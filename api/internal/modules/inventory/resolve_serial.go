@@ -34,6 +34,7 @@ type resolveScanStatus string
 const (
 	resolveScanAccepted       resolveScanStatus = "accepted"
 	resolveScanNotFound       resolveScanStatus = "not_found"
+	resolveScanNotReceived    resolveScanStatus = "not_received"
 	resolveScanUnavailable    resolveScanStatus = "unavailable"
 	resolveScanWrongItem      resolveScanStatus = "wrong_item"
 	resolveScanWrongLocation  resolveScanStatus = "wrong_location"
@@ -41,12 +42,23 @@ const (
 	resolveScanEmpty          resolveScanStatus = "empty"
 )
 
+const (
+	msgSerialNotFound      = "Serial not found."
+	msgSerialNotReceivedPO = "Serial is on a purchase order but not in stock. Complete Purchase Receive, then scan again."
+	msgSerialNotReceivedGR = "Serial was scanned on a draft receive but is not in stock yet. Confirm Purchase Receive, then scan again."
+)
+
+// isStockConsumingResolveContext is true for flows that require ledger units in stock.
+func isStockConsumingResolveContext(context string) bool {
+	return context == "sale" || context == "pos" || context == "release"
+}
+
 type resolveScanBatchResult struct {
-	ClientScanID string               `json:"client_scan_id,omitempty"`
-	SerialNo     string               `json:"serial_no"`
-	Status       resolveScanStatus    `json:"status"`
-	Message      string               `json:"message,omitempty"`
-	Unit         *resolvedSerialUnit  `json:"unit,omitempty"`
+	ClientScanID string              `json:"client_scan_id,omitempty"`
+	SerialNo     string              `json:"serial_no"`
+	Status       resolveScanStatus   `json:"status"`
+	Message      string              `json:"message,omitempty"`
+	Unit         *resolvedSerialUnit `json:"unit,omitempty"`
 }
 
 func normalizeResolveSerialNo(s string) string {
@@ -146,6 +158,84 @@ func enrichResolvedUnits(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 	})
 }
 
+// classifyLedgerMiss maps a missing ledger unit to not_found vs not_received.
+// Never returns a Unit — planned/draft serials are not sellable.
+func classifyLedgerMiss(serialNo string, context string, plannedOnPO, onDraftGR bool) resolveScanBatchResult {
+	res := resolveScanBatchResult{SerialNo: serialNo}
+	if isStockConsumingResolveContext(context) {
+		if onDraftGR {
+			res.Status = resolveScanNotReceived
+			res.Message = msgSerialNotReceivedGR
+			return res
+		}
+		if plannedOnPO {
+			res.Status = resolveScanNotReceived
+			res.Message = msgSerialNotReceivedPO
+			return res
+		}
+	}
+	res.Status = resolveScanNotFound
+	res.Message = msgSerialNotFound
+	return res
+}
+
+func serialPlannedOnOpenPO(ctx context.Context, pool *pgxpool.Pool, tenantID int64, serialNo string) (bool, error) {
+	if pool == nil {
+		return false, nil
+	}
+	var exists bool
+	err := pool.QueryRow(ctx, `
+		select exists(
+		  select 1
+		  from public.po_purchase_order_lines ln
+		  join public.po_purchase_orders po on po.id = ln.purchase_order_id
+		  where po.tenant_id = $1
+		    and po.deleted_at is null
+		    and po.status <> 'cancelled'
+		    and exists (
+		      select 1 from unnest(coalesce(ln.planned_serial_nos, '{}')) p
+		      where lower(trim(p)) = lower($2)
+		    )
+		)`, tenantID, serialNo).Scan(&exists)
+	return exists, err
+}
+
+func serialOnDraftGoodsReceipt(ctx context.Context, pool *pgxpool.Pool, tenantID int64, serialNo string) (bool, error) {
+	if pool == nil {
+		return false, nil
+	}
+	var exists bool
+	err := pool.QueryRow(ctx, `
+		select exists(
+		  select 1
+		  from public.gr_goods_receipt_serials gs
+		  join public.gr_goods_receipt_lines grl on grl.id = gs.goods_receipt_line_id
+		  join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
+		  where gr.tenant_id = $1
+		    and gr.status = 'draft'
+		    and lower(trim(gs.serial_no)) = lower($2)
+		)`, tenantID, serialNo).Scan(&exists)
+	return exists, err
+}
+
+func resolveLedgerMiss(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID int64,
+	serialNo string,
+	context string,
+) resolveScanBatchResult {
+	plannedOnPO, errPO := serialPlannedOnOpenPO(ctx, pool, tenantID, serialNo)
+	if errPO != nil {
+		return resolveScanBatchResult{SerialNo: serialNo, Status: resolveScanNotFound, Message: msgSerialNotFound}
+	}
+	onDraftGR, errGR := serialOnDraftGoodsReceipt(ctx, pool, tenantID, serialNo)
+	if errGR != nil {
+		return resolveScanBatchResult{SerialNo: serialNo, Status: resolveScanNotFound, Message: msgSerialNotFound}
+	}
+	return classifyLedgerMiss(serialNo, context, plannedOnPO, onDraftGR)
+}
+
 func resolveOneSerial(
 	ctx context.Context,
 	pool *pgxpool.Pool,
@@ -182,12 +272,10 @@ func resolveOneSerial(
 					return res
 				}
 			}
-			res.Status = resolveScanNotFound
-			res.Message = "Serial not found."
-			return res
+			return resolveLedgerMiss(ctx, pool, tenantID, sn, context)
 		}
 		res.Status = resolveScanNotFound
-		res.Message = "Serial not found."
+		res.Message = msgSerialNotFound
 		return res
 	}
 

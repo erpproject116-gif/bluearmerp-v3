@@ -71,6 +71,21 @@ export const helpArticleAliases: Record<string, HelpArticleAlias> = {
     ],
     errorPhrases: ["serial count does not match", "serial count must equal"],
   },
+  "serial-not-found-sale": {
+    questions: [
+      "serial on PO but not found on sales",
+      "scan serial new sales not found",
+      "serial number not found despite purchase order",
+      "serial registered on PO cannot sell",
+    ],
+    errorPhrases: [
+      "Serial not found.",
+      "isn't in stock or isn't registered",
+      "not in stock. Complete Purchase Receive",
+      "on a purchase order but not in stock",
+      "Complete Purchase Receive, then scan again",
+    ],
+  },
   "official-receipt-after-si": {
     questions: [
       "how to collect payment",

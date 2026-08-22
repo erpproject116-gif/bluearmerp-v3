@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { A, useNavigate, useParams } from "@solidjs/router";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { LookupCombo } from "../../shared/LookupCombo";
@@ -14,6 +14,7 @@ import {
   canPreviewSupportTicketAttachment,
   downloadSupportTicketAttachment,
   formatTicketFileSize,
+  getSupportTicketAttachmentObjectUrl,
   listSupportTicketAttachments,
   previewSupportTicketAttachment,
   uploadSupportTicketAttachment,
@@ -24,9 +25,85 @@ import { canManageAllSupportTickets, useAuth } from "../../shared/auth-context";
 import { SupportLayout } from "./SupportLayout";
 import { fetchRepairOrders, fetchSupportUsers, fetchWarrantyAssets } from "./supportLookups";
 import { LoadingText } from "../../shared/LoadingText";
+import { RichTextEditor, type PasteImageResult } from "../comms/RichTextEditor";
 
 const STATUS_OPTIONS: TicketStatus[] = ["open", "in_progress", "waiting", "resolved", "closed"];
 const PRIORITY_OPTIONS: TicketPriority[] = ["low", "normal", "high", "urgent"];
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
+function isEmptyHtml(html: string): boolean {
+  if (/<img\b/i.test(html)) return false;
+  const text = html
+    .replace(/<br\s*\/?>/gi, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .trim();
+  return text.length === 0;
+}
+
+function looksLikeHtml(s: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(s);
+}
+
+/** Drop ephemeral blob/data URLs; keep data-ticket-attachment-id for reload. */
+function persistableCommentHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(`<div id="root">${html}</div>`, "text/html");
+  const wrap = doc.getElementById("root");
+  if (!wrap) return html;
+  wrap.querySelectorAll("img[data-ticket-attachment-id]").forEach((img) => {
+    const src = img.getAttribute("src") ?? "";
+    if (src.startsWith("blob:") || src.startsWith("data:")) {
+      img.setAttribute("src", "");
+    }
+  });
+  return wrap.innerHTML;
+}
+
+function screenshotFileName(file: File): string {
+  const mime = file.type || "image/png";
+  const ext = (mime.split("/")[1] || "png").replace("jpeg", "jpg");
+  if (file.name && file.name !== "image.png" && file.name !== "image.jpg") return file.name;
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `screenshot-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.${ext}`;
+}
+
+function TicketCommentHtml(props: { ticketId: number; html: string }) {
+  const [root, setRoot] = createSignal<HTMLDivElement>();
+  const objectUrls: string[] = [];
+
+  const revokeAll = () => {
+    for (const u of objectUrls) URL.revokeObjectURL(u);
+    objectUrls.length = 0;
+  };
+
+  createEffect(() => {
+    const el = root();
+    const html = props.html;
+    const ticketId = props.ticketId;
+    if (!el) return;
+    revokeAll();
+    el.innerHTML = html;
+    const imgs = [...el.querySelectorAll<HTMLImageElement>("img[data-ticket-attachment-id]")];
+    void Promise.all(
+      imgs.map(async (img) => {
+        const aid = Number(img.getAttribute("data-ticket-attachment-id"));
+        if (!aid) return;
+        const url = await getSupportTicketAttachmentObjectUrl(ticketId, {
+          id: aid,
+          mime_type: "image/*",
+        });
+        if (!url) return;
+        objectUrls.push(url);
+        img.src = url;
+      }),
+    );
+  });
+
+  onCleanup(revokeAll);
+
+  return <div ref={setRoot} class="ticket-comment-body mt-1 text-sm text-text-primary" />;
+}
 
 export default function TicketDetailPage() {
   const params = useParams();
@@ -39,6 +116,7 @@ export default function TicketDetailPage() {
 
   const [comment, setComment] = createSignal("");
   const [saving, setSaving] = createSignal(false);
+  const [pastingImage, setPastingImage] = createSignal(false);
   const [editing, setEditing] = createSignal(false);
   const [editSubject, setEditSubject] = createSignal("");
   const [editDescription, setEditDescription] = createSignal("");
@@ -118,10 +196,10 @@ export default function TicketDetailPage() {
 
   const postComment = async () => {
     const id = ticketId();
-    const text = comment().trim();
-    if (!id || !text) return;
+    const html = comment();
+    if (!id || isEmptyHtml(html)) return;
     setSaving(true);
-    const res = await addTicketComment(id, text);
+    const res = await addTicketComment(id, persistableCommentHtml(html.trim()));
     setSaving(false);
     if (!res.success) {
       toast.warning(res.message ?? "Could not add comment.");
@@ -129,6 +207,38 @@ export default function TicketDetailPage() {
     }
     setComment("");
     await invalidate(res.data);
+  };
+
+  const handlePasteImage = async (file: File): Promise<PasteImageResult | null> => {
+    const id = ticketId();
+    if (!id) return null;
+    const remaining = MAX_ATTACHMENT_BYTES - attachmentBytesUsed();
+    if (file.size > remaining) {
+      toast.warning(
+        remaining <= 0
+          ? "Ticket already has 25 MB of attachments."
+          : `Screenshot is too large. ${formatTicketFileSize(remaining)} remaining under the 25 MB limit.`,
+      );
+      return null;
+    }
+    const named =
+      file.name && file.name !== "image.png" && file.name !== "image.jpg"
+        ? file
+        : new File([file], screenshotFileName(file), { type: file.type || "image/png" });
+    setPastingImage(true);
+    const res = await uploadSupportTicketAttachment(id, named);
+    setPastingImage(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Could not attach screenshot.");
+      return null;
+    }
+    await loadAttachments(id);
+    const src = URL.createObjectURL(file);
+    return {
+      src,
+      alt: res.data.file_name,
+      attrs: { "data-ticket-attachment-id": String(res.data.id) },
+    };
   };
 
   return (
@@ -325,7 +435,12 @@ export default function TicketDetailPage() {
                       <p class="text-xs text-text-secondary">
                         {c.author_name} · {c.created_at}
                       </p>
-                      <p class="mt-1 text-sm whitespace-pre-wrap">{c.body}</p>
+                      <Show
+                        when={looksLikeHtml(c.body)}
+                        fallback={<p class="mt-1 text-sm whitespace-pre-wrap">{c.body}</p>}
+                      >
+                        <TicketCommentHtml ticketId={ticketId()!} html={c.body} />
+                      </Show>
                     </div>
                   )}
                 </For>
@@ -333,20 +448,31 @@ export default function TicketDetailPage() {
                   <p class="text-sm text-text-secondary">No comments yet.</p>
                 </Show>
               </div>
+              <style>{`
+                .ticket-comment-body p { margin: 0 0 0.75em; }
+                .ticket-comment-body ul, .ticket-comment-body ol { margin: 0 0 0.75em; padding-left: 1.25rem; }
+                .ticket-comment-body li { margin: 0.15em 0; }
+                .ticket-comment-body p:last-child { margin-bottom: 0; }
+                .ticket-comment-body a { color: var(--color-brand-600, #2563eb); text-decoration: underline; }
+                .ticket-comment-body img { max-width: 100%; height: auto; border-radius: 6px; margin: 8px 0; display: block; }
+              `}</style>
 
               <Show when={canInteract()}>
                 <div class="mt-4">
-                  <textarea
-                    class={inputClass}
-                    rows={3}
-                    placeholder="Add a comment…"
+                  <RichTextEditor
                     value={comment()}
-                    onInput={(e) => setComment(e.currentTarget.value)}
+                    onChange={setComment}
+                    onPasteImage={handlePasteImage}
+                    placeholder="Add a comment… (paste a screenshot to attach)"
+                    minHeightClass="min-h-[100px]"
                   />
+                  <Show when={pastingImage()}>
+                    <p class="mt-1 text-xs text-text-secondary">Uploading screenshot…</p>
+                  </Show>
                   <button
                     type="button"
                     class="mt-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    disabled={saving() || !comment().trim()}
+                    disabled={saving() || pastingImage() || isEmptyHtml(comment())}
                     onClick={() => void postComment()}
                   >
                     Post comment

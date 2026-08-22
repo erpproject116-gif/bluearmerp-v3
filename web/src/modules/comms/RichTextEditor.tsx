@@ -1,5 +1,12 @@
 import { createEffect, on, type JSX } from "solid-js";
 
+export type PasteImageResult = {
+  src: string;
+  alt?: string;
+  /** Extra attributes on the img (e.g. data-ticket-attachment-id). */
+  attrs?: Record<string, string>;
+};
+
 export type RichTextEditorProps = {
   /** External HTML to load (set when opening compose / loading signature). Not reapplied while typing. */
   value: string;
@@ -7,7 +14,16 @@ export type RichTextEditorProps = {
   placeholder?: string;
   minHeightClass?: string;
   class?: string;
+  /**
+   * When set, image files on paste are uploaded/handled by the parent.
+   * Return insert info, or null to skip that file.
+   */
+  onPasteImage?: (file: File) => Promise<PasteImageResult | null>;
 };
+
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
 
 /** Lightweight contenteditable editor (Gmail-like toolbar, no extra deps). */
 export function RichTextEditor(props: RichTextEditorProps) {
@@ -45,7 +61,52 @@ export function RichTextEditor(props: RichTextEditorProps) {
     emit();
   };
 
+  const insertImage = (result: PasteImageResult) => {
+    editor?.focus();
+    const alt = result.alt ?? "image";
+    const extra = Object.entries(result.attrs ?? {})
+      .map(([k, v]) => `${k}="${escapeAttr(v)}"`)
+      .join(" ");
+    const html = `<img src="${escapeAttr(result.src)}" alt="${escapeAttr(alt)}" ${extra} style="max-width:100%;height:auto;border-radius:6px;margin:8px 0;" />`;
+    document.execCommand("insertHTML", false, html);
+  };
+
+  const clipboardImageFiles = (data: DataTransfer | null): File[] => {
+    if (!data) return [];
+    const out: File[] = [];
+    const items = data.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) out.push(f);
+        }
+      }
+    }
+    if (out.length === 0 && data.files?.length) {
+      for (let i = 0; i < data.files.length; i++) {
+        const f = data.files[i];
+        if (f.type.startsWith("image/")) out.push(f);
+      }
+    }
+    return out;
+  };
+
   const onPaste: JSX.EventHandlerUnion<HTMLDivElement, ClipboardEvent> = (e) => {
+    const images = props.onPasteImage ? clipboardImageFiles(e.clipboardData) : [];
+    if (images.length > 0 && props.onPasteImage) {
+      e.preventDefault();
+      const handler = props.onPasteImage;
+      void (async () => {
+        for (const file of images) {
+          const result = await handler(file);
+          if (result) insertImage(result);
+        }
+        emit();
+      })();
+      return;
+    }
     e.preventDefault();
     const text = e.clipboardData?.getData("text/plain") ?? "";
     document.execCommand("insertText", false, text);
@@ -139,6 +200,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
           .email-rte ul, .email-rte ol { margin: 0 0 0.75em; padding-left: 1.25rem; }
           .email-rte li { margin: 0.15em 0; }
           .email-rte p:last-child { margin-bottom: 0; }
+          .email-rte img { max-width: 100%; height: auto; border-radius: 6px; margin: 8px 0; }
         `}</style>
       </div>
     </div>

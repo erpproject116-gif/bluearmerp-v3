@@ -47,6 +47,9 @@ func resolveSerialScan(pool *pgxpool.Pool) http.HandlerFunc {
 		case resolveScanNotFound:
 			response.Err(w, http.StatusNotFound, res.Message, "ERR_NOT_FOUND")
 			return
+		case resolveScanNotReceived:
+			response.Err(w, http.StatusConflict, res.Message, "ERR_SERIAL_NOT_RECEIVED")
+			return
 		case resolveScanWrongLocation:
 			response.Err(w, http.StatusConflict, res.Message, "ERR_SERIAL_WRONG_LOCATION")
 			return
@@ -66,7 +69,7 @@ func resolveSerialScan(pool *pgxpool.Pool) http.HandlerFunc {
 		if res.Unit == nil {
 			_, err := lookupResolvedSerial(ctx, pool, tu.TenantID, normalizeResolveSerialNo(serialNo), body.LocationID)
 			if err == pgx.ErrNoRows {
-				response.Err(w, http.StatusNotFound, "Serial not found.", "ERR_NOT_FOUND")
+				response.Err(w, http.StatusNotFound, msgSerialNotFound, "ERR_NOT_FOUND")
 				return
 			}
 		}

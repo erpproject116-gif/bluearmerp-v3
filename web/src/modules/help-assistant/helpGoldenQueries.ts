@@ -23,6 +23,8 @@ export const HELP_GOLDEN_QUERIES: HelpGoldenQuery[] = [
   { query: "process policy gates GR before supplier invoice", path: "/app/user-management/process-policies", expectArticleId: "process-policy-gates-explained" },
   { query: "transactions blocked until foundation setup", path: "/app/setup", expectArticleId: "foundation-setup-blocked-api" },
   { query: "serial count does not match quantity", path: "/app/purchases/purchase-receive/new", expectArticleId: "serial-count-mismatch" },
+  { query: "Serial not found.", path: "/app/sales", expectArticleId: "serial-not-found-sale" },
+  { query: "serial on PO but not found on sales", path: "/app/sales", expectArticleId: "serial-not-found-sale" },
   { query: "official receipt after sales invoice", path: "/app/finance/official-receipts", expectArticleId: "official-receipt-after-si" },
   { query: "payment voucher after supplier invoice", path: "/app/finance/payment-vouchers", expectArticleId: "payment-voucher-after-purchase" },
   { query: "import chart of accounts philippines", path: "/app/finance/acct-i/chart-of-accounts", expectArticleId: "chart-of-accounts-ph-template" },

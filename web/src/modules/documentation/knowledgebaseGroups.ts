@@ -114,6 +114,7 @@ export const knowledgebaseGroups: KbGroup[] = [
       "issue-stock-from-branch",
       "serial-barcode-scanning",
       "serial-count-mismatch",
+      "serial-not-found-sale",
       "serial-lot-registry",
       "item-serial-lot-tab",
       "find-inventory-record-history",

@@ -46,7 +46,7 @@ export async function uploadSupportTicketAttachment(
 
 async function fetchAttachmentBlob(
   ticketId: number,
-  attachment: SupportTicketAttachment,
+  attachment: Pick<SupportTicketAttachment, "id">,
 ): Promise<Blob | null> {
   const res = await fetch(
     `${apiBase}/api/v1/support/tickets/${ticketId}/attachments/${attachment.id}/download`,
@@ -54,6 +54,18 @@ async function fetchAttachmentBlob(
   );
   if (!res.ok) return null;
   return res.blob();
+}
+
+/** Object URL for inline preview; caller must revoke when done. */
+export async function getSupportTicketAttachmentObjectUrl(
+  ticketId: number,
+  attachment: Pick<SupportTicketAttachment, "id" | "mime_type">,
+): Promise<string | null> {
+  const blob = await fetchAttachmentBlob(ticketId, attachment);
+  if (!blob) return null;
+  const mime = attachment.mime_type || blob.type || "application/octet-stream";
+  const typed = blob.type === mime ? blob : new Blob([blob], { type: mime });
+  return URL.createObjectURL(typed);
 }
 
 export async function downloadSupportTicketAttachment(
