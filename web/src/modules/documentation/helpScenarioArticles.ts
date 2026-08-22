@@ -244,6 +244,48 @@ export const helpScenarioArticles: KbArticle[] = [
     relatedGuideIds: ["serial-barcode-scanning", "goods-receipt-serial-receive", "pos-checkout-guide"],
   },
   {
+    id: "serial-not-found-sale",
+    title: "Serial not found on New Sales (PO only is not enough)",
+    scenario:
+      "You scan or type a serial on New Sales / sales invoice and see “Serial not found,” even though the same serial is already listed on a Purchase Order.",
+    intro:
+      "Sales only accepts serials that exist in Inventory → Serials as in stock (or reserved). A serial on a PO is planning data until you post Purchase Receive. Being on the PO alone cannot populate or sell the unit.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Inventory → Serials and search the serial. If it is missing, it was never received into stock.",
+          "Open Buy → Purchase Receive. Load Slip from the purchase order (or open the matching draft receive).",
+          "Set qty, scan the serial on the Track serial line until the accepted count matches qty, then confirm.",
+          "Confirm Serials now shows the unit with status in stock at the sale location.",
+          "Return to New Sales: use Scan serial (document bar or SERIAL / LOT cell). The line should auto-fill and show 1 / 1 (or matching qty).",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Goods Receive / Purchase Receive is the step that creates sellable serials — it is not another place this sales toast “also fails.” If the toast says the serial is on a PO but not in stock, finish receive first; do not re-register the same serial on the PO.",
+      },
+    ],
+    primaryHref: "/app/purchases/purchase-receive",
+    primaryLabel: "Purchase Receive",
+    relatedGuideIds: ["goods-receipt-serial-receive", "serial-barcode-scanning", "serial-lot-registry"],
+    questions: [
+      "serial on PO but not found on sales",
+      "scan serial new sales not found",
+      "serial number not found despite purchase order",
+      "serial registered on PO cannot sell",
+      "BA serial not found new sales",
+    ],
+    errorPhrases: [
+      "Serial not found.",
+      "isn't in stock or isn't registered",
+      "not in stock. Complete Purchase Receive",
+      "on a purchase order but not in stock",
+      "scanned on a draft receive but is not in stock",
+      "Complete Purchase Receive, then scan again",
+    ],
+  },
+  {
     id: "official-receipt-after-si",
     title: "Official receipt (Cash In) after sales invoice",
     scenario: "You saved a sales invoice and need to record customer payment / official receipt.",
