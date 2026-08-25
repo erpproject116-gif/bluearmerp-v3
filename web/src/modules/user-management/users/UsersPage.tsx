@@ -119,13 +119,6 @@ export default function UsersPage() {
     setInviteOpen(true);
   };
 
-  const openReInvite = (row: TenantUserRow) => {
-    setInviteEmail(row.email);
-    setInviteName(row.full_name ?? "");
-    setInviteRole(row.tenant_role || "member");
-    setInviteOpen(true);
-  };
-
   const openEdit = async (row: TenantUserRow) => {
     setEditing(row);
     setEditName(row.full_name ?? "");
