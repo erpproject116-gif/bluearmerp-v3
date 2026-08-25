@@ -170,7 +170,7 @@ export async function apiFetch<T>(
       success: false,
       message:
         res.status === 404
-          ? "API endpoint not found. The backend may need a deploy (merge staging → main)."
+          ? "API endpoint not found. Redeploy the Go API on Alibaba ECS (api.bluearmerp.com) with the latest code."
           : res.statusText || `Request failed (${res.status}).`,
       code: res.status === 404 ? "ERR_NOT_FOUND" : "ERR_BAD_RESPONSE",
     };
