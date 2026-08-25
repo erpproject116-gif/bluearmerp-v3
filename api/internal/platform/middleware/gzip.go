@@ -9,10 +9,21 @@ import (
 
 const gzipMinBytes = 8 << 10
 
+// captureWriter buffers the body and owns a separate header map.
+// Embedding ResponseWriter alone makes Header() return the outer map, so copying
+// with Add() would duplicate CORS and Content-Type headers already set upstream.
 type captureWriter struct {
 	http.ResponseWriter
+	h      http.Header
 	status int
 	buf    bytes.Buffer
+}
+
+func (c *captureWriter) Header() http.Header {
+	if c.h == nil {
+		c.h = make(http.Header)
+	}
+	return c.h
 }
 
 func (c *captureWriter) Write(b []byte) (int, error) {
@@ -21,6 +32,18 @@ func (c *captureWriter) Write(b []byte) (int, error) {
 
 func (c *captureWriter) WriteHeader(statusCode int) {
 	c.status = statusCode
+}
+
+func flushCapturedHeaders(dst http.ResponseWriter, src http.Header) {
+	for k, vals := range src {
+		for i, v := range vals {
+			if i == 0 {
+				dst.Header().Set(k, v)
+			} else {
+				dst.Header().Add(k, v)
+			}
+		}
+	}
 }
 
 // SelectiveGzip buffers the response and compresses when body >= 8KB.
@@ -46,23 +69,14 @@ func SelectiveGzip(enabled bool) func(http.Handler) http.Handler {
 			if cw.status == 0 {
 				cw.status = http.StatusOK
 			}
+			flushCapturedHeaders(w, cw.Header())
 			if len(body) < gzipMinBytes {
-				for k, vals := range cw.Header() {
-					for _, v := range vals {
-						w.Header().Add(k, v)
-					}
-				}
 				w.WriteHeader(cw.status)
 				_, _ = w.Write(body)
 				return
 			}
-			for k, vals := range cw.Header() {
-				for _, v := range vals {
-					w.Header().Add(k, v)
-				}
-			}
 			w.Header().Set("Content-Encoding", "gzip")
-			w.Header().Set("Vary", "Accept-Encoding")
+			w.Header().Add("Vary", "Accept-Encoding")
 			w.WriteHeader(cw.status)
 			gz := gzip.NewWriter(w)
 			_, _ = gz.Write(body)

@@ -88,9 +88,7 @@ func (c Config) corsAllowOrigin(origin string) bool {
 
 // CORSOptions returns chi CORS middleware settings for the API router.
 func (c Config) CORSOptions() cors.Options {
-	allowed := c.CORSOrigins()
 	return cors.Options{
-		AllowedOrigins: allowed,
 		AllowOriginFunc: func(_ *http.Request, origin string) bool {
 			return c.corsAllowOrigin(origin)
 		},
