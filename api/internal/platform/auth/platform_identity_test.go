@@ -21,6 +21,13 @@ func TestTenantUserHasPlatformPermission(t *testing.T) {
 	}
 }
 
+func TestHasPlatformPermissionProductOwnerEmail(t *testing.T) {
+	tu := TenantUser{Email: "bluearmph@gmail.com"}
+	if !tu.HasPlatformPermission("platform.staff.manage") {
+		t.Fatal("bluearmph superadmin email should have all platform permissions")
+	}
+}
+
 func TestCanAccessPlatformCommand(t *testing.T) {
 	tu := TenantUser{PlatformPermissions: map[string]bool{"platform.command.read": true}}
 	if !tu.CanAccessPlatformCommand() {
@@ -29,5 +36,9 @@ func TestCanAccessPlatformCommand(t *testing.T) {
 	tu2 := TenantUser{}
 	if tu2.CanAccessPlatformCommand() {
 		t.Fatal("empty user should not access command")
+	}
+	tu3 := TenantUser{Email: "bluearmph@gmail.com"}
+	if !tu3.CanAccessPlatformCommand() {
+		t.Fatal("bluearmph superadmin email should access command without a platform_users row")
 	}
 }

@@ -305,7 +305,7 @@ func traceSerialUnit(pool *pgxpool.Pool) http.HandlerFunc {
 			left join public.inv_partners p on p.id = su.partner_id
 			left join public.po_purchase_order_lines pol on pol.id = su.purchase_order_line_id
 			left join public.po_purchase_orders po on po.id = pol.purchase_order_id
-			where su.tenant_id = $1 and su.serial_no = $2
+			where su.tenant_id = $1 and lower(btrim(su.serial_no)) = lower(btrim($2::text))
 			order by su.id desc limit 1`, tu.TenantID, serialNo).Scan(
 			&unit.ID, &unit.SerialNo, &unit.ItemID, &unit.ItemCode, &unit.ItemName, &unit.Status,
 			&unit.LocationID, &unit.LocationName, &unit.PartnerID, &unit.PartnerName,

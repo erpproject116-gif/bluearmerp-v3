@@ -41,6 +41,7 @@ type MePayload struct {
 func fullModuleAccess(tu TenantUser) bool {
 	// Platform operators and tenants with auto_enable_all_modules see every module as on.
 	// Tenant owners otherwise respect tenant_modules so Simple store / feature hide works for admins too.
+	applyBootstrapOwnerFlags(&tu)
 	return tu.IsPlatformSuperadmin || tu.AutoEnableAllModules
 }
 
@@ -62,6 +63,7 @@ func MeHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 }
 
 func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.Config) (MePayload, error) {
+	applyBootstrapOwnerFlags(&tu)
 	if tu.PlatformOnly || tu.TenantID <= 0 {
 		return buildPlatformOnlyMe(tu), nil
 	}
@@ -197,6 +199,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 }
 
 func buildPlatformOnlyMe(tu TenantUser) MePayload {
+	applyBootstrapOwnerFlags(&tu)
 	return MePayload{
 		User: map[string]any{
 			"id":                          tu.AppUserID,

@@ -28,6 +28,8 @@ begin
     raise exception 'link-platform-owners: BLUEARM tenant missing — run scripts/seed-platform-owners.sql first.';
   end if;
 
+  perform public.seed_tenant_defaults(v_tenant_id);
+
   for r in
     select *
     from (
@@ -68,6 +70,7 @@ begin
         r.display_name
       ),
       status = 'active',
+      tenant_role = 'store_admin',
       updated_at = now()
     from auth.users au
     where au.id = v_auth_id
@@ -104,12 +107,21 @@ begin
       is_active = true;
 
     if lower(r.gmail) = 'bluearmph@gmail.com' then
+      update public.users u
+      set tenant_role = 'store_admin',
+          status = 'active',
+          updated_at = now()
+      where u.auth_user_id = v_auth_id
+        and lower(u.email) = lower(r.gmail)
+        and u.tenant_role is distinct from 'store_admin';
+
       update public.tenants t
       set owner_user_id = u.id, updated_at = now()
       from public.users u
-      where t.company_code = 'BLUEARM'
-        and u.tenant_id = t.id
+      where u.auth_user_id = v_auth_id
         and lower(u.email) = lower(r.gmail)
+        and u.status = 'active'
+        and t.id = u.tenant_id
         and t.owner_user_id is distinct from u.id;
     end if;
 

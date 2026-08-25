@@ -69,39 +69,41 @@ export type MeData = {
   };
 };
 
-/** @deprecated Prefer server-returned can_access_platform_command / platform_permissions. */
+/** Platform superadmins — same Command Center + unrestricted ERP as itsjohnranel.
+ *  bluearmph@gmail.com is also a store owner of the signed-in business. */
 export const PLATFORM_CONSOLE_EMAILS = new Set([
   "itsjohnranel@gmail.com",
   "bluearmph@gmail.com",
   "erpproject116@gmail.com",
 ]);
 
+function isProductOwnerEmail(email?: string): boolean {
+  return PLATFORM_CONSOLE_EMAILS.has(email?.trim().toLowerCase() ?? "");
+}
+
 export function canAccessPlatformConsole(me: MeData | null | undefined): boolean {
   if (!me?.user) return false;
+  if (isProductOwnerEmail(me.user.email) || me.user.is_platform_superadmin) return true;
   if (me.user.can_access_platform_command) return true;
   if (me.user.platform_permissions && Object.keys(me.user.platform_permissions).length > 0) {
     return Boolean(
       me.user.platform_permissions["platform.command.read"] ||
-        me.user.platform_permissions["platform.customers.read"] ||
-        me.user.is_platform_superadmin,
+        me.user.platform_permissions["platform.customers.read"],
     );
   }
-  // Bootstrap fallback until migration 179 is applied everywhere.
-  if (!me.user.is_platform_superadmin) return false;
-  const email = me.user.email?.trim().toLowerCase() ?? "";
-  return PLATFORM_CONSOLE_EMAILS.has(email);
+  return false;
 }
 
 export function hasPlatformPermission(me: MeData | null | undefined, code: string): boolean {
   if (!me?.user) return false;
-  if (me.user.is_platform_superadmin) return true;
+  if (me.user.is_platform_superadmin || isProductOwnerEmail(me.user.email)) return true;
   return Boolean(me.user.platform_permissions?.[code]);
 }
 
 export function canManageFormSettings(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  return Boolean(u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin);
+  return Boolean(u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || isProductOwnerEmail(u.email));
 }
 
 export function canManageBranding(me: MeData | null | undefined): boolean {
@@ -109,23 +111,24 @@ export function canManageBranding(me: MeData | null | undefined): boolean {
   const u = me.user;
   return Boolean(
     u.can_manage_branding ??
-      (u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin),
+      (u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || isProductOwnerEmail(u.email)),
   );
 }
 
 export function canManageUsers(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
+  if (u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email)) return true;
   if (u.permissions && Object.keys(u.permissions).length > 0) {
     return hasPermission(me, "user_management.users", "write");
   }
-  return Boolean(u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner);
+  return Boolean(u.can_manage_users);
 }
 
 export function canViewActivityLogs(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  if (u.is_platform_superadmin || u.is_tenant_owner) return true;
+  if (u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email)) return true;
   if (u.permissions && Object.keys(u.permissions).length > 0) {
     return hasPermission(me, "activity_logs.logs", "read");
   }
@@ -135,7 +138,7 @@ export function canViewActivityLogs(me: MeData | null | undefined): boolean {
 export function canViewChangeLogs(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  if (u.is_platform_superadmin || u.is_tenant_owner) return true;
+  if (u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email)) return true;
   if (u.permissions && Object.keys(u.permissions).length > 0) {
     return (
       hasPermission(me, "activity_logs.changes", "read") || hasPermission(me, "activity_logs.logs", "read")
@@ -147,7 +150,7 @@ export function canViewChangeLogs(me: MeData | null | undefined): boolean {
 export function canViewCrm(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  return Boolean(u.can_view_crm || u.is_platform_superadmin || u.is_tenant_owner);
+  return Boolean(u.can_view_crm || u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email));
 }
 
 /** Same gate as the notifications inbox page (CrmRoute + ModuleAccessGate). */
@@ -163,21 +166,21 @@ export function canManageCrmRules(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
   return Boolean(
-    u.can_manage_crm_rules || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin,
+    u.can_manage_crm_rules || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || isProductOwnerEmail(u.email),
   );
 }
 
 export function canViewAllCrm(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  return Boolean(u.can_view_all_crm || u.is_platform_superadmin || u.is_tenant_owner);
+  return Boolean(u.can_view_all_crm || u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email));
 }
 
 export function canManageSalesTeam(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
   return Boolean(
-    u.can_manage_sales_team || u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner,
+    u.can_manage_sales_team || u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email),
   );
 }
 
@@ -187,7 +190,7 @@ export function canViewCrmAnalytics(me: MeData | null | undefined): boolean {
   if (u.permissions && Object.keys(u.permissions).length > 0) {
     return hasPermission(me, "crm.reports_customer_quotations", "read");
   }
-  return Boolean(u.can_view_crm_analytics || u.is_platform_superadmin || u.is_tenant_owner);
+  return Boolean(u.can_view_crm_analytics || u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email));
 }
 
 /** IT desk / superadmin — may view and manage every support ticket in the tenant. */
@@ -198,6 +201,8 @@ export function canManageAllSupportTickets(me: MeData | null | undefined): boole
     u.can_manage_all_support_tickets ||
       u.is_platform_superadmin ||
       u.is_tenant_owner ||
+      u.is_store_admin ||
+      isProductOwnerEmail(u.email) ||
       hasPermission(me, "support.tickets_assign", "write"),
   );
 }
@@ -207,7 +212,7 @@ export type AccessLevel = "deny" | "read" | "write";
 export function permissionLevel(me: MeData | null | undefined, code: string): AccessLevel {
   const u = me?.user;
   if (!u) return "deny";
-  if (u.is_platform_superadmin || u.is_tenant_owner) return "write";
+  if (u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email)) return "write";
   const perms = u.permissions;
   if (perms && Object.keys(perms).length > 0) {
     if (perms[code]) return perms[code] as AccessLevel;

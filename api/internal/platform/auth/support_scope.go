@@ -3,7 +3,7 @@ package auth
 // CanManageAllSupportTickets reports whether the user may view and manage every tenant ticket.
 // IT desk staff are granted support.tickets_assign write; platform superadmins and tenant owners bypass.
 func (tu TenantUser) CanManageAllSupportTickets() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() || tu.IsStoreAdmin {
 		return true
 	}
 	return tu.HasPermission("support.tickets_assign", AccessWrite)

@@ -18,7 +18,7 @@ const (
 
 // PermissionLevel returns the effective access level for a permission code.
 func (tu TenantUser) PermissionLevel(code string) string {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return AccessWrite
 	}
 	if tu.permissions == nil {
@@ -51,7 +51,7 @@ func (tu TenantUser) HasPermission(code, minLevel string) bool {
 
 // HasModuleRead reports read access to any feature in a module or the module itself.
 func (tu TenantUser) HasModuleRead(moduleCode string) bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.HasPermission(moduleCode, AccessRead) {
@@ -69,7 +69,7 @@ func (tu TenantUser) HasModuleRead(moduleCode string) bool {
 }
 
 func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *TenantUser) error {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return nil
 	}
 	perms := map[string]string{}
@@ -213,7 +213,7 @@ func (tu TenantUser) legacyModuleRead(moduleCode string) bool {
 
 // PermissionsMap returns a copy of effective permissions for /auth/me.
 func (tu TenantUser) PermissionsMap() map[string]string {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return nil
 	}
 	if tu.permissions == nil {
@@ -235,7 +235,7 @@ func RequireSubmit(code string) func(http.Handler) http.Handler {
 				response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 				return
 			}
-			if tu.IsPlatformSuperadmin || tu.IsTenantOwner || tu.HasSubmit(code) {
+			if tu.hasOwnerCapability() || tu.HasSubmit(code) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -250,7 +250,7 @@ func RequireSubmit(code string) func(http.Handler) http.Handler {
 
 // HasSubmit reports submit action on a permission code.
 func (tu TenantUser) HasSubmit(code string) bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.submitPerms == nil {

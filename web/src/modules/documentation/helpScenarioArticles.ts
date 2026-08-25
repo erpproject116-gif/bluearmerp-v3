@@ -249,12 +249,12 @@ export const helpScenarioArticles: KbArticle[] = [
     scenario:
       "You scan or type a serial on New Sales / sales invoice and see “Serial not found,” even though the same serial is already listed on a Purchase Order.",
     intro:
-      "Sales only accepts serials that exist in Inventory → Serials as in stock (or reserved). A serial on a PO is planning data until you post Purchase Receive. Being on the PO alone cannot populate or sell the unit.",
+      "Sales only accepts serials that exist in Inventory → Serials as in stock (or reserved). A serial typed on a Purchase Order is planning data until Purchase Receive is confirmed. Scan lookup is case-insensitive, but the unit must still be in the serial ledger — being on the PO alone cannot populate or sell it.",
     blocks: [
       {
         type: "steps",
         items: [
-          "Open Inventory → Serials and search the serial. If it is missing, it was never received into stock.",
+          "Open Inventory → Serials and search the serial. If it is listed, note its status (must be in stock or reserved) and location. If it is missing, it was never received into stock.",
           "Open Buy → Purchase Receive. Load Slip from the purchase order (or open the matching draft receive).",
           "Set qty, scan the serial on the Track serial line until the accepted count matches qty, then confirm.",
           "Confirm Serials now shows the unit with status in stock at the sale location.",
@@ -275,6 +275,8 @@ export const helpScenarioArticles: KbArticle[] = [
       "serial number not found despite purchase order",
       "serial registered on PO cannot sell",
       "BA serial not found new sales",
+      "serial registered in registry but not found on sales",
+      "BA082126000181 serial not found",
     ],
     errorPhrases: [
       "Serial not found.",

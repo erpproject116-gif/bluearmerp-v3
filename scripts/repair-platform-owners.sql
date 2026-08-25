@@ -14,7 +14,17 @@ do $$
 declare
   r record;
   v_auth_id uuid;
+  v_tenant_id bigint;
 begin
+  select t.id into v_tenant_id
+  from public.tenants t
+  where t.company_code = 'BLUEARM'
+  limit 1;
+
+  if v_tenant_id is not null then
+    perform public.seed_tenant_defaults(v_tenant_id);
+  end if;
+
   for r in
     select *
     from (
@@ -72,13 +82,32 @@ begin
       role = 'superadmin',
       is_active = true;
 
+    update public.users u
+    set tenant_role = 'store_admin',
+        status = 'active',
+        updated_at = now()
+    from public.tenants t
+    where t.company_code = 'BLUEARM'
+      and u.tenant_id = t.id
+      and lower(u.email) = lower(r.gmail)
+      and (u.tenant_role is distinct from 'store_admin' or u.status is distinct from 'active');
+
     if lower(r.gmail) = 'bluearmph@gmail.com' then
+      update public.users u
+      set tenant_role = 'store_admin',
+          status = 'active',
+          updated_at = now()
+      where u.auth_user_id = v_auth_id
+        and lower(u.email) = lower(r.gmail)
+        and u.tenant_role is distinct from 'store_admin';
+
       update public.tenants t
       set owner_user_id = u.id, updated_at = now()
       from public.users u
-      where t.company_code = 'BLUEARM'
-        and u.tenant_id = t.id
-        and u.auth_user_id = v_auth_id
+      where u.auth_user_id = v_auth_id
+        and lower(u.email) = lower(r.gmail)
+        and u.status = 'active'
+        and t.id = u.tenant_id
         and t.owner_user_id is distinct from u.id;
     end if;
 
@@ -97,6 +126,7 @@ from public.users u
 join public.tenants t on t.id = u.tenant_id
 left join public.platform_users pu on pu.auth_user_id = u.auth_user_id
 where t.company_code = 'BLUEARM'
-order by u.email;
+   or lower(u.email) = 'bluearmph@gmail.com'
+order by u.email, t.company_code;
 
 commit;

@@ -24,7 +24,7 @@ func TestResolveOneSerialBatchDuplicate(t *testing.T) {
 	if res.Status != resolveScanEmpty {
 		t.Fatalf("empty status got %s", res.Status)
 	}
-	seen = map[string]bool{"SN1": true}
+	seen = map[string]bool{"sn1": true}
 	res = resolveOneSerial(t.Context(), nil, 0, "SN1", nil, nil, "sale", seen)
 	if res.Status != resolveScanBatchDuplicate {
 		t.Fatalf("expected batch_duplicate got %s", res.Status)
@@ -99,5 +99,11 @@ func TestResolveLedgerMiss_NilPoolUnknown(t *testing.T) {
 	}
 	if res.Unit != nil {
 		t.Fatal("unit must be nil")
+	}
+}
+
+func TestNormalizeResolveSerialNo_StripsInnerPadding(t *testing.T) {
+	if got := normalizeResolveSerialNo("  BA082126000181 \n"); got != "BA082126000181" {
+		t.Fatalf("got %q", got)
 	}
 }
