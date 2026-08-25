@@ -50,6 +50,10 @@ const GO_CANONICAL: Record<MigKind, string[]> = {
   open_si: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount", "si_dr_no"],
   open_ap: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount", "vendor_invoice_no"],
   open_po: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"],
+  open_quo: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"],
+  open_so: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"],
+  open_pr: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"],
+  open_rfq: ["source_doc_no", "date", "item_code", "item", "quantity", "notes"],
   in_transit: ["item_code", "item", "quantity", "from_location", "to_location", "date"],
 };
 
@@ -61,6 +65,10 @@ const GO_REQUIRED: Record<MigKind, string[]> = {
   open_si: ["source_doc_no", "partner", "date", "amount"],
   open_ap: ["source_doc_no", "partner", "date", "amount"],
   open_po: ["source_doc_no", "partner", "date", "item", "quantity"],
+  open_quo: ["source_doc_no", "partner", "date", "item", "quantity"],
+  open_so: ["source_doc_no", "partner", "date", "item", "quantity"],
+  open_pr: ["source_doc_no", "date", "item", "quantity"],
+  open_rfq: ["source_doc_no", "date", "item", "quantity"],
   in_transit: ["quantity", "from_location", "to_location"],
 };
 
@@ -69,6 +77,10 @@ describe("migrationCsvImport", () => {
     expect(MIG_NEEDS_JOB_DEFAULTS.items).toBe(false);
     expect(MIG_NEEDS_JOB_DEFAULTS.open_si).toBe(true);
     expect(MIG_NEEDS_JOB_DEFAULTS.open_ap).toBe(true);
+    expect(MIG_NEEDS_JOB_DEFAULTS.open_quo).toBe(true);
+    expect(MIG_NEEDS_JOB_DEFAULTS.open_so).toBe(true);
+    expect(MIG_NEEDS_JOB_DEFAULTS.open_pr).toBe(true);
+    expect(MIG_NEEDS_JOB_DEFAULTS.open_rfq).toBe(false);
     expect(MIG_REQUIRED.opening_stock).toContain("quantity");
   });
 

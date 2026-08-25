@@ -40,6 +40,10 @@ func TestTemplatesShareImporterSlices(t *testing.T) {
 		"open_si":        {openSICanonical, openSIRequired},
 		"open_ap":        {openAPCanonical, openAPRequired},
 		"open_po":        {openPOCanonical, openPORequired},
+		"open_quo":       {openQuoCanonical, openQuoRequired},
+		"open_so":        {openSOCanonical, openSORequired},
+		"open_pr":        {openPRCanonical, openPRRequired},
+		"open_rfq":       {openRFQCanonical, openRFQRequired},
 		"in_transit":     {inTransitCanonical, inTransitRequired},
 	}
 	for kind, exp := range want {

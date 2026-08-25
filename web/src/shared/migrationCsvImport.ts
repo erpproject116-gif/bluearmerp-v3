@@ -9,6 +9,10 @@ export type MigKind =
   | "open_si"
   | "open_ap"
   | "open_po"
+  | "open_quo"
+  | "open_so"
+  | "open_pr"
+  | "open_rfq"
   | "in_transit";
 
 export type MigImportProfile = {
@@ -31,6 +35,8 @@ export type MigJobDefaults = {
   currency_id?: number | null;
   location_id?: number | null;
 };
+
+const openDocFields = ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"] as const;
 
 export const MIG_ENTITY_FIELDS: Record<MigKind, string[]> = {
   items: [
@@ -68,7 +74,11 @@ export const MIG_ENTITY_FIELDS: Record<MigKind, string[]> = {
   opening_stock: ["item_code", "item", "quantity", "location", "as_of_date"],
   open_si: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount", "si_dr_no"],
   open_ap: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount", "vendor_invoice_no"],
-  open_po: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"],
+  open_po: [...openDocFields],
+  open_quo: [...openDocFields],
+  open_so: [...openDocFields],
+  open_pr: [...openDocFields],
+  open_rfq: ["source_doc_no", "date", "item_code", "item", "quantity", "notes"],
   in_transit: ["item_code", "item", "quantity", "from_location", "to_location", "date"],
 };
 
@@ -80,6 +90,10 @@ export const MIG_REQUIRED: Record<MigKind, string[]> = {
   open_si: ["source_doc_no", "partner", "date", "amount"],
   open_ap: ["source_doc_no", "partner", "date", "amount"],
   open_po: ["source_doc_no", "partner", "date", "item", "quantity"],
+  open_quo: ["source_doc_no", "partner", "date", "item", "quantity"],
+  open_so: ["source_doc_no", "partner", "date", "item", "quantity"],
+  open_pr: ["source_doc_no", "date", "item", "quantity"],
+  open_rfq: ["source_doc_no", "date", "item", "quantity"],
   in_transit: ["quantity", "from_location", "to_location"],
 };
 
@@ -91,6 +105,10 @@ export const MIG_NEEDS_JOB_DEFAULTS: Record<MigKind, boolean> = {
   open_si: true,
   open_ap: true,
   open_po: true,
+  open_quo: true,
+  open_so: true,
+  open_pr: true,
+  open_rfq: false,
   in_transit: false,
 };
 
@@ -103,6 +121,10 @@ export const MIG_NEEDS_ITEM: Record<MigKind, boolean> = {
   open_si: true,
   open_ap: true,
   open_po: true,
+  open_quo: true,
+  open_so: true,
+  open_pr: true,
+  open_rfq: true,
   in_transit: true,
 };
 
@@ -114,6 +136,10 @@ export const MIG_TEMPLATE_FILENAME: Record<MigKind, string> = {
   open_si: "mig-open-si-import-template.csv",
   open_ap: "mig-open-ap-import-template.csv",
   open_po: "mig-open-po-import-template.csv",
+  open_quo: "mig-open-quo-import-template.csv",
+  open_so: "mig-open-so-import-template.csv",
+  open_pr: "mig-open-pr-import-template.csv",
+  open_rfq: "mig-open-rfq-import-template.csv",
   in_transit: "mig-in-transit-import-template.csv",
 };
 
@@ -125,6 +151,10 @@ const MIG_KIND_PATH: Record<MigKind, string> = {
   open_si: "/open-si",
   open_ap: "/open-ap",
   open_po: "/open-po",
+  open_quo: "/open-quo",
+  open_so: "/open-so",
+  open_pr: "/open-pr",
+  open_rfq: "/open-rfq",
   in_transit: "/in-transit",
 };
 
@@ -150,6 +180,10 @@ const MIG_KINDS: MigKind[] = [
   "open_si",
   "open_ap",
   "open_po",
+  "open_quo",
+  "open_so",
+  "open_pr",
+  "open_rfq",
   "in_transit",
 ];
 

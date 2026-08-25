@@ -19,6 +19,7 @@ import (
 var allowedKinds = map[string]bool{
 	"items": true, "partners": true, "accounts": true,
 	"opening_stock": true, "open_si": true, "open_ap": true, "open_po": true, "in_transit": true,
+	"open_quo": true, "open_so": true, "open_pr": true, "open_rfq": true,
 }
 
 type jobDefaults struct {
@@ -325,6 +326,23 @@ func lineUnitPrice(qty, amount float64) (float64, float64, string) {
 	}
 	if qty <= 0 {
 		return amount, 1, ""
+	}
+	return amount / qty, qty, ""
+}
+
+// lineUnitPriceOptional allows amount 0 (qty-only pipeline docs such as RFQ).
+func lineUnitPriceOptional(qty, amount float64) (float64, float64, string) {
+	if amount < 0 {
+		return 0, 0, "amount cannot be negative"
+	}
+	if qty <= 0 {
+		if amount > 0 {
+			return amount, 1, ""
+		}
+		return 0, 0, "quantity must be greater than 0"
+	}
+	if amount == 0 {
+		return 0, qty, ""
 	}
 	return amount / qty, qty, ""
 }
