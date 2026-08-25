@@ -334,7 +334,7 @@ export default function UsersPage() {
   const reinviteKeepData = async (row: TenantUserRow) => {
     if (
       !confirm(
-        `Re-invite ${row.full_name || row.email}?\n\nKeeps their roles, groups, and permissions. They get an email to sign in and can set a new password.`,
+        `Re-invite ${row.full_name || row.email} and send a set-password link?\n\nKeeps their roles, groups, and permissions. They get an email to sign in and set a new password.`,
       )
     ) {
       return;
@@ -349,7 +349,7 @@ export default function UsersPage() {
       toast.warning(res.message ?? "Could not re-invite user.");
       return;
     }
-    toast.success(res.message ?? "Re-invite sent. Their data was kept.");
+    toast.success(res.message ?? "Re-invite sent with set-password link. Their data was kept.");
     invalidate.all();
   };
 
@@ -360,7 +360,7 @@ export default function UsersPage() {
     }
     if (
       !confirm(
-        `Remove access and reset ${row.full_name || row.email} for re-invite?\n\nClears data scopes, overrides, and groups; unlinks Google; status becomes Pending invite.\n\nPrefer “Re-invite (keep data)” if you only need to resend access or let them set a password.`,
+        `Remove access and reset ${row.full_name || row.email} for re-invite?\n\nClears data scopes, overrides, and groups; unlinks Google; status becomes Pending invite.\n\nPrefer “Re-invite + set password” if you only need to resend access or let them set a password.`,
       )
     ) {
       return;
@@ -608,7 +608,7 @@ export default function UsersPage() {
             <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
               Lifecycle
             </p>
-            <Show when={menuRow()!.status === "active"}>
+            <Show when={menuRow()!.status === "active" || menuRow()!.status === "disabled" || menuRow()!.status === "invited"}>
               <button
                 type="button"
                 role="menuitem"
@@ -618,8 +618,10 @@ export default function UsersPage() {
                   void reinviteKeepData(row);
                 }}
               >
-                Re-invite (keep data)
+                Re-invite + set password
               </button>
+            </Show>
+            <Show when={menuRow()!.status === "active"}>
               <Show when={!menuRow()!.is_owner}>
                 <button
                   type="button"
@@ -661,17 +663,6 @@ export default function UsersPage() {
                   Restore
                 </button>
               </Show>
-              <button
-                type="button"
-                role="menuitem"
-                class="block w-full px-3 py-1.5 text-left text-sm text-brand-600 hover:bg-slate-50"
-                onClick={() => {
-                  const row = menuRow()!;
-                  void reinviteKeepData(row);
-                }}
-              >
-                Re-invite (keep data)
-              </button>
               <Show when={menuRow()!.auth_linked && !menuRow()!.is_owner}>
                 <button
                   type="button"
@@ -698,17 +689,6 @@ export default function UsersPage() {
                 }}
               >
                 Resend invite
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                class="block w-full px-3 py-1.5 text-left text-sm text-brand-600 hover:bg-slate-50"
-                onClick={() => {
-                  const row = menuRow()!;
-                  void reinviteKeepData(row);
-                }}
-              >
-                Re-invite + set password
               </button>
               <button
                 type="button"
