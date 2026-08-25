@@ -185,11 +185,24 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			safetyJSON, _ := marshalJSONMap(safetyStock)
 			serialPolicy := SanitizeTrackingPolicy(body.SerialPolicy)
 			lotPolicy := SanitizeTrackingPolicy(body.LotPolicy)
-			if !boolOrFalse(body.TrackSerial) {
+			// New items default to serial tracking (UI + API omit → on). Lot still wins if set.
+			trackLot := boolOrFalse(body.TrackLot)
+			trackSerial := true
+			if body.TrackSerial != nil {
+				trackSerial = *body.TrackSerial
+			}
+			if trackLot {
+				trackSerial = false
+			}
+			if !trackSerial {
 				serialPolicy = TrackingPolicyRequired
 			}
-			if !boolOrFalse(body.TrackLot) {
+			if !trackLot {
 				lotPolicy = TrackingPolicyRequired
+			}
+			trackQty := true
+			if body.TrackInventoryQty != nil {
+				trackQty = *body.TrackInventoryQty
 			}
 			specName, unit, itemCategory, itemType, productionProcess, oePrice, standardCosts := itemBodyScalars(body)
 			standardJSON, _ := marshalJSONMap(standardCosts)
@@ -208,7 +221,7 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, base_unit_id, item_category, item_type, production_process, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, oe_price, standard_costs, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
 				returning id, item_code, item_name, coalesce(spec_name,''), coalesce(unit,''), base_unit_id, coalesce(item_category,'merchandise'), coalesce(item_type,'item'), production_process, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, oe_price::float8, standard_costs, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id`,
-				tu.TenantID, code, strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), body.ItemCategoryID).
+				tu.TenantID, code, strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, trackSerial, trackLot, serialPolicy, lotPolicy, trackQty, defaultStatus(body.Status), body.ItemCategoryID).
 				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit, &row.BaseUnitID, &row.ItemCategory, &row.ItemType, &row.ProductionProcess, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.OePrice, &standardJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
 			row.PriceLevels = unmarshalJSONFloatMap(priceJSON)
 			row.SafetyStockByDoc = unmarshalJSONFloatMap(safetyJSON)
