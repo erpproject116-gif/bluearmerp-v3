@@ -20,20 +20,27 @@ func TestSerialGoUsesLocationNameNotLocName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read serial.go: %v", err)
 	}
-	src := string(raw)
-
-	mustContain := []string{
+	assertLocationNameSQL(t, "serial.go", string(raw), []string{
 		"loc.location_name",
 		"fl.location_name",
 		"tl.location_name",
+	})
+
+	resolvePath := filepath.Join(filepath.Dir(thisFile), "resolve_serial.go")
+	resolveRaw, err := os.ReadFile(resolvePath)
+	if err != nil {
+		t.Fatalf("read resolve_serial.go: %v", err)
 	}
+	assertLocationNameSQL(t, "resolve_serial.go", string(resolveRaw), []string{"loc.location_name"})
+}
+
+func assertLocationNameSQL(t *testing.T, name, src string, mustContain []string) {
+	t.Helper()
 	for _, s := range mustContain {
 		if !strings.Contains(src, s) {
-			t.Errorf("serial.go must contain %q", s)
+			t.Errorf("%s must contain %q", name, s)
 		}
 	}
-
-	// Forbidden: location alias .name (categories use cat.name — leave those alone).
 	badPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`\bloc\.name\b`),
 		regexp.MustCompile(`\bfl\.name\b`),
@@ -41,7 +48,7 @@ func TestSerialGoUsesLocationNameNotLocName(t *testing.T) {
 	}
 	for _, re := range badPatterns {
 		if re.MatchString(src) {
-			t.Errorf("serial.go must not contain %s (use location_name)", re.String())
+			t.Errorf("%s must not contain %s (use location_name)", name, re.String())
 		}
 	}
 }

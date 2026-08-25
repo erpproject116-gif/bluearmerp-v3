@@ -26,7 +26,7 @@ func RequireManageUsers(next http.Handler) http.Handler {
 
 // CanManageUsers reports whether the tenant user may access user-management APIs and UI.
 func (tu TenantUser) CanManageUsers() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {
@@ -37,7 +37,7 @@ func (tu TenantUser) CanManageUsers() bool {
 
 // CanManageFormSettings reports whether the tenant user may edit form field settings.
 func (tu TenantUser) CanManageFormSettings() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {
@@ -53,7 +53,7 @@ func (tu TenantUser) CanManageBranding() bool {
 
 // CanViewChangeLogs reports whether the tenant user may access change log APIs and UI.
 func (tu TenantUser) CanViewChangeLogs() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {
@@ -144,7 +144,7 @@ func RequireViewChangeLogsOrRecordScoped(next http.Handler) http.Handler {
 
 // CanViewActivityLogs reports whether the tenant user may access activity log APIs and UI.
 func (tu TenantUser) CanViewActivityLogs() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {
@@ -171,7 +171,7 @@ func RequireViewCRM(next http.Handler) http.Handler {
 
 // CanViewCRM reports whether the tenant user may access CRM APIs and UI.
 func (tu TenantUser) CanViewCRM() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {
@@ -198,7 +198,7 @@ func RequireManageCrmRules(next http.Handler) http.Handler {
 
 // CanManageCrmRules reports whether the tenant user may edit CRM alert rules.
 func (tu TenantUser) CanManageCrmRules() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {

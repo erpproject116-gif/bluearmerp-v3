@@ -77,6 +77,8 @@ export const helpArticleAliases: Record<string, HelpArticleAlias> = {
       "scan serial new sales not found",
       "serial number not found despite purchase order",
       "serial registered on PO cannot sell",
+      "serial registered in registry but not found on sales",
+      "BA082126000181 serial not found",
     ],
     errorPhrases: [
       "Serial not found.",

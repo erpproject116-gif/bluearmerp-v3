@@ -4,7 +4,7 @@ import "fmt"
 
 // CanViewAllCRM reports whether the user may see all tenant CRM/commercial records.
 func (tu TenantUser) CanViewAllCRM() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {
@@ -15,7 +15,7 @@ func (tu TenantUser) CanViewAllCRM() bool {
 
 // CanViewCrmAnalytics reports whether the user may access CRM analytics reports and tenant-wide KPIs.
 func (tu TenantUser) CanViewCrmAnalytics() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {
@@ -26,7 +26,7 @@ func (tu TenantUser) CanViewCrmAnalytics() bool {
 
 // CanManageSalesTeam reports whether the user may assign work to sales team members.
 func (tu TenantUser) CanManageSalesTeam() bool {
-	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
+	if tu.hasOwnerCapability() {
 		return true
 	}
 	if tu.permissions != nil {

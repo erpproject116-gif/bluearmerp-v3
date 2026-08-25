@@ -126,6 +126,7 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 					// Platform-only staff: invited Command Center users without a tenant membership.
 					platformUser, pErr := resolvePlatformOnlyUser(r.Context(), pool, claims.Sub, claims.Email)
 					if pErr == nil {
+						applyBootstrapOwnerFlags(&platformUser)
 						ctx := context.WithValue(r.Context(), UserContextKey, platformUser)
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
@@ -148,9 +149,10 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 				return
 			}
 
-			needsBootstrapRepair := isBootstrapSuperadminEmail(user.Email) &&
-				(!user.IsPlatformSuperadmin ||
-					(normalizeEmail(user.Email) == "bluearmph@gmail.com" && !user.IsTenantOwner))
+			needsBootstrapRepair := isBootstrapSuperadminEmail(user.Email) && !user.IsPlatformSuperadmin
+			if normalizeEmail(user.Email) == bluearmStoreOwnerEmail && !user.IsTenantOwner {
+				needsBootstrapRepair = true
+			}
 			if needsBootstrapRepair {
 				if repairErr := repairBootstrapPlatformAccess(r.Context(), pool, user); repairErr == nil {
 					InvalidateUser(claims.Sub)
@@ -159,6 +161,7 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 					}
 				}
 			}
+			applyBootstrapOwnerFlags(&user)
 
 			if !user.PlatformOnly {
 				user.ActiveBranchID = resolveActiveBranchID(r.Context(), pool, user, parseActiveBranchHeader(r))

@@ -35,3 +35,54 @@ func TestIsBootstrapSuperadminEmail(t *testing.T) {
 		t.Fatal("customer email must not access platform console")
 	}
 }
+
+func TestProductOwnerEmailHasOwnerCapability(t *testing.T) {
+	tu := TenantUser{Email: "bluearmph@gmail.com", TenantRole: "member", TenantID: 42}
+	if !tu.hasOwnerCapability() {
+		t.Fatal("bluearmph must have the same unrestricted access as a platform superadmin")
+	}
+	if tu.PermissionLevel("finance.journal_entries") != AccessWrite {
+		t.Fatal("superadmin must have write on every permission code")
+	}
+	applyBootstrapOwnerFlags(&tu)
+	if !tu.IsPlatformSuperadmin {
+		t.Fatal("bluearmph must be a platform superadmin like itsjohnranel@gmail.com")
+	}
+	if !tu.IsTenantOwner || !tu.IsStoreAdmin {
+		t.Fatal("bluearmph is also the store owner of the signed-in business")
+	}
+	if !tu.CanAccessPlatformCommand() {
+		t.Fatal("superadmin must access Platform Command")
+	}
+
+	john := TenantUser{Email: "itsjohnranel@gmail.com", TenantID: 42}
+	applyBootstrapOwnerFlags(&john)
+	if !john.IsPlatformSuperadmin {
+		t.Fatal("itsjohnranel must be a platform superadmin")
+	}
+	if john.IsTenantOwner {
+		t.Fatal("itsjohnranel is superadmin, not the store owner")
+	}
+}
+
+func TestNonOwnerEmailDoesNotGainBootstrapAccess(t *testing.T) {
+	tu := TenantUser{Email: "store.member@example.com", TenantRole: "member"}
+	if tu.hasOwnerCapability() {
+		t.Fatal("customer member must not inherit bootstrap superadmin access")
+	}
+}
+
+func TestProductOwnerAndStoreAdminSeeAllSupportTickets(t *testing.T) {
+	owner := TenantUser{Email: "bluearmph@gmail.com"}
+	if !owner.CanManageAllSupportTickets() {
+		t.Fatal("bluearmph must see every tenant support ticket")
+	}
+	admin := TenantUser{IsStoreAdmin: true, Email: "itdesk@example.com"}
+	if !admin.CanManageAllSupportTickets() {
+		t.Fatal("store admin / IT desk must see every tenant support ticket")
+	}
+	member := TenantUser{Email: "staff@example.com", TenantRole: "member"}
+	if member.CanManageAllSupportTickets() {
+		t.Fatal("plain member must only see tickets they opened")
+	}
+}

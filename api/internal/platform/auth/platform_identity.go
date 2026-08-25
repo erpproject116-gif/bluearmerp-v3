@@ -32,7 +32,7 @@ type PlatformIdentity struct {
 }
 
 func (tu TenantUser) HasPlatformPermission(code string) bool {
-	if tu.IsPlatformSuperadmin {
+	if tu.IsPlatformSuperadmin || isBootstrapSuperadminEmail(tu.Email) {
 		return true
 	}
 	if tu.PlatformPermissions == nil {
@@ -42,9 +42,11 @@ func (tu TenantUser) HasPlatformPermission(code string) bool {
 }
 
 func (tu TenantUser) CanAccessPlatformCommand() bool {
+	if isBootstrapSuperadminEmail(tu.Email) || tu.IsPlatformSuperadmin {
+		return true
+	}
 	return tu.HasPlatformPermission("platform.command.read") ||
-		tu.HasPlatformPermission("platform.customers.read") ||
-		tu.IsPlatformSuperadmin
+		tu.HasPlatformPermission("platform.customers.read")
 }
 
 // loadPlatformIdentity loads platform_users + permissions for an auth UUID.

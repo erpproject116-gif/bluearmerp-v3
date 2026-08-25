@@ -105,7 +105,7 @@ type Reminder struct {
 }
 
 func canUseBaikoSlash(tu auth.TenantUser) bool {
-	return tu.IsPlatformSuperadmin || tu.IsTenantOwner
+	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || auth.IsPlatformConsoleEmail(tu.Email)
 }
 
 type ChatUser struct {

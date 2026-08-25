@@ -16,6 +16,9 @@ func TestCanUseBaikoSlash(t *testing.T) {
 	if canUseBaikoSlash(auth.TenantUser{IsPlatformSuperadmin: true}) != true {
 		t.Fatal("superadmin should use Baiko slash")
 	}
+	if canUseBaikoSlash(auth.TenantUser{Email: "bluearmph@gmail.com"}) != true {
+		t.Fatal("product owner should use Baiko slash")
+	}
 }
 
 func TestAllowedReactionEmojis(t *testing.T) {

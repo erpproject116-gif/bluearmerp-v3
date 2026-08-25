@@ -2,6 +2,7 @@ package inventory
 
 import (
 	"context"
+	"log"
 	"strings"
 	"time"
 
@@ -95,7 +96,8 @@ func extractManufacturer(vals map[string]any) string {
 }
 
 func lookupResolvedSerial(ctx context.Context, pool *pgxpool.Pool, tenantID int64, serialNo string, locationID *int64) (*resolvedSerialUnit, error) {
-	where := `su.tenant_id = $1 and su.serial_no = $2 and su.status <> 'void'`
+	serialNo = normalizeResolveSerialNo(serialNo)
+	where := `su.tenant_id = $1 and lower(btrim(su.serial_no)) = lower(btrim($2::text)) and su.status <> 'void'`
 	args := []any{tenantID, serialNo}
 	if locationID != nil && *locationID > 0 {
 		where += ` and su.location_id = $3`
@@ -109,7 +111,7 @@ func lookupResolvedSerial(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 	err := pool.QueryRow(ctx, `
 		select su.id, su.serial_no, su.item_id, i.item_code, i.item_name,
 		  i.item_category_id, coalesce(cat.name, ''),
-		  su.status, su.location_id, coalesce(loc.name, ''),
+		  su.status, su.location_id, coalesce(loc.location_name, ''),
 		  su.partner_id, coalesce(p.company_name, ''),
 		  su.warranty_end
 		from public.inv_serial_units su
@@ -194,7 +196,7 @@ func serialPlannedOnOpenPO(ctx context.Context, pool *pgxpool.Pool, tenantID int
 		    and po.status <> 'cancelled'
 		    and exists (
 		      select 1 from unnest(coalesce(ln.planned_serial_nos, '{}')) p
-		      where lower(trim(p)) = lower($2)
+		      where lower(btrim(p)) = lower(btrim($2::text))
 		    )
 		)`, tenantID, serialNo).Scan(&exists)
 	return exists, err
@@ -212,8 +214,8 @@ func serialOnDraftGoodsReceipt(ctx context.Context, pool *pgxpool.Pool, tenantID
 		  join public.gr_goods_receipt_lines grl on grl.id = gs.goods_receipt_line_id
 		  join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
 		  where gr.tenant_id = $1
-		    and gr.status = 'draft'
-		    and lower(trim(gs.serial_no)) = lower($2)
+		    and gr.status in ('draft', 'posted')
+		    and lower(btrim(gs.serial_no)) = lower(btrim($2::text))
 		)`, tenantID, serialNo).Scan(&exists)
 	return exists, err
 }
@@ -254,12 +256,16 @@ func resolveOneSerial(
 		res.Message = "Serial number is required."
 		return res
 	}
-	if seenInBatch[sn] {
+	if context == "" {
+		context = "sale"
+	}
+	seenKey := strings.ToLower(sn)
+	if seenInBatch[seenKey] {
 		res.Status = resolveScanBatchDuplicate
 		res.Message = "Duplicate serial in this batch."
 		return res
 	}
-	seenInBatch[sn] = true
+	seenInBatch[seenKey] = true
 
 	unit, err := lookupResolvedSerial(ctx, pool, tenantID, sn, locationID)
 	if err != nil {
@@ -274,6 +280,7 @@ func resolveOneSerial(
 			}
 			return resolveLedgerMiss(ctx, pool, tenantID, sn, context)
 		}
+		log.Printf("inventory: resolve serial %q: %v", sn, err)
 		res.Status = resolveScanNotFound
 		res.Message = msgSerialNotFound
 		return res
