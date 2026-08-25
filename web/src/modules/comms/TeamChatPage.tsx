@@ -8,7 +8,7 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
-import { useAuth } from "../../shared/auth-context";
+import { hasPermission, useAuth } from "../../shared/auth-context";
 import { LoadingText } from "../../shared/LoadingText";
 import { useToast } from "../../shared/toast";
 import { crmNotificationRelativeTime } from "../../shared/crmNotificationRoutes";
@@ -17,6 +17,7 @@ import {
   CHAT_ENTITY_TYPES,
   CHAT_MAX_ATTACH_BYTES,
   CHAT_REACTION_EMOJIS,
+  addChatMembers,
   addChatReaction,
   cancelChatReminder,
   createChatChannel,
@@ -28,6 +29,7 @@ import {
   forwardChatMessage,
   getChatMessage,
   listChatChannels,
+  listChatMembers,
   listChatMessages,
   listChatReminders,
   listChatTyping,
@@ -42,6 +44,7 @@ import {
   uploadChatAttachment,
   type ChatActionDraft,
   type ChatChannel,
+  type ChatMember,
   type ChatMessage,
   type ChatMessageLink,
   type ChatReminder,
@@ -60,6 +63,37 @@ import { safeAppPath } from "../help-assistant/safeAppPath";
 type PendingLink = { entity_type: string; entity_id?: number | null; label: string; href: string };
 
 type SlashItem = { command: string; label: string; baikoOnly?: boolean };
+
+function clipboardImageFiles(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const out: File[] = [];
+  const items = data.items;
+  if (items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item?.kind === "file" && item.type.startsWith("image/")) {
+        const f = item.getAsFile();
+        if (f) out.push(f);
+      }
+    }
+  }
+  if (out.length === 0 && data.files?.length) {
+    for (let i = 0; i < data.files.length; i++) {
+      const f = data.files[i];
+      if (f?.type.startsWith("image/")) out.push(f);
+    }
+  }
+  return out;
+}
+
+function chatScreenshotFileName(file: File): string {
+  const mime = file.type || "image/png";
+  const ext = (mime.split("/")[1] || "png").replace("jpeg", "jpg");
+  if (file.name && file.name !== "image.png" && file.name !== "image.jpg") return file.name;
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `screenshot-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.${ext}`;
+}
 
 const SLASH_ITEMS: SlashItem[] = [
   { command: "reminder", label: "Schedule a reminder" },
@@ -135,7 +169,13 @@ export default function TeamChatPage() {
   const [mentionIds, setMentionIds] = createSignal<number[]>([]);
   const [showCreate, setShowCreate] = createSignal<"channel" | "group" | "dm" | "doc" | null>(null);
   const [createName, setCreateName] = createSignal("");
+  const [createMemberIds, setCreateMemberIds] = createSignal<number[]>([]);
   const [dmUserId, setDmUserId] = createSignal<number | null>(null);
+  const [addMembersOpen, setAddMembersOpen] = createSignal(false);
+  const [channelMembers, setChannelMembers] = createSignal<ChatMember[]>([]);
+  const [addMemberIds, setAddMemberIds] = createSignal<number[]>([]);
+  const [loadingMembers, setLoadingMembers] = createSignal(false);
+  const [savingMembers, setSavingMembers] = createSignal(false);
   const [docType, setDocType] = createSignal("quo_quotation");
   const [docQ, setDocQ] = createSignal("");
   const [docHits, setDocHits] = createSignal<DocSearchHit[]>([]);
@@ -196,6 +236,23 @@ export default function TeamChatPage() {
       (u) => u.id !== meId() && (!q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)),
     );
   });
+
+  const memberIdSet = createMemo(() => new Set(channelMembers().map((m) => m.user_id)));
+
+  const canManageMembers = createMemo(() => {
+    const ch = selected();
+    if (!ch || ch.type === "dm") return false;
+    if (hasPermission(auth.me, "comms.chat_admin", "write")) return true;
+    const mine = channelMembers().find((m) => m.user_id === meId());
+    return mine?.role === "admin";
+  });
+
+  const addableUsers = createMemo(() => {
+    const existing = memberIdSet();
+    return users().filter((u) => !existing.has(u.id));
+  });
+
+  const createPickableUsers = createMemo(() => users().filter((u) => u.id !== meId()));
 
   const slashCandidates = createMemo(() => {
     const q = slashQ().toLowerCase();
@@ -560,6 +617,7 @@ export default function TeamChatPage() {
         return;
       }
       setShowCreate(null);
+      setCreateMemberIds([]);
       await refreshChannels();
       selectChannel(res.data.id);
       return;
@@ -574,6 +632,7 @@ export default function TeamChatPage() {
         type: mode,
         name: name || "Group chat",
         is_private: mode === "group",
+        member_ids: createMemberIds(),
       });
       if (!res.success || !res.data) {
         toast.error(res.message || "Failed to create.");
@@ -581,9 +640,65 @@ export default function TeamChatPage() {
       }
       setShowCreate(null);
       setCreateName("");
+      setCreateMemberIds([]);
       await refreshChannels();
       selectChannel(res.data.id);
     }
+  };
+
+  const toggleCreateMember = (userId: number) => {
+    setCreateMemberIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+    );
+  };
+
+  const toggleAddMember = (userId: number) => {
+    setAddMemberIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+    );
+  };
+
+  const openAddMembers = async () => {
+    const ch = selected();
+    if (!ch || ch.type === "dm") return;
+    setMenuOpen(false);
+    setAddMembersOpen(true);
+    setAddMemberIds([]);
+    setChannelMembers([]);
+    setLoadingMembers(true);
+    if (users().length === 0) {
+      const u = await listChatUsers("");
+      if (u.success) setUsers(u.data ?? []);
+    }
+    const res = await listChatMembers(ch.id);
+    setLoadingMembers(false);
+    if (!res.success) {
+      toast.error(res.message || "Failed to load members.");
+      setAddMembersOpen(false);
+      return;
+    }
+    setChannelMembers(res.data ?? []);
+  };
+
+  const handleAddMembers = async () => {
+    const ch = selected();
+    const ids = addMemberIds();
+    if (!ch || ids.length === 0) {
+      toast.error("Pick at least one teammate.");
+      return;
+    }
+    setSavingMembers(true);
+    const res = await addChatMembers(ch.id, ids);
+    setSavingMembers(false);
+    if (!res.success) {
+      toast.error(res.message || "Failed to add members.");
+      return;
+    }
+    const added = res.data?.added ?? ids.length;
+    toast.success(added === 1 ? "1 member added." : `${added} members added.`);
+    setAddMembersOpen(false);
+    setAddMemberIds([]);
+    await refreshChannels();
   };
 
   const handleDocSearch = async () => {
@@ -623,9 +738,11 @@ export default function TeamChatPage() {
     queueMicrotask(() => document.getElementById("team-chat-composer")?.focus());
   };
 
-  const onPickFiles = (files: FileList | null) => {
-    if (!files?.length) return;
-    const next = [...pendingFiles(), ...Array.from(files)];
+  const onPickFiles = (files: FileList | File[] | null) => {
+    if (!files) return;
+    const list = Array.isArray(files) ? files : Array.from(files);
+    if (list.length === 0) return;
+    const next = [...pendingFiles(), ...list];
     const total = next.reduce((s, f) => s + f.size, 0);
     if (total > CHAT_MAX_ATTACH_BYTES) {
       toast.error(
@@ -634,6 +751,39 @@ export default function TeamChatPage() {
       return;
     }
     setPendingFiles(next);
+  };
+
+  /** Ctrl/Cmd+V screenshots — any member of the open channel / GC / DM can paste. */
+  const onPasteComposer = (e: ClipboardEvent) => {
+    if (!selectedId() || sending()) return;
+    const images = clipboardImageFiles(e.clipboardData);
+    if (images.length === 0) return;
+    e.preventDefault();
+    const named = images.map((file) =>
+      file.name && file.name !== "image.png" && file.name !== "image.jpg"
+        ? file
+        : new File([file], chatScreenshotFileName(file), { type: file.type || "image/png" }),
+    );
+    const next = [...pendingFiles(), ...named];
+    const total = next.reduce((s, f) => s + f.size, 0);
+    if (total > CHAT_MAX_ATTACH_BYTES) {
+      toast.error(
+        `Screenshot too large. ${formatFileSize(CHAT_MAX_ATTACH_BYTES - pendingBytes())} remaining under 25 MB.`,
+      );
+      return;
+    }
+    setPendingFiles(next);
+    const autoSend = !draft().trim() && pendingLinks().length === 0;
+    if (autoSend) {
+      toast.success(named.length === 1 ? "Screenshot sending…" : `${named.length} screenshots sending…`);
+      queueMicrotask(() => void handleSend());
+    } else {
+      toast.success(
+        named.length === 1
+          ? "Screenshot attached — press Send or Enter."
+          : `${named.length} screenshots attached — press Send or Enter.`,
+      );
+    }
   };
 
   const toggleReaction = async (m: ChatMessage, emoji: string) => {
@@ -836,7 +986,18 @@ export default function TeamChatPage() {
                   <h3 class="truncate text-sm font-semibold text-text-primary">
                     {ch().type === "channel" ? `# ${ch().name}` : ch().name}
                   </h3>
-                  <p class="text-xs text-text-secondary">{ch().member_count} members</p>
+                  <Show
+                    when={ch().type !== "dm"}
+                    fallback={<p class="text-xs text-text-secondary">Direct message</p>}
+                  >
+                    <button
+                      type="button"
+                      class="text-xs text-text-secondary hover:text-brand-700 hover:underline"
+                      onClick={() => void openAddMembers()}
+                    >
+                      {ch().member_count} members · Add people
+                    </button>
+                  </Show>
                 </div>
                 <button
                   type="button"
@@ -875,6 +1036,16 @@ export default function TeamChatPage() {
                     >
                       Schedule reminder
                     </button>
+                    <Show when={ch().type === "channel" || ch().type === "group"}>
+                      <button
+                        type="button"
+                        class="block w-full px-3 py-2 text-left text-sm hover:bg-brand-50"
+                        role="menuitem"
+                        onClick={() => void openAddMembers()}
+                      >
+                        Add members
+                      </button>
+                    </Show>
                     <button
                       type="button"
                       class="block w-full px-3 py-2 text-left text-sm hover:bg-brand-50"
@@ -1177,12 +1348,13 @@ export default function TeamChatPage() {
                   rows={3}
                   placeholder={
                     canBaikoSlash()
-                      ? "Message… / for Baiko skills & reminder, @ to mention"
-                      : "Message… /reminder, @ to mention"
+                      ? "Message… paste screenshot, / for Baiko, @ to mention"
+                      : "Message… paste screenshot, /reminder, @ to mention"
                   }
                   value={draft()}
                   onInput={(e) => handleComposerInput(e.currentTarget.value)}
                   onKeyDown={handleKeyDown}
+                  onPaste={onPasteComposer}
                   disabled={sending()}
                 />
                 <div class="flex flex-wrap items-center gap-2">
@@ -1217,6 +1389,7 @@ export default function TeamChatPage() {
                       type="file"
                       class="hidden"
                       multiple
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.txt,.md,video/*,audio/*"
                       onChange={(e) => {
                         onPickFiles(e.currentTarget.files);
                         e.currentTarget.value = "";
@@ -1244,7 +1417,8 @@ export default function TeamChatPage() {
                   </button>
                 </div>
                 <p class="mt-2 text-xs text-text-secondary">
-                  Attach source documents (SO, PO, invoice, etc.).{" "}
+                  Paste a screenshot (Ctrl/Cmd+V) or attach files — available to every member of this channel, group, or
+                  DM. Attach ERP documents (SO, PO, invoice, etc.).{" "}
                   <A href="/app/comms/sent-documents" class="text-brand-700 underline">
                     Email inbox
                   </A>
@@ -1266,6 +1440,24 @@ export default function TeamChatPage() {
                 value={createName()}
                 onInput={(e) => setCreateName(e.currentTarget.value)}
               />
+              <p class="mb-2 text-xs font-medium text-text-secondary">Add members (optional)</p>
+              <div class="mb-3 max-h-40 overflow-y-auto rounded-lg border border-stroke">
+                <For each={createPickableUsers()} fallback={<p class="p-3 text-sm text-text-secondary">No teammates found</p>}>
+                  {(u) => (
+                    <label class="flex cursor-pointer items-center gap-2 border-b border-stroke px-3 py-2 text-sm last:border-b-0 hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={createMemberIds().includes(u.id)}
+                        onChange={() => toggleCreateMember(u.id)}
+                      />
+                      <span class="min-w-0 truncate">
+                        {u.full_name}
+                        <span class="ml-1 text-xs text-text-secondary">{u.email}</span>
+                      </span>
+                    </label>
+                  )}
+                </For>
+              </div>
             </Show>
             <Show when={showCreate() === "dm"}>
               <h3 class="mb-3 text-base font-semibold">Message a teammate</h3>
@@ -1317,7 +1509,14 @@ export default function TeamChatPage() {
               </div>
             </Show>
             <div class="flex justify-end gap-2">
-              <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setShowCreate(null)}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
+                onClick={() => {
+                  setShowCreate(null);
+                  setCreateMemberIds([]);
+                }}
+              >
                 Cancel
               </button>
               <Show when={showCreate() !== "doc"}>
@@ -1327,6 +1526,86 @@ export default function TeamChatPage() {
                   onClick={() => void handleCreate()}
                 >
                   Create
+                </button>
+              </Show>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={addMembersOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Add members">
+          <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
+            <h3 class="mb-1 text-base font-semibold">Add members</h3>
+            <p class="mb-3 text-xs text-text-secondary">
+              {selected()?.type === "channel" ? `# ${selected()?.name}` : selected()?.name}
+            </p>
+            <Show when={loadingMembers()}>
+              <LoadingText />
+            </Show>
+            <Show when={!loadingMembers()}>
+              <Show when={channelMembers().length > 0}>
+                <p class="mb-1 text-xs font-medium text-text-secondary">Already in conversation</p>
+                <ul class="mb-3 max-h-24 overflow-y-auto rounded-lg border border-stroke text-sm">
+                  <For each={channelMembers()}>
+                    {(m) => (
+                      <li class="border-b border-stroke px-3 py-1.5 last:border-b-0">
+                        {m.full_name}
+                        <Show when={m.role === "admin"}>
+                          <span class="ml-1 text-xs text-text-secondary">(admin)</span>
+                        </Show>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
+              <Show
+                when={canManageMembers()}
+                fallback={
+                  <p class="mb-3 text-sm text-text-secondary">
+                    Only channel admins can add members.
+                  </p>
+                }
+              >
+                <p class="mb-1 text-xs font-medium text-text-secondary">Add people</p>
+                <div class="mb-3 max-h-48 overflow-y-auto rounded-lg border border-stroke">
+                  <For each={addableUsers()} fallback={<p class="p-3 text-sm text-text-secondary">Everyone is already a member</p>}>
+                    {(u) => (
+                      <label class="flex cursor-pointer items-center gap-2 border-b border-stroke px-3 py-2 text-sm last:border-b-0 hover:bg-slate-50">
+                        <input
+                          type="checkbox"
+                          checked={addMemberIds().includes(u.id)}
+                          onChange={() => toggleAddMember(u.id)}
+                        />
+                        <span class="min-w-0 truncate">
+                          {u.full_name}
+                          <span class="ml-1 text-xs text-text-secondary">{u.email}</span>
+                        </span>
+                      </label>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </Show>
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
+                onClick={() => {
+                  setAddMembersOpen(false);
+                  setAddMemberIds([]);
+                }}
+              >
+                Close
+              </button>
+              <Show when={canManageMembers() && !loadingMembers()}>
+                <button
+                  type="button"
+                  class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                  disabled={savingMembers() || addMemberIds().length === 0}
+                  onClick={() => void handleAddMembers()}
+                >
+                  {savingMembers() ? "Adding…" : "Add selected"}
                 </button>
               </Show>
             </div>

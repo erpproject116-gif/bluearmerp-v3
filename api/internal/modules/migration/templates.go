@@ -79,6 +79,42 @@ var importTemplates = map[string]importTemplate{
 			"EXAMPLE-PO-1", "EXAMPLE Vendor Co", "2026-01-31", "EXAMPLE-ITEM", "EXAMPLE Widget", "10.5", "1000.50",
 		},
 	},
+	"open_quo": {
+		Kind:     "open_quo",
+		Filename: "mig-open-quo-import-template.csv",
+		Headers:  openQuoCanonical,
+		Required: openQuoRequired,
+		Example: []string{
+			"EXAMPLE-QUO-1", "EXAMPLE Customer Co", "2026-01-31", "EXAMPLE-ITEM", "EXAMPLE Widget", "2", "500.00",
+		},
+	},
+	"open_so": {
+		Kind:     "open_so",
+		Filename: "mig-open-so-import-template.csv",
+		Headers:  openSOCanonical,
+		Required: openSORequired,
+		Example: []string{
+			"EXAMPLE-SO-1", "EXAMPLE Customer Co", "2026-01-31", "EXAMPLE-ITEM", "EXAMPLE Widget", "2", "500.00",
+		},
+	},
+	"open_pr": {
+		Kind:     "open_pr",
+		Filename: "mig-open-pr-import-template.csv",
+		Headers:  openPRCanonical,
+		Required: openPRRequired,
+		Example: []string{
+			"EXAMPLE-PR-1", "EXAMPLE Vendor Co", "2026-01-31", "EXAMPLE-ITEM", "EXAMPLE Widget", "5", "250.00",
+		},
+	},
+	"open_rfq": {
+		Kind:     "open_rfq",
+		Filename: "mig-open-rfq-import-template.csv",
+		Headers:  openRFQCanonical,
+		Required: openRFQRequired,
+		Example: []string{
+			"EXAMPLE-RFQ-1", "2026-01-31", "EXAMPLE-ITEM", "EXAMPLE Widget", "10", "Cutover RFQ",
+		},
+	},
 	"in_transit": {
 		Kind:     "in_transit",
 		Filename: "mig-in-transit-import-template.csv",

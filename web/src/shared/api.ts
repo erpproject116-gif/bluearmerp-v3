@@ -161,7 +161,20 @@ export async function apiFetch<T>(
   } catch {
     throw new Error("ERR_NETWORK");
   }
-  const body = (await res.json()) as ApiEnvelope<T>;
+  const raw = await res.text();
+  let body: ApiEnvelope<T>;
+  try {
+    body = (raw ? JSON.parse(raw) : {}) as ApiEnvelope<T>;
+  } catch {
+    body = {
+      success: false,
+      message:
+        res.status === 404
+          ? "API endpoint not found. The backend may need a deploy (merge staging → main)."
+          : res.statusText || `Request failed (${res.status}).`,
+      code: res.status === 404 ? "ERR_NOT_FOUND" : "ERR_BAD_RESPONSE",
+    };
+  }
   const result = { ...body, status: res.status, ok: res.ok };
   if (body.code === "ERR_SESSION_IDLE" && !options?.background) {
     const path = window.location.pathname;

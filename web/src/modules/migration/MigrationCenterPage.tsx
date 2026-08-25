@@ -48,24 +48,52 @@ const OPENING: EntityCard[] = [
 
 const OPEN_DOCS: EntityCard[] = [
   {
+    kind: "open_quo",
+    title: "Quotation",
+    blurb: "Optional. Open customer quotations still in the pipeline. Saved as unconfirmed — no stock impact.",
+    href: "/app/quotation/quotations",
+    optional: true,
+  },
+  {
+    kind: "open_so",
+    title: "Sales Order",
+    blurb: "Optional. Open sales orders not yet fulfilled. Saved as unconfirmed — does not reserve stock.",
+    href: "/app/sales-order/sales-orders",
+    optional: true,
+  },
+  {
     kind: "open_si",
-    title: "Open unpaid sales invoices",
-    blurb: "Optional. Remaining customer balances only. Does not deduct stock or create Official Receipts.",
+    title: "Sales",
+    blurb: "Optional. Remaining unpaid sales invoices / customer balances. Does not deduct stock or create Official Receipts.",
     href: "/app/sales/sales",
     optional: true,
   },
   {
-    kind: "open_ap",
-    title: "Open unpaid supplier invoices",
-    blurb: "Optional. Remaining payables only. Does not create goods receipts.",
-    href: "/app/finance/supplier-invoices",
+    kind: "open_pr",
+    title: "Purchase Requisition",
+    blurb: "Optional. Open purchase requests still to process. Saved as unconfirmed. Partner is optional.",
+    href: "/app/purchase-request/purchase-requests",
+    optional: true,
+  },
+  {
+    kind: "open_rfq",
+    title: "RFQ",
+    blurb: "Optional. Open requests for quotation. Saved as draft RFQs (line qty; no supplier quote prices).",
+    href: "/app/purchase-order/rfq",
     optional: true,
   },
   {
     kind: "open_po",
-    title: "Undelivered purchase orders",
+    title: "Purchase Order",
     blurb: "Optional. Outstanding PO qty still expected. Left as draft — do not receive here.",
     href: "/app/purchase-order/purchase-orders",
+    optional: true,
+  },
+  {
+    kind: "open_ap",
+    title: "Purchases",
+    blurb: "Optional. Remaining unpaid supplier invoices / payables. Does not create goods receipts.",
+    href: "/app/finance/supplier-invoices",
     optional: true,
   },
   {
@@ -143,8 +171,9 @@ export default function MigrationCenterPage() {
           Skip any step you do not need — you can enter masters and opening balances in the normal screens instead.
         </p>
         <p class="mt-2 text-sm text-text-secondary">
-          Suggested order if you do import: accounts → partners → items → bank opening (Banking) → opening stock → unpaid
-          invoices. Import remaining unpaid amounts only. Do not import paid history. Official Receipts start at go-live.
+          Suggested order if you do import: accounts → partners → items → bank opening (Banking) → opening stock → open
+          pipeline docs (quotation, SO, PR, RFQ, PO) → unpaid sales/purchases. Import remaining open amounts only. Do not
+          import paid history. Official Receipts start at go-live.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Mapping Center (document-generation rules) is a different tool. CSV/XLSX column mapping lives only here.
@@ -169,7 +198,11 @@ export default function MigrationCenterPage() {
       </section>
 
       <section class="space-y-3">
-        <h3 class="text-sm font-semibold text-text-primary">3. Open documents (optional)</h3>
+        <h3 class="text-sm font-semibold text-text-primary">3. Open transactions (optional)</h3>
+        <p class="text-xs text-text-secondary">
+          Cutover pipeline and unpaid balances: Quotation, Sales Order, Sales, Purchase Requisition, RFQ, Purchase Order,
+          Purchases. Documents are created as draft/unconfirmed and do not post stock or payments.
+        </p>
         <CardGrid items={OPEN_DOCS} onImport={setKind} />
       </section>
 

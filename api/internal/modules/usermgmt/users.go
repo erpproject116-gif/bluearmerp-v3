@@ -16,7 +16,9 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inviteemail"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/supabaseadmin"
 )
 
 type UserRow struct {
@@ -50,6 +52,7 @@ func registerUserRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/invites", createInvite(pool))
 	r.Patch("/users/{id}", patchUser(pool))
 	r.Post("/users/{id}/reset-for-reinvite", resetUserForReinvite(pool))
+	r.Post("/users/{id}/reinvite", reinviteExistingUser(pool))
 	r.Get("/users/{id}/groups", getUserGroups(pool))
 	r.Put("/users/{id}/groups", putUserGroups(pool))
 	r.Post("/invites/{id}/revoke", revokeInvite(pool))
@@ -604,6 +607,130 @@ func revokeInvite(pool *pgxpool.Pool) http.HandlerFunc {
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.invite_revoke", "user", &userID, nil, nil)
 		response.OK(w, map[string]any{"id": userID, "invite_id": inviteID}, "Invite revoked.")
+	}
+}
+
+// reinviteExistingUser emails access again without clearing roles, groups, scopes, or auth link.
+// Includes a set-password link (Supabase Admin recovery/invite) when possible.
+func reinviteExistingUser(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to re-invite user.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var (
+			email, fullName, roleCode, status string
+			authUserID                        *string
+		)
+		err = tx.QueryRow(r.Context(), `
+			select u.email, u.full_name, u.tenant_role, u.status, u.auth_user_id::text
+			from public.users u
+			where u.id = $1 and u.tenant_id = $2
+			for update of u`, id, tu.TenantID).
+			Scan(&email, &fullName, &roleCode, &status, &authUserID)
+		if err == pgx.ErrNoRows {
+			response.Err(w, http.StatusNotFound, "User not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load user.", "ERR_INTERNAL")
+			return
+		}
+
+		// Soft-deleted users: restore access so they can sign in — do not clear ACL data.
+		if status == "disabled" {
+			if _, err := tx.Exec(r.Context(), `
+				update public.users
+				set status = case when auth_user_id is null then 'invited' else 'active' end,
+				    updated_at = now()
+				where id = $1 and tenant_id = $2`, id, tu.TenantID); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to restore user for re-invite.", "ERR_INTERNAL")
+				return
+			}
+			if authUserID == nil {
+				status = "invited"
+			} else {
+				status = "active"
+			}
+		}
+
+		var inviteID int64
+		var invitedAt time.Time
+		err = tx.QueryRow(r.Context(), `
+			select id from public.user_invites
+			where tenant_id = $1 and user_id = $2
+			order by invited_at desc nulls last
+			limit 1`, tu.TenantID, id).Scan(&inviteID)
+		if err == pgx.ErrNoRows {
+			err = tx.QueryRow(r.Context(), `
+				insert into public.user_invites
+				  (tenant_id, user_id, email, full_name, role_code, invited_by_user_id, accepted_at)
+				values ($1,$2,$3,$4,$5,$6, case when $7::boolean then now() else null end)
+				returning id, invited_at`,
+				tu.TenantID, id, email, fullName, roleCode, tu.AppUserID, authUserID != nil).
+				Scan(&inviteID, &invitedAt)
+		} else if err == nil {
+			err = tx.QueryRow(r.Context(), `
+				update public.user_invites
+				set revoked_at = null,
+				    full_name = $1,
+				    role_code = $2,
+				    invited_by_user_id = $3,
+				    invited_at = now(),
+				    accepted_at = case
+				      when $4::boolean then coalesce(accepted_at, now())
+				      else null
+				    end
+				where id = $5
+				returning invited_at`,
+				fullName, roleCode, tu.AppUserID, authUserID != nil, inviteID).
+				Scan(&invitedAt)
+		}
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to record re-invite.", "ERR_INTERNAL")
+			return
+		}
+
+		linkType := "recovery"
+		if authUserID == nil {
+			linkType = "invite"
+		}
+		pwdURL, genErr := supabaseadmin.GeneratePasswordLink(r.Context(), email, linkType, inviteemail.AbsoluteResetPasswordURL())
+		if genErr != nil || strings.TrimSpace(pwdURL) == "" {
+			pwdURL = inviteemail.AbsoluteForgotPasswordURL()
+		}
+
+		_ = enqueueReinviteEmailTx(r.Context(), tx, pool, tu.TenantID, tu.AppUserID, inviteID, id, email, fullName, roleCode,
+			fmt.Sprintf("safe-reinvite:%d", time.Now().UnixNano()), pwdURL)
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to re-invite user.", "ERR_INTERNAL")
+			return
+		}
+		drainInviteOutboxAsync(pool)
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.reinvite_safe", "user", &id, nil, map[string]any{
+			"email": email, "kept_auth": authUserID != nil, "status": status,
+		})
+
+		msg := "Re-invite sent. Roles and permissions were kept. They can sign in or set a new password from the email."
+		if !inviteEmailSMTPEnabled() {
+			msg = "Re-invite recorded (email not configured). Share /signin or /forgot-password — roles and permissions were kept."
+		}
+		response.OK(w, map[string]any{
+			"id": id, "email": email, "status": status, "invite_id": inviteID,
+			"auth_linked": authUserID != nil, "password_setup_included": true,
+		}, msg)
 	}
 }
 

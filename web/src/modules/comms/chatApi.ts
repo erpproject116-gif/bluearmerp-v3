@@ -22,6 +22,15 @@ export type ChatUser = {
   email: string;
 };
 
+export type ChatMember = {
+  user_id: number;
+  full_name: string;
+  email?: string;
+  role: string;
+  last_read_message_id?: number | null;
+  joined_at: string;
+};
+
 export type ChatMessageLink = {
   id: number;
   entity_type: string;
@@ -245,8 +254,12 @@ export async function downloadChatAttachment(att: ChatAttachment): Promise<boole
   return true;
 }
 
+export async function listChatMembers(channelId: number) {
+  return apiFetch<ChatMember[]>(`/api/v1/comms/chat/channels/${channelId}/members`);
+}
+
 export async function addChatMembers(channelId: number, userIds: number[]) {
-  return apiFetch(`/api/v1/comms/chat/channels/${channelId}/members`, {
+  return apiFetch<{ added: number }>(`/api/v1/comms/chat/channels/${channelId}/members`, {
     method: "POST",
     body: JSON.stringify({ user_ids: userIds }),
   });

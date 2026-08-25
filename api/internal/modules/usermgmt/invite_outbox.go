@@ -31,3 +31,7 @@ func drainInviteOutboxAsync(pool *pgxpool.Pool) {
 func enqueueInviteEmailTx(ctx context.Context, tx pgx.Tx, pool *pgxpool.Pool, tenantID, inviterUserID, inviteID, userID int64, email, fullName, roleCode, idemSuffix string) error {
 	return inviteemail.EnqueueUserInviteTx(ctx, tx, pool, tenantID, inviterUserID, inviteID, userID, email, fullName, roleCode, idemSuffix)
 }
+
+func enqueueReinviteEmailTx(ctx context.Context, tx pgx.Tx, pool *pgxpool.Pool, tenantID, inviterUserID, inviteID, userID int64, email, fullName, roleCode, idemSuffix, passwordResetURL string) error {
+	return inviteemail.EnqueueUserInviteTxWithOptions(ctx, tx, pool, tenantID, inviterUserID, inviteID, userID, email, fullName, roleCode, idemSuffix, passwordResetURL, "reinvite")
+}
