@@ -23,15 +23,16 @@ const (
 
 // Payload is stored on user.invite outbox events and used for HTML/text rendering.
 type Payload struct {
-	InviteID    int64  `json:"invite_id"`
-	UserID      int64  `json:"user_id"`
-	Email       string `json:"email"`
-	FullName    string `json:"full_name"`
-	RoleCode    string `json:"role_code"`
-	CompanyName string `json:"company_name"`
-	InviterName string `json:"inviter_name"`
-	SignInURL   string `json:"signin_url"`
-	Kind        string `json:"kind,omitempty"` // "workspace" | "staff"
+	InviteID         int64  `json:"invite_id"`
+	UserID           int64  `json:"user_id"`
+	Email            string `json:"email"`
+	FullName         string `json:"full_name"`
+	RoleCode         string `json:"role_code"`
+	CompanyName      string `json:"company_name"`
+	InviterName      string `json:"inviter_name"`
+	SignInURL        string `json:"signin_url"`
+	PasswordResetURL string `json:"password_reset_url,omitempty"`
+	Kind             string `json:"kind,omitempty"` // "workspace" | "staff" | "reinvite"
 }
 
 // MailConfigured reports whether Resend or SMTP can send invite mail.
@@ -39,8 +40,8 @@ func MailConfigured() bool {
 	return outbox.MailConfigured()
 }
 
-// AbsoluteSignInURL builds https://…/signin from APP_PUBLIC_URL or CORS_ORIGIN.
-func AbsoluteSignInURL() string {
+// AbsoluteAppURL returns the public app origin (no trailing slash), or "".
+func AbsoluteAppURL() string {
 	origin := strings.TrimSpace(os.Getenv("APP_PUBLIC_URL"))
 	if origin == "" {
 		raw := strings.TrimSpace(os.Getenv("CORS_ORIGIN"))
@@ -48,11 +49,34 @@ func AbsoluteSignInURL() string {
 			origin = strings.TrimSpace(strings.Split(raw, ",")[0])
 		}
 	}
-	origin = strings.TrimRight(origin, "/")
+	return strings.TrimRight(origin, "/")
+}
+
+// AbsoluteSignInURL builds https://…/signin from APP_PUBLIC_URL or CORS_ORIGIN.
+func AbsoluteSignInURL() string {
+	origin := AbsoluteAppURL()
 	if origin == "" {
 		return "/signin"
 	}
 	return origin + "/signin"
+}
+
+// AbsoluteForgotPasswordURL is the fallback page when Admin generate_link is unavailable.
+func AbsoluteForgotPasswordURL() string {
+	origin := AbsoluteAppURL()
+	if origin == "" {
+		return "/forgot-password"
+	}
+	return origin + "/forgot-password"
+}
+
+// AbsoluteResetPasswordURL is the Supabase recovery redirect target.
+func AbsoluteResetPasswordURL() string {
+	origin := AbsoluteAppURL()
+	if origin == "" {
+		return "/auth/reset-password"
+	}
+	return origin + "/auth/reset-password"
 }
 
 // LoadWorkspaceContext loads company + inviter for a tenant invite.
@@ -74,11 +98,19 @@ func LoadWorkspaceContext(ctx context.Context, pool *pgxpool.Pool, tenantID, inv
 
 // EnqueueUserInviteTx queues a workspace invite email on the tenant outbox.
 func EnqueueUserInviteTx(ctx context.Context, tx pgx.Tx, pool *pgxpool.Pool, tenantID, inviterUserID, inviteID, userID int64, email, fullName, roleCode, idemSuffix string) error {
+	return EnqueueUserInviteTxWithOptions(ctx, tx, pool, tenantID, inviterUserID, inviteID, userID, email, fullName, roleCode, idemSuffix, "", "workspace")
+}
+
+// EnqueueUserInviteTxWithOptions queues invite/re-invite mail; passwordResetURL enables set-password CTA.
+func EnqueueUserInviteTxWithOptions(ctx context.Context, tx pgx.Tx, pool *pgxpool.Pool, tenantID, inviterUserID, inviteID, userID int64, email, fullName, roleCode, idemSuffix, passwordResetURL, kind string) error {
 	companyName, inviterName, signInURL := LoadWorkspaceContext(ctx, pool, tenantID, inviterUserID)
+	if kind == "" {
+		kind = "workspace"
+	}
 	p := Payload{
 		InviteID: inviteID, UserID: userID, Email: email, FullName: fullName,
 		RoleCode: roleCode, CompanyName: companyName, InviterName: inviterName, SignInURL: signInURL,
-		Kind: "workspace",
+		PasswordResetURL: strings.TrimSpace(passwordResetURL), Kind: kind,
 	}
 	key := fmt.Sprintf("user.invite:%d:%d", tenantID, inviteID)
 	if idemSuffix != "" {
@@ -169,6 +201,23 @@ func Deliver(p Payload) error {
 			fullName, inviter, role, signIn, to,
 		)
 		htmlBody = buildStaffInviteHTML(fullName, inviter, role, signIn, to)
+	} else if kind == "reinvite" {
+		if company == "" {
+			company = "your company"
+		}
+		subject = fmt.Sprintf("Access again — %s on BluearmERP", company)
+		pwdURL := strings.TrimSpace(p.PasswordResetURL)
+		if pwdURL == "" {
+			pwdURL = AbsoluteForgotPasswordURL()
+		}
+		textBody = fmt.Sprintf(
+			"Hello %s,\n\n%s re-invited you to %s on BluearmERP as %s.\n\n"+
+				"Your existing roles and permissions were kept.\n\n"+
+				"Sign in at %s (Google with %s), or set a new password: %s\n\n"+
+				"— BluearmERP\n",
+			fullName, inviter, company, role, signIn, to, pwdURL,
+		)
+		htmlBody = buildReinviteHTML(fullName, inviter, company, role, signIn, to, pwdURL)
 	} else {
 		if company == "" {
 			company = "your company"
@@ -176,14 +225,18 @@ func Deliver(p Payload) error {
 		} else {
 			subject = fmt.Sprintf("You're invited to %s on BluearmERP", company)
 		}
+		pwdURL := strings.TrimSpace(p.PasswordResetURL)
 		textBody = fmt.Sprintf(
 			"Hello %s,\n\n%s invited you to join %s on BluearmERP as %s.\n\n"+
 				"Sign in at %s using Google with this same email address (%s).\n"+
-				"There is no separate Accept button — joining happens when you sign in.\n\n"+
-				"— BluearmERP\n",
+				"There is no separate Accept button — joining happens when you sign in.\n",
 			fullName, inviter, company, role, signIn, to,
 		)
-		htmlBody = buildWorkspaceInviteHTML(fullName, inviter, company, role, signIn, to)
+		if pwdURL != "" {
+			textBody += fmt.Sprintf("\nYou can also set a password here: %s\n", pwdURL)
+		}
+		textBody += "\n— BluearmERP\n"
+		htmlBody = buildWorkspaceInviteHTML(fullName, inviter, company, role, signIn, to, pwdURL)
 	}
 	return outbox.DeliverHTML(to, subject, htmlBody, textBody)
 }
@@ -202,8 +255,15 @@ func SendStaffInviteAsync(inviteID int64, email, fullName, role, inviterName str
 	}()
 }
 
-func buildWorkspaceInviteHTML(fullName, inviter, company, role, signInURL, email string) string {
+func buildWorkspaceInviteHTML(fullName, inviter, company, role, signInURL, email, passwordResetURL string) string {
 	esc := html.EscapeString
+	pwdBlock := ""
+	if strings.TrimSpace(passwordResetURL) != "" {
+		pwdBlock = fmt.Sprintf(`
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#334155;">
+            Prefer email and password? <a href="%s" style="color:#3c50e0;font-weight:600;">Set a new password</a>.
+          </p>`, esc(passwordResetURL))
+	}
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/></head>
@@ -230,6 +290,7 @@ func buildWorkspaceInviteHTML(fullName, inviter, company, role, signInURL, email
               </a>
             </td></tr>
           </table>
+          %s
           <p style="margin:0;font-size:13px;line-height:1.5;color:#64748b;">If you were not expecting this invite, you can ignore this email.</p>
         </td></tr>
         <tr><td style="padding:16px 28px 24px;border-top:1px solid #e2e8f0;">
@@ -240,7 +301,58 @@ func buildWorkspaceInviteHTML(fullName, inviter, company, role, signInURL, email
   </table>
 </body>
 </html>`,
-		esc(fullName), esc(inviter), esc(company), esc(role), esc(email), esc(signInURL),
+		esc(fullName), esc(inviter), esc(company), esc(role), esc(email), esc(signInURL), pwdBlock,
+	)
+}
+
+func buildReinviteHTML(fullName, inviter, company, role, signInURL, email, passwordResetURL string) string {
+	esc := html.EscapeString
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/></head>
+<body style="margin:0;padding:0;background-color:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">
+  <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background-color:#f4f6fb;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+        <tr><td style="background-color:#3c50e0;padding:20px 28px;">
+          <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;">BluearmERP</p>
+        </td></tr>
+        <tr><td style="padding:28px;">
+          <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#0f172a;">You're re-invited</h1>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#334155;">
+            Hello %s — <strong>%s</strong> sent you access again for <strong>%s</strong> as <strong>%s</strong>.
+          </p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#334155;">
+            Your existing roles, groups, and permissions were <strong>not</strong> reset.
+          </p>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#334155;">
+            Sign in with Google using <strong>%s</strong>, or set a new password with the button below.
+          </p>
+          <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 12px;">
+            <tr><td style="border-radius:6px;background-color:#3c50e0;">
+              <a href="%s" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+                Sign in to BluearmERP
+              </a>
+            </td></tr>
+          </table>
+          <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 24px;">
+            <tr><td style="border-radius:6px;border:1px solid #3c50e0;">
+              <a href="%s" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#3c50e0;text-decoration:none;">
+                Set a new password
+              </a>
+            </td></tr>
+          </table>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:#64748b;">If you were not expecting this email, you can ignore it.</p>
+        </td></tr>
+        <tr><td style="padding:16px 28px 24px;border-top:1px solid #e2e8f0;">
+          <p style="margin:0;font-size:12px;line-height:1.5;color:#94a3b8;">BluearmERP — workspace re-invite</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+		esc(fullName), esc(inviter), esc(company), esc(role), esc(email), esc(signInURL), esc(passwordResetURL),
 	)
 }
 
