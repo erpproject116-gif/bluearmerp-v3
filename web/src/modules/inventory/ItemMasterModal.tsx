@@ -70,7 +70,7 @@ export const emptyItemForm = (): ItemFormState => ({
   standard_costs: emptyStandardCosts(),
   warranty_duration_months: null,
   reorder_level: null,
-  track_serial: false,
+  track_serial: true,
   track_lot: false,
   serial_policy: "optional",
   lot_policy: "optional",
@@ -283,8 +283,9 @@ export function ItemMasterModal(props: Props) {
           <div>
             <p class="text-sm font-semibold text-text-primary">Tracking</p>
             <p class="mt-0.5 text-xs text-text-secondary">
-              Quantity tracking drives Find Stock and Stock Movements. Serial/Lot is for unit identity on Purchase Receive
-              and Sales — quantity tracking should stay on when you use them.
+              Quantity tracking drives Find Stock and Stock Movements. Serial tracking is on by default for new items —
+              choose None for services / non-serialized stock, or Lot when you track batches instead. Quantity tracking
+              should stay on when you use Serial or Lot.
             </p>
           </div>
           <Field label="Inventory quantity">
@@ -327,7 +328,7 @@ export function ItemMasterModal(props: Props) {
                     }))
                   }
                 />
-                Serial
+                Serial (default)
               </label>
               <label class="flex items-center gap-2">
                 <input
