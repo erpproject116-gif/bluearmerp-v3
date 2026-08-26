@@ -226,11 +226,12 @@ export function ItemMasterModal(props: Props) {
       </Show>
 
       <Show when={props.itemTab === "item_info"}>
-        <Field label="Spec name">
+        <Field label="Spec name / Description">
           <input
             class={inputClass}
             value={props.form().spec_name}
             onInput={(e) => setForm((f) => ({ ...f, spec_name: e.currentTarget.value }))}
+            placeholder="Shown as Description on document lines"
           />
         </Field>
         <div>

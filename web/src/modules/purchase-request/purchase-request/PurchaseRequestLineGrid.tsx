@@ -5,6 +5,10 @@ import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import { ItemSearchModal, type ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
+import {
+  itemSpecAsLineDescription,
+  syncSpecDescriptionPatch,
+} from "../../../shared/itemLineSpecDescription";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
@@ -221,7 +225,8 @@ export function PurchaseRequestLineGrid(props: Props) {
   });
 
   const updateLine = (idx: number, patch: Partial<PurchaseRequestLineRow>) => {
-    const next = props.lines().map((ln, i) => (i === idx ? { ...ln, ...patch } : ln));
+    const synced = syncSpecDescriptionPatch(patch);
+    const next = props.lines().map((ln, i) => (i === idx ? { ...ln, ...patch, ...synced } : ln));
     props.onChange(next);
     if (patch.qty !== undefined || patch.unit_price !== undefined || patch.input_basis !== undefined) {
       schedulePreview(idx);
@@ -263,7 +268,8 @@ export function PurchaseRequestLineGrid(props: Props) {
             item_id: item.id,
             item_code: item.item_code,
             item_name: item.item_name,
-            spec_name: item.spec_name ?? "",
+            spec_name: itemSpecAsLineDescription(item),
+            description: itemSpecAsLineDescription(item),
             unit_id: item.base_unit_id ?? null,
             unit_code: item.base_unit_code ?? "",
             unit_price: String(item.sales_price ?? 0),

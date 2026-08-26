@@ -11,6 +11,7 @@ import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { coalesceSpecDescription } from "../../../shared/itemLineSpecDescription";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
@@ -138,8 +139,8 @@ function linesFromDetail(lines?: PurchaseRequestDetail["lines"]): PurchaseReques
     item_id: ln.item_id,
     item_code: ln.item_code ?? "",
     item_name: ln.item_name ?? "",
-    spec_name: ln.spec_name ?? "",
-    description: ln.description ?? "",
+    spec_name: coalesceSpecDescription(ln.spec_name, ln.description),
+    description: coalesceSpecDescription(ln.description, ln.spec_name),
     qty: ln.qty != null ? String(ln.qty) : "1",
     unit_id: ln.unit_id ?? null,
     unit_code: ln.unit_code ?? "",
@@ -538,8 +539,8 @@ export function PurchaseRequestModal(props: Props) {
         item_id: ln.item_id || null,
         item_code: ln.item_code,
         item_name: ln.item_name,
-        spec_name: ln.spec_name || null,
-        description: ln.description || null,
+        spec_name: coalesceSpecDescription(ln.spec_name, ln.description) || null,
+        description: coalesceSpecDescription(ln.description, ln.spec_name) || null,
         qty: ln.qty === "" ? 0 : Number(ln.qty),
         unit_id: ln.unit_id || null,
         unit_code: ln.unit_code || null,
