@@ -4,6 +4,16 @@ import { supabase, supabaseConfigured } from "../../shared/api";
 import { useAuth } from "../../shared/auth-context";
 import { AuthAlert, AuthShell, authInputClass } from "./AuthShell";
 
+type OtpType = "recovery" | "invite" | "signup" | "magiclink" | "email";
+
+function normalizeOtpType(raw: string | null): OtpType {
+  const t = (raw ?? "recovery").toLowerCase();
+  if (t === "invite" || t === "signup" || t === "magiclink" || t === "email" || t === "recovery") {
+    return t;
+  }
+  return "recovery";
+}
+
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
   const auth = useAuth();
@@ -30,6 +40,25 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    // Admin re-invite / generate_link deep link (no current password required).
+    const tokenHash = params.get("token_hash");
+    const otpType = normalizeOtpType(params.get("type"));
+    if (tokenHash) {
+      const { error: otpErr } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: otpType,
+      });
+      if (otpErr) {
+        setBootstrapping(false);
+        setError(otpErr.message);
+        return;
+      }
+      window.history.replaceState({}, document.title, "/auth/reset-password");
+      setBootstrapping(false);
+      setSessionReady(true);
+      return;
+    }
+
     const code = params.get("code");
     if (code) {
       const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
@@ -47,7 +76,7 @@ export default function ResetPasswordPage() {
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
       const type = hashParams.get("type");
-      if (accessToken && refreshToken && type === "recovery") {
+      if (accessToken && refreshToken && (type === "recovery" || type === "invite")) {
         const { error: sessionErr } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
@@ -68,7 +97,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setError("This reset link is invalid or has expired. Request a new one from the sign-in page.");
+    setError("This reset link is invalid or has expired. Ask your admin to re-invite you, or request a new link.");
   });
 
   const submit = async (e: Event) => {
@@ -87,11 +116,19 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
+    // Recovery/invite session from the email link — never ask for the old password here.
     const { error: updateErr } = await supabase.auth.updateUser({ password: pwd });
     setLoading(false);
 
     if (updateErr) {
-      setError(updateErr.message);
+      const msg = updateErr.message || "Could not update password.";
+      if (/current.?password|reauth|re-auth|recent.?login/i.test(msg)) {
+        setError(
+          "Your auth project requires the current password for changes. Disable “Require current password when changing password” in Supabase Auth settings for admin re-invite links, or open a fresh Set password link from your email.",
+        );
+        return;
+      }
+      setError(msg);
       return;
     }
 
@@ -103,7 +140,7 @@ export default function ResetPasswordPage() {
   return (
     <AuthShell
       title="Choose a new password"
-      subtitle="Enter and confirm your new password below."
+      subtitle="Enter and confirm your new password. You do not need your old password."
       heroTitle="Set a password you can rely on."
       heroBody="Choose something unique and at least eight characters. You'll return to your workspace as soon as it's saved."
       trustPoints={[
