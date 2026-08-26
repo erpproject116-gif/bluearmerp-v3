@@ -34,6 +34,10 @@ const MESSAGE_HINTS: Array<{ match: RegExp; hint: PolicyActionHint }> = [
     hint: { href: "/app/purchase-order/purchase-orders", label: "Open Purchase Orders" },
   },
   { match: /goods receipt|purchase receive/i, hint: { href: "/app/purchase-order/goods-receipt", label: "Open Purchase Receive" } },
+  {
+    match: /progress must be completed/i,
+    hint: { href: "/app/sales-order/sales-orders", label: "Set SO Progress to Completed" },
+  },
   { match: /sales order/i, hint: { href: "/app/sales-order/sales-orders", label: "Open Sales Orders" } },
   { match: /quotation/i, hint: { href: "/app/quotation/quotations", label: "Open Quotations" } },
   { match: /purchase request/i, hint: { href: "/app/purchase-request/purchase-requests", label: "Open Purchase Requests" } },

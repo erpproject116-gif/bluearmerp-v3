@@ -61,8 +61,7 @@ type openSalesOrderLineRow struct {
 func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		// Load Slip lists every open SO residual (including Unconfirmed), matching
-		// Quotation Load Slip. Delivery / Pick List rules still apply on Save.
+		// New Sales Load Slip: only Completed SOs may be invoiced (Confirm / In progress is not enough).
 		p := httputil.ParseListParams(r, "order_date", map[string]string{
 			"order_date":     "so.order_date",
 			"sales_order_no": "so.sales_order_no",
@@ -72,10 +71,9 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		pageSize := openlines.PageSize(r, p.PageSize)
 		offset := (p.Page - 1) * pageSize
 
-		// Open residual for Load Slip listing = ordered − already invoiced
-		// (serial release is enforced on Save, not used to hide rows here).
+		// Open residual = ordered − already invoiced (serial release still enforced on Save).
 		where := `so.tenant_id = $1 and so.deleted_at is null
-			and so.progress_status in ('unconfirmed', 'e_approval', 'in_progress', 'completed')
+			and so.progress_status = 'completed'
 			and (ln.qty - coalesce(slip.sold, 0)) > 0.0001`
 		args := []any{tu.TenantID}
 		argN := 2
@@ -190,11 +188,15 @@ func balanceExpr(useDelivery bool) string {
 		else ln.qty - coalesce(slip.sold, 0) end`
 }
 
+func soMustBeCompletedForSaleMessage() string {
+	return "Sales order progress must be Completed before creating a New Sale (Confirm / In progress is not enough)."
+}
+
 func zeroBalanceMessage(useDelivery bool) string {
 	if useDelivery {
-		return "No delivered balance available."
+		return "No delivered balance available. Post a Delivery Receipt against the Completed sales order first."
 	}
-	return "No open sales order quantity available. Confirm the SO first; serial-tracked items also need Pick List release."
+	return "No open sales order quantity available. For serial-tracked items, release quantity on Pick List first."
 }
 
 func salesOrderLineQtyError(balance, qty float64) string {
@@ -276,8 +278,9 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 			continue
 		}
 		var balance float64
+		var progress string
 		err := pool.QueryRow(ctx, fmt.Sprintf(`
-			select (%s)::float8
+			select (%s)::float8, so.progress_status
 			from public.so_sales_order_lines ln
 			join public.so_sales_orders so on so.id = ln.sales_order_id
 			left join public.inv_items i on i.id = ln.item_id
@@ -299,9 +302,13 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 			  group by sales_order_line_id
 			) slip on slip.sales_order_line_id = ln.id
 			where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null`,
-			balanceExpr(useDelivery)), *ln.SourceSalesOrderLineID, tenantID).Scan(&balance)
+			balanceExpr(useDelivery)), *ln.SourceSalesOrderLineID, tenantID).Scan(&balance, &progress)
 		if err != nil {
 			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = "Sales order line not found."
+			continue
+		}
+		if progress != "completed" {
+			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = soMustBeCompletedForSaleMessage()
 			continue
 		}
 		if balance <= 0.0001 {
@@ -407,11 +414,11 @@ func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 		  group by sales_order_line_id
 		) slip on slip.sales_order_line_id = ln.id
 		where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null
-		  and so.progress_status in ('unconfirmed', 'e_approval', 'in_progress', 'completed')`,
+		  and so.progress_status = 'completed'`,
 		salesOrderLineID, tenantID,
 	).Scan(&locationID, &itemID, &released, &sold, &trackInventory, &trackSerial)
 	if err != nil {
-		return errors.New("sales order line not found or not open")
+		return errors.New(soMustBeCompletedForSaleMessage())
 	}
 
 	availableReleased := released - sold

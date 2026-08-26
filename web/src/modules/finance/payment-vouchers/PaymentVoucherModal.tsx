@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Index, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { DecimalInput } from "../../../shared/DecimalInput";
@@ -296,20 +296,20 @@ export function PaymentVoucherModal(props: Props) {
       </Field>
       <div class="col-span-full space-y-2">
         <p class="text-sm font-medium text-text-primary">Invoice applications</p>
-        <For each={applications()}>
-          {(_, index) => (
+        <Index each={applications()}>
+          {(app, index) => (
             <div class="grid grid-cols-2 gap-2">
               <LookupCombo
                 label="Supplier invoice"
-                value={() => applications()[index()]?.label ?? ""}
-                selectedId={() => applications()[index()]?.supplier_invoice_id ?? null}
+                value={() => app()?.label ?? ""}
+                selectedId={() => app()?.supplier_invoice_id ?? null}
                 onInput={(t) =>
-                  setApplications((rows) => rows.map((r, idx) => (idx === index() ? { ...r, label: t } : r)))
+                  setApplications((rows) => rows.map((r, idx) => (idx === index ? { ...r, label: t } : r)))
                 }
                 onSelect={(o) =>
                   setApplications((rows) =>
                     rows.map((r, idx) =>
-                      idx === index()
+                      idx === index
                         ? { ...r, supplier_invoice_id: o.id, label: o.label, grand_total: Number(o.sublabel ?? 0) }
                         : r,
                     ),
@@ -318,7 +318,7 @@ export function PaymentVoucherModal(props: Props) {
                 onClear={() =>
                   setApplications((rows) =>
                     rows.map((r, idx) =>
-                      idx === index()
+                      idx === index
                         ? { supplier_invoice_id: null, label: "", grand_total: 0, applied_amount: r.applied_amount }
                         : r,
                     ),
@@ -329,15 +329,15 @@ export function PaymentVoucherModal(props: Props) {
               <Field label="Applied amount">
                 <DecimalInput
                   class={inputClass}
-                  value={applications()[index()]?.applied_amount ?? ""}
+                  value={app()?.applied_amount ?? ""}
                   onValue={(v) =>
-                    setApplications((rows) => rows.map((r, idx) => (idx === index() ? { ...r, applied_amount: v } : r)))
+                    setApplications((rows) => rows.map((r, idx) => (idx === index ? { ...r, applied_amount: v } : r)))
                   }
                 />
               </Field>
             </div>
           )}
-        </For>
+        </Index>
         <button type="button" class="text-sm text-brand-600" onClick={() => setApplications((rows) => [...rows, { supplier_invoice_id: null, label: "", grand_total: 0, applied_amount: "" }])}>
           + Add application
         </button>
