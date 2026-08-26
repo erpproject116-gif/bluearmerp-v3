@@ -208,8 +208,9 @@ export function MigrationMappedImportModal(props: Props) {
         <p class="text-sm text-text-secondary">
           Download the template and fill it, or upload a CSV/Excel export from another system and map columns. Preview
           writes nothing. Replace the EXAMPLE row before Import. Dates must be YYYY-MM-DD. Amounts use a dot, no thousands
-          separators. Serial/lot items cannot go through opening stock or open documents. Open invoices also need tax type,
-          currency, and warehouse below. This step is optional.
+          separators. For open documents, <strong>item_code</strong>, <strong>item</strong>, and <strong>quantity</strong> are
+          optional — blank cells are skipped; unmatched codes import as free-text lines (qty defaults to 1). Serial-tracked
+          items are skipped on unpaid sales/purchases. Open invoices also need tax type, currency, and warehouse below.
         </p>
         <button
           type="button"

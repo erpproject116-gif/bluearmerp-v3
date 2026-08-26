@@ -23,19 +23,19 @@ var openAPCanonical = []string{"source_doc_no", "partner", "date", "item_code", 
 var openAPRequired = []string{"source_doc_no", "partner", "date", "amount"}
 
 var openPOCanonical = []string{"source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"}
-var openPORequired = []string{"source_doc_no", "partner", "date", "item", "quantity"}
+var openPORequired = []string{"source_doc_no", "partner", "date"}
 
 var openQuoCanonical = []string{"source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"}
-var openQuoRequired = []string{"source_doc_no", "partner", "date", "item", "quantity"}
+var openQuoRequired = []string{"source_doc_no", "partner", "date"}
 
 var openSOCanonical = []string{"source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"}
-var openSORequired = []string{"source_doc_no", "partner", "date", "item", "quantity"}
+var openSORequired = []string{"source_doc_no", "partner", "date"}
 
 var openPRCanonical = []string{"source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount"}
-var openPRRequired = []string{"source_doc_no", "date", "item", "quantity"}
+var openPRRequired = []string{"source_doc_no", "date"}
 
 var openRFQCanonical = []string{"source_doc_no", "date", "item_code", "item", "quantity", "notes"}
-var openRFQRequired = []string{"source_doc_no", "date", "item", "quantity"}
+var openRFQRequired = []string{"source_doc_no", "date"}
 
 var inTransitCanonical = []string{"item_code", "item", "quantity", "from_location", "to_location", "date"}
 var inTransitRequired = []string{"quantity", "from_location", "to_location"}
@@ -168,40 +168,54 @@ func mappedOpenDocHandler(pool *pgxpool.Pool, kind string, forcePreview bool) ht
 			}
 
 			var lines []openLine
-			docFail := false
 			for i, row := range doc.Rows {
 				rowNum := doc.RowNums[i]
-				item, errMsg := lookupItem(r.Context(), pool, tu.TenantID, strings.TrimSpace(row["item_code"]), strings.TrimSpace(row["item"]))
-				if item.ID == 0 && strings.HasPrefix(errMsg, "unmatched item_code") {
-					item, errMsg = lookupItem(r.Context(), pool, tu.TenantID, "", strings.TrimSpace(row["item"]))
-				}
-				if strings.TrimSpace(row["item"]) == "" && strings.TrimSpace(row["item_code"]) == "" && parseFloatDefault(row["amount"], 0) > 0 {
-					failRow(&result, rowNum, "item is required (or map a catch-all product)")
-					docFail = true
+				code := strings.TrimSpace(row["item_code"])
+				name := strings.TrimSpace(row["item"])
+				qtyRaw := parseFloatDefault(row["quantity"], 0)
+				amount := parseFloatDefault(row["amount"], 0)
+
+				// Blank / noise row — skip without failing the document.
+				if code == "" && name == "" && qtyRaw <= 0 && amount <= 0 {
 					continue
+				}
+
+				item, errMsg := lookupItem(r.Context(), pool, tu.TenantID, code, name)
+				if item.ID == 0 && strings.HasPrefix(errMsg, "unmatched item_code") && name != "" {
+					item, errMsg = lookupItem(r.Context(), pool, tu.TenantID, "", name)
+				}
+				// Unmatched or missing inventory: keep free-text code/name so cutover still imports.
+				if item.ID == 0 {
+					if code == "" && name == "" {
+						if amount > 0 || qtyRaw > 0 {
+							item = freeTextItem("OPEN", "Imported line (no item mapped)")
+							errMsg = ""
+						} else {
+							failRow(&result, rowNum, "item_code or item name is empty — row skipped")
+							continue
+						}
+					} else {
+						item = freeTextItem(code, name)
+						errMsg = ""
+					}
 				}
 				if errMsg != "" {
 					failRow(&result, rowNum, errMsg)
-					docFail = true
 					continue
 				}
-				if blockSerial && item.TrackSerial {
-					failRow(&result, rowNum, "serial-tracked items cannot be imported as open documents")
-					docFail = true
+				if blockSerial && item.ID > 0 && item.TrackSerial {
+					failRow(&result, rowNum, "serial-tracked items cannot be imported as open documents — row skipped")
 					continue
 				}
-				qty := parseFloatDefault(row["quantity"], 0)
-				amount := parseFloatDefault(row["amount"], 0)
 				var unit, q float64
 				var uerr string
 				if amountRequired {
-					unit, q, uerr = lineUnitPrice(qty, amount)
+					unit, q, uerr = lineUnitPrice(qtyRaw, amount)
 				} else {
-					unit, q, uerr = lineUnitPriceOptional(qty, amount)
+					unit, q, uerr = lineUnitPriceOptional(qtyRaw, amount)
 				}
 				if uerr != "" {
-					failRow(&result, rowNum, uerr)
-					docFail = true
+					failRow(&result, rowNum, uerr+" — row skipped")
 					continue
 				}
 				var amts taxcalc.LineAmounts
@@ -212,7 +226,8 @@ func mappedOpenDocHandler(pool *pgxpool.Pool, kind string, forcePreview bool) ht
 				}
 				lines = append(lines, openLine{Item: item, Qty: q, Amt: amts, Row: rowNum, Notes: strings.TrimSpace(row["notes"])})
 			}
-			if docFail || len(lines) == 0 {
+			if len(lines) == 0 {
+				failRow(&result, firstRow, "no usable lines after optional/blank rows were skipped")
 				continue
 			}
 			if dry {
@@ -302,7 +317,7 @@ func insertOpenSale(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, job jobD
 			  sales_id, line_no, item_id, item_code, item_name,
 			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total
 			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			id, i+1, ln.Item.ID, ln.Item.Code, ln.Item.Name,
+			id, i+1, nullIfZeroID(ln.Item.ID), ln.Item.Code, ln.Item.Name,
 			ln.Qty, ln.Amt.UnitNonVat, ln.Amt.NonVatTotal, ln.Amt.TaxAmount, ln.Amt.UnitVatInc, ln.Amt.LineTotal)
 		if err != nil {
 			return err
@@ -348,7 +363,7 @@ func insertOpenBill(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, job jobD
 			  supplier_invoice_id, line_no, item_id, item_code, item_name,
 			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total
 			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			id, i+1, ln.Item.ID, ln.Item.Code, ln.Item.Name,
+			id, i+1, nullIfZeroID(ln.Item.ID), ln.Item.Code, ln.Item.Name,
 			ln.Qty, ln.Amt.UnitNonVat, ln.Amt.NonVatTotal, ln.Amt.TaxAmount, ln.Amt.UnitVatInc, ln.Amt.LineTotal)
 		if err != nil {
 			return err
@@ -397,7 +412,7 @@ func insertOpenPO(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, job jobDef
 			  unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total
 			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'vat_inc_unit',$10,$11,$12,$13,$14)`,
 			id, i+1, partnerID, partnerCode, partnerName,
-			ln.Item.ID, ln.Item.Code, ln.Item.Name, ln.Qty,
+			nullIfZeroID(ln.Item.ID), ln.Item.Code, ln.Item.Name, ln.Qty,
 			ln.Amt.UnitNonVat, ln.Amt.NonVatTotal, ln.Amt.TaxAmount, ln.Amt.UnitVatInc, ln.Amt.LineTotal)
 		if err != nil {
 			return err
@@ -442,7 +457,7 @@ func insertOpenQuotation(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, job
 			  quotation_id, line_no, item_id, item_code, item_name,
 			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total
 			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			id, i+1, ln.Item.ID, ln.Item.Code, ln.Item.Name,
+			id, i+1, nullIfZeroID(ln.Item.ID), ln.Item.Code, ln.Item.Name,
 			ln.Qty, ln.Amt.UnitNonVat, ln.Amt.NonVatTotal, ln.Amt.TaxAmount, ln.Amt.UnitVatInc, ln.Amt.LineTotal)
 		if err != nil {
 			return err
@@ -487,7 +502,7 @@ func insertOpenSalesOrder(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, jo
 			  sales_order_id, line_no, item_id, item_code, item_name,
 			  qty, unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total
 			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			id, i+1, ln.Item.ID, ln.Item.Code, ln.Item.Name,
+			id, i+1, nullIfZeroID(ln.Item.ID), ln.Item.Code, ln.Item.Name,
 			ln.Qty, ln.Amt.UnitNonVat, ln.Amt.NonVatTotal, ln.Amt.TaxAmount, ln.Amt.UnitVatInc, ln.Amt.LineTotal)
 		if err != nil {
 			return err
@@ -547,7 +562,7 @@ func insertOpenPurchaseRequest(ctx context.Context, tx pgx.Tx, tu auth.TenantUse
 			  unit_non_vat, non_vat_total, tax_amount, unit_vat_inc, line_total
 			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'vat_inc_unit',$10,$11,$12,$13,$14)`,
 			id, i+1, linePartner, partnerCode, partnerName,
-			ln.Item.ID, ln.Item.Code, ln.Item.Name, ln.Qty,
+			nullIfZeroID(ln.Item.ID), ln.Item.Code, ln.Item.Name, ln.Qty,
 			ln.Amt.UnitNonVat, ln.Amt.NonVatTotal, ln.Amt.TaxAmount, ln.Amt.UnitVatInc, ln.Amt.LineTotal)
 		if err != nil {
 			return err
@@ -580,11 +595,10 @@ func insertOpenRFQ(ctx context.Context, tx pgx.Tx, tu auth.TenantUser, dateStr s
 		return err
 	}
 	for i, ln := range lines {
-		itemID := any(ln.Item.ID)
 		_, err = tx.Exec(ctx, `
 			insert into public.rfq_request_lines (rfq_id, line_no, item_id, item_code, item_name, qty, notes)
 			values ($1,$2,$3,$4,$5,$6,$7)`,
-			id, i+1, itemID, ln.Item.Code, ln.Item.Name, ln.Qty, nullIfEmpty(ln.Notes))
+			id, i+1, nullIfZeroID(ln.Item.ID), ln.Item.Code, ln.Item.Name, ln.Qty, nullIfEmpty(ln.Notes))
 		if err != nil {
 			return err
 		}

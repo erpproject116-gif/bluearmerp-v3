@@ -4,6 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
+import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
@@ -17,6 +18,7 @@ import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { SalesOrderItemSearchModal } from "./SalesOrderItemSearchModal";
 import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
 import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
+import { useToast } from "../../../shared/toast";
 
 type ProductBundleListRow = { id: number };
 type ExplodedBundleLine = { item_id: number; item_code: string; item_name: string; qty: number };
@@ -161,6 +163,7 @@ type Props = {
 };
 
 export function SalesOrderLineGrid(props: Props) {
+  const toast = useToast();
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchLineIdx, setSearchLineIdx] = createSignal<number | null>(null);
 
@@ -324,6 +327,26 @@ export function SalesOrderLineGrid(props: Props) {
     });
   };
 
+  const resolveItemCode = async (idx: number, rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+    const current = props.lines()[idx];
+    if (
+      current?.item_id &&
+      (current.item_code || "").trim().toLowerCase() === code.toLowerCase()
+    ) {
+      return;
+    }
+    const { item, error } = await resolveInventoryItemByCode(code);
+    if (error) {
+      toast.warning(error);
+      return;
+    }
+    if (!item) return;
+    setSearchLineIdx(idx);
+    await applyItems([item]);
+  };
+
   const totals = () => {
     const lines = props.lines();
     return {
@@ -382,11 +405,26 @@ export function SalesOrderLineGrid(props: Props) {
                   <ResizableTd width={widthFor("line_no")} class="px-2 py-1">{line().line_no}</ResizableTd>
                   <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
-                      class={`${inputClass} w-full cursor-pointer`}
+                      class={`${inputClass} w-full`}
                       value={line().item_code}
-                      readOnly
+                      placeholder="Code or dbl-click to search"
+                      title="Type a registered code and Tab/Enter to auto-fill, or double-click to search"
                       onDblClick={() => openSearch(idx)}
-                      title={uiLabel("lines.item_search_hint")}
+                      onInput={(e) =>
+                        void updateLine(idx, {
+                          item_code: e.currentTarget.value,
+                          item_id: null,
+                          track_serial: false,
+                          planned_serial_nos: [],
+                        })
+                      }
+                      onBlur={(e) => void resolveItemCode(idx, e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void resolveItemCode(idx, e.currentTarget.value);
+                        }
+                      }}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">

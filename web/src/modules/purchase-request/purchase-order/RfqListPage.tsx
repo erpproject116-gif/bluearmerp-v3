@@ -5,6 +5,7 @@ import { apiFetch } from "../../../shared/api";
 import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
+import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { takeDocSeed } from "../../../shared/docSeed";
@@ -221,7 +222,7 @@ export default function RfqListPage() {
                       <input
                         class="mt-1 w-full rounded border border-stroke px-2 py-1"
                         value={ln.item_code}
-                        placeholder="Free-text code"
+                        placeholder="Registered code → Tab to auto-fill"
                         onInput={(e) => {
                           const v = e.currentTarget.value;
                           setLines((prev) => {
@@ -229,6 +230,37 @@ export default function RfqListPage() {
                             next[idx()] = { ...next[idx()], item_code: v, item_id: null };
                             return next;
                           });
+                        }}
+                        onBlur={(e) => {
+                          const code = e.currentTarget.value.trim();
+                          if (!code) return;
+                          const i = idx();
+                          void (async () => {
+                            const { item, error } = await resolveInventoryItemByCode(code);
+                            if (error) {
+                              toast.warning(error);
+                              return;
+                            }
+                            if (!item) return;
+                            setLines((prev) => {
+                              const next = [...prev];
+                              next[i] = {
+                                ...next[i],
+                                item_id: item.id,
+                                item_code: item.item_code,
+                                item_name: item.item_name,
+                                unit_id: item.base_unit_id ?? next[i].unit_id,
+                                unit_code: item.base_unit_code ?? next[i].unit_code,
+                              };
+                              return next;
+                            });
+                          })();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
                         }}
                       />
                     </label>

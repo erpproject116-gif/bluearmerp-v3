@@ -11,6 +11,7 @@ import { useToast } from "../../../shared/toast";
 import { trackingPolicyLabel } from "../../../shared/itemMasterConstants";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
+import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
@@ -341,6 +342,26 @@ export function SalesLineGrid(props: Props) {
     });
   };
 
+  const resolveItemCode = async (idx: number, rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+    const current = props.lines()[idx];
+    if (
+      current?.item_id &&
+      (current.item_code || "").trim().toLowerCase() === code.toLowerCase()
+    ) {
+      return;
+    }
+    const { item, error } = await resolveInventoryItemByCode(code);
+    if (error) {
+      toast.warning(error);
+      return;
+    }
+    if (!item) return;
+    setSearchLineIdx(idx);
+    await applyItems([item]);
+  };
+
   const applySerialUnits = async (units: ResolvedSerialUnit[], preferLineIdx?: number) => {
     const meta = props.taxTypeMeta();
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
@@ -507,11 +528,30 @@ export function SalesLineGrid(props: Props) {
                   <ResizableTd width={widthFor("line_no")} class="px-2 py-1">{line().line_no}</ResizableTd>
                   <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
-                      class={`${inputClass} w-full cursor-pointer`}
+                      class={`${inputClass} w-full`}
                       value={line().item_code}
-                      readOnly
+                      placeholder="Code or dbl-click to search"
+                      title="Type a registered code and Tab/Enter to auto-fill, or double-click to search"
                       onDblClick={() => openSearch(idx)}
-                      title={uiLabel("lines.item_search_hint")}
+                      onInput={(e) =>
+                        void updateLine(idx, {
+                          item_code: e.currentTarget.value,
+                          item_id: null,
+                          track_serial: false,
+                          track_lot: false,
+                          serial_unit_ids: [],
+                          serial_lot_no: "",
+                          lot_batch_id: null,
+                          lot_no: "",
+                        })
+                      }
+                      onBlur={(e) => void resolveItemCode(idx, e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void resolveItemCode(idx, e.currentTarget.value);
+                        }
+                      }}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">

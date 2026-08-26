@@ -4,6 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import { ItemSearchModal, type ItemSearchRow } from "../../../shared/ItemSearchModal";
+import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
@@ -250,8 +251,8 @@ export function PurchaseRequestLineGrid(props: Props) {
     setPartnerSearchOpen(true);
   };
 
-  const applyItem = (item: ItemSearchRow) => {
-    const idx = itemSearchLineIdx();
+  const applyItem = (item: ItemSearchRow, atIdx?: number | null) => {
+    const idx = atIdx ?? itemSearchLineIdx();
     if (idx == null) return;
     const meta = props.taxTypeMeta();
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
@@ -278,6 +279,24 @@ export function PurchaseRequestLineGrid(props: Props) {
     void previewLine(next[idx]).then((amounts) => {
       props.onChange((prev) => prev.map((ln, i) => (i === idx ? { ...ln, ...amounts } : ln)));
     });
+  };
+
+  const resolveItemCode = async (idx: number, rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+    const current = props.lines()[idx];
+    if (
+      current?.item_id &&
+      (current.item_code || "").trim().toLowerCase() === code.toLowerCase()
+    ) {
+      return;
+    }
+    const { item, error } = await resolveInventoryItemByCode(code);
+    if (error) {
+      toast.warning(error);
+      return;
+    }
+    if (item) applyItem(item, idx);
   };
 
   const applyPartner = (partner: PartnerSearchRow) => {
@@ -441,7 +460,7 @@ export function PurchaseRequestLineGrid(props: Props) {
         <div>
           <h3 class="text-sm font-semibold text-text-primary">{uiLabel("lines.heading")}</h3>
           <p class="text-xs text-text-secondary">
-            Unregistered products are allowed on purchase requests — type a name/code, or double-click Item Code to pick from inventory. Registration is required from Purchase Order onward.
+            Unregistered products are allowed on purchase requests — type a registered code and press Tab/Enter to auto-fill, or double-click Item Code to search. Registration is required from Purchase Order onward.
           </p>
         </div>
         <button type="button" class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50" onClick={addLine}>
@@ -526,7 +545,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                       class={`${inputClass} w-full`}
                       value={line().item_code}
                       placeholder="Code or dbl-click to search"
-                      title="Type freely for unregistered products, or double-click to pick from inventory"
+                      title="Type a registered code and Tab/Enter to auto-fill, or double-click to search"
                       onDblClick={() => openItemSearch(idx)}
                       onInput={(e) =>
                         void updateLine(idx, {
@@ -536,6 +555,13 @@ export function PurchaseRequestLineGrid(props: Props) {
                           planned_serial_nos: [],
                         })
                       }
+                      onBlur={(e) => void resolveItemCode(idx, e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void resolveItemCode(idx, e.currentTarget.value);
+                        }
+                      }}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">
