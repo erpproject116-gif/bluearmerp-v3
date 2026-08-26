@@ -22,7 +22,16 @@ const PAGE_COLUMNS: GridExportColumn[] = [
     header: "Description / body",
     value: (r) => String(r.description ?? ""),
   },
-  { key: "partner_name", header: "Customer", value: (r) => String(r.partner_name ?? "") },
+  {
+    key: "partner_name",
+    header: "Customer",
+    value: (r) => {
+      const customer = String(r.partner_name ?? "").trim();
+      if (customer) return customer;
+      const requester = String(r.created_by_name ?? "").trim();
+      return requester || "";
+    },
+  },
   { key: "category", header: "Category", value: (r) => String(r.category ?? "") },
   { key: "priority", header: "Priority", value: (r) => String(r.priority ?? "") },
   { key: "status", header: "Status", value: (r) => String(r.status ?? "") },
