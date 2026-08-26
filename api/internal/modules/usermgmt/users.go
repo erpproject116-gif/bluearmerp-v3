@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -706,7 +707,11 @@ func reinviteExistingUser(pool *pgxpool.Pool) http.HandlerFunc {
 			linkType = "invite"
 		}
 		pwdURL, genErr := supabaseadmin.GeneratePasswordLink(r.Context(), email, linkType, inviteemail.AbsoluteResetPasswordURL())
-		if genErr != nil || strings.TrimSpace(pwdURL) == "" {
+		pwdLinkOK := genErr == nil && strings.TrimSpace(pwdURL) != ""
+		if !pwdLinkOK {
+			if genErr != nil {
+				log.Printf("usermgmt: reinvite generate_link for %s: %v", email, genErr)
+			}
 			pwdURL = inviteemail.AbsoluteForgotPasswordURL()
 		}
 
@@ -720,16 +725,18 @@ func reinviteExistingUser(pool *pgxpool.Pool) http.HandlerFunc {
 		drainInviteOutboxAsync(pool)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "user.reinvite_safe", "user", &id, nil, map[string]any{
-			"email": email, "kept_auth": authUserID != nil, "status": status,
+			"email": email, "kept_auth": authUserID != nil, "status": status, "password_link_ok": pwdLinkOK,
 		})
 
-		msg := "Re-invite sent. Roles and permissions were kept. They can sign in or set a new password from the email."
+		msg := "Re-invite sent. Roles and permissions were kept. They can sign in or set a new password from the email (no current password required)."
 		if !inviteEmailSMTPEnabled() {
 			msg = "Re-invite recorded (email not configured). Share /signin or /forgot-password — roles and permissions were kept."
+		} else if !pwdLinkOK {
+			msg = "Re-invite email queued, but the direct set-password link could not be generated. They can use Forgot password, or check SUPABASE_SERVICE_ROLE_KEY on the API."
 		}
 		response.OK(w, map[string]any{
 			"id": id, "email": email, "status": status, "invite_id": inviteID,
-			"auth_linked": authUserID != nil, "password_setup_included": true,
+			"auth_linked": authUserID != nil, "password_setup_included": pwdLinkOK,
 		}, msg)
 	}
 }
