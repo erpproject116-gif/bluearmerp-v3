@@ -1,4 +1,4 @@
-import { For, Show, createMemo } from "solid-js";
+import { For, Index, Show, createMemo } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -130,24 +130,25 @@ export function SalesCommissionPanel(props: Props) {
 
       <Show when={props.rows().length > 0}>
         <div class="space-y-3">
-          <For each={props.rows()}>
+          {/* Index (not For): row object identity changes on each keystroke — For would remount inputs. */}
+          <Index each={props.rows()}>
             {(row, idx) => {
               const preview = () =>
                 computeCommissionPreview(
-                  row.calc_mode,
-                  row.rate_value === "" ? 0 : Number(row.rate_value),
-                  baseFor(row),
+                  row().calc_mode,
+                  row().rate_value === "" ? 0 : Number(row().rate_value),
+                  baseFor(row()),
                 );
               return (
                 <div class="grid gap-2 rounded-lg border border-stroke bg-white p-3 sm:grid-cols-12">
                   <div class="sm:col-span-3">
                     <LookupCombo
                       label="TIC"
-                      value={() => row.tic_name}
-                      selectedId={() => row.tic_user_id ?? null}
-                      onInput={(v) => update(idx(), { tic_name: v })}
-                      onSelect={(o) => update(idx(), { tic_user_id: o.id, tic_name: o.label })}
-                      onClear={() => update(idx(), { tic_user_id: null, tic_name: "" })}
+                      value={() => row().tic_name}
+                      selectedId={() => row().tic_user_id ?? null}
+                      onInput={(v) => update(idx, { tic_name: v })}
+                      onSelect={(o) => update(idx, { tic_user_id: o.id, tic_name: o.label })}
+                      onClear={() => update(idx, { tic_user_id: null, tic_name: "" })}
                       fetchOptions={props.fetchUsers}
                       disabled={props.disabled}
                       placeholder="Search user or type name…"
@@ -159,13 +160,13 @@ export function SalesCommissionPanel(props: Props) {
                       <select
                         class={inputClass}
                         disabled={props.disabled}
-                        value={row.scope}
+                        value={row().scope}
                         onChange={(e) => {
                           const scope = e.currentTarget.value as SaleCommissionScope;
-                          update(idx(), {
+                          update(idx, {
                             scope,
-                            sales_line_no: scope === "transaction" ? null : row.sales_line_no,
-                            sales_line_id: scope === "transaction" ? null : row.sales_line_id,
+                            sales_line_no: scope === "transaction" ? null : row().sales_line_no,
+                            sales_line_id: scope === "transaction" ? null : row().sales_line_id,
                           });
                         }}
                       >
@@ -174,18 +175,18 @@ export function SalesCommissionPanel(props: Props) {
                       </select>
                     </label>
                   </div>
-                  <Show when={row.scope === "item"}>
+                  <Show when={row().scope === "item"}>
                     <div class="sm:col-span-3">
                       <label class="block">
                         <span class="mb-1 block text-sm font-medium text-text-primary">Sale line</span>
                         <select
                           class={inputClass}
                           disabled={props.disabled}
-                          value={row.sales_line_no ?? ""}
+                          value={row().sales_line_no ?? ""}
                           onChange={(e) => {
                             const no = Number(e.currentTarget.value) || null;
                             const ln = props.saleLines().find((l) => l.line_no === no);
-                            update(idx(), {
+                            update(idx, {
                               sales_line_no: no,
                               sales_line_id: ln?.id ?? null,
                             });
@@ -209,9 +210,9 @@ export function SalesCommissionPanel(props: Props) {
                       <select
                         class={inputClass}
                         disabled={props.disabled}
-                        value={row.calc_mode}
+                        value={row().calc_mode}
                         onChange={(e) =>
-                          update(idx(), { calc_mode: e.currentTarget.value as "percent" | "fixed" })
+                          update(idx, { calc_mode: e.currentTarget.value as "percent" | "fixed" })
                         }
                       >
                         <option value="percent">Percent %</option>
@@ -222,7 +223,7 @@ export function SalesCommissionPanel(props: Props) {
                   <div class="sm:col-span-2">
                     <label class="block">
                       <span class="mb-1 block text-sm font-medium text-text-primary">
-                        {row.calc_mode === "percent" ? "Rate %" : "Amount ₱"}
+                        {row().calc_mode === "percent" ? "Rate %" : "Amount ₱"}
                       </span>
                       <input
                         type="number"
@@ -230,9 +231,9 @@ export function SalesCommissionPanel(props: Props) {
                         step="0.01"
                         class={`${inputClass} text-right`}
                         disabled={props.disabled}
-                        value={row.rate_value}
-                        placeholder={row.calc_mode === "percent" ? "e.g. 5" : "e.g. 500"}
-                        onInput={(e) => update(idx(), { rate_value: e.currentTarget.value })}
+                        value={row().rate_value}
+                        placeholder={row().calc_mode === "percent" ? "e.g. 5" : "e.g. 500"}
+                        onInput={(e) => update(idx, { rate_value: e.currentTarget.value })}
                       />
                     </label>
                   </div>
@@ -240,7 +241,7 @@ export function SalesCommissionPanel(props: Props) {
                     <span class="mb-1 block text-sm font-medium text-text-primary">
                       Commission
                       <span class="ml-1 font-normal text-text-secondary">
-                        (base {formatPeso(baseFor(row))})
+                        (base {formatPeso(baseFor(row()))})
                       </span>
                     </span>
                     <p class="rounded border border-stroke bg-slate-50 px-2 py-2 text-right text-sm font-medium tabular-nums">
@@ -252,7 +253,7 @@ export function SalesCommissionPanel(props: Props) {
                       type="button"
                       class="w-full rounded border border-stroke px-2 py-2 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
                       disabled={props.disabled}
-                      onClick={() => removeRow(idx())}
+                      onClick={() => removeRow(idx)}
                     >
                       Remove
                     </button>
@@ -260,7 +261,7 @@ export function SalesCommissionPanel(props: Props) {
                 </div>
               );
             }}
-          </For>
+          </Index>
           <p class="text-right text-sm text-text-secondary">
             Total commissions:{" "}
             <span class="font-semibold tabular-nums text-text-primary">

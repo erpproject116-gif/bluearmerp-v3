@@ -50,8 +50,18 @@ func TestZeroBalanceMessage(t *testing.T) {
 	if !strings.Contains(zeroBalanceMessage(false), "open sales order quantity") {
 		t.Fatal("legacy message mismatch")
 	}
-	if zeroBalanceMessage(true) != "No delivered balance available." {
+	if !strings.Contains(zeroBalanceMessage(false), "Pick List") {
+		t.Fatal("legacy message should mention Pick List")
+	}
+	if !strings.Contains(zeroBalanceMessage(true), "delivered balance") {
 		t.Fatal("delivery message mismatch")
+	}
+}
+
+func TestSoMustBeCompletedForSaleMessage(t *testing.T) {
+	msg := soMustBeCompletedForSaleMessage()
+	if !strings.Contains(msg, "Completed") || !strings.Contains(strings.ToLower(msg), "in progress") {
+		t.Fatalf("expected completed-gate message, got %q", msg)
 	}
 }
 

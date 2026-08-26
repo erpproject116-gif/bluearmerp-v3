@@ -114,20 +114,26 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 	var picUserID, projectID *int64
 	var picName string
 	var projectName, reference, notes, paymentTerms *string
+	var progressStatus string
 	err = pool.QueryRow(ctx, `
 		select tax_type_id, currency_id, partner_id, pic_user_id, pic_name,
-		  location_id, project_id, project_name, reference, notes, payment_terms
+		  location_id, project_id, project_name, reference, notes, payment_terms, progress_status
 		from public.so_sales_orders
 		where id = $1 and tenant_id = $2 and deleted_at is null`,
 		soID, tu.TenantID).Scan(
 		&taxTypeID, &currencyID, &partnerID, &picUserID, &picName,
-		&locationID, &projectID, &projectName, &reference, &notes, &paymentTerms,
+		&locationID, &projectID, &projectName, &reference, &notes, &paymentTerms, &progressStatus,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, ErrSalesOrderNotFound
 		}
 		return 0, err
+	}
+	if progressStatus != "completed" {
+		return 0, docflowValidation(map[string]string{
+			"progress_status": soMustBeCompletedForSaleMessage(),
+		})
 	}
 
 	tt, err := loadTaxCalcType(ctx, pool, tu.TenantID, taxTypeID)

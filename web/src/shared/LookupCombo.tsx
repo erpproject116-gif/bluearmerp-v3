@@ -1,4 +1,4 @@
-import { createSignal, For, Show, onMount } from "solid-js";
+import { createEffect, createSignal, For, Show, onMount } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
 import { LoadingText } from "../shared/LoadingText";
 
@@ -24,7 +24,16 @@ export function LookupCombo(props: Props) {
   const [open, setOpen] = createSignal(false);
   const [options, setOptions] = createSignal<LookupOption[]>([]);
   const [loading, setLoading] = createSignal(false);
+  /** Local draft while focused so typing stays smooth even if parents remount list rows. */
+  const [focused, setFocused] = createSignal(false);
+  const [draft, setDraft] = createSignal("");
   let debounce: ReturnType<typeof setTimeout> | undefined;
+
+  const displayValue = () => (focused() ? draft() : props.value());
+
+  createEffect(() => {
+    if (!focused()) setDraft(props.value());
+  });
 
   const search = (q: string) => {
     clearTimeout(debounce);
@@ -40,6 +49,7 @@ export function LookupCombo(props: Props) {
 
   const clearSelection = () => {
     // Clear text here so callers that only null the id still wipe the visible value.
+    setDraft("");
     props.onInput("");
     props.onClear();
     setOpen(false);
@@ -47,7 +57,7 @@ export function LookupCombo(props: Props) {
   };
 
   const showClear = () =>
-    !props.disabled && (props.selectedId() != null || props.value().trim().length > 0);
+    !props.disabled && (props.selectedId() != null || displayValue().trim().length > 0);
 
   onMount(() => {
     void search("");
@@ -63,22 +73,29 @@ export function LookupCombo(props: Props) {
       </Show>
       <div class="relative">
         <input
-          class={`${inputClass}${showClear() ? " pr-14" : ""}`}
-          value={props.value()}
+          class={`${inputClass} pr-14`}
+          value={displayValue()}
           placeholder={props.placeholder ?? "Search…"}
           disabled={props.disabled}
           onFocus={() => {
             if (props.disabled) return;
+            setDraft(props.value());
+            setFocused(true);
             setOpen(true);
             void search(props.value());
           }}
           onInput={(e) => {
             if (props.disabled) return;
-            props.onInput(e.currentTarget.value);
+            const v = e.currentTarget.value;
+            setDraft(v);
+            props.onInput(v);
             setOpen(true);
-            search(e.currentTarget.value);
+            search(v);
           }}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onBlur={() => {
+            setFocused(false);
+            setTimeout(() => setOpen(false), 150);
+          }}
         />
         <Show when={showClear()}>
           <button
@@ -114,6 +131,7 @@ export function LookupCombo(props: Props) {
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       props.onSelect(opt);
+                      setDraft(opt.label);
                       setOpen(false);
                     }}
                   >
@@ -125,14 +143,14 @@ export function LookupCombo(props: Props) {
                 </li>
               )}
             </For>
-            <Show when={props.onCreate && props.value().trim()}>
+            <Show when={props.onCreate && displayValue().trim()}>
               <li class="sticky bottom-0 border-t border-stroke bg-white">
                 <button
                   type="button"
                   class="flex w-full items-center gap-1 px-3 py-2 text-left text-sm font-medium text-brand-600 hover:bg-brand-50"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
-                    const q = props.value().trim();
+                    const q = displayValue().trim();
                     if (!q) return;
                     props.onCreate!(q);
                     setOpen(false);
@@ -140,7 +158,7 @@ export function LookupCombo(props: Props) {
                 >
                   <span class="text-base leading-none">+</span>
                   <span>
-                    {props.createLabel ?? "Add new"} "{props.value().trim()}"
+                    {props.createLabel ?? "Add new"} "{displayValue().trim()}"
                   </span>
                 </button>
               </li>

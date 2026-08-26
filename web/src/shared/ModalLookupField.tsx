@@ -8,7 +8,6 @@ import {
   fieldVisible,
   labelWithRequired,
 } from "./useFormFieldSettings";
-import type { ModalFieldMeta } from "./ModalField";
 
 type Props = {
   settings: () => Record<string, FormFieldSetting>;
@@ -31,39 +30,33 @@ type Props = {
 };
 
 export function ModalLookupField(props: Props) {
-  const meta = (): ModalFieldMeta | null => {
-    const f = props.settings()[props.fieldKey];
-    if (!props.forceVisible && !fieldVisible(f, true)) return null;
-    const label = f?.label?.trim() || props.fallbackLabel;
-    const required = props.forceRequired || fieldRequired(f, props.fallbackRequired ?? false);
-    const disabled = fieldDisabled(f);
-    const placeholder = fieldPlaceholder(f, props.fallbackPlaceholder);
-    return {
-      label: labelWithRequired(label, required),
-      required,
-      disabled,
-      placeholder: placeholder || undefined,
-    };
+  const setting = () => props.settings()[props.fieldKey];
+  const visible = () => props.forceVisible || fieldVisible(setting(), true);
+  const label = () => {
+    const f = setting();
+    return labelWithRequired(f?.label?.trim() || props.fallbackLabel, required());
   };
+  const required = () => props.forceRequired || fieldRequired(setting(), props.fallbackRequired ?? false);
+  const disabled = () => fieldDisabled(setting());
+  const placeholder = () => fieldPlaceholder(setting(), props.fallbackPlaceholder) || undefined;
 
+  // Boolean `when` — avoid remounting LookupCombo when a new meta object is allocated each read.
   return (
-    <Show when={meta()}>
-      {(m) => (
-        <LookupCombo
-          label={m().label}
-          required={m().required}
-          disabled={m().disabled}
-          placeholder={m().placeholder}
-          value={props.value}
-          selectedId={props.selectedId}
-          onInput={props.onInput}
-          onSelect={props.onSelect}
-          onClear={props.onClear}
-          fetchOptions={props.fetchOptions}
-          onCreate={props.onCreate}
-          createLabel={props.createLabel}
-        />
-      )}
+    <Show when={visible()}>
+      <LookupCombo
+        label={label()}
+        required={required()}
+        disabled={disabled()}
+        placeholder={placeholder()}
+        value={props.value}
+        selectedId={props.selectedId}
+        onInput={props.onInput}
+        onSelect={props.onSelect}
+        onClear={props.onClear}
+        fetchOptions={props.fetchOptions}
+        onCreate={props.onCreate}
+        createLabel={props.createLabel}
+      />
     </Show>
   );
 }

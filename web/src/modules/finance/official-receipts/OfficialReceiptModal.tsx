@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Index, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { apiFetch } from "../../../shared/api";
@@ -393,7 +393,7 @@ export function OfficialReceiptModal(props: Props) {
               </tr>
             </thead>
             <tbody>
-              <For each={applications()}>
+              <Index each={applications()}>
                 {(row, index) => (
                   <tr class="border-t border-stroke/60">
                     <td class="px-3 py-2">
@@ -403,40 +403,40 @@ export function OfficialReceiptModal(props: Props) {
                       >
                         <LookupCombo
                           label=""
-                          value={() => applications()[index()]?.sales_label ?? ""}
-                          selectedId={() => applications()[index()]?.sales_id ?? null}
-                          onInput={(v) => patchApplication(index(), { sales_label: v })}
+                          value={() => row()?.sales_label ?? ""}
+                          selectedId={() => row()?.sales_id ?? null}
+                          onInput={(v) => patchApplication(index, { sales_label: v })}
                           onSelect={async (o) => {
                             const res = await apiFetch<{ grand_total: number }>(`/api/v1/sales/${o.id}`);
-                            patchApplication(index(), {
+                            patchApplication(index, {
                               sales_id: o.id,
                               sales_label: o.label,
                               grand_total: res.data?.grand_total ?? 0,
                             });
                           }}
                           onClear={() =>
-                            patchApplication(index(), { sales_id: null, sales_label: "", grand_total: 0, applied_amount: "" })
+                            patchApplication(index, { sales_id: null, sales_label: "", grand_total: 0, applied_amount: "" })
                           }
                           fetchOptions={(q) => fetchSalesForPartner(partnerId()!, q)}
                         />
                       </Show>
                     </td>
-                    <td class="px-3 py-2 text-right">{formatPeso(row.grand_total)}</td>
+                    <td class="px-3 py-2 text-right">{formatPeso(row().grand_total)}</td>
                     <td class="px-3 py-2">
                       <DecimalInput
                         class={`${inputClass} text-right`}
-                        value={row.applied_amount}
-                        onValue={(v) => patchApplication(index(), { applied_amount: v })}
+                        value={row().applied_amount}
+                        onValue={(v) => patchApplication(index, { applied_amount: v })}
                       />
                     </td>
                     <td class="px-3 py-2 text-right">
-                      <button type="button" class="text-sm text-red-600 hover:underline" onClick={() => removeApplication(index())}>
+                      <button type="button" class="text-sm text-red-600 hover:underline" onClick={() => removeApplication(index)}>
                         Remove
                       </button>
                     </td>
                   </tr>
                 )}
-              </For>
+              </Index>
             </tbody>
             <tfoot>
               <tr class="border-t border-stroke bg-slate-50 font-semibold">

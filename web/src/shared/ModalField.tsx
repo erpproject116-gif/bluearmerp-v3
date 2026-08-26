@@ -34,32 +34,40 @@ type Props = {
 };
 
 export function ModalField(props: Props) {
-  const meta = (): ModalFieldMeta | null => {
-    const f = props.settings()[props.fieldKey];
-    if (!props.forceVisible && !fieldVisible(f, true)) return null;
-    const label = f?.label?.trim() || props.fallbackLabel;
-    const required = props.forceRequired
+  const setting = () => props.settings()[props.fieldKey];
+  const visible = () => props.forceVisible || fieldVisible(setting(), true);
+  const required = () =>
+    props.forceRequired
       ? true
       : DEFAULTED_STATUS_FIELDS.has(props.fieldKey)
         ? false
-        : fieldRequired(f, props.fallbackRequired ?? false);
-    const disabled = fieldDisabled(f);
-    const placeholder = fieldPlaceholder(f, props.fallbackPlaceholder);
-    return {
-      label: labelWithRequired(label, required),
-      required,
-      disabled,
-      placeholder: placeholder || undefined,
-    };
-  };
+        : fieldRequired(setting(), props.fallbackRequired ?? false);
+  const disabled = () => fieldDisabled(setting());
+  const placeholder = () => fieldPlaceholder(setting(), props.fallbackPlaceholder) || undefined;
+  const label = () => labelWithRequired(setting()?.label?.trim() || props.fallbackLabel, required());
 
+  // Live meta object with getters so children see updates without remounting on object identity.
+  const meta = (): ModalFieldMeta => ({
+    get label() {
+      return label();
+    },
+    get required() {
+      return required();
+    },
+    get disabled() {
+      return disabled();
+    },
+    get placeholder() {
+      return placeholder();
+    },
+  });
+
+  // Boolean `when` — avoid remount when a new plain meta object would change Show's key.
   return (
-    <Show when={meta()}>
-      {(m) => (
-        <Field label={m().label} span={props.span} as={props.as}>
-          {props.children(m())}
-        </Field>
-      )}
+    <Show when={visible()}>
+      <Field label={label()} span={props.span} as={props.as}>
+        {props.children(meta())}
+      </Field>
     </Show>
   );
 }

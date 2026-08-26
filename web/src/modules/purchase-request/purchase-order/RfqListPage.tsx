@@ -1,5 +1,5 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createSignal, For, Index, onMount, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { LineUnitSelect } from "../../../shared/LineUnitSelect";
@@ -170,22 +170,22 @@ export default function RfqListPage() {
             <p class="mb-3 text-xs text-text-secondary">
               Free-text products are allowed on RFQ. Register items in Inventory before converting to a Purchase Order.
             </p>
-            <For each={lines()}>
+            <Index each={lines()}>
               {(ln, idx) => (
                 <div class="mb-3 space-y-2 rounded-lg border border-stroke p-3">
                   <LookupCombo
-                    label={`Item ${idx() + 1} (search inventory or type a free-text name)`}
+                    label={`Item ${idx + 1} (search inventory or type a free-text name)`}
                     value={() => {
-                      const l = lines()[idx()];
+                      const l = ln();
                       if (l.item_id && l.item_code) return `${l.item_code} — ${l.item_name}`;
                       return l.item_name || l.item_code || "";
                     }}
-                    selectedId={() => ln.item_id}
+                    selectedId={() => ln().item_id}
                     onInput={(text) => {
                       setLines((prev) => {
                         const next = [...prev];
-                        next[idx()] = {
-                          ...next[idx()],
+                        next[idx] = {
+                          ...next[idx],
                           item_id: null,
                           item_code: "",
                           item_name: text,
@@ -197,8 +197,8 @@ export default function RfqListPage() {
                       const parts = o.label.split(" — ");
                       setLines((prev) => {
                         const next = [...prev];
-                        next[idx()] = {
-                          ...next[idx()],
+                        next[idx] = {
+                          ...next[idx],
                           item_id: o.id,
                           item_code: parts[0] ?? "",
                           item_name: parts.slice(1).join(" — ") || o.label,
@@ -209,7 +209,7 @@ export default function RfqListPage() {
                     onClear={() => {
                       setLines((prev) => {
                         const next = [...prev];
-                        next[idx()] = { ...emptyRfqLine(), qty: next[idx()].qty };
+                        next[idx] = { ...emptyRfqLine(), qty: next[idx].qty };
                         return next;
                       });
                     }}
@@ -221,20 +221,19 @@ export default function RfqListPage() {
                       <span class="text-text-secondary">Item code (optional)</span>
                       <input
                         class="mt-1 w-full rounded border border-stroke px-2 py-1"
-                        value={ln.item_code}
+                        value={ln().item_code}
                         placeholder="Registered code → Tab to auto-fill"
                         onInput={(e) => {
                           const v = e.currentTarget.value;
                           setLines((prev) => {
                             const next = [...prev];
-                            next[idx()] = { ...next[idx()], item_code: v, item_id: null };
+                            next[idx] = { ...next[idx], item_code: v, item_id: null };
                             return next;
                           });
                         }}
                         onBlur={(e) => {
                           const code = e.currentTarget.value.trim();
                           if (!code) return;
-                          const i = idx();
                           void (async () => {
                             const { item, error } = await resolveInventoryItemByCode(code);
                             if (error) {
@@ -244,13 +243,13 @@ export default function RfqListPage() {
                             if (!item) return;
                             setLines((prev) => {
                               const next = [...prev];
-                              next[i] = {
-                                ...next[i],
+                              next[idx] = {
+                                ...next[idx],
                                 item_id: item.id,
                                 item_code: item.item_code,
                                 item_name: item.item_name,
-                                unit_id: item.base_unit_id ?? next[i].unit_id,
-                                unit_code: item.base_unit_code ?? next[i].unit_code,
+                                unit_id: item.base_unit_id ?? next[idx].unit_id,
+                                unit_code: item.base_unit_code ?? next[idx].unit_code,
                               };
                               return next;
                             });
@@ -270,12 +269,12 @@ export default function RfqListPage() {
                         type="number"
                         class="mt-1 w-full rounded border border-stroke px-2 py-1"
                         min="0"
-                        value={ln.qty}
+                        value={ln().qty}
                         onInput={(e) => {
                           const v = e.currentTarget.value;
                           setLines((prev) => {
                             const next = [...prev];
-                            next[idx()] = { ...next[idx()], qty: v };
+                            next[idx] = { ...next[idx], qty: v };
                             return next;
                           });
                         }}
@@ -285,12 +284,12 @@ export default function RfqListPage() {
                       <span class="text-text-secondary">UoM</span>
                       <div class="mt-1">
                         <LineUnitSelect
-                          unitId={ln.unit_id}
-                          unitCode={ln.unit_code}
+                          unitId={ln().unit_id}
+                          unitCode={ln().unit_code}
                           onChange={(u) =>
                             setLines((prev) => {
                               const next = [...prev];
-                              next[idx()] = { ...next[idx()], unit_id: u.unit_id, unit_code: u.unit_code };
+                              next[idx] = { ...next[idx], unit_id: u.unit_id, unit_code: u.unit_code };
                               return next;
                             })
                           }
@@ -300,7 +299,7 @@ export default function RfqListPage() {
                   </div>
                 </div>
               )}
-            </For>
+            </Index>
             <button type="button" class="text-sm text-brand-600 hover:underline" onClick={addLine}>
               + Add line
             </button>
