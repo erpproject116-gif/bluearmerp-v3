@@ -12,6 +12,7 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
 import { useAuth, hasPermission } from "../../../shared/auth-context";
+import { coalesceSpecDescription } from "../../../shared/itemLineSpecDescription";
 import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
 import {
   ACTIVE_CURRENCIES_KEY,
@@ -171,8 +172,8 @@ function linesFromDetail(lines?: PurchaseOrderDetail["lines"]): PurchaseRequestL
     item_id: ln.item_id,
     item_code: ln.item_code ?? "",
     item_name: ln.item_name ?? "",
-    spec_name: ln.spec_name ?? "",
-    description: ln.description ?? "",
+    spec_name: coalesceSpecDescription(ln.spec_name, ln.description),
+    description: coalesceSpecDescription(ln.description, ln.spec_name),
     qty: ln.qty != null ? String(ln.qty) : "1",
     unit_id: ln.unit_id ?? null,
     unit_code: ln.unit_code ?? "",
@@ -445,8 +446,8 @@ export function PurchaseOrderModal(props: Props) {
       item_id: row.item_id ?? null,
       item_code: row.item_code,
       item_name: row.item_name,
-      spec_name: row.spec_name ?? "",
-      description: row.description ?? "",
+      spec_name: coalesceSpecDescription(row.spec_name, row.description),
+      description: coalesceSpecDescription(row.description, row.spec_name),
       qty: String(row.balance_qty),
       unit_id: row.unit_id ?? null,
       unit_code: row.unit_code ?? "",
@@ -607,8 +608,8 @@ export function PurchaseOrderModal(props: Props) {
         item_id: ln.item_id || null,
         item_code: ln.item_code,
         item_name: ln.item_name,
-        spec_name: ln.spec_name || null,
-        description: ln.description || null,
+        spec_name: coalesceSpecDescription(ln.spec_name, ln.description) || null,
+        description: coalesceSpecDescription(ln.description, ln.spec_name) || null,
         qty: ln.qty === "" ? 0 : Number(ln.qty),
         unit_id: ln.unit_id || null,
         unit_code: ln.unit_code || null,

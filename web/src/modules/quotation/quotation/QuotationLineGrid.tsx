@@ -6,6 +6,7 @@ import { formatAmount, parseNum } from "../../../shared/money";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
 import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
+import { itemSpecAsLineDescription } from "../../../shared/itemLineSpecDescription";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
@@ -189,6 +190,7 @@ export function QuotationLineGrid(props: Props) {
             item_id: item.id,
             item_code: item.item_code,
             item_name: item.item_name,
+            description: itemSpecAsLineDescription(item),
             unit_id: item.base_unit_id ?? null,
             unit_code: item.base_unit_code ?? "",
             unit_price: String(rate),
@@ -236,6 +238,7 @@ export function QuotationLineGrid(props: Props) {
       item_id: first.id,
       item_code: first.item_code,
       item_name: first.item_name,
+      description: itemSpecAsLineDescription(first),
       unit_id: first.base_unit_id ?? null,
       unit_code: first.base_unit_code ?? "",
       unit_price: String(rate0),
@@ -254,6 +257,7 @@ export function QuotationLineGrid(props: Props) {
         item_id: it.id,
         item_code: it.item_code,
         item_name: it.item_name,
+        description: itemSpecAsLineDescription(it),
         unit_id: it.base_unit_id ?? null,
         unit_code: it.base_unit_code ?? "",
         track_serial: Boolean(it.track_serial),

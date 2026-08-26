@@ -27,6 +27,7 @@ import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { postInventoryItemSearch } from "../../../shared/inventoryItemSearch";
+import { itemSpecAsLineDescription, coalesceSpecDescription } from "../../../shared/itemLineSpecDescription";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
@@ -101,8 +102,8 @@ function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseReques
     item_id: ln.item_id,
     item_code: ln.item_code ?? "",
     item_name: ln.item_name ?? "",
-    spec_name: "",
-    description: ln.description ?? "",
+    spec_name: coalesceSpecDescription(null, ln.description),
+    description: coalesceSpecDescription(ln.description, null),
     qty: ln.qty != null ? String(ln.qty) : "1",
     unit_id: ln.unit_id ?? null,
     unit_code: ln.unit_code ?? "",
@@ -467,6 +468,8 @@ export function SupplierInvoiceModal(props: Props) {
       item_id: row.id,
       item_code: row.item_code,
       item_name: row.item_name,
+      spec_name: itemSpecAsLineDescription(row),
+      description: itemSpecAsLineDescription(row),
       unit_id: row.base_unit_id ?? null,
       unit_code: row.base_unit_code ?? "",
       qty: "1",
