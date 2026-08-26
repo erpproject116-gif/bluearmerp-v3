@@ -307,6 +307,32 @@ func rememberImport(ctx context.Context, tx pgx.Tx, tenantID int64, kind, source
 	return err
 }
 
+func nullIfZeroID(id int64) any {
+	if id <= 0 {
+		return nil
+	}
+	return id
+}
+
+// freeTextItem builds a non-inventory line for cutover when code/name are not in inv_items.
+func freeTextItem(code, name string) itemMatch {
+	code = strings.TrimSpace(code)
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = code
+	}
+	if code == "" {
+		code = "FREE"
+	}
+	if len(code) > 20 {
+		code = code[:20]
+	}
+	if len(name) > 500 {
+		name = name[:500]
+	}
+	return itemMatch{ID: 0, Code: code, Name: name}
+}
+
 func requireJobDefaults(job jobDefaults, needTax, needCurrency, needLocation bool) string {
 	if needTax && job.TaxTypeID <= 0 {
 		return "Choose a tax type for this import (job default)."
@@ -331,6 +357,7 @@ func lineUnitPrice(qty, amount float64) (float64, float64, string) {
 }
 
 // lineUnitPriceOptional allows amount 0 (qty-only pipeline docs such as RFQ).
+// Missing qty defaults to 1 when the row otherwise has product or amount data.
 func lineUnitPriceOptional(qty, amount float64) (float64, float64, string) {
 	if amount < 0 {
 		return 0, 0, "amount cannot be negative"
@@ -339,7 +366,7 @@ func lineUnitPriceOptional(qty, amount float64) (float64, float64, string) {
 		if amount > 0 {
 			return amount, 1, ""
 		}
-		return 0, 0, "quantity must be greater than 0"
+		return 0, 1, ""
 	}
 	if amount == 0 {
 		return 0, qty, ""

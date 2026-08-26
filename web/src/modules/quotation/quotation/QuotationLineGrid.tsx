@@ -5,6 +5,7 @@ import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import { resolveItemRate } from "../../../shared/useResolveItemRate";
 import type { ItemSearchRow } from "../../../shared/ItemSearchModal";
+import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
 import { defaultInputBasis, type TaxTypeMeta } from "../../../shared/taxcalc";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/ResizableTable";
@@ -16,6 +17,7 @@ import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
 import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { QuotationItemSearchModal } from "./QuotationItemSearchModal";
 import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
+import { useToast } from "../../../shared/toast";
 
 export type QuotationLineRow = {
   line_no: number;
@@ -137,6 +139,7 @@ type Props = {
 };
 
 export function QuotationLineGrid(props: Props) {
+  const toast = useToast();
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchLineIdx, setSearchLineIdx] = createSignal<number | null>(null);
 
@@ -172,6 +175,51 @@ export function QuotationLineGrid(props: Props) {
   const openSearch = (idx: number) => {
     setSearchLineIdx(idx);
     setSearchOpen(true);
+  };
+
+  const applySingleItemAt = async (idx: number, item: ItemSearchRow) => {
+    const meta = props.taxTypeMeta();
+    const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
+    const pid = props.partnerId?.() ?? null;
+    const rate = (await resolveItemRate(pid, item.id)) ?? item.sales_price ?? 0;
+    const next = props.lines().map((ln, i) =>
+      i === idx
+        ? {
+            ...ln,
+            item_id: item.id,
+            item_code: item.item_code,
+            item_name: item.item_name,
+            unit_id: item.base_unit_id ?? null,
+            unit_code: item.base_unit_code ?? "",
+            unit_price: String(rate),
+            input_basis: basis,
+            track_serial: Boolean(item.track_serial),
+            serial_policy: item.serial_policy ?? "required",
+            planned_serial_nos: [],
+          }
+        : ln,
+    );
+    props.onChange(next);
+    const amounts = await previewLine(next[idx]!);
+    props.onChange(next.map((ln, i) => (i === idx ? { ...ln, ...amounts } : ln)));
+  };
+
+  const resolveItemCode = async (idx: number, rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+    const current = props.lines()[idx];
+    if (
+      current?.item_id &&
+      (current.item_code || "").trim().toLowerCase() === code.toLowerCase()
+    ) {
+      return;
+    }
+    const { item, error } = await resolveInventoryItemByCode(code);
+    if (error) {
+      toast.warning(error);
+      return;
+    }
+    if (item) await applySingleItemAt(idx, item);
   };
 
   const applyItems = async (items: ItemSearchRow[]) => {
@@ -290,7 +338,7 @@ export function QuotationLineGrid(props: Props) {
                       class={`${inputClass} w-full`}
                       value={line().item_code}
                       placeholder="Code or dbl-click to search"
-                      title="Type freely for unregistered products, or double-click to pick from inventory"
+                      title="Type a registered code and Tab/Enter to auto-fill, or double-click to search"
                       onDblClick={() => openSearch(idx)}
                       onInput={(e) =>
                         void updateLine(idx, {
@@ -300,6 +348,13 @@ export function QuotationLineGrid(props: Props) {
                           planned_serial_nos: [],
                         })
                       }
+                      onBlur={(e) => void resolveItemCode(idx, e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void resolveItemCode(idx, e.currentTarget.value);
+                        }
+                      }}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">

@@ -89,11 +89,11 @@ export const MIG_REQUIRED: Record<MigKind, string[]> = {
   opening_stock: ["quantity", "location"],
   open_si: ["source_doc_no", "partner", "date", "amount"],
   open_ap: ["source_doc_no", "partner", "date", "amount"],
-  open_po: ["source_doc_no", "partner", "date", "item", "quantity"],
-  open_quo: ["source_doc_no", "partner", "date", "item", "quantity"],
-  open_so: ["source_doc_no", "partner", "date", "item", "quantity"],
-  open_pr: ["source_doc_no", "date", "item", "quantity"],
-  open_rfq: ["source_doc_no", "date", "item", "quantity"],
+  open_po: ["source_doc_no", "partner", "date"],
+  open_quo: ["source_doc_no", "partner", "date"],
+  open_so: ["source_doc_no", "partner", "date"],
+  open_pr: ["source_doc_no", "date"],
+  open_rfq: ["source_doc_no", "date"],
   in_transit: ["quantity", "from_location", "to_location"],
 };
 
@@ -112,19 +112,19 @@ export const MIG_NEEDS_JOB_DEFAULTS: Record<MigKind, boolean> = {
   in_transit: false,
 };
 
-/** Opening stock / open docs look up an item; mapping neither item_code nor item fails every row. */
+/** Opening stock still needs an item map; open docs allow free-text when unmatched. */
 export const MIG_NEEDS_ITEM: Record<MigKind, boolean> = {
   items: false,
   partners: false,
   accounts: false,
   opening_stock: true,
-  open_si: true,
-  open_ap: true,
-  open_po: true,
-  open_quo: true,
-  open_so: true,
-  open_pr: true,
-  open_rfq: true,
+  open_si: false,
+  open_ap: false,
+  open_po: false,
+  open_quo: false,
+  open_so: false,
+  open_pr: false,
+  open_rfq: false,
   in_transit: true,
 };
 

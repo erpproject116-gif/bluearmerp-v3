@@ -2,9 +2,11 @@ import { Index, Show, createSignal } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
 import { DecimalInput } from "./DecimalInput";
 import { ItemSearchModal, type ItemSearchRow } from "./ItemSearchModal";
+import { resolveInventoryItemByCode } from "./resolveInventoryItemByCode";
 import { DataTableScroll, ResizableTd, ResizableTh } from "./ResizableTable";
 import { useResizableColumns } from "./useResizableColumns";
 import { uiLabel } from "./branding/uiLabel";
+import { useToast } from "./toast";
 
 export type RepairLineRow = {
   line_no: number;
@@ -56,6 +58,7 @@ const REPAIR_LINE_COLUMNS = [
 ] as const;
 
 export function EditableLineGrid(props: Props) {
+  const toast = useToast();
   const [pickerOpen, setPickerOpen] = createSignal(false);
   const [pickerRow, setPickerRow] = createSignal<number | null>(null);
 
@@ -88,6 +91,33 @@ export function EditableLineGrid(props: Props) {
       item_name: item.item_name + spec,
     });
     setPickerOpen(false);
+  };
+
+  const resolveItemCode = async (index: number, rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+    const current = props.lines()[index];
+    if (
+      current?.item_id &&
+      (current.item_code || "").trim().toLowerCase() === code.toLowerCase()
+    ) {
+      return;
+    }
+    const { item, error } = await resolveInventoryItemByCode(code);
+    if (error) {
+      toast.warning(error);
+      return;
+    }
+    if (item) onPickItemAt(index, item);
+  };
+
+  const onPickItemAt = (idx: number, item: ItemSearchRow) => {
+    const spec = item.spec_name ? ` [${item.spec_name}]` : "";
+    updateRow(idx, {
+      item_id: item.id,
+      item_code: item.item_code,
+      item_name: item.item_name + spec,
+    });
   };
 
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(() =>
@@ -128,11 +158,18 @@ export function EditableLineGrid(props: Props) {
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_code")} class="px-2 py-1">
                     <input
-                      class={`${inputClass} w-full cursor-pointer`}
+                      class={`${inputClass} w-full`}
                       value={row().item_code}
-                      title="Double-click to search items"
+                      title="Type a registered code and Tab/Enter to auto-fill, or double-click to search"
                       onDblClick={() => openPicker(index)}
                       onInput={(e) => updateRow(index, { item_code: e.currentTarget.value, item_id: null })}
+                      onBlur={(e) => void resolveItemCode(index, e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void resolveItemCode(index, e.currentTarget.value);
+                        }
+                      }}
                     />
                   </ResizableTd>
                   <ResizableTd width={widthFor("item_name")} class="px-2 py-1">
