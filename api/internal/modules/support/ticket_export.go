@@ -155,8 +155,12 @@ func writeTicketsCSV(w http.ResponseWriter, rows []ticketExportRow, stamp string
 		"assigned", "created_by", "resolved_at", "comments",
 	})
 	for _, row := range rows {
+		customer := strings.TrimSpace(row.PartnerName)
+		if customer == "" {
+			customer = strings.TrimSpace(row.CreatedByName)
+		}
 		_ = cw.Write([]string{
-			row.TicketNo, row.TicketDate, row.Subject, row.Description, row.PartnerName,
+			row.TicketNo, row.TicketDate, row.Subject, row.Description, customer,
 			row.Category, row.Priority, row.Status, row.AssignedName, row.CreatedByName,
 			row.ResolvedAt, row.Comments,
 		})
@@ -177,6 +181,8 @@ func writeTicketsMarkdown(w http.ResponseWriter, rows []ticketExportRow, stamp s
 		b.WriteString(fmt.Sprintf("- **Status:** %s · **Priority:** %s · **Category:** %s\n", row.Status, row.Priority, row.Category))
 		if row.PartnerName != "" {
 			b.WriteString(fmt.Sprintf("- **Customer:** %s\n", row.PartnerName))
+		} else if row.CreatedByName != "" {
+			b.WriteString(fmt.Sprintf("- **Customer:** %s (requester; no partner linked)\n", row.CreatedByName))
 		}
 		if row.AssignedName != "" {
 			b.WriteString(fmt.Sprintf("- **Assigned:** %s\n", row.AssignedName))

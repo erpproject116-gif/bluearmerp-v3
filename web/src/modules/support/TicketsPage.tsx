@@ -129,7 +129,19 @@ export default function TicketsPage() {
           { key: "ticket_no", header: "Ticket #", clickable: true },
           { key: "ticket_date", header: "Date" },
           { key: "subject", header: "Subject" },
-          { key: "partner_name", header: "Customer" },
+          {
+            key: "partner_name",
+            header: "Customer",
+            render: (row) => {
+              const customer = (row.partner_name ?? "").trim();
+              if (customer) return <>{customer}</>;
+              const requester = (row.created_by_name ?? "").trim();
+              if (requester) {
+                return <span class="text-text-secondary" title="No customer linked — showing requester">{requester}</span>;
+              }
+              return <span class="text-text-secondary">—</span>;
+            },
+          },
           { key: "category", header: "Category" },
           { key: "priority", header: "Priority" },
           { key: "status", header: "Status" },
