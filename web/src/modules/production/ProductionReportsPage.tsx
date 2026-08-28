@@ -1,0 +1,308 @@
+import { createSignal, For, onMount, Show } from "solid-js";
+import { createQuery } from "@tanstack/solid-query";
+import { apiFetch } from "../../shared/api";
+import { defaultReportDateRange, ReportPageLayout } from "../../shared/reports/ReportPageLayout";
+import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { ProductionLayout } from "./ProductionLayout";
+
+type ReportTab = "work-order-status" | "progress" | "stock-movements";
+
+type WoStatusRow = {
+  work_order_id: number;
+  work_order_no: string;
+  order_date: string;
+  status: string;
+  inspection_status: string;
+  bom_code: string;
+  bom_name: string;
+  finished_item_code: string;
+  finished_item_name: string;
+  location_name: string;
+  qty_to_produce: number;
+  qty_produced: number;
+  source_sales_order_no?: string | null;
+  released_at?: string | null;
+  completed_at?: string | null;
+};
+
+type WoProgressRow = {
+  work_order_id: number;
+  work_order_no: string;
+  status: string;
+  qty_to_produce: number;
+  qty_produced: number;
+  progress_pct: number;
+  issued_serials: number;
+  issued_lot_qty: number;
+  output_serials: number;
+  output_lot_qty: number;
+  inspection_status: string;
+};
+
+type WoStockMovementRow = {
+  id: number;
+  work_order_id: number;
+  work_order_no: string;
+  item_code: string;
+  item_name: string;
+  location_name: string;
+  qty_delta: number;
+  movement_type: string;
+  created_at: string;
+};
+
+type DateFilters = { date_from: string; date_to: string; status?: string; work_order_id?: number };
+
+const TAB_LABELS: Record<ReportTab, string> = {
+  "work-order-status": "Work order status",
+  progress: "Progress",
+  "stock-movements": "Stock movements",
+};
+
+function reportPath(tab: ReportTab): string {
+  switch (tab) {
+    case "work-order-status":
+      return "/api/v1/manufacturing/reports/work-order-status";
+    case "progress":
+      return "/api/v1/manufacturing/reports/progress";
+    case "stock-movements":
+      return "/api/v1/manufacturing/reports/stock-movements";
+  }
+}
+
+export default function ProductionReportsPage() {
+  const defaults = defaultReportDateRange();
+  const [tab, setTab] = createSignal<ReportTab>("work-order-status");
+  const [draftFilters, setDraftFilters] = createSignal<DateFilters>(defaults);
+  const [filters, setFilters] = createSignal<DateFilters>(defaults);
+  const [submitted, setSubmitted] = createSignal(true);
+  const [page, setPage] = createSignal(1);
+  const [generatedAt, setGeneratedAt] = createSignal(new Date());
+  const pageSize = 50;
+
+  const report = createQuery(() => {
+    const f = filters();
+    const qs = new URLSearchParams({
+      page: String(page()),
+      pageSize: String(pageSize),
+      date_from: f.date_from,
+      date_to: f.date_to,
+    });
+    if (f.status) qs.set("status", f.status);
+    if (f.work_order_id) qs.set("work_order_id", String(f.work_order_id));
+    return {
+      queryKey: ["mfg-report", tab(), page(), pageSize, f],
+      queryFn: async () => {
+        const res = await apiFetch<unknown[]>(`${reportPath(tab())}?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load report");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      enabled: submitted(),
+    };
+  });
+
+  const search = () => {
+    setFilters({ ...draftFilters() });
+    setSubmitted(true);
+    setPage(1);
+    setGeneratedAt(new Date());
+  };
+
+  const patch = (p: Partial<DateFilters>) => setDraftFilters((prev) => ({ ...prev, ...p }));
+
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F8") {
+        e.preventDefault();
+        search();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+
+  return (
+    <ProductionLayout>
+      <div class="mb-4 flex flex-wrap gap-2">
+        <For each={(["work-order-status", "progress", "stock-movements"] as ReportTab[])}>
+          {(t) => (
+            <button
+              type="button"
+              class={`rounded-lg px-3 py-1.5 text-sm ${tab() === t ? "bg-brand-600 text-white" : "border border-stroke text-text-secondary"}`}
+              onClick={() => {
+                setTab(t);
+                setPage(1);
+              }}
+            >
+              {TAB_LABELS[t]}
+            </button>
+          )}
+        </For>
+      </div>
+
+      <ReportPageLayout
+        title={TAB_LABELS[tab()]}
+        description="Set date range and filters, then Search (F8)."
+        dateFrom={() => draftFilters().date_from}
+        dateTo={() => draftFilters().date_to}
+        onDateFromChange={(v) => patch({ date_from: v })}
+        onDateToChange={(v) => patch({ date_to: v })}
+        submitted={submitted()}
+        loading={report.isFetching}
+        generatedAt={generatedAt()}
+        page={page()}
+        totalPages={totalPages()}
+        onPageChange={setPage}
+        onSearch={search}
+        onReset={() => {
+          setDraftFilters(defaults);
+          setFilters(defaults);
+          setSubmitted(true);
+          setPage(1);
+        }}
+        filterExtra={
+          <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <Show when={tab() !== "stock-movements"}>
+              <Field label="WO status">
+                <select
+                  class={inputClass}
+                  value={draftFilters().status ?? ""}
+                  onChange={(e) => patch({ status: e.currentTarget.value || undefined })}
+                >
+                  <option value="">All</option>
+                  <option value="draft">Draft</option>
+                  <option value="released">Released</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </Field>
+            </Show>
+            <Show when={tab() === "stock-movements"}>
+              <Field label="Work order ID">
+                <input
+                  type="number"
+                  class={inputClass}
+                  value={draftFilters().work_order_id ?? ""}
+                  onInput={(e) =>
+                    patch({
+                      work_order_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined,
+                    })
+                  }
+                />
+              </Field>
+            </Show>
+          </div>
+        }
+      >
+        <Show when={tab() === "work-order-status"}>
+          <table class="erp-grid min-w-full text-left text-sm">
+            <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+              <tr>
+                <th class="px-3 py-2">WO no.</th>
+                <th class="px-3 py-2">Date</th>
+                <th class="px-3 py-2">Status</th>
+                <th class="px-3 py-2">Inspection</th>
+                <th class="px-3 py-2">BOM</th>
+                <th class="px-3 py-2">Finished item</th>
+                <th class="px-3 py-2">Location</th>
+                <th class="px-3 py-2 text-right">Qty</th>
+                <th class="px-3 py-2 text-right">Produced</th>
+                <th class="px-3 py-2">Source SO</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={(report.data?.rows ?? []) as WoStatusRow[]}>
+                {(row) => (
+                  <tr class="border-t border-stroke/60">
+                    <td class="px-3 py-2">{row.work_order_no}</td>
+                    <td class="px-3 py-2">{row.order_date?.slice(0, 10)}</td>
+                    <td class="px-3 py-2 capitalize">{row.status.replace(/_/g, " ")}</td>
+                    <td class="px-3 py-2 capitalize">{row.inspection_status.replace(/_/g, " ")}</td>
+                    <td class="px-3 py-2">{row.bom_code}</td>
+                    <td class="px-3 py-2">{row.finished_item_code} — {row.finished_item_name}</td>
+                    <td class="px-3 py-2">{row.location_name}</td>
+                    <td class="px-3 py-2 text-right">{row.qty_to_produce}</td>
+                    <td class="px-3 py-2 text-right">{row.qty_produced}</td>
+                    <td class="px-3 py-2">{row.source_sales_order_no ?? "—"}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </Show>
+
+        <Show when={tab() === "progress"}>
+          <table class="erp-grid min-w-full text-left text-sm">
+            <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+              <tr>
+                <th class="px-3 py-2">WO no.</th>
+                <th class="px-3 py-2">Status</th>
+                <th class="px-3 py-2 text-right">To produce</th>
+                <th class="px-3 py-2 text-right">Produced</th>
+                <th class="px-3 py-2 text-right">Progress %</th>
+                <th class="px-3 py-2 text-right">Issued serials</th>
+                <th class="px-3 py-2 text-right">Issued lot qty</th>
+                <th class="px-3 py-2 text-right">Output serials</th>
+                <th class="px-3 py-2 text-right">Output lot qty</th>
+                <th class="px-3 py-2">Inspection</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={(report.data?.rows ?? []) as WoProgressRow[]}>
+                {(row) => (
+                  <tr class="border-t border-stroke/60">
+                    <td class="px-3 py-2">{row.work_order_no}</td>
+                    <td class="px-3 py-2 capitalize">{row.status.replace(/_/g, " ")}</td>
+                    <td class="px-3 py-2 text-right">{row.qty_to_produce}</td>
+                    <td class="px-3 py-2 text-right">{row.qty_produced}</td>
+                    <td class="px-3 py-2 text-right">{row.progress_pct.toFixed(1)}%</td>
+                    <td class="px-3 py-2 text-right">{row.issued_serials}</td>
+                    <td class="px-3 py-2 text-right">{row.issued_lot_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2 text-right">{row.output_serials}</td>
+                    <td class="px-3 py-2 text-right">{row.output_lot_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2 capitalize">{row.inspection_status.replace(/_/g, " ")}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </Show>
+
+        <Show when={tab() === "stock-movements"}>
+          <table class="erp-grid min-w-full text-left text-sm">
+            <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+              <tr>
+                <th class="px-3 py-2">Date</th>
+                <th class="px-3 py-2">WO no.</th>
+                <th class="px-3 py-2">Item</th>
+                <th class="px-3 py-2">Location</th>
+                <th class="px-3 py-2 text-right">Qty delta</th>
+                <th class="px-3 py-2">Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={(report.data?.rows ?? []) as WoStockMovementRow[]}>
+                {(row) => (
+                  <tr class="border-t border-stroke/60">
+                    <td class="px-3 py-2">{row.created_at?.slice(0, 19).replace("T", " ")}</td>
+                    <td class="px-3 py-2">{row.work_order_no}</td>
+                    <td class="px-3 py-2">{row.item_code} — {row.item_name}</td>
+                    <td class="px-3 py-2">{row.location_name}</td>
+                    <td class="px-3 py-2 text-right">{row.qty_delta.toFixed(4)}</td>
+                    <td class="px-3 py-2">{row.movement_type}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </Show>
+
+        <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
+          <p class="px-5 py-8 text-center text-sm text-text-secondary">No rows in this date range.</p>
+        </Show>
+      </ReportPageLayout>
+    </ProductionLayout>
+  );
+}

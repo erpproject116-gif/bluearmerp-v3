@@ -9,7 +9,11 @@ import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useListState } from "../../shared/useListState";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
-import { ManufacturingLayout } from "./ManufacturingLayout";
+import { ProductionLayout } from "../production/ProductionLayout";
+import {
+  WoSalesOrderLinePickerModal,
+  type PickedWoSalesOrderLine,
+} from "./WoSalesOrderLinePickerModal";
 
 type WorkOrder = {
   id: number;
@@ -24,6 +28,7 @@ type WorkOrder = {
   qty_to_produce: number;
   qty_produced: number;
   status: string;
+  inspection_status?: string;
   order_date: string;
   notes?: string | null;
 };
@@ -79,6 +84,7 @@ export default function WorkOrdersPage() {
   const auth = useAuth();
   const canRelease = () => hasPermission(auth.me, "manufacturing.work_orders_release", "write");
   const canComplete = () => hasPermission(auth.me, "manufacturing.work_orders_complete", "write");
+  const canInspect = () => hasPermission(auth.me, "quality.wo_inspection", "write");
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
     useListState("order_date", 25, { defaultOrder: "desc", defaultStatus: "" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -93,6 +99,9 @@ export default function WorkOrdersPage() {
   const [saving, setSaving] = createSignal(false);
   const [actionId, setActionId] = createSignal<number | null>(null);
   const [materials, setMaterials] = createSignal<MaterialNeeds | null>(null);
+  const [soPickerOpen, setSoPickerOpen] = createSignal(false);
+  const [loadSlipBusy, setLoadSlipBusy] = createSignal(false);
+  const [inspectingId, setInspectingId] = createSignal<number | null>(null);
   const toast = useToast();
   const client = useQueryClient();
 
@@ -245,6 +254,39 @@ export default function WorkOrdersPage() {
     invalidate();
   };
 
+  const patchInspection = async (row: WorkOrder, status: "held" | "released") => {
+    if (row.status !== "released") return;
+    setInspectingId(row.id);
+    const res = await apiFetch(`/api/v1/quality/work-orders/${row.id}/inspection`, {
+      method: "PATCH",
+      body: JSON.stringify({ inspection_status: status }),
+    });
+    setInspectingId(null);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to update inspection.");
+      return;
+    }
+    toast.success(status === "released" ? "FG inspection released." : "Work order placed on hold.");
+    invalidate();
+  };
+
+  const applySalesOrderLines = async (picked: PickedWoSalesOrderLine[]) => {
+    if (picked.length === 0) return;
+    const soIds = [...new Set(picked.map((l) => l.sales_order_id))];
+    setLoadSlipBusy(true);
+    let ok = 0;
+    for (const soId of soIds) {
+      const res = await apiFetch(`/api/v1/manufacturing/work-orders/from-sales-order/${soId}`, { method: "POST" });
+      if (res.success) ok++;
+      else toast.warning(res.message ?? `Failed to create work order from SO #${soId}.`);
+    }
+    setLoadSlipBusy(false);
+    if (ok > 0) {
+      toast.success(`Created work order(s) from ${ok} sales order(s).`);
+      invalidate();
+    }
+  };
+
   const complete = async (row: WorkOrder) => {
     const needsRes = await apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${row.id}/material-needs`);
     const needs = needsRes.data;
@@ -272,7 +314,7 @@ export default function WorkOrdersPage() {
   };
 
   return (
-    <ManufacturingLayout>
+    <ProductionLayout>
       <SpreadsheetGrid<WorkOrder>
         columns={[
           { key: "work_order_no", header: "WO no.", clickable: true },
@@ -284,6 +326,34 @@ export default function WorkOrdersPage() {
             key: "qty_to_produce",
             header: "Qty",
             render: (r) => `${r.qty_to_produce}${r.finished_base_unit_code ? ` ${r.finished_base_unit_code}` : ""}`,
+          },
+          {
+            key: "inspection_status",
+            header: "Inspection",
+            sortable: false,
+            render: (r) => (
+              <div class="flex items-center gap-2 capitalize">
+                <span>{(r.inspection_status ?? "released").replace(/_/g, " ")}</span>
+                <Show when={r.status === "released" && canInspect()}>
+                  <button
+                    type="button"
+                    class="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                    disabled={inspectingId() === r.id}
+                    onClick={(e) => { e.stopPropagation(); void patchInspection(r, "released"); }}
+                  >
+                    Release
+                  </button>
+                  <button
+                    type="button"
+                    class="text-xs text-amber-700 hover:underline disabled:opacity-50"
+                    disabled={inspectingId() === r.id}
+                    onClick={(e) => { e.stopPropagation(); void patchInspection(r, "held"); }}
+                  >
+                    Hold
+                  </button>
+                </Show>
+              </div>
+            ),
           },
           {
             key: "status",
@@ -322,7 +392,17 @@ export default function WorkOrdersPage() {
         onSelect={setSelectedId}
         onNew={openNew}
         onEdit={(row) => void openEdit(row)}
-        settingsHref="/app/inventory/serial-lot/manufacturing/work-orders"
+        settingsHref="/app/production/work-orders"
+        toolbarExtra={
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={loadSlipBusy()}
+            onClick={() => setSoPickerOpen(true)}
+          >
+            {loadSlipBusy() ? "Loading…" : "Load Slip"}
+          </button>
+        }
         codeKey="work_order_no"
         nameKey="bom_code"
         sortKey={sort()}
@@ -437,6 +517,11 @@ export default function WorkOrdersPage() {
           )}
         </Show>
       </EntityModal>
-    </ManufacturingLayout>
+      <WoSalesOrderLinePickerModal
+        open={soPickerOpen()}
+        onClose={() => setSoPickerOpen(false)}
+        onConfirm={(picked) => void applySalesOrderLines(picked)}
+      />
+    </ProductionLayout>
   );
 }

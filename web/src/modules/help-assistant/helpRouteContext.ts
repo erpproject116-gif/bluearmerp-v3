@@ -25,6 +25,7 @@ const ROUTE_TAG_RULES: Array<{ prefix: string; tags: string[] }> = [
   { prefix: "/app/onboarding", tags: ["onboarding", "setup"] },
   { prefix: "/app/setup", tags: ["setup", "onboarding"] },
   { prefix: "/app/user-management", tags: ["admin", "permissions", "policies"] },
+  { prefix: "/app/production", tags: ["manufacturing", "bom", "production"] },
   { prefix: "/app/manufacturing", tags: ["manufacturing", "bom"] },
   { prefix: "/app/quality", tags: ["quality", "ncr", "capa"] },
   { prefix: "/app/support", tags: ["support"] },

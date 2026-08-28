@@ -52,6 +52,13 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
+    id: "production_process",
+    label: "Production",
+    iconId: "manufacturing",
+    defaultExpanded: true,
+    entries: [{ kind: "module", moduleId: "production" }],
+  },
+  {
     id: "sales_process",
     label: "Sales",
     iconId: "selling",

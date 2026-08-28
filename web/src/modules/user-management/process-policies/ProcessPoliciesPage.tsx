@@ -35,6 +35,7 @@ type ProcessPolicy = {
   sales_require_attachment: boolean;
   purchase_order_require_attachment: boolean;
   supplier_invoice_require_attachment: boolean;
+  manufacturing_require_fg_qc: boolean;
   ar_payment_discount_account_id?: number | null;
   ap_payment_discount_account_id?: number | null;
 };
@@ -210,6 +211,18 @@ const SECTIONS: PolicySection[] = [
       },
     ],
   },
+  {
+    id: "production",
+    title: "Production",
+    blurb: "Finished-goods QC gate before work orders can complete and post stock.",
+    fields: [
+      {
+        key: "manufacturing_require_fg_qc",
+        label: "Require FG QC before WO complete",
+        help: "When on, new work orders start with inspection pending until Quality releases them. Off = legacy behavior (released by default).",
+      },
+    ],
+  },
 ];
 
 const LOT_ALLOCATION_OPTIONS = [
@@ -226,7 +239,7 @@ const BUDGET_CONTROL_OPTIONS: { value: BudgetControlMode; label: string }[] = [
 
 const ALL_BOOLEAN_FIELDS = SECTIONS.flatMap((s) => s.fields);
 
-type PresetId = "flexible" | "full_process" | "attachments_light" | "perishables_warehouse";
+type PresetId = "flexible" | "full_process" | "attachments_light" | "perishables_warehouse" | "production_qc";
 
 const PRESETS: { id: PresetId; label: string; help: string; apply: (p: ProcessPolicy) => ProcessPolicy }[] = [
   {
@@ -297,6 +310,15 @@ const PRESETS: { id: PresetId; label: string; help: string; apply: (p: ProcessPo
       ...p,
       inventory_block_expired_lot_sales: true,
       inventory_default_lot_allocation: "fefo",
+    }),
+  },
+  {
+    id: "production_qc",
+    label: "Production QC required",
+    help: "New work orders require FG inspection release before complete.",
+    apply: (p) => ({
+      ...p,
+      manufacturing_require_fg_qc: true,
     }),
   },
 ];

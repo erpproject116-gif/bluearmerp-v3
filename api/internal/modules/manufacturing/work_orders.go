@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -40,6 +41,11 @@ type WorkOrder struct {
 	CompletedAt        *string  `json:"completed_at,omitempty"`
 	ActualInputQty     *float64 `json:"actual_input_qty,omitempty"`
 	InputLotBatchID    *int64   `json:"input_lot_batch_id,omitempty"`
+	InspectionStatus   string   `json:"inspection_status"`
+	InspectionNotes    *string  `json:"inspection_notes,omitempty"`
+	InspectedAt        *string  `json:"inspected_at,omitempty"`
+	SourceSalesOrderID     *int64 `json:"source_sales_order_id,omitempty"`
+	SourceSalesOrderLineID *int64 `json:"source_sales_order_line_id,omitempty"`
 }
 
 type MaterialNeedLine struct {
@@ -66,11 +72,12 @@ type MaterialNeeds struct {
 }
 
 type workOrderBody struct {
-	BomID        int64   `json:"bom_id"`
-	LocationID   int64   `json:"location_id"`
-	QtyToProduce float64 `json:"qty_to_produce"`
-	OrderDate    string  `json:"order_date"`
-	Notes        *string `json:"notes"`
+	BomID                  int64   `json:"bom_id"`
+	LocationID             int64   `json:"location_id"`
+	QtyToProduce           float64 `json:"qty_to_produce"`
+	OrderDate              string  `json:"order_date"`
+	Notes                  *string `json:"notes"`
+	SourceSalesOrderLineID *int64  `json:"source_sales_order_line_id"`
 }
 
 type workOrderPatchBody struct {
@@ -126,6 +133,8 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status,
 			  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text,
 			  wo.actual_input_qty::float8, wo.input_lot_batch_id,
+			  wo.inspection_status, wo.inspection_notes, wo.inspected_at::text,
+			  wo.source_sales_order_id, wo.source_sales_order_line_id,
 			  count(*) over()
 			from public.mfg_work_orders wo
 			join public.mfg_boms b on b.id = wo.bom_id
@@ -150,14 +159,17 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row WorkOrder
 			var notes *string
-			var released, completed *string
+			var released, completed, inspectedAt *string
+			var inspectionNotes *string
 			if err := rows.Scan(
 				&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName,
 				&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 				&row.LocationID, &row.LocationName,
 				&row.QtyToProduce, &row.QtyProduced, &row.Status,
 				&row.OrderDate, &notes, &released, &completed,
-				&row.ActualInputQty, &row.InputLotBatchID, &total,
+				&row.ActualInputQty, &row.InputLotBatchID,
+				&row.InspectionStatus, &inspectionNotes, &inspectedAt,
+				&row.SourceSalesOrderID, &row.SourceSalesOrderLineID, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read work order.", "ERR_INTERNAL")
 				return
@@ -165,6 +177,8 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			row.Notes = notes
 			row.ReleasedAt = released
 			row.CompletedAt = completed
+			row.InspectionNotes = inspectionNotes
+			row.InspectedAt = inspectedAt
 			out = append(out, row)
 		}
 		if out == nil {
@@ -229,15 +243,34 @@ func createWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		woNo := fmt.Sprintf("WO-%s-%04d", orderDate.Format("20060102"), time.Now().Unix()%10000)
+		var sourceSalesOrderID *int64
+		if body.SourceSalesOrderLineID != nil && *body.SourceSalesOrderLineID > 0 {
+			var soID int64
+			var lineItemID *int64
+			err = pool.QueryRow(r.Context(), `
+				select ln.sales_order_id, ln.item_id
+				from public.so_sales_order_lines ln
+				join public.so_sales_orders so on so.id = ln.sales_order_id
+				where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null`,
+				*body.SourceSalesOrderLineID, tu.TenantID).Scan(&soID, &lineItemID)
+			if err != nil || lineItemID == nil || *lineItemID != bom.FinishedItemID {
+				response.Validation(w, map[string]string{"source_sales_order_line_id": "Sales order line not found or item mismatch."})
+				return
+			}
+			sourceSalesOrderID = &soID
+		}
 		var id int64
+		inspectionStatus := initialWorkOrderInspectionStatus(r.Context(), pool, tu.TenantID)
 		err = pool.QueryRow(r.Context(), `
 			insert into public.mfg_work_orders (
 			  tenant_id, work_order_no, bom_id, finished_item_id, location_id,
-			  qty_to_produce, order_date, notes, created_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7::date,$8,$9)
+			  qty_to_produce, order_date, notes, source_sales_order_id, source_sales_order_line_id,
+			  inspection_status, created_by_user_id
+			) values ($1,$2,$3,$4,$5,$6,$7::date,$8,$9,$10,$11,$12)
 			returning id`,
 			tu.TenantID, woNo, body.BomID, bom.FinishedItemID, locationID,
-			body.QtyToProduce, orderDate.Format("2006-01-02"), body.Notes, tu.AppUserID,
+			body.QtyToProduce, orderDate.Format("2006-01-02"), body.Notes,
+			sourceSalesOrderID, body.SourceSalesOrderLineID, inspectionStatus, tu.AppUserID,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create work order.", "ERR_INTERNAL")
@@ -372,21 +405,25 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		defer tx.Rollback(r.Context())
 
 		var wo WorkOrder
-		var status string
+		var status, inspectionStatus string
 		err = tx.QueryRow(r.Context(), `
 			select wo.id, wo.work_order_no, wo.bom_id, wo.finished_item_id, wo.location_id,
-			  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status
+			  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status, wo.inspection_status
 			from public.mfg_work_orders wo
 			where wo.id = $1 and wo.tenant_id = $2
 			for update`, id, tu.TenantID).Scan(
 			&wo.ID, &wo.WorkOrderNo, &wo.BomID, &wo.FinishedItemID, &wo.LocationID,
-			&wo.QtyToProduce, &wo.QtyProduced, &status)
+			&wo.QtyToProduce, &wo.QtyProduced, &status, &inspectionStatus)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
 			return
 		}
 		if status != "released" {
 			response.Validation(w, map[string]string{"status": "Only released work orders can be completed."})
+			return
+		}
+		if inspectionStatus != "released" {
+			response.Validation(w, map[string]string{"inspection_status": "Work order must pass FG inspection before completion."})
 			return
 		}
 
@@ -403,7 +440,17 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if bomType == "disassembly" {
-			if completeBody.InputLotBatchID != nil && *completeBody.InputLotBatchID > 0 {
+			fgSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, wo.FinishedItemID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load finished item settings.", "ERR_INTERNAL")
+				return
+			}
+			if fgSettings.TrackSerial || fgSettings.TrackLot {
+				if err := consumeWoIssueTrace(r.Context(), tx, tu.TenantID, id, wo.LocationID, wo.FinishedItemID, actualInputQty, tu.AppUserID); err != nil {
+					response.Validation(w, map[string]string{"stock": err.Error()})
+					return
+				}
+			} else if completeBody.InputLotBatchID != nil && *completeBody.InputLotBatchID > 0 {
 				var lotItemID, lotLocationID int64
 				var lotQty float64
 				err := tx.QueryRow(r.Context(), `
@@ -431,10 +478,11 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Validation(w, map[string]string{"input_lot_batch_id": "Failed to consume input lot batch."})
 					return
 				}
-			}
-			if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, -actualInputQty, tu.AppUserID, "mfg_work_order", id, "wo_disassembly_issue"); err != nil {
-				response.Validation(w, map[string]string{"stock": err.Error()})
-				return
+			} else if !fgSettings.TrackSerial && !fgSettings.TrackLot {
+				if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, -actualInputQty, tu.AppUserID, "mfg_work_order", id, "wo_disassembly_issue"); err != nil {
+					response.Validation(w, map[string]string{"stock": err.Error()})
+					return
+				}
 			}
 			for _, ln := range bom.Lines {
 				recvQty, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, actualInputQty, bom.OutputQty, bom.YieldPct)
@@ -462,7 +510,21 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Validation(w, map[string]string{"stock": err.Error()})
 					return
 				}
-				if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, -issueQty, tu.AppUserID, "mfg_work_order", id, "wo_backflush_issue"); err != nil {
+				compSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, ln.ComponentItemID)
+				if err != nil {
+					response.Validation(w, map[string]string{"stock": err.Error()})
+					return
+				}
+				if compSettings.TrackSerial || compSettings.TrackLot {
+					if err := consumeWoIssueTrace(r.Context(), tx, tu.TenantID, id, wo.LocationID, ln.ComponentItemID, issueQty, tu.AppUserID); err != nil {
+						label := ln.ComponentCode
+						if label == "" {
+							label = fmt.Sprintf("item %d", ln.ComponentItemID)
+						}
+						response.Validation(w, map[string]string{"stock": fmt.Sprintf("insufficient staged issue for %s: %s", label, err.Error())})
+						return
+					}
+				} else if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, -issueQty, tu.AppUserID, "mfg_work_order", id, "wo_backflush_issue"); err != nil {
 					label := ln.ComponentCode
 					if label == "" {
 						label = fmt.Sprintf("item %d", ln.ComponentItemID)
@@ -475,7 +537,17 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 			}
-			if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, wo.QtyToProduce, tu.AppUserID, "mfg_work_order", id, "wo_backflush_receipt"); err != nil {
+			fgSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, wo.FinishedItemID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load finished item settings.", "ERR_INTERNAL")
+				return
+			}
+			if fgSettings.TrackSerial || fgSettings.TrackLot {
+				if err := postWoOutputTrace(r.Context(), tx, tu.TenantID, id, wo.LocationID, wo.FinishedItemID, wo.QtyToProduce, tu.AppUserID, bom.FinishedItemCode, fgSettings.DefaultShelfLifeDays); err != nil {
+					response.Validation(w, map[string]string{"stock": err.Error()})
+					return
+				}
+			} else if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, wo.QtyToProduce, tu.AppUserID, "mfg_work_order", id, "wo_backflush_receipt"); err != nil {
 				response.Validation(w, map[string]string{"stock": err.Error()})
 				return
 			}
@@ -569,7 +641,8 @@ func getWorkOrderMaterialNeeds(pool *pgxpool.Pool) http.HandlerFunc {
 func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (WorkOrder, error) {
 	var row WorkOrder
 	var notes *string
-	var released, completed *string
+	var released, completed, inspectedAt *string
+	var inspectionNotes *string
 	err := pool.QueryRow(ctx, `
 		select wo.id, wo.work_order_no, wo.bom_id, b.bom_code, b.bom_name,
 		  wo.finished_item_id, coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
@@ -577,7 +650,9 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		  wo.location_id, coalesce(loc.location_name, ''),
 		  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status,
 		  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text,
-		  wo.actual_input_qty::float8, wo.input_lot_batch_id
+		  wo.actual_input_qty::float8, wo.input_lot_batch_id,
+		  wo.inspection_status, wo.inspection_notes, wo.inspected_at::text,
+		  wo.source_sales_order_id, wo.source_sales_order_line_id
 		from public.mfg_work_orders wo
 		join public.mfg_boms b on b.id = wo.bom_id
 		join public.inv_items fi on fi.id = wo.finished_item_id
@@ -588,13 +663,17 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 		&row.LocationID, &row.LocationName,
 		&row.QtyToProduce, &row.QtyProduced, &row.Status,
-		&row.OrderDate, &notes, &released, &completed, &row.ActualInputQty, &row.InputLotBatchID)
+		&row.OrderDate, &notes, &released, &completed, &row.ActualInputQty, &row.InputLotBatchID,
+		&row.InspectionStatus, &inspectionNotes, &inspectedAt,
+		&row.SourceSalesOrderID, &row.SourceSalesOrderLineID)
 	if err != nil {
 		return WorkOrder{}, err
 	}
 	row.Notes = notes
 	row.ReleasedAt = released
 	row.CompletedAt = completed
+	row.InspectionNotes = inspectionNotes
+	row.InspectedAt = inspectedAt
 	return row, nil
 }
 
@@ -610,4 +689,12 @@ func validateWorkOrderBody(b workOrderBody) map[string]string {
 		return errs
 	}
 	return nil
+}
+
+func initialWorkOrderInspectionStatus(ctx context.Context, pool *pgxpool.Pool, tenantID int64) string {
+	pol, err := processpolicy.Load(ctx, pool, tenantID)
+	if err != nil || !pol.ManufacturingRequireFgQc {
+		return "released"
+	}
+	return "pending"
 }

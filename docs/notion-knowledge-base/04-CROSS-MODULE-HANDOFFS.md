@@ -75,7 +75,8 @@ flowchart TB
 | SO Release (split) | Serial | Units `reserved` |
 | Sales invoice | Serial | Units `sold` |
 | BOM | Work Order | Materials plan |
-| Work Order release → complete | Stock | Backflush materials + finished goods receive |
+| Sales Order line | Work Order | Load Slip on New Work Order copies open SO lines (`source_sales_order_line_id`); MTO golden S14 |
+| Work Order release → complete | Stock | Backflush materials + finished goods receive (`mfg_work_order` stock movements) |
 | WMS scheduled receipt | Goods Receipt | Compare planned vs posted; variance/close |
 | Repair order | Stock location | RMA hold → parts consumption → release to non-RMA |
 

@@ -63,6 +63,12 @@ func SalesOrderConfig() Config {
 				BlockDelete: true,
 			},
 			{
+				Code: "work_orders", Kind: "downstream_document", Label: "Work orders sourced from this sales order",
+				Query: `select count(*) from public.mfg_work_orders wo
+					where wo.tenant_id = $1 and wo.source_sales_order_id = $2 and wo.status <> 'cancelled'`,
+				BlockDelete: true,
+			},
+			{
 				Code: "deleted_source_quotation", Kind: "source_document", Label: "Deleted source quotation",
 				Query: `select count(*) from public.so_sales_orders so
 					join public.quo_quotations q on q.id = so.source_quotation_id

@@ -240,6 +240,10 @@ import {
   JobCostingPage,
   BomsPage,
   WorkOrdersPage,
+  ProductionWorkspacePage,
+  ProductionReportsPage,
+  ProductionIssueStationPage,
+  ProductionReceiveStationPage,
   NcrsPage,
   CapaPage,
   QcRequestsPage,
@@ -544,23 +548,41 @@ export default function App() {
           <Route path="/inventory/serial-lot/pack-station" component={PackStationPage} />
           <Route path="/inventory/serial-lot/receive" component={SerialReceivePage} />
           <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
-          <Route path="/inventory/serial-lot/manufacturing/work-orders" component={() => (
-            <ManufacturingRoute><WorkOrdersPage /></ManufacturingRoute>
+          <Route path="/production" component={() => (
+            <ManufacturingRoute><ProductionWorkspacePage /></ManufacturingRoute>
           )} />
-          <Route path="/inventory/serial-lot/manufacturing/boms" component={() => (
+          <Route path="/production/boms" component={() => (
             <ManufacturingRoute><BomsPage /></ManufacturingRoute>
           )} />
+          <Route path="/production/work-orders" component={() => (
+            <ManufacturingRoute><WorkOrdersPage /></ManufacturingRoute>
+          )} />
+          <Route path="/production/issue-station" component={() => (
+            <ManufacturingRoute><ProductionIssueStationPage /></ManufacturingRoute>
+          )} />
+          <Route path="/production/receive-station" component={() => (
+            <ManufacturingRoute><ProductionReceiveStationPage /></ManufacturingRoute>
+          )} />
+          <Route path="/production/reports" component={() => (
+            <ManufacturingRoute><ProductionReportsPage /></ManufacturingRoute>
+          )} />
+          <Route path="/inventory/serial-lot/manufacturing/work-orders" component={() => (
+            <Navigate href="/app/production/work-orders" />
+          )} />
+          <Route path="/inventory/serial-lot/manufacturing/boms" component={() => (
+            <Navigate href="/app/production/boms" />
+          )} />
           <Route path="/manufacturing/work-orders" component={() => (
-            <Navigate href="/app/inventory/serial-lot/manufacturing/work-orders" />
+            <Navigate href="/app/production/work-orders" />
           )} />
           <Route path="/manufacturing/boms" component={() => (
-            <Navigate href="/app/inventory/serial-lot/manufacturing/boms" />
+            <Navigate href="/app/production/boms" />
           )} />
           <Route path="/inventory/work-orders" component={() => (
-            <Navigate href="/app/inventory/serial-lot/manufacturing/work-orders" />
+            <Navigate href="/app/production/work-orders" />
           )} />
           <Route path="/inventory/boms" component={() => (
-            <Navigate href="/app/inventory/serial-lot/manufacturing/boms" />
+            <Navigate href="/app/production/boms" />
           )} />
           <Route path="/after-sales/repair-orders/new" component={RepairOrderNewPage} />
           <Route path="/after-sales/repair-orders/status" component={RepairOrderStatusPage} />

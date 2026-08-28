@@ -16,6 +16,7 @@ export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: s
       isTenantModuleEnabled(me, "sales_order")
     );
   }
+  if (moduleId === "production") return isTenantModuleEnabled(me, "manufacturing");
   if (moduleId === "user_management" && !canManageUsers(me)) return false;
   if (moduleId === "activity_logs" && !canViewActivityLogs(me)) return false;
   if (moduleId === "crm" && !canViewCrm(me)) return false;

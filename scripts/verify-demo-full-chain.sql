@@ -1,5 +1,6 @@
--- Verify golden demo scenario linkage (run after seed-demo-full-chain.sql)
--- Raises exception on failure.
+-- Verify golden demo scenario linkage (run after seed-demo-full-chain.sql or supabase db seed)
+-- Tenants without golden scenarios (no DEMO-S2-PR) are skipped with a notice.
+-- Raises exception on failure for seeded tenants.
 begin;
 
 do $$
@@ -12,12 +13,39 @@ declare
   v_reserved int;
   v_lot_qty numeric;
   v_sale_line bigint;
+  v_has_mfg_inspection boolean;
+  v_has_mfg_so_link boolean;
+  v_has_bom_type boolean;
 begin
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'mfg_work_orders' and column_name = 'inspection_status'
+  ) into v_has_mfg_inspection;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'mfg_work_orders' and column_name = 'source_sales_order_line_id'
+  ) into v_has_mfg_so_link;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'mfg_boms' and column_name = 'bom_type'
+  ) into v_has_bom_type;
+
   foreach v_code in array array['DEMO000', 'BLUEARM']
   loop
     select id into v_tenant from public.tenants where company_code = v_code;
     if v_tenant is null then
       raise exception 'verify-full-chain: tenant % missing', v_code;
+    end if;
+
+    -- Skip tenants that never received golden scenario seeds (e.g. production BLUEARM without demo reload).
+    if not exists (
+      select 1 from public.pr_purchase_requests
+      where tenant_id = v_tenant and purchase_request_no = 'DEMO-S2-PR'
+    ) then
+      raise notice 'verify-full-chain [%]: skipping — golden scenarios not seeded (run scripts/seed-demo-inventory.sql then seed-demo-golden-scenarios.sql)', v_code;
+      continue;
     end if;
 
     -- S2: posted GR + PO + PR
@@ -27,7 +55,7 @@ begin
       join public.gr_goods_receipts gr on gr.purchase_order_id = po.id and gr.status = 'posted'
       where pr.tenant_id = v_tenant and pr.purchase_request_no = 'DEMO-S2-PR'
     ) then
-      raise exception 'verify-full-chain [%]: S2 PR→PO→GR chain missing', v_code;
+      raise exception 'verify-full-chain [%]: S2 PR→PO→GR chain incomplete — DEMO-S2-PR exists but posted GR missing; re-run scripts/seed-demo-golden-scenarios.sql', v_code;
     end if;
 
     select count(*) into v_count
@@ -184,6 +212,61 @@ begin
       where s.tenant_id = v_tenant and s.sales_no = 'DEMO-S13-SI'
     ) then
       raise exception 'verify-full-chain [%]: DEMO-S13-SI lot allocations missing', v_code;
+    end if;
+
+    -- S14–S16: production module (requires migrations 272 + 274; S16 also needs bom_type from 270)
+    if not v_has_mfg_inspection or not v_has_mfg_so_link then
+      raise exception 'verify-full-chain [%]: production migrations not applied — run api/migrations/272_mfg_fg_inspection.sql and 274_mfg_so_link.sql (then seed-demo-golden-s14-s16-production.sql)', v_code;
+    end if;
+
+    -- S14: MTO SO → completed WO with FG QC released
+    if not exists (
+      select 1 from public.so_sales_orders so
+      join public.so_sales_order_lines ln on ln.sales_order_id = so.id
+      join public.mfg_work_orders wo on wo.source_sales_order_line_id = ln.id
+      join public.inv_items i on i.id = ln.item_id
+      where so.tenant_id = v_tenant and so.sales_order_no = 'DEMO-S14-SO'
+        and wo.work_order_no = 'DEMO-S14-WO' and wo.status = 'completed'
+        and wo.inspection_status = 'released' and wo.qty_produced = 1
+        and i.item_code = '00001'
+    ) then
+      raise exception 'verify-full-chain [%]: S14 MTO SO→WO chain missing — run scripts/seed-demo-golden-s14-s16-production.sql', v_code;
+    end if;
+
+    select count(*) into v_count
+    from public.inv_stock_movements sm
+    join public.mfg_work_orders wo on wo.id = sm.ref_id and wo.tenant_id = sm.tenant_id
+    where sm.tenant_id = v_tenant and sm.ref_type = 'mfg_work_order'
+      and wo.work_order_no = 'DEMO-S14-WO';
+    if v_count < 1 then
+      raise exception 'verify-full-chain [%]: S14 expected stock movements on DEMO-S14-WO, got %', v_code, v_count;
+    end if;
+
+    -- S15: MTS completed WO without SO link
+    if not exists (
+      select 1 from public.mfg_work_orders wo
+      join public.mfg_boms b on b.id = wo.bom_id
+      where wo.tenant_id = v_tenant and wo.work_order_no = 'DEMO-S15-WO'
+        and wo.status = 'completed' and wo.qty_produced = 1
+        and wo.source_sales_order_line_id is null
+        and b.bom_code in ('DEMO-S14-BOM', 'DEMO-S15-BOM')
+    ) then
+      raise exception 'verify-full-chain [%]: S15 MTS work order missing — run scripts/seed-demo-golden-s14-s16-production.sql', v_code;
+    end if;
+
+    -- S16: disassembly WO with actual_input_qty (when bom_type migration applied)
+    if v_has_bom_type then
+      if not exists (
+        select 1 from public.mfg_work_orders wo
+        join public.mfg_boms b on b.id = wo.bom_id and b.bom_type = 'disassembly'
+        where wo.tenant_id = v_tenant and wo.work_order_no = 'DEMO-S16-WO'
+          and wo.status = 'completed' and wo.actual_input_qty is not null
+          and b.bom_code = 'DEMO-S16-BOM'
+      ) then
+        raise exception 'verify-full-chain [%]: S16 disassembly WO missing — run scripts/seed-demo-golden-s14-s16-production.sql', v_code;
+      end if;
+    else
+      raise notice 'verify-full-chain [%]: S16 skipped — migration 270_mfg_disassembly_phase3.sql (bom_type) not applied', v_code;
     end if;
 
     -- Platform feature gap closure: default doc generation rules seeded

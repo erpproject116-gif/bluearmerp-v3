@@ -16,6 +16,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		qr.With(auth.RequirePermission("quality.ncrs", auth.AccessWrite)).Delete("/ncrs/{id}", deleteNcr(pool))
 
 		qr.With(auth.RequirePermission("quality.gr_inspection", auth.AccessWrite)).Patch("/goods-receipts/{id}/inspection", patchGrInspection(pool))
+		qr.With(auth.RequirePermission("quality.wo_inspection", auth.AccessWrite)).Patch("/work-orders/{id}/inspection", patchWoInspection(pool))
 
 		qr.With(auth.RequirePermission("quality.capa_read", auth.AccessRead)).Get("/capa", listCapaRecords(pool))
 		qr.With(auth.RequirePermission("quality.capa_write", auth.AccessWrite)).Post("/capa", createCapaRecord(pool))

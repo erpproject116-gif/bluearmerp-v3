@@ -41,6 +41,7 @@ type Bom = {
   output_unit_id?: number | null;
   output_unit_code?: string;
   yield_pct?: number;
+  bom_type?: string;
   is_active: boolean;
   notes?: string | null;
   components?: string;
@@ -132,6 +133,7 @@ export default function BomsPage() {
   const [outputUnitId, setOutputUnitId] = createSignal<number | null>(null);
   const [outputUnitLabel, setOutputUnitLabel] = createSignal("");
   const [yieldPct, setYieldPct] = createSignal("100");
+  const [bomType, setBomType] = createSignal<"assembly" | "disassembly">("assembly");
   const [notes, setNotes] = createSignal("");
   const [lines, setLines] = createSignal<BomLine[]>([emptyLine()]);
   const [lineLabels, setLineLabels] = createSignal<Record<number, string>>({});
@@ -182,6 +184,7 @@ export default function BomsPage() {
     setOutputUnitId(null);
     setOutputUnitLabel("");
     setYieldPct("100");
+    setBomType("assembly");
     setNotes("");
     setLines([emptyLine()]);
     setLineLabels({});
@@ -208,6 +211,7 @@ export default function BomsPage() {
     setOutputUnitId(detail.output_unit_id ?? null);
     setOutputUnitLabel(detail.output_unit_code ?? "");
     setYieldPct(String(detail.yield_pct ?? 100));
+    setBomType(detail.bom_type === "disassembly" ? "disassembly" : "assembly");
     setNotes(detail.notes ?? "");
     const loaded = detail.lines?.length ? detail.lines : [emptyLine()];
     setLines(
@@ -236,6 +240,7 @@ export default function BomsPage() {
       output_unit_id: outputUnitId(),
       output_unit_label: outputUnitLabel(),
       yield_pct: yieldPct(),
+      bom_type: bomType(),
       notes: notes(),
       lines: lines(),
       line_labels: lineLabels(),
@@ -253,6 +258,7 @@ export default function BomsPage() {
       setOutputUnitId(payload.output_unit_id ?? null);
       setOutputUnitLabel(payload.output_unit_label ?? "");
       setYieldPct(payload.yield_pct ?? "100");
+      setBomType(payload.bom_type === "disassembly" ? "disassembly" : "assembly");
       setNotes(payload.notes ?? "");
       setLines(payload.lines?.length ? payload.lines : [emptyLine()]);
       setLineLabels(payload.line_labels ?? {});
@@ -289,6 +295,7 @@ export default function BomsPage() {
       output_qty: Number(outputQty()) || 1,
       output_unit_id: outputUnitId(),
       yield_pct: Number(yieldPct()) || 100,
+      bom_type: bomType(),
       is_active: isActive(),
       notes: notes().trim() || null,
       lines: bodyLines,
@@ -322,6 +329,12 @@ export default function BomsPage() {
           { key: "bom_code", header: "BOM code", clickable: true },
           { key: "bom_name", header: "Name", clickable: true },
           { key: "finished_item_name", header: "Finished item" },
+          {
+            key: "bom_type",
+            header: "Type",
+            sortable: false,
+            render: (r) => (r.bom_type === "disassembly" ? "Disassembly" : "Assembly"),
+          },
           { key: "components", header: "Components" },
           { key: "default_location_name", header: "Default location" },
           {
@@ -337,7 +350,7 @@ export default function BomsPage() {
         onSelect={setSelectedId}
         onNew={openNew}
         onEdit={openEdit}
-        settingsHref="/app/inventory/serial-lot/manufacturing/boms"
+        settingsHref="/app/production/boms"
         codeKey="bom_code"
         nameKey="bom_name"
         sortKey={sort()}
@@ -380,6 +393,16 @@ export default function BomsPage() {
         </Field>
         <Field label="Name *">
           <input class={inputClass} value={bomName()} onInput={(e) => setBomName(e.currentTarget.value)} />
+        </Field>
+        <Field label="BOM type">
+          <select
+            class={inputClass}
+            value={bomType()}
+            onChange={(e) => setBomType(e.currentTarget.value === "disassembly" ? "disassembly" : "assembly")}
+          >
+            <option value="assembly">Assembly — consume components, receive finished item</option>
+            <option value="disassembly">Disassembly — consume input item, receive components</option>
+          </select>
         </Field>
         <label class="flex items-end gap-2 pb-2 text-sm">
           <input type="checkbox" checked={isActive()} onChange={(e) => setIsActive(e.currentTarget.checked)} />

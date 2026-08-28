@@ -101,8 +101,6 @@ export const appModules: AppModule[] = [
       { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing", settingsHref: "/app/inventory/stock-movements", headerPriority: "overflow" },
       { label: "Price List", href: "/app/inventory/price-lists", settingsHref: "/app/inventory/price-lists", featureCode: "inventory.price_lists", headerPriority: "overflow" },
       { label: "Product Bundles", href: "/app/inventory/product-bundles", settingsHref: "/app/inventory/product-bundles", headerPriority: "overflow" },
-      { label: "BOMs", href: "/app/inventory/serial-lot/manufacturing/boms", settingsHref: "/app/inventory/serial-lot/manufacturing/boms", featureCode: "manufacturing.boms", headerPriority: "overflow" },
-      { label: "Work Orders", href: "/app/inventory/serial-lot/manufacturing/work-orders", settingsHref: "/app/inventory/serial-lot/manufacturing/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "overflow" },
     ],
     subBranches: [
       {
@@ -119,6 +117,20 @@ export const appModules: AppModule[] = [
         settingsHref: "/app/inventory/wms/scheduled-receipts",
         featureCode: "inventory.wms",
       },
+    ],
+  },
+  {
+    id: "production",
+    label: "Production",
+    href: "/app/production",
+    basePath: "/app/production",
+    features: [
+      { label: "Workspace", href: "/app/production", settingsHref: "/app/production", headerPriority: "primary" },
+      { label: "BOMs", href: "/app/production/boms", settingsHref: "/app/production/boms", featureCode: "manufacturing.boms", headerPriority: "primary" },
+      { label: "Work Orders", href: "/app/production/work-orders", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
+      { label: "Issue station", href: "/app/production/issue-station", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "overflow" },
+      { label: "Receive station", href: "/app/production/receive-station", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "overflow" },
+      { label: "Reports", href: "/app/production/reports", settingsHref: "/app/production/reports", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
     ],
   },
   {

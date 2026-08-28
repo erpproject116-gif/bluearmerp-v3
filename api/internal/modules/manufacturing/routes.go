@@ -15,12 +15,25 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Patch("/boms/{id}", updateBom(pool))
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Delete("/boms/{id}", deleteBom(pool))
 
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/sales-order-lines/open", listOpenSalesOrderSlipLinesForWO(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/open-sales-order-lines", listOpenSalesOrderLinesForWO(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/from-sales-order/{soId}", createWorkOrderFromSalesOrder(pool))
+
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders", listWorkOrders(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/{id}", getWorkOrder(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/{id}/material-needs", getWorkOrderMaterialNeeds(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/{id}/scan-context", getWorkOrderScanContext(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders", createWorkOrder(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Patch("/work-orders/{id}", updateWorkOrder(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/issue-serials", issueWorkOrderSerials(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/issue-lots", issueWorkOrderLots(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/output-serials/batch", batchWorkOrderOutputSerials(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/output-lots/batch", batchWorkOrderOutputLots(pool))
 		mr.With(auth.RequireSubmit("manufacturing.work_orders_release")).Post("/work-orders/{id}/release", releaseWorkOrder(pool))
 		mr.With(auth.RequireSubmit("manufacturing.work_orders_complete")).Post("/work-orders/{id}/complete", completeWorkOrder(pool))
+
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/work-order-status", listWorkOrderStatusReport(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/progress", listWorkOrderProgressReport(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/stock-movements", listWorkOrderStockMovementsReport(pool))
 	})
 }

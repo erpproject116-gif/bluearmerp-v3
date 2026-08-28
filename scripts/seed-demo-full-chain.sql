@@ -17,6 +17,8 @@
 \ir seed-demo-golden-scenarios.sql
 \echo '=== seed-demo-full-chain: golden S13 perishable ==='
 \ir seed-demo-golden-s13-perishable.sql
+\echo '=== seed-demo-full-chain: golden S14-S16 production ==='
+\ir seed-demo-golden-s14-s16-production.sql
 \echo '=== seed-demo-full-chain: open PO/GR ==='
 \ir seed-demo-po-gr-open.sql
 \echo '=== seed-demo-full-chain: sales ==='
