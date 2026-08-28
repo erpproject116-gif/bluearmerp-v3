@@ -437,17 +437,31 @@ export default function ReceiveStationPage() {
 
   onMount(() => {
     const seed = takeSerialLotSeed();
-    if (seed?.purchase_order_id) {
-      void (async () => {
-        const res = await apiFetch<PurchaseOrderRow>(
-          `/api/v1/purchase-order/purchase-orders/${seed.purchase_order_id}`,
+    if (seed?.rows?.length) {
+      const serials = seed.rows
+        .map((row) => row.serial?.trim())
+        .filter((s): s is string => !!s);
+      if (serials.length > 0) {
+        setSerialPasteText(serials.join("\n"));
+        setSerialPasteOpen(true);
+        toast.success(
+          `Baiko staged ${serials.length} serial(s) from ${seed.file_name || "your attachment"}. ` +
+            "Create or select a goods receipt, pick the scan line, then Import to confirm.",
         );
-        if (res.success && res.data) {
-          setSelectedPo(res.data);
-          setSelectedPoId(res.data.id);
-          setPoLabel(`${res.data.purchase_order_no} — ${res.data.partner_name}`);
-        }
-      })();
+      }
+      const lotRows = seed.rows.filter((row) => row.lot?.trim());
+      if (lotRows.length > 0) {
+        setLotPasteText(
+          lotRows
+            .map((row) => {
+              const lot = row.lot?.trim() ?? "";
+              const qty = row.qty != null && row.qty > 0 ? String(row.qty) : "1";
+              return `${lot}, ${qty}`;
+            })
+            .join("\n"),
+        );
+        setLotPasteOpen(true);
+      }
     }
     const gr = goodsReceipt();
     if (gr) {

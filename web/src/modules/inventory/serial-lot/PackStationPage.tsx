@@ -78,7 +78,7 @@ export default function PackStationPage() {
   };
 
   return (
-    <SerialLotLayout title="Pack station">
+    <SerialLotLayout>
       <Show
         when={session()}
         fallback={

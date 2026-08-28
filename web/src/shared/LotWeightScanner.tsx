@@ -78,7 +78,7 @@ export function LotWeightScanner(props: {
   const activeLineCounts = () => {
     const ln = activeLine();
     if (!ln) return "";
-    return `${"received_qty" in ln ? ln.received_qty : ln.received_qty} / ${ln.expected_qty}`;
+    return `${ln.received_qty} / ${ln.expected_qty}`;
   };
 
   const loadContext = async () => {
