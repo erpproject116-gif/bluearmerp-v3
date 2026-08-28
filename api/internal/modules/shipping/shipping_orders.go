@@ -124,9 +124,10 @@ func createShippingOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		if shippingDate == "" {
 			shippingDate = time.Now().Format("2006-01-02")
 		}
-		status := strings.TrimSpace(body.Status)
-		if status == "" {
-			status = "draft"
+		status, ok := NormalizeShippingOrderStatus(body.Status)
+		if !ok {
+			response.Validation(w, map[string]string{"status": "Must be draft, confirmed, shipped, or cancelled."})
+			return
 		}
 		freight := body.FreightAmount
 		if freight == nil {
@@ -175,9 +176,10 @@ func patchShippingOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		status := strings.TrimSpace(body.Status)
-		if status == "" {
-			status = "draft"
+		status, ok := NormalizeShippingOrderStatus(body.Status)
+		if !ok {
+			response.Validation(w, map[string]string{"status": "Must be draft, confirmed, shipped, or cancelled."})
+			return
 		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.sh_shipping_orders set

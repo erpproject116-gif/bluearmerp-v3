@@ -106,6 +106,35 @@ type addLotBody struct {
 	ExpiryDate         *string `json:"expiry_date"`
 }
 
+type batchLotScanItem struct {
+	ClientScanID       string   `json:"client_scan_id"`
+	GoodsReceiptLineID int64    `json:"goods_receipt_line_id"`
+	LotNo              string   `json:"lot_no"`
+	Qty                float64  `json:"qty"`
+	ExpiryDate         *string  `json:"expiry_date,omitempty"`
+	GrossWeightKg      *float64 `json:"gross_weight_kg,omitempty"`
+}
+
+type batchLotBody struct {
+	Scans []batchLotScanItem `json:"scans"`
+}
+
+type batchContainerScanItem struct {
+	ClientScanID       string   `json:"client_scan_id"`
+	GoodsReceiptLineID int64    `json:"goods_receipt_line_id"`
+	ContainerNo        string   `json:"container_no"`
+	ContainerType      string   `json:"container_type"`
+	GrossWeightKg      *float64 `json:"gross_weight_kg,omitempty"`
+	TareWeightKg       *float64 `json:"tare_weight_kg,omitempty"`
+	NetWeightKg        float64  `json:"net_weight_kg"`
+	LotNo              string   `json:"lot_no"`
+	ExpiryDate         *string  `json:"expiry_date,omitempty"`
+}
+
+type batchContainerBody struct {
+	Scans []batchContainerScanItem `json:"scans"`
+}
+
 func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{
 		"receipt_date":      "gr.receipt_date",
@@ -905,6 +934,172 @@ func addGoodsReceiptLot(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func addGoodsReceiptLotBatch(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		grID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body batchLotBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if len(body.Scans) == 0 {
+			response.Validation(w, map[string]string{"scans": "At least one lot entry is required."})
+			return
+		}
+		if len(body.Scans) > maxLotBatchSize {
+			response.Validation(w, map[string]string{"scans": fmt.Sprintf("Maximum %d lot entries per batch.", maxLotBatchSize)})
+			return
+		}
+
+		inputs := make([]lotScanInput, len(body.Scans))
+		for i, sc := range body.Scans {
+			var expiry *time.Time
+			if sc.ExpiryDate != nil && strings.TrimSpace(*sc.ExpiryDate) != "" {
+				d, err := parseDate(*sc.ExpiryDate)
+				if err != nil {
+					response.Validation(w, map[string]string{"expiry_date": "Invalid date. Use YYYY-MM-DD."})
+					return
+				}
+				expiry = &d
+			}
+			qty := sc.Qty
+			if qty <= 0 && sc.GrossWeightKg != nil && *sc.GrossWeightKg > 0 {
+				qty = *sc.GrossWeightKg
+			}
+			inputs[i] = lotScanInput{
+				ClientScanID:       sc.ClientScanID,
+				GoodsReceiptLineID: sc.GoodsReceiptLineID,
+				LotNo:              sc.LotNo,
+				Qty:                qty,
+				ExpiryDate:         expiry,
+			}
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add lots.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		results, err := processLotScans(r.Context(), tx, tu.TenantID, grID, inputs)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if err.Error() == "only draft goods receipts accept lots" {
+				response.Validation(w, map[string]string{"status": "Only draft goods receipts accept lots."})
+				return
+			}
+			if strings.HasPrefix(err.Error(), "maximum ") {
+				response.Validation(w, map[string]string{"scans": err.Error()})
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to add lots.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add lots.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.add_lot_batch", "gr_goods_receipt", &grID, nil, map[string]any{"count": len(body.Scans)})
+		response.OK(w, map[string]any{"results": results}, "Batch processed.")
+	}
+}
+
+func addGoodsReceiptContainerBatch(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		grID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body batchContainerBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if len(body.Scans) == 0 {
+			response.Validation(w, map[string]string{"scans": "At least one container entry is required."})
+			return
+		}
+
+		inputs := make([]inventory.ContainerScanInput, len(body.Scans))
+		for i, sc := range body.Scans {
+			var expiry *time.Time
+			if sc.ExpiryDate != nil && strings.TrimSpace(*sc.ExpiryDate) != "" {
+				d, err := parseDate(*sc.ExpiryDate)
+				if err != nil {
+					response.Validation(w, map[string]string{"expiry_date": "Invalid date. Use YYYY-MM-DD."})
+					return
+				}
+				expiry = &d
+			}
+			netWeight := sc.NetWeightKg
+			if netWeight <= 0 && sc.GrossWeightKg != nil && *sc.GrossWeightKg > 0 {
+				tare := 0.0
+				if sc.TareWeightKg != nil {
+					tare = *sc.TareWeightKg
+				}
+				netWeight = *sc.GrossWeightKg - tare
+			}
+			inputs[i] = inventory.ContainerScanInput{
+				ClientScanID:       sc.ClientScanID,
+				GoodsReceiptLineID: sc.GoodsReceiptLineID,
+				ContainerNo:        sc.ContainerNo,
+				ContainerType:      sc.ContainerType,
+				GrossWeightKg:      sc.GrossWeightKg,
+				TareWeightKg:       sc.TareWeightKg,
+				NetWeightKg:        netWeight,
+				LotNo:              sc.LotNo,
+				ExpiryDate:         expiry,
+			}
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add containers.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		results, err := inventory.ProcessContainerScans(r.Context(), tx, tu.TenantID, grID, inputs)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if err.Error() == "only draft goods receipts accept containers" {
+				response.Validation(w, map[string]string{"status": "Only draft goods receipts accept containers."})
+				return
+			}
+			if strings.HasPrefix(err.Error(), "maximum ") {
+				response.Validation(w, map[string]string{"scans": err.Error()})
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to add containers.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to add containers.", "ERR_INTERNAL")
+			return
+		}
+
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.add_container_batch", "gr_goods_receipt", &grID, nil, map[string]any{"count": len(body.Scans)})
+		response.OK(w, map[string]any{"results": results}, "Batch processed.")
+	}
+}
+
 func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -1220,6 +1415,10 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 						response.Err(w, http.StatusInternalServerError, "Failed to upsert lot batch.", "ERR_INTERNAL")
 						return
 					}
+				}
+				if err := inventory.LinkContainersAfterGoodsReceiptPost(r.Context(), tx, tu.TenantID, ln.ID, *ln.ItemID, locationID, receiptDate); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to link containers.", "ERR_INTERNAL")
+					return
 				}
 			}
 

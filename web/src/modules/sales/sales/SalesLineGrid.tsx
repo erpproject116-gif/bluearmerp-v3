@@ -5,6 +5,7 @@ import { DecimalInput } from "../../../shared/DecimalInput";
 import { formatAmount, parseNum } from "../../../shared/money";
 import { SerialLineCell } from "../../../shared/SerialLineCell";
 import { LotLineCell } from "../../../shared/LotLineCell";
+import { fetchItemLotAllocation, LotAllocationSuggest } from "../../../shared/LotAllocationSuggest";
 import { DocumentSerialScanBar } from "../../../shared/DocumentSerialScanBar";
 import type { ResolvedSerialUnit } from "../../../shared/serialScanTypes";
 import { useToast } from "../../../shared/toast";
@@ -52,6 +53,7 @@ export type SalesLineRow = {
   lot_policy?: string;
   lot_batch_id?: number | null;
   lot_no?: string;
+  lot_allocation_method?: string;
   source_sales_order_line_id?: number | null;
   source_quotation_line_id?: number | null;
 };
@@ -295,6 +297,7 @@ export function SalesLineGrid(props: Props) {
     const current = [...props.lines()];
     const first = items[0];
     const rate0 = (await resolveItemRate(pid, first.id)) ?? first.sales_price ?? 0;
+    const lotAlloc0 = first.track_lot ? await fetchItemLotAllocation(first.id) : "manual";
     current[idx] = {
       ...current[idx],
       item_id: first.id,
@@ -309,6 +312,7 @@ export function SalesLineGrid(props: Props) {
       track_lot: Boolean(first.track_lot),
       serial_policy: first.serial_policy ?? "required",
       lot_policy: first.lot_policy ?? "required",
+      lot_allocation_method: lotAlloc0,
       serial_unit_ids: [],
       serial_lot_no: "",
       lot_batch_id: null,
@@ -317,6 +321,7 @@ export function SalesLineGrid(props: Props) {
     for (let i = 1; i < items.length; i++) {
       const it = items[i];
       const rate = (await resolveItemRate(pid, it.id)) ?? it.sales_price ?? 0;
+      const lotAlloc = it.track_lot ? await fetchItemLotAllocation(it.id) : "manual";
       current.push(emptySalesLine(current.length + 1, String(rate), basis));
       const last = current.length - 1;
       current[last] = {
@@ -331,6 +336,7 @@ export function SalesLineGrid(props: Props) {
         track_lot: Boolean(it.track_lot),
         serial_policy: it.serial_policy ?? "required",
         lot_policy: it.lot_policy ?? "required",
+        lot_allocation_method: lotAlloc,
       };
     }
     const numbered = current.map((ln, i) => ({ ...ln, line_no: i + 1 }));
@@ -652,6 +658,19 @@ export function SalesLineGrid(props: Props) {
                           void updateLine(idx, { lot_batch_id: lotBatchId, lot_no: lotNo, serial_lot_no: lotNo });
                         }}
                       />
+                        <LotAllocationSuggest
+                          itemId={line().item_id!}
+                          locationId={props.locationId()}
+                          qty={parseNum(line().qty) || 1}
+                          lotAllocationMethod={line().lot_allocation_method}
+                          onPick={(lotBatchId, lotNo) => {
+                            void updateLine(idx, {
+                              lot_batch_id: lotBatchId,
+                              lot_no: lotNo,
+                              serial_lot_no: lotNo,
+                            });
+                          }}
+                        />
                       </div>
                     </Show>
                     <Show when={line().item_id && !line().track_serial && !line().track_lot}>

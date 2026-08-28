@@ -105,6 +105,7 @@ export type LotBatchListParams = {
   q?: string;
   item_id?: number;
   location_id?: number;
+  expires_in_days?: number;
   enabled?: boolean;
 };
 
@@ -187,6 +188,7 @@ export function useLotBatchList(params: () => LotBatchListParams) {
       q: p.q,
       item_id: p.item_id,
       location_id: p.location_id,
+      expires_in_days: p.expires_in_days,
     });
 
     return {

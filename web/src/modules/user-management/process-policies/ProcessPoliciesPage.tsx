@@ -24,6 +24,8 @@ type ProcessPolicy = {
   inventory_gl_hybrid_enabled: boolean;
   inventory_require_serial_adjustment_approval: boolean;
   inventory_require_stock_adjustment_approval: boolean;
+  inventory_block_expired_lot_sales: boolean;
+  inventory_default_lot_allocation: string;
   sales_require_so_approval: boolean;
   purchase_require_po_approval: boolean;
   finance_require_je_approval: boolean;
@@ -76,7 +78,7 @@ const SECTIONS: PolicySection[] = [
       {
         key: "sales_require_delivery_receipt",
         label: "Require delivery receipt before invoice",
-        help: "When on, posting a delivery receipt is required before invoicing from SO lines.",
+        help: "When on, invoice qty from a sales order cannot exceed delivered qty on posted delivery receipts.",
       },
       {
         key: "legacy_combined_so_release",
@@ -102,8 +104,8 @@ const SECTIONS: PolicySection[] = [
       },
       {
         key: "purchase_require_pr_approval",
-        label: "Require PR approval before PO",
-        help: "When on, PO from PR is allowed only when PR progress is Confirmed.",
+        label: "Require approved purchase request (advisory)",
+        help: "Shown for process design. POs may currently be created from Unconfirmed / pending PRs — the API does not block on this flag yet.",
       },
       {
         key: "purchase_require_gr_before_supplier_invoice",
@@ -115,22 +117,22 @@ const SECTIONS: PolicySection[] = [
   {
     id: "approvals",
     title: "Approvals",
-    blurb: "Send documents to e-Approval before fulfillment or posting.",
+    blurb: "Journal approval is enforced. SO/PO approval toggles are advisory until the API gates are re-enabled.",
     fields: [
       {
         key: "sales_require_so_approval",
-        label: "Require sales order approval",
-        help: "When on, sales orders must be approved before release or invoicing.",
+        label: "Require approval on sales orders (advisory)",
+        help: "Shown for process design. Fulfillment and invoicing currently proceed without blocking on SO approval.",
       },
       {
         key: "purchase_require_po_approval",
-        label: "Require purchase order approval",
-        help: "When on, purchase orders must be approved before Purchase Receive or Bill.",
+        label: "Require approval on purchase orders (advisory)",
+        help: "Shown for process design. Purchase Receive and Bills currently proceed without blocking on PO approval.",
       },
       {
         key: "finance_require_je_approval",
         label: "Require journal entry approval",
-        help: "When on, journal entries must be approved before posting.",
+        help: "When on, journal entries must be approved before posting. Auto-post is downgraded to draft.",
       },
     ],
   },
@@ -210,6 +212,12 @@ const SECTIONS: PolicySection[] = [
   },
 ];
 
+const LOT_ALLOCATION_OPTIONS = [
+  { value: "manual", label: "Manual — picker chooses lot on each sale" },
+  { value: "fefo", label: "FEFO — first expiry, first out (perishables)" },
+  { value: "fifo", label: "FIFO — oldest lot first" },
+];
+
 const BUDGET_CONTROL_OPTIONS: { value: BudgetControlMode; label: string }[] = [
   { value: "off", label: "Off — no budget checks" },
   { value: "warn", label: "Warn — allow but show warnings" },
@@ -218,7 +226,7 @@ const BUDGET_CONTROL_OPTIONS: { value: BudgetControlMode; label: string }[] = [
 
 const ALL_BOOLEAN_FIELDS = SECTIONS.flatMap((s) => s.fields);
 
-type PresetId = "flexible" | "full_process" | "attachments_light";
+type PresetId = "flexible" | "full_process" | "attachments_light" | "perishables_warehouse";
 
 const PRESETS: { id: PresetId; label: string; help: string; apply: (p: ProcessPolicy) => ProcessPolicy }[] = [
   {
@@ -281,6 +289,16 @@ const PRESETS: { id: PresetId; label: string; help: string; apply: (p: ProcessPo
       supplier_invoice_require_attachment: true,
     }),
   },
+  {
+    id: "perishables_warehouse",
+    label: "Perishables / warehouse fast",
+    help: "FEFO lot allocation tenant default; block expired lot sales.",
+    apply: (p) => ({
+      ...p,
+      inventory_block_expired_lot_sales: true,
+      inventory_default_lot_allocation: "fefo",
+    }),
+  },
 ];
 
 export default function ProcessPoliciesPage() {
@@ -333,6 +351,12 @@ export default function ProcessPoliciesPage() {
     toast.success(`Applied “${preset.label}” — review, then Save.`);
   };
 
+  const setLotAllocation = (mode: string) => {
+    const p = policy();
+    if (!p || !canManage()) return;
+    setPolicy({ ...p, inventory_default_lot_allocation: mode });
+  };
+
   const save = async () => {
     const p = policy();
     if (!p || !canManage()) return;
@@ -341,7 +365,9 @@ export default function ProcessPoliciesPage() {
     for (const f of ALL_BOOLEAN_FIELDS) {
       body[f.key] = !!p[f.key];
     }
+    body.inventory_block_expired_lot_sales = !!p.inventory_block_expired_lot_sales;
     body.budget_control_mode = p.budget_control_mode || "off";
+    body.inventory_default_lot_allocation = p.inventory_default_lot_allocation || "manual";
     const res = await apiFetch<ProcessPolicy>("/api/v1/settings/process-policies", {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -460,6 +486,43 @@ export default function ProcessPoliciesPage() {
                   </section>
                 )}
               </For>
+
+              <section class="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div>
+                  <h2 class="text-sm font-semibold text-slate-900">Inventory / perishables</h2>
+                  <p class="mt-0.5 text-xs text-slate-500">
+                    Tenant default when an item&apos;s lot allocation is manual. Per-item FEFO/FIFO overrides this.
+                  </p>
+                </div>
+                <label class="flex cursor-pointer gap-3 border-b border-slate-100 pb-3">
+                  <input
+                    type="checkbox"
+                    class="mt-1 h-4 w-4"
+                    checked={!!p.inventory_block_expired_lot_sales}
+                    disabled={!canManage()}
+                    onChange={() => toggle("inventory_block_expired_lot_sales")}
+                  />
+                  <span>
+                    <span class="block text-sm font-medium text-slate-900">Block sales of expired lot batches</span>
+                    <span class="block text-xs text-slate-500">
+                      FEFO/FIFO skips expired lots; manual picks of expired stock are blocked when on.
+                    </span>
+                  </span>
+                </label>
+                <label class="block text-sm">
+                  <span class="font-medium text-slate-900">Default lot allocation</span>
+                  <select
+                    class="mt-1 w-full max-w-md rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50"
+                    value={p.inventory_default_lot_allocation || "manual"}
+                    disabled={!canManage()}
+                    onChange={(e) => setLotAllocation(e.currentTarget.value)}
+                  >
+                    <For each={LOT_ALLOCATION_OPTIONS}>
+                      {(opt) => <option value={opt.value}>{opt.label}</option>}
+                    </For>
+                  </select>
+                </label>
+              </section>
 
               <section class="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <div>

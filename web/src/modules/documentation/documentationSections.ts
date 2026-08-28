@@ -191,6 +191,10 @@ export const documentationSections: DocSection[] = [
         text: "Receiving adds stock. Releasing prepares items for shipping and reserves them for the order. Invoicing completes the sale. For lot-tracked items (without individual serials), you enter lot numbers and quantities when receiving instead of scanning each unit.",
       },
       {
+        type: "paragraph",
+        text: "For perishable catch-weight items (e.g. meat sold by kg), use Serial & Lot → Receive station to weigh lots in batch, print PDF labels, and post once. FEFO/FIFO lot picking can be enabled on the item or via Process policies → Perishables preset.",
+      },
+      {
         type: "steps",
         items: [
           "Create a Purchase Request, then convert it to a Purchase Order.",
@@ -1062,11 +1066,65 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Process policies let administrators enforce commercial flow gates: quotation before sales order, sales order before invoice, PR approval before PO, goods receipt before supplier invoice, and whether SO release combines reservation with stock deduction (legacy) or uses delivery receipts to issue stock. Attachment requirements (quotation, SO, sales, PO, supplier invoice) default on — save the document, upload at least one file, then confirm. Review and confirm policies during workspace setup (/app/setup/process-policies) before your first transactions.",
+        text: "Process policies let administrators enforce commercial flow gates: quotation before sales order, sales order before invoice, goods receipt before supplier invoice (legacy), delivery qty before invoice when that toggle is on, and whether SO release combines reservation with stock deduction (legacy) or uses delivery receipts to issue stock. PR / SO / PO “approval required” toggles are advisory today — they do not block conversion until the API gates are re-enabled (journal approval is enforced). Attachment requirements (quotation, SO, sales, PO, supplier invoice) default on — save the document, upload at least one file, then confirm. Review and confirm policies during workspace setup (/app/setup/process-policies) before your first transactions.",
       },
       {
         type: "paragraph",
         text: "Defaults are skip-friendly with legacy combined SO release on. Turn policies on one at a time when rolling out stricter controls. The Business Dashboard red flags help find gaps—for example released but not delivered lines when DR is expected.",
+      },
+    ],
+  },
+  {
+    id: "sop",
+    title: "SOP library",
+    iconId: "documentation",
+    intro: "Write and publish standard operating procedures for your team.",
+    primaryHref: "/app/sop",
+    primaryLabel: "Open SOP library",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "SOP (Standard Operating Procedures) lives in the sidebar as SOP. Use the Library to draft procedures and the Dashboard to see what is published or needs review.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Enable the SOP module under User Management → Module & Features if it is missing.",
+          "Create a document in draft, write the steps your team must follow, then Publish (version bumps).",
+          "Archive outdated procedures instead of deleting them when you need history.",
+          "Use the dashboard to spot published docs that are due for review (“stale”).",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Document statuses are draft, published, and archived. More detail: docs/modules/sop/README.md and the Notion operations playbook.",
+      },
+    ],
+  },
+  {
+    id: "okr",
+    title: "OKRs",
+    iconId: "documentation",
+    intro: "Track company and team objectives with measurable key results.",
+    primaryHref: "/app/okr",
+    primaryLabel: "Open OKRs",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "OKRs live in the sidebar. Create objectives, attach key results, and update progress manually as work completes.",
+      },
+      {
+        type: "steps",
+        items: [
+          "Enable OKRs under Module & Features if needed.",
+          "Add an objective (status starts as active).",
+          "Add key results and update progress on the dashboard.",
+          "Mark objectives completed or cancelled when the cycle ends.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Objective statuses: active, completed, cancelled. See docs/modules/okr/README.md.",
       },
     ],
   },

@@ -42,6 +42,10 @@ type Item struct {
 	SerialPolicy           string             `json:"serial_policy"`
 	LotPolicy              string             `json:"lot_policy"`
 	TrackInventoryQty      bool               `json:"track_inventory_qty"`
+	CatchWeight            bool               `json:"catch_weight"`
+	DefaultShelfLifeDays   *int               `json:"default_shelf_life_days,omitempty"`
+	LotAllocationMethod    string             `json:"lot_allocation_method"`
+	PriceBasis             string             `json:"price_basis"`
 	Status                 string             `json:"status"`
 	ItemCategoryID         *int64             `json:"item_category_id,omitempty"`
 	ItemCategoryName       string             `json:"item_category_name,omitempty"`
@@ -70,6 +74,10 @@ type itemBody struct {
 	SerialPolicy           *string            `json:"serial_policy"`
 	LotPolicy              *string            `json:"lot_policy"`
 	TrackInventoryQty      *bool              `json:"track_inventory_qty"`
+	CatchWeight            *bool              `json:"catch_weight"`
+	DefaultShelfLifeDays   *int               `json:"default_shelf_life_days"`
+	LotAllocationMethod    *string            `json:"lot_allocation_method"`
+	PriceBasis             *string            `json:"price_basis"`
 	Status                 string             `json:"status"`
 	ItemCategoryID         *int64             `json:"item_category_id"`
 	CustomValues           map[string]any     `json:"custom_values"`
@@ -121,7 +129,9 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 			coalesce(i.item_category, 'merchandise'), coalesce(i.item_type, 'item'), i.production_process,
 			i.purchase_price::float8, i.sales_price::float8, i.vip_price::float8,
 			i.price_levels, i.safety_stock_by_doc, i.oe_price::float8, i.standard_costs,
-			i.warranty_duration_months, i.reorder_level::float8, i.track_serial, i.track_lot, i.serial_policy, i.lot_policy, i.track_inventory_qty, i.status, i.item_category_id,
+			i.warranty_duration_months, i.reorder_level::float8, i.track_serial, i.track_lot, i.serial_policy, i.lot_policy, i.track_inventory_qty,
+			coalesce(i.catch_weight, false), i.default_shelf_life_days, coalesce(i.lot_allocation_method, 'manual'), coalesce(i.price_basis, 'unit'),
+			i.status, i.item_category_id,
 			coalesce(cat.name, ''), count(*) over()
 			from public.inv_items i
 			left join public.inv_item_categories cat on cat.id = i.item_category_id and cat.tenant_id = i.tenant_id
@@ -145,7 +155,9 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.ItemCategory, &row.ItemType, &row.ProductionProcess,
 				&row.PurchasePrice, &row.SalesPrice, &row.VipPrice,
 				&priceLevelsJSON, &safetyJSON, &row.OePrice, &standardJSON,
-				&row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID,
+				&row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty,
+				&row.CatchWeight, &row.DefaultShelfLifeDays, &row.LotAllocationMethod, &row.PriceBasis,
+				&row.Status, &row.ItemCategoryID,
 				&row.ItemCategoryName, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read.", "ERR_INTERNAL")
 				return
@@ -155,6 +167,8 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 			row.StandardCosts = unmarshalJSONFloatMap(standardJSON)
 			row.SerialPolicy = NormalizeTrackingPolicy(row.SerialPolicy)
 			row.LotPolicy = NormalizeTrackingPolicy(row.LotPolicy)
+			row.LotAllocationMethod = NormalizeLotAllocationMethod(row.LotAllocationMethod)
+			row.PriceBasis = NormalizePriceBasis(row.PriceBasis)
 			out = append(out, row)
 		}
 		if out == nil {
@@ -194,6 +208,25 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			if trackLot {
 				trackSerial = false
 			}
+			catchWeight := boolOrFalse(body.CatchWeight)
+			if catchWeight {
+				trackLot = true
+				trackSerial = false
+			}
+			lotAlloc := LotAllocationManual
+			if body.LotAllocationMethod != nil {
+				lotAlloc = NormalizeLotAllocationMethod(*body.LotAllocationMethod)
+			}
+			priceBasis := PriceBasisUnit
+			if body.PriceBasis != nil {
+				priceBasis = NormalizePriceBasis(*body.PriceBasis)
+			}
+			if perErrs := ValidatePerishableItemFields(trackSerial, trackLot, catchWeight, lotAlloc, priceBasis); len(perErrs) > 0 {
+				return 0, Item{}, fmt.Errorf("perishable validation")
+			}
+			if err := validateShelfLifeDays(body.DefaultShelfLifeDays); err != nil {
+				return 0, Item{}, err
+			}
 			if !trackSerial {
 				serialPolicy = TrackingPolicyRequired
 			}
@@ -219,9 +252,9 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			} else {
 				baseUnitID = nil
 			}
-			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, base_unit_id, item_category, item_type, production_process, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, oe_price, standard_costs, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
-				returning id, item_code, item_name, coalesce(spec_name,''), coalesce(unit,''), base_unit_id, coalesce(item_category,'merchandise'), coalesce(item_type,'item'), production_process, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, oe_price::float8, standard_costs, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, status, item_category_id`,
-				tu.TenantID, code, strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, trackSerial, trackLot, serialPolicy, lotPolicy, trackQty, defaultStatus(body.Status), body.ItemCategoryID).
+			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, base_unit_id, item_category, item_type, production_process, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, oe_price, standard_costs, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, catch_weight, default_shelf_life_days, lot_allocation_method, price_basis, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
+				returning id, item_code, item_name, coalesce(spec_name,''), coalesce(unit,''), base_unit_id, coalesce(item_category,'merchandise'), coalesce(item_type,'item'), production_process, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, oe_price::float8, standard_costs, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, catch_weight, default_shelf_life_days, lot_allocation_method, price_basis, status, item_category_id`,
+				tu.TenantID, code, strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, trackSerial, trackLot, serialPolicy, lotPolicy, trackQty, catchWeight, body.DefaultShelfLifeDays, lotAlloc, priceBasis, defaultStatus(body.Status), body.ItemCategoryID).
 				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit, &row.BaseUnitID, &row.ItemCategory, &row.ItemType, &row.ProductionProcess, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.OePrice, &standardJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
 			row.PriceLevels = unmarshalJSONFloatMap(priceJSON)
 			row.SafetyStockByDoc = unmarshalJSONFloatMap(safetyJSON)
@@ -231,6 +264,17 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			if strings.Contains(err.Error(), "invalid base unit") {
 				response.Validation(w, map[string]string{"base_unit_id": "Base unit must belong to this business."})
+				return
+			}
+			if strings.Contains(err.Error(), "perishable validation") {
+				response.Validation(w, ValidatePerishableItemFields(
+					boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), boolOrFalse(body.CatchWeight),
+					NormalizeLotAllocationMethod(ptrStr(body.LotAllocationMethod)), NormalizePriceBasis(ptrStr(body.PriceBasis)),
+				))
+				return
+			}
+			if strings.Contains(err.Error(), "shelf life") {
+				response.Validation(w, map[string]string{"default_shelf_life_days": err.Error()})
 				return
 			}
 			response.Err(w, http.StatusInternalServerError, "Failed to create.", "ERR_INTERNAL")
@@ -315,6 +359,30 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 			lotPolicy = TrackingPolicyRequired
 		}
 
+		trackSerial := boolOrFalse(body.TrackSerial)
+		trackLot := boolOrFalse(body.TrackLot)
+		catchWeight := boolOrFalse(body.CatchWeight)
+		if catchWeight {
+			trackLot = true
+			trackSerial = false
+		}
+		lotAlloc := LotAllocationManual
+		if body.LotAllocationMethod != nil {
+			lotAlloc = NormalizeLotAllocationMethod(*body.LotAllocationMethod)
+		}
+		priceBasis := PriceBasisUnit
+		if body.PriceBasis != nil {
+			priceBasis = NormalizePriceBasis(*body.PriceBasis)
+		}
+		if perErrs := ValidatePerishableItemFields(trackSerial, trackLot, catchWeight, lotAlloc, priceBasis); len(perErrs) > 0 {
+			response.Validation(w, perErrs)
+			return
+		}
+		if err := validateShelfLifeDays(body.DefaultShelfLifeDays); err != nil {
+			response.Validation(w, map[string]string{"default_shelf_life_days": err.Error()})
+			return
+		}
+
 		specName, unit, itemCategory, itemType, productionProcess, oePrice, standardCosts := itemBodyScalars(body)
 		standardJSON, _ := marshalJSONMap(standardCosts)
 
@@ -331,9 +399,9 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, spec_name=$2, unit=$3, base_unit_id=$4, item_category=$5, item_type=$6, production_process=$7, purchase_price=$8, sales_price=$9, vip_price=$10, price_levels=$11, safety_stock_by_doc=$12, oe_price=$13, standard_costs=$14, warranty_duration_months=$15, reorder_level=$16, track_serial=$17, track_lot=$18, serial_policy=$19, lot_policy=$20, track_inventory_qty=$21, status=$22, item_category_id=$25, updated_at=now()
-			where id=$23 and tenant_id=$24 and deleted_at is null`,
-			strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, boolOrFalse(body.TrackSerial), boolOrFalse(body.TrackLot), serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
+		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, spec_name=$2, unit=$3, base_unit_id=$4, item_category=$5, item_type=$6, production_process=$7, purchase_price=$8, sales_price=$9, vip_price=$10, price_levels=$11, safety_stock_by_doc=$12, oe_price=$13, standard_costs=$14, warranty_duration_months=$15, reorder_level=$16, track_serial=$17, track_lot=$18, serial_policy=$19, lot_policy=$20, track_inventory_qty=$21, catch_weight=$22, default_shelf_life_days=$23, lot_allocation_method=$24, price_basis=$25, status=$26, item_category_id=$29, updated_at=now()
+			where id=$27 and tenant_id=$28 and deleted_at is null`,
+			strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, trackSerial, trackLot, serialPolicy, lotPolicy, boolOrFalse(body.TrackInventoryQty), catchWeight, body.DefaultShelfLifeDays, lotAlloc, priceBasis, defaultStatus(body.Status), id, tu.TenantID, body.ItemCategoryID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
 			return

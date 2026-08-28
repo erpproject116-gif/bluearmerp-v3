@@ -51,6 +51,8 @@ export const LotBatchesListPage = lazy(() => import("../modules/inventory/serial
 export const SerialMovementsListPage = lazy(() => import("../modules/inventory/serial-lot/SerialMovementsListPage"));
 export const SerialTracePage = lazy(() => import("../modules/inventory/serial-lot/SerialTracePage"));
 export const SerialReceivePage = lazy(() => import("../modules/inventory/serial-lot/SerialReceivePage"));
+export const ReceiveStationPage = lazy(() => import("../modules/inventory/serial-lot/ReceiveStationPage"));
+export const PackStationPage = lazy(() => import("../modules/inventory/serial-lot/PackStationPage"));
 export const SerialLotSettingsPage = lazy(() => import("../modules/inventory/serial-lot/SerialLotSettingsPage"));
 export const SerialStatusReportPage = lazy(() => import("../modules/inventory/serial-lot/SerialStatusReportPage"));
 export const SerialBookReportPage = lazy(() => import("../modules/inventory/serial-lot/SerialBookReportPage"));
