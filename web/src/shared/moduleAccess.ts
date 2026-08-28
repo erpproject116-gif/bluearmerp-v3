@@ -17,6 +17,12 @@ export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: s
     );
   }
   if (moduleId === "production") return isTenantModuleEnabled(me, "manufacturing");
+  if (moduleId === "manufacturing") {
+    const codes = me?.enabled_module_codes;
+    // Nav follows tenant module toggle; pages still gate on manufacturing.* permissions.
+    if (codes?.length) return codes.includes("manufacturing");
+    return hasModuleAccess(me, "manufacturing");
+  }
   if (moduleId === "user_management" && !canManageUsers(me)) return false;
   if (moduleId === "activity_logs" && !canViewActivityLogs(me)) return false;
   if (moduleId === "crm" && !canViewCrm(me)) return false;

@@ -34,6 +34,17 @@ describe("isTenantModuleEnabled", () => {
     expect(isTenantModuleEnabled(m, "sales")).toBe(true);
     expect(isTenantModuleEnabled(m, "quotation")).toBe(false);
   });
+
+  it("shows production when manufacturing tenant module is on (nav gate)", () => {
+    const m = me({ enabled_module_codes: ["inventory", "manufacturing"] });
+    expect(isTenantModuleEnabled(m, "production")).toBe(true);
+    expect(isTenantModuleEnabled(m, "manufacturing")).toBe(true);
+  });
+
+  it("hides production when manufacturing tenant module is off", () => {
+    const m = me({ enabled_module_codes: ["inventory"] });
+    expect(isTenantModuleEnabled(m, "production")).toBe(false);
+  });
 });
 
 describe("isTenantFeatureEnabled", () => {

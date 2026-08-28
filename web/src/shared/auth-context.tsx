@@ -238,6 +238,7 @@ export function hasPermission(
 
 export function hasModuleAccess(me: MeData | null | undefined, moduleId: string): boolean {
   if (!me) return false;
+  if (moduleId === "production") moduleId = "manufacturing";
   if (hasPermission(me, moduleId, "read")) return true;
   const u = me.user;
   if (u?.permissions) {
@@ -273,6 +274,7 @@ function legacyPermissionLevel(me: MeData, code: string): AccessLevel {
   if (
     code.startsWith("inventory") ||
     code.startsWith("after_sales") ||
+    code.startsWith("manufacturing") ||
     code.startsWith("quotation") ||
     code.startsWith("sales") ||
     code.startsWith("sales_order")
