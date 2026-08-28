@@ -58,6 +58,10 @@ type Item = {
   serial_policy?: string;
   lot_policy?: string;
   track_inventory_qty?: boolean;
+  catch_weight?: boolean;
+  default_shelf_life_days?: number | null;
+  lot_allocation_method?: string;
+  price_basis?: string;
   status: string;
   item_category_id?: number | null;
   item_category_name?: string;
@@ -104,6 +108,10 @@ function rowToForm(row: Item): ItemFormState {
     serial_policy: row.serial_policy ?? "required",
     lot_policy: row.lot_policy ?? "required",
     track_inventory_qty: row.track_inventory_qty ?? false,
+    catch_weight: row.catch_weight ?? false,
+    default_shelf_life_days: row.default_shelf_life_days ?? null,
+    lot_allocation_method: row.lot_allocation_method ?? "manual",
+    price_basis: row.price_basis ?? "unit",
     status: row.status,
   };
 }

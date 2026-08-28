@@ -43,7 +43,7 @@ unconfirmed → (submit) → e_approval → (approve) → confirmed + approved_a
 
 - Audit rows in `pr_approvals` (`submit`, `approve`, `reject`).
 - Permission `purchase_request.approve` (write for store admins) required to approve/reject.
-- When **Process Policies → Require PR approval** is enabled, PO conversion requires `confirmed` **and** `approved_at`; manual progress dropdown cannot set `confirmed` directly.
+- Manual progress dropdown cannot set `confirmed` directly when the PR-approval policy is on (use Approve). **PO conversion** currently allows Unconfirmed / pending PRs — `ValidatePurchaseRequestForPO` is intentionally relaxed (advisory flag). See ADR 0005.
 
 ## CRM
 
@@ -72,7 +72,7 @@ PO conversion and goods receipt are implemented (migrations `042`–`044`); see 
 2. Submit for approval — status becomes `e_approval`.
 3. Approve (store admin) — status `confirmed`, `approved_at` set, audit row written.
 4. Reject pending PR — returns to `unconfirmed` with required remarks.
-5. Enable **Require PR approval** in Process Policies — PO from PR blocked until approved; manual confirm blocked.
+5. Enable **Require approved purchase request (advisory)** — manual confirm to `confirmed` still blocked (use Approve); PO from Unconfirmed PR is still allowed until the API gate is re-enabled.
 6. Status report — approval column shows actions; CSV export still works.
 7. Golden S10 verify script passes after `db reset`.
 

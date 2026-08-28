@@ -81,6 +81,8 @@ func registerReconciliationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/reconciliation/dr-without-invoice", listDRWithoutInvoice(pool))
 	r.Get("/reconciliation/gr-without-supplier-invoice", listGRWithoutSupplierInvoice(pool))
 	r.Get("/reconciliation/ap-over-application", listAPOverApplication(pool))
+	r.Get("/reconciliation/expired-lots", listExpiredLotsWithQty(pool))
+	r.Get("/reconciliation/lots-expiring-soon", listLotsExpiringSoon(pool))
 }
 
 type reconciliationCategory struct {
@@ -108,6 +110,8 @@ func reconciliationSummary(pool *pgxpool.Pool) http.HandlerFunc {
 			{Code: "dr_without_invoice", Label: "Delivered, not invoiced", API: "dr-without-invoice"},
 			{Code: "gr_without_supplier_invoice", Label: "GR not fully billed", API: "gr-without-supplier-invoice"},
 			{Code: "ap_over_application", Label: "AP over-applied payments", API: "ap-over-application"},
+			{Code: "expired_lots_with_qty", Label: "Expired lots with quantity", API: "expired-lots"},
+			{Code: "lots_expiring_soon", Label: "Lots expiring soon", API: "lots-expiring-soon"},
 		}
 
 		staleDays := 7
@@ -192,6 +196,30 @@ func reconciliationSummary(pool *pgxpool.Pool) http.HandlerFunc {
 			left join (select supplier_invoice_id, sum(applied_amount) as applied from public.fin_payment_applications group by supplier_invoice_id) paid on paid.supplier_invoice_id = si.id
 			where si.tenant_id = $1 and si.deleted_at is null
 			  and coalesce(paid.applied, 0) > si.grand_total + 0.0001`, tu.TenantID).Scan(&categories[7].Count)
+
+		expiryDays := 7
+		if v := r.URL.Query().Get("expiry_days"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				expiryDays = n
+			}
+		}
+
+		_ = pool.QueryRow(ctx, `
+			select count(*)
+			from public.inv_lot_batches lb
+			where lb.tenant_id = $1
+			  and lb.qty_on_hand > 0.0001
+			  and lb.expiry_date is not null
+			  and lb.expiry_date < current_date`, tu.TenantID).Scan(&categories[8].Count)
+
+		_ = pool.QueryRow(ctx, `
+			select count(*)
+			from public.inv_lot_batches lb
+			where lb.tenant_id = $1
+			  and lb.qty_on_hand > 0.0001
+			  and lb.expiry_date is not null
+			  and lb.expiry_date >= current_date
+			  and lb.expiry_date <= (current_date + make_interval(days => $2))`, tu.TenantID, expiryDays).Scan(&categories[9].Count)
 
 		var total int64
 		for i := range categories {
@@ -768,6 +796,116 @@ func listAPOverApplication(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if out == nil {
 			out = []apOverApplicationRow{}
+		}
+		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}
+
+type lotExpiryRow struct {
+	LotBatchID   int64   `json:"lot_batch_id"`
+	LotNo        string  `json:"lot_no"`
+	ItemCode     string  `json:"item_code"`
+	ItemName     string  `json:"item_name"`
+	LocationName string  `json:"location_name"`
+	QtyOnHand    float64 `json:"qty_on_hand"`
+	ExpiryDate   string  `json:"expiry_date"`
+	DaysToExpiry int     `json:"days_to_expiry"`
+}
+
+func listExpiredLotsWithQty(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "expiry_date", map[string]string{
+			"expiry_date": "lb.expiry_date",
+			"qty_on_hand": "lb.qty_on_hand",
+			"lot_no":      "lb.lot_no",
+		})
+		offset := httputil.Offset(p)
+		rows, err := pool.Query(r.Context(), `
+			select lb.id, lb.lot_no, i.item_code, i.item_name, loc.location_name,
+			  lb.qty_on_hand::float8, lb.expiry_date::text,
+			  (lb.expiry_date - current_date)::int,
+			  count(*) over()
+			from public.inv_lot_batches lb
+			join public.inv_items i on i.id = lb.item_id
+			join public.inv_locations loc on loc.id = lb.location_id
+			where lb.tenant_id = $1
+			  and lb.qty_on_hand > 0.0001
+			  and lb.expiry_date is not null
+			  and lb.expiry_date < current_date
+			order by lb.expiry_date asc
+			limit $2 offset $3`, tu.TenantID, p.PageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load expired lots.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		var out []lotExpiryRow
+		var total int64
+		for rows.Next() {
+			var row lotExpiryRow
+			if err := rows.Scan(&row.LotBatchID, &row.LotNo, &row.ItemCode, &row.ItemName, &row.LocationName,
+				&row.QtyOnHand, &row.ExpiryDate, &row.DaysToExpiry, &total); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read expired lots.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, row)
+		}
+		if out == nil {
+			out = []lotExpiryRow{}
+		}
+		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}
+
+func listLotsExpiringSoon(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "expiry_date", map[string]string{
+			"expiry_date": "lb.expiry_date",
+			"qty_on_hand": "lb.qty_on_hand",
+			"lot_no":      "lb.lot_no",
+		})
+		offset := httputil.Offset(p)
+		expiryDays := 7
+		if v := r.URL.Query().Get("expiry_days"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				expiryDays = n
+			}
+		}
+		rows, err := pool.Query(r.Context(), `
+			select lb.id, lb.lot_no, i.item_code, i.item_name, loc.location_name,
+			  lb.qty_on_hand::float8, lb.expiry_date::text,
+			  (lb.expiry_date - current_date)::int,
+			  count(*) over()
+			from public.inv_lot_batches lb
+			join public.inv_items i on i.id = lb.item_id
+			join public.inv_locations loc on loc.id = lb.location_id
+			where lb.tenant_id = $1
+			  and lb.qty_on_hand > 0.0001
+			  and lb.expiry_date is not null
+			  and lb.expiry_date >= current_date
+			  and lb.expiry_date <= (current_date + make_interval(days => $2))
+			order by lb.expiry_date asc
+			limit $3 offset $4`, tu.TenantID, expiryDays, p.PageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load expiring lots.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		var out []lotExpiryRow
+		var total int64
+		for rows.Next() {
+			var row lotExpiryRow
+			if err := rows.Scan(&row.LotBatchID, &row.LotNo, &row.ItemCode, &row.ItemName, &row.LocationName,
+				&row.QtyOnHand, &row.ExpiryDate, &row.DaysToExpiry, &total); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read expiring lots.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, row)
+		}
+		if out == nil {
+			out = []lotExpiryRow{}
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)
 	}

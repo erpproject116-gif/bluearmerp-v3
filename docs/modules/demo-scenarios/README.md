@@ -17,13 +17,15 @@ See `scripts/fixtures/demo-scenarios.yaml` for stable document numbers.
 | S10 | PR approval | `DEMO-S10-PR`, `DEMO-S10-PR-OK` → `DEMO-S10-PO` |
 | S11 | Operations Hub demo | Workspace `demo-riverside-reno` (Construction pack) |
 | S12 | Communications demo | Sent messages `DEMO-COMMS-*` + stub inbox threads |
+| S13 | Perishable catch-weight FEFO | `DEMO-S13-PR` → PO → GR (2 lots) → `DEMO-S13-SI` (FEFO) |
 
 ## Run order
 
 Included automatically in `supabase db reset` via `supabase/config.toml`:
 
 1. `seed-demo-golden-scenarios.sql`
-2. `seed-demo-finance-ap.sql` (S8)
+2. `seed-demo-golden-s13-perishable.sql`
+3. `seed-demo-finance-ap.sql` (S8)
 3. `scripts/verify-demo-full-chain.sql` (post-seed gate)
 
 Manual:

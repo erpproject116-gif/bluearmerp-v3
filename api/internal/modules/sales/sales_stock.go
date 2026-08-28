@@ -9,6 +9,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inventorygl"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 )
 
 // validateSaleLotRequirements enforces lot_batch_id per item lot_policy before save.
@@ -147,6 +148,7 @@ func validateLotBatchForSaleLine(lineNo int, lineItemID *int64, saleLocationID, 
 }
 
 // applySaleLot deducts lot batch qty for sales lines with lot_batch_id set.
+// When lot_batch_id is unset and item uses fefo/fifo, auto-allocates before deduct.
 func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
 	var saleLocationID int64
 	if err := tx.QueryRow(ctx, `
@@ -155,50 +157,137 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 		return fmt.Errorf("sale not found")
 	}
 
+	pol, err := processpolicy.LoadTx(ctx, tx, tenantID)
+	if err != nil {
+		return err
+	}
+
 	rows, err := tx.Query(ctx, `
 		select ln.id, ln.line_no, ln.item_id, ln.unit_id, ln.lot_batch_id, ln.qty::float8
 		from public.sa_sales_lines ln
-		where ln.sales_id = $1 and ln.lot_batch_id is not null
+		where ln.sales_id = $1
 		order by ln.line_no`, salesID)
 	if err != nil {
 		return err
 	}
 
-	type pendingLot struct {
-		lineID, lotBatchID int64
-		lineNo             int
-		lineItemID         *int64
-		unitID             *int64
-		lineQty            float64
+	type saleLine struct {
+		id         int64
+		lineNo     int
+		itemID     *int64
+		unitID     *int64
+		lotBatchID *int64
+		lineQty    float64
 	}
-	var pending []pendingLot
+	var lines []saleLine
 	for rows.Next() {
-		var p pendingLot
-		if err := rows.Scan(&p.lineID, &p.lineNo, &p.lineItemID, &p.unitID, &p.lotBatchID, &p.lineQty); err != nil {
+		var ln saleLine
+		if err := rows.Scan(&ln.id, &ln.lineNo, &ln.itemID, &ln.unitID, &ln.lotBatchID, &ln.lineQty); err != nil {
 			rows.Close()
 			return err
 		}
-		if p.lineQty <= 0 {
+		if ln.lineQty <= 0 || ln.itemID == nil {
 			continue
 		}
-		pending = append(pending, p)
+		lines = append(lines, ln)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
 
-	for _, p := range pending {
-		lineID, lineNo, lotBatchID, lineItemID := p.lineID, p.lineNo, p.lotBatchID, p.lineItemID
-		_ = lineID
-		qty := p.lineQty
-		if lineItemID != nil {
-			converted, err := inventory.BaseQtyForLine(ctx, tx, tenantID, *lineItemID, p.unitID, p.lineQty)
-			if err != nil {
-				return fmt.Errorf("line %d: %w", lineNo, err)
-			}
-			qty = converted
+	for _, ln := range lines {
+		if ln.lotBatchID != nil && *ln.lotBatchID > 0 {
+			continue
 		}
+		settings, err := inventory.LoadItemTrackingSettings(ctx, tx, tenantID, *ln.itemID)
+		if err != nil || !settings.TrackLot {
+			continue
+		}
+		method := inventory.ResolveLotAllocationMethod(settings.LotAllocationMethod, pol.InventoryDefaultLotAllocation)
+		if method == inventory.LotAllocationManual {
+			if inventory.IsTrackingPolicyRequired(settings.LotPolicy) {
+				return fmt.Errorf("line %d: lot batch is required for this item", ln.lineNo)
+			}
+			continue
+		}
+		baseQty, err := inventory.BaseQtyForLine(ctx, tx, tenantID, *ln.itemID, ln.unitID, ln.lineQty)
+		if err != nil {
+			return fmt.Errorf("line %d: %w", ln.lineNo, err)
+		}
+		allocs, err := inventory.AllocateLots(ctx, tx, tenantID, *ln.itemID, saleLocationID, baseQty, method, pol.InventoryBlockExpiredLotSales)
+		if err != nil {
+			return fmt.Errorf("line %d: %w", ln.lineNo, err)
+		}
+		if len(allocs) == 0 {
+			if inventory.IsTrackingPolicyRequired(settings.LotPolicy) {
+				return fmt.Errorf("line %d: lot batch is required for this item", ln.lineNo)
+			}
+			continue
+		}
+		for _, a := range allocs {
+			if _, err := tx.Exec(ctx, `
+				insert into public.sa_sales_line_lot_allocations (sales_line_id, lot_batch_id, qty)
+				values ($1, $2, $3)
+				on conflict (sales_line_id, lot_batch_id) do update set qty = excluded.qty`,
+				ln.id, a.LotBatchID, a.Qty); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx, `
+			update public.sa_sales_lines set lot_batch_id = $1 where id = $2`,
+			allocs[0].LotBatchID, ln.id); err != nil {
+			return err
+		}
+	}
+
+	type lotDeduction struct {
+		lineNo     int
+		lineItemID *int64
+		lotBatchID int64
+		qty        float64
+	}
+	var deductions []lotDeduction
+
+	allocRows, err := tx.Query(ctx, `
+		select ln.line_no, ln.item_id, a.lot_batch_id, a.qty::float8
+		from public.sa_sales_line_lot_allocations a
+		join public.sa_sales_lines ln on ln.id = a.sales_line_id
+		where ln.sales_id = $1`, salesID)
+	if err != nil {
+		return err
+	}
+	for allocRows.Next() {
+		var d lotDeduction
+		if err := allocRows.Scan(&d.lineNo, &d.lineItemID, &d.lotBatchID, &d.qty); err != nil {
+			allocRows.Close()
+			return err
+		}
+		deductions = append(deductions, d)
+	}
+	allocRows.Close()
+	if err := allocRows.Err(); err != nil {
+		return err
+	}
+
+	if len(deductions) == 0 {
+		for _, ln := range lines {
+			if ln.lotBatchID == nil || *ln.lotBatchID <= 0 {
+				continue
+			}
+			baseQty, err := inventory.BaseQtyForLine(ctx, tx, tenantID, *ln.itemID, ln.unitID, ln.lineQty)
+			if err != nil {
+				return fmt.Errorf("line %d: %w", ln.lineNo, err)
+			}
+			deductions = append(deductions, lotDeduction{
+				lineNo: ln.lineNo, lineItemID: ln.itemID, lotBatchID: *ln.lotBatchID, qty: baseQty,
+			})
+		}
+	}
+
+	for _, d := range deductions {
+		lineNo, lotBatchID, lineItemID := d.lineNo, d.lotBatchID, d.lineItemID
+		qty := d.qty
 		var lotQty float64
 		var lotItemID, lotLocationID int64
 		err := tx.QueryRow(ctx, `

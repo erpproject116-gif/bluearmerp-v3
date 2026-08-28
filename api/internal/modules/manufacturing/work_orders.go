@@ -36,8 +36,10 @@ type WorkOrder struct {
 	Status             string  `json:"status"`
 	OrderDate          string  `json:"order_date"`
 	Notes              *string `json:"notes,omitempty"`
-	ReleasedAt         *string `json:"released_at,omitempty"`
-	CompletedAt        *string `json:"completed_at,omitempty"`
+	ReleasedAt         *string  `json:"released_at,omitempty"`
+	CompletedAt        *string  `json:"completed_at,omitempty"`
+	ActualInputQty     *float64 `json:"actual_input_qty,omitempty"`
+	InputLotBatchID    *int64   `json:"input_lot_batch_id,omitempty"`
 }
 
 type MaterialNeedLine struct {
@@ -79,6 +81,11 @@ type workOrderPatchBody struct {
 	Status       *string  `json:"status"`
 }
 
+type workOrderCompleteBody struct {
+	ActualInputQty  *float64 `json:"actual_input_qty"`
+	InputLotBatchID *int64   `json:"input_lot_batch_id"`
+}
+
 func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{
 		"work_order_no": "wo.work_order_no",
@@ -118,6 +125,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			  wo.location_id, coalesce(loc.location_name, ''),
 			  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status,
 			  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text,
+			  wo.actual_input_qty::float8, wo.input_lot_batch_id,
 			  count(*) over()
 			from public.mfg_work_orders wo
 			join public.mfg_boms b on b.id = wo.bom_id
@@ -148,7 +156,8 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 				&row.LocationID, &row.LocationName,
 				&row.QtyToProduce, &row.QtyProduced, &row.Status,
-				&row.OrderDate, &notes, &released, &completed, &total,
+				&row.OrderDate, &notes, &released, &completed,
+				&row.ActualInputQty, &row.InputLotBatchID, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read work order.", "ERR_INTERNAL")
 				return
@@ -350,6 +359,10 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		var completeBody workOrderCompleteBody
+		if r.ContentLength > 0 {
+			_ = json.NewDecoder(r.Body).Decode(&completeBody)
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -383,34 +396,97 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		for _, ln := range bom.Lines {
-			issueQty, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
-			if err != nil {
+		bomType := normalizeBomType(bom.BomType)
+		actualInputQty := wo.QtyToProduce
+		if completeBody.ActualInputQty != nil && *completeBody.ActualInputQty > 0 {
+			actualInputQty = *completeBody.ActualInputQty
+		}
+
+		if bomType == "disassembly" {
+			if completeBody.InputLotBatchID != nil && *completeBody.InputLotBatchID > 0 {
+				var lotItemID, lotLocationID int64
+				var lotQty float64
+				err := tx.QueryRow(r.Context(), `
+					select item_id, location_id, qty_on_hand::float8
+					from public.inv_lot_batches
+					where id = $1 and tenant_id = $2 for update`, *completeBody.InputLotBatchID, tu.TenantID).Scan(&lotItemID, &lotLocationID, &lotQty)
+				if err != nil {
+					response.Validation(w, map[string]string{"input_lot_batch_id": "Input lot batch not found."})
+					return
+				}
+				if lotItemID != wo.FinishedItemID || lotLocationID != wo.LocationID {
+					response.Validation(w, map[string]string{"input_lot_batch_id": "Input lot must match finished item and location."})
+					return
+				}
+				if lotQty+0.0001 < actualInputQty {
+					response.Validation(w, map[string]string{"actual_input_qty": "Insufficient qty on input lot batch."})
+					return
+				}
+				tag, err := tx.Exec(r.Context(), `
+					update public.inv_lot_batches
+					set qty_on_hand = qty_on_hand - $1, updated_at = now()
+					where id = $2 and tenant_id = $3 and qty_on_hand >= $1`,
+					actualInputQty, *completeBody.InputLotBatchID, tu.TenantID)
+				if err != nil || tag.RowsAffected() == 0 {
+					response.Validation(w, map[string]string{"input_lot_batch_id": "Failed to consume input lot batch."})
+					return
+				}
+			}
+			if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, -actualInputQty, tu.AppUserID, "mfg_work_order", id, "wo_disassembly_issue"); err != nil {
 				response.Validation(w, map[string]string{"stock": err.Error()})
 				return
 			}
-			if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, -issueQty, tu.AppUserID, "mfg_work_order", id, "wo_backflush_issue"); err != nil {
-				label := ln.ComponentCode
-				if label == "" {
-					label = fmt.Sprintf("item %d", ln.ComponentItemID)
+			for _, ln := range bom.Lines {
+				recvQty, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, actualInputQty, bom.OutputQty, bom.YieldPct)
+				if err != nil {
+					response.Validation(w, map[string]string{"stock": err.Error()})
+					return
 				}
-				msg := err.Error()
-				if strings.Contains(msg, "insufficient") || strings.Contains(msg, "no balance") {
-					msg = fmt.Sprintf("insufficient stock for %s: need %.4f %s at location", label, issueQty, unitCode)
+				if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, recvQty, tu.AppUserID, "mfg_work_order", id, "wo_disassembly_receipt"); err != nil {
+					label := ln.ComponentCode
+					if label == "" {
+						label = fmt.Sprintf("item %d", ln.ComponentItemID)
+					}
+					msg := err.Error()
+					if strings.Contains(msg, "insufficient") || strings.Contains(msg, "no balance") {
+						msg = fmt.Sprintf("failed to receive %s: %.4f %s", label, recvQty, unitCode)
+					}
+					response.Validation(w, map[string]string{"stock": msg})
+					return
 				}
-				response.Validation(w, map[string]string{"stock": msg})
+			}
+		} else {
+			for _, ln := range bom.Lines {
+				issueQty, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
+				if err != nil {
+					response.Validation(w, map[string]string{"stock": err.Error()})
+					return
+				}
+				if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, -issueQty, tu.AppUserID, "mfg_work_order", id, "wo_backflush_issue"); err != nil {
+					label := ln.ComponentCode
+					if label == "" {
+						label = fmt.Sprintf("item %d", ln.ComponentItemID)
+					}
+					msg := err.Error()
+					if strings.Contains(msg, "insufficient") || strings.Contains(msg, "no balance") {
+						msg = fmt.Sprintf("insufficient stock for %s: need %.4f %s at location", label, issueQty, unitCode)
+					}
+					response.Validation(w, map[string]string{"stock": msg})
+					return
+				}
+			}
+			if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, wo.QtyToProduce, tu.AppUserID, "mfg_work_order", id, "wo_backflush_receipt"); err != nil {
+				response.Validation(w, map[string]string{"stock": err.Error()})
 				return
 			}
-		}
-		if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, wo.QtyToProduce, tu.AppUserID, "mfg_work_order", id, "wo_backflush_receipt"); err != nil {
-			response.Validation(w, map[string]string{"stock": err.Error()})
-			return
+			actualInputQty = wo.QtyToProduce
 		}
 
 		tag, err := tx.Exec(r.Context(), `
 			update public.mfg_work_orders
-			set status = 'completed', qty_produced = qty_to_produce, completed_at = now(), updated_at = now()
-			where id = $1 and tenant_id = $2 and status = 'released'`, id, tu.TenantID)
+			set status = 'completed', qty_produced = qty_to_produce, completed_at = now(), updated_at = now(),
+			  actual_input_qty = $3, input_lot_batch_id = $4
+			where id = $1 and tenant_id = $2 and status = 'released'`, id, tu.TenantID, actualInputQty, completeBody.InputLotBatchID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusConflict, "Work order already completed.", "ERR_CONFLICT")
 			return
@@ -421,7 +497,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.work_order_complete", "mfg_work_order", &id, nil, nil)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.work_order_complete", "mfg_work_order", &id, nil, completeBody)
 		row, _ := loadWorkOrder(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Work order completed.")
 	}
@@ -500,7 +576,8 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		  coalesce(bu.code, coalesce(nullif(trim(fi.unit), ''), 'ea')),
 		  wo.location_id, coalesce(loc.location_name, ''),
 		  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status,
-		  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text
+		  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text,
+		  wo.actual_input_qty::float8, wo.input_lot_batch_id
 		from public.mfg_work_orders wo
 		join public.mfg_boms b on b.id = wo.bom_id
 		join public.inv_items fi on fi.id = wo.finished_item_id
@@ -511,7 +588,7 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 		&row.LocationID, &row.LocationName,
 		&row.QtyToProduce, &row.QtyProduced, &row.Status,
-		&row.OrderDate, &notes, &released, &completed)
+		&row.OrderDate, &notes, &released, &completed, &row.ActualInputQty, &row.InputLotBatchID)
 	if err != nil {
 		return WorkOrder{}, err
 	}

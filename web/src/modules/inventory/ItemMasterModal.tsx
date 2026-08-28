@@ -11,6 +11,8 @@ import {
   PRICE_LEVEL_KEYS,
   PRODUCTION_PROCESS_OPTIONS,
   SAFETY_DOC_TYPES,
+  LOT_ALLOCATION_OPTIONS,
+  PRICE_BASIS_OPTIONS,
   TRACKING_POLICY_OPTIONS,
   emptyPriceLevels,
   emptySafetyStockByDoc,
@@ -49,6 +51,10 @@ export type ItemFormState = {
   serial_policy: string;
   lot_policy: string;
   track_inventory_qty: boolean;
+  catch_weight: boolean;
+  default_shelf_life_days: number | null;
+  lot_allocation_method: string;
+  price_basis: string;
   status: string;
 };
 
@@ -75,6 +81,10 @@ export const emptyItemForm = (): ItemFormState => ({
   serial_policy: "optional",
   lot_policy: "optional",
   track_inventory_qty: true,
+  catch_weight: false,
+  default_shelf_life_days: null,
+  lot_allocation_method: "manual",
+  price_basis: "unit",
   status: "active",
 });
 
@@ -372,6 +382,52 @@ export function ItemMasterModal(props: Props) {
                 <For each={TRACKING_POLICY_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
               </select>
               <p class="mt-1 text-xs text-text-secondary">Optional = capture when available. Required = block save without lots.</p>
+            </Field>
+            <Field label="Catch weight (variable kg)">
+              <label class="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={props.form().catch_weight}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      catch_weight: e.currentTarget.checked,
+                      track_lot: e.currentTarget.checked ? true : f.track_lot,
+                      track_serial: e.currentTarget.checked ? false : f.track_serial,
+                    }))
+                  }
+                />
+                Sell and stock by weighed quantity (kg)
+              </label>
+            </Field>
+            <Field label="Default shelf life (days)">
+              <DecimalInput
+                mode="qty"
+                class={inputClass}
+                placeholder="Not set"
+                value={props.form().default_shelf_life_days == null ? "" : String(props.form().default_shelf_life_days)}
+                onValue={(v) =>
+                  setForm((f) => ({ ...f, default_shelf_life_days: v === "" ? null : parseNum(v) }))
+                }
+              />
+            </Field>
+            <Field label="Lot allocation on sale">
+              <select
+                class={inputClass}
+                value={props.form().lot_allocation_method}
+                onChange={(e) => setForm((f) => ({ ...f, lot_allocation_method: e.currentTarget.value }))}
+              >
+                <For each={LOT_ALLOCATION_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
+              </select>
+            </Field>
+            <Field label="Price basis">
+              <select
+                class={inputClass}
+                value={props.form().price_basis}
+                onChange={(e) => setForm((f) => ({ ...f, price_basis: e.currentTarget.value }))}
+              >
+                <For each={PRICE_BASIS_OPTIONS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
+              </select>
             </Field>
           </Show>
           <Show when={props.form().track_serial || props.form().track_lot}>

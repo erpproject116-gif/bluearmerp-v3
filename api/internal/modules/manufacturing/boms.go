@@ -44,11 +44,14 @@ type Bom struct {
 	FinishedItemName  string    `json:"finished_item_name,omitempty"`
 	DefaultLocationID *int64    `json:"default_location_id,omitempty"`
 	DefaultLocation   string    `json:"default_location_name,omitempty"`
-	OutputQty         float64   `json:"output_qty"`
-	OutputUnitID      *int64    `json:"output_unit_id,omitempty"`
-	OutputUnitCode    string    `json:"output_unit_code,omitempty"`
-	YieldPct          float64   `json:"yield_pct"`
-	IsActive          bool      `json:"is_active"`
+	OutputQty            float64   `json:"output_qty"`
+	OutputUnitID         *int64    `json:"output_unit_id,omitempty"`
+	OutputUnitCode       string    `json:"output_unit_code,omitempty"`
+	YieldPct             float64   `json:"yield_pct"`
+	BomType              string    `json:"bom_type"`
+	ExpectedYieldPctMin  *float64  `json:"expected_yield_pct_min,omitempty"`
+	ExpectedYieldPctMax  *float64  `json:"expected_yield_pct_max,omitempty"`
+	IsActive             bool      `json:"is_active"`
 	Notes             *string   `json:"notes,omitempty"`
 	Components        string    `json:"components,omitempty"`
 	Lines             []BomLine `json:"lines,omitempty"`
@@ -59,10 +62,13 @@ type bomBody struct {
 	BomName           string        `json:"bom_name"`
 	FinishedItemID    int64         `json:"finished_item_id"`
 	DefaultLocationID *int64        `json:"default_location_id"`
-	OutputQty         *float64      `json:"output_qty"`
-	OutputUnitID      *int64        `json:"output_unit_id"`
-	YieldPct          *float64      `json:"yield_pct"`
-	IsActive          *bool         `json:"is_active"`
+	OutputQty             *float64      `json:"output_qty"`
+	OutputUnitID          *int64        `json:"output_unit_id"`
+	YieldPct              *float64      `json:"yield_pct"`
+	BomType               string        `json:"bom_type"`
+	ExpectedYieldPctMin   *float64      `json:"expected_yield_pct_min"`
+	ExpectedYieldPctMax   *float64      `json:"expected_yield_pct_max"`
+	IsActive              *bool         `json:"is_active"`
 	Notes             *string       `json:"notes"`
 	Lines             []bomLineBody `json:"lines"`
 }
@@ -108,7 +114,9 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
 			  b.default_location_id, coalesce(loc.location_name, ''),
 			  coalesce(b.output_qty, 1)::float8, b.output_unit_id, coalesce(ou.code, ''),
-			  coalesce(b.yield_pct, 100)::float8, b.is_active, b.notes,
+			  coalesce(b.yield_pct, 100)::float8, coalesce(b.bom_type, 'assembly'),
+			  b.expected_yield_pct_min::float8, b.expected_yield_pct_max::float8,
+			  b.is_active, b.notes,
 			  string_agg(
 			    coalesce(ci.item_code, '') || ' × ' || l.qty::text || ' ' || coalesce(lu.code, coalesce(nullif(trim(ci.unit), ''), '')),
 			    ', ' order by l.line_no
@@ -146,7 +154,8 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.FinishedItemCode, &row.FinishedItemName,
 				&row.DefaultLocationID, &row.DefaultLocation,
 				&row.OutputQty, &row.OutputUnitID, &row.OutputUnitCode,
-				&row.YieldPct, &row.IsActive, &notes, &components, &total,
+				&row.YieldPct, &row.BomType, &row.ExpectedYieldPctMin, &row.ExpectedYieldPctMax,
+				&row.IsActive, &notes, &components, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read BOM.", "ERR_INTERNAL")
 				return
@@ -222,12 +231,16 @@ func createBom(pool *pgxpool.Pool) http.HandlerFunc {
 		err = tx.QueryRow(r.Context(), `
 			insert into public.mfg_boms (
 			  tenant_id, bom_code, bom_name, finished_item_id, default_location_id,
-			  output_qty, output_unit_id, yield_pct, is_active, notes
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			  output_qty, output_unit_id, yield_pct, bom_type,
+			  expected_yield_pct_min, expected_yield_pct_max,
+			  is_active, notes
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 			returning id`,
 			tu.TenantID, strings.TrimSpace(body.BomCode), strings.TrimSpace(body.BomName),
 			body.FinishedItemID, body.DefaultLocationID,
-			outputQty, outputUnitID, yieldPct, body.IsActive == nil || *body.IsActive, body.Notes,
+			outputQty, outputUnitID, yieldPct, normalizeBomType(body.BomType),
+			body.ExpectedYieldPctMin, body.ExpectedYieldPctMax,
+			body.IsActive == nil || *body.IsActive, body.Notes,
 		).Scan(&id)
 		if err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(err.Error(), "23505") {
@@ -304,10 +317,12 @@ func updateBom(pool *pgxpool.Pool) http.HandlerFunc {
 			update public.mfg_boms set
 			  bom_code=$1, bom_name=$2, finished_item_id=$3, default_location_id=$4,
 			  output_qty=$5, output_unit_id=$6, yield_pct=$7,
-			  is_active=$8, notes=$9, updated_at=now()
-			where id=$10 and tenant_id=$11`,
+			  bom_type=$8, expected_yield_pct_min=$9, expected_yield_pct_max=$10,
+			  is_active=$11, notes=$12, updated_at=now()
+			where id=$13 and tenant_id=$14`,
 			strings.TrimSpace(body.BomCode), strings.TrimSpace(body.BomName), body.FinishedItemID,
 			body.DefaultLocationID, outputQty, outputUnitID, yieldPct,
+			normalizeBomType(body.BomType), body.ExpectedYieldPctMin, body.ExpectedYieldPctMax,
 			body.IsActive == nil || *body.IsActive, body.Notes, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "BOM not found.", "ERR_NOT_FOUND")
@@ -367,7 +382,9 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		  coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
 		  b.default_location_id, coalesce(loc.location_name, ''),
 		  coalesce(b.output_qty, 1)::float8, b.output_unit_id, coalesce(ou.code, ''),
-		  coalesce(b.yield_pct, 100)::float8, b.is_active, b.notes
+		  coalesce(b.yield_pct, 100)::float8, coalesce(b.bom_type, 'assembly'),
+		  b.expected_yield_pct_min::float8, b.expected_yield_pct_max::float8,
+		  b.is_active, b.notes
 		from public.mfg_boms b
 		left join public.inv_items fi on fi.id = b.finished_item_id and fi.tenant_id = b.tenant_id
 		left join public.inv_locations loc on loc.id = b.default_location_id
@@ -377,7 +394,8 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 			&row.FinishedItemCode, &row.FinishedItemName,
 			&row.DefaultLocationID, &row.DefaultLocation,
 			&row.OutputQty, &row.OutputUnitID, &row.OutputUnitCode,
-			&row.YieldPct, &row.IsActive, &row.Notes)
+			&row.YieldPct, &row.BomType, &row.ExpectedYieldPctMin, &row.ExpectedYieldPctMax,
+			&row.IsActive, &row.Notes)
 	if err != nil {
 		return Bom{}, err
 	}
@@ -464,6 +482,13 @@ func validateBomBody(b bomBody) map[string]string {
 	}
 	if b.YieldPct != nil && *b.YieldPct <= 0 {
 		errs["yield_pct"] = "Yield % must be greater than zero."
+	}
+	bomType := normalizeBomType(b.BomType)
+	if bomType != "assembly" && bomType != "disassembly" {
+		errs["bom_type"] = "BOM type must be assembly or disassembly."
+	}
+	if b.ExpectedYieldPctMin != nil && b.ExpectedYieldPctMax != nil && *b.ExpectedYieldPctMin > *b.ExpectedYieldPctMax {
+		errs["expected_yield_pct_min"] = "Minimum yield cannot exceed maximum yield."
 	}
 	if len(b.Lines) == 0 {
 		errs["lines"] = "At least one component line is required."
@@ -573,4 +598,13 @@ func StockIssueForLine(ctx context.Context, q inventory.UnitQuerier, tenantID in
 	yieldFactor := math.Max(yieldPct/100, eps)
 	stock := converted * (woQty / outputQty) / yieldFactor
 	return stock, line.BaseUnitCode, nil
+}
+
+func normalizeBomType(v string) string {
+	switch strings.TrimSpace(strings.ToLower(v)) {
+	case "disassembly":
+		return "disassembly"
+	default:
+		return "assembly"
+	}
 }

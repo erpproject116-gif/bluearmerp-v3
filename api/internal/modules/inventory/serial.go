@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -89,9 +90,11 @@ func registerSerialRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Patch("/serial-units/{id}/warranty", patchSerialUnitWarranty(pool))
 	r.Get("/serial-events", listSerialEvents(pool))
 	r.Get("/lot-batches", listLotBatches(pool))
+	r.Get("/lot-batches/suggest", suggestLotBatches(pool))
 	r.Get("/lot-batches/adjustment-candidates", listLotAdjustmentCandidates(pool))
 	r.Post("/lot-batches/adjustments", applyLotAdjustments(pool))
 	r.Post("/lot-batches/register", registerLotBatch(pool))
+	registerLabelRoutes(r, pool)
 }
 
 func listSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
@@ -514,10 +517,21 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 		if strings.TrimSpace(r.URL.Query().Get("available_only")) == "true" {
 			where += " and lb.qty_on_hand > 0.0001"
 		}
+		if daysStr := strings.TrimSpace(r.URL.Query().Get("expires_in_days")); daysStr != "" {
+			if days, err := strconv.Atoi(daysStr); err == nil && days >= 0 {
+				where += fmt.Sprintf(" and lb.expiry_date is not null and lb.expiry_date <= (current_date + make_interval(days => $%d))", argN)
+				args = append(args, days)
+				argN++
+			}
+		}
+		if strings.TrimSpace(r.URL.Query().Get("expired_only")) == "true" {
+			where += " and lb.expiry_date is not null and lb.expiry_date < current_date and lb.qty_on_hand > 0.0001"
+		}
 
 		sortCol := allowed[p.Sort]
 		if sortCol == "" {
-			sortCol = "lb.updated_at"
+			sortCol = "lb.expiry_date"
+			p.Order = "asc"
 		}
 
 		q := fmt.Sprintf(`

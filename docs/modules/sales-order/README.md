@@ -78,6 +78,17 @@ Default filters: `balance_qty > 0` (order qty minus released qty) and stock at L
 
 Seed: `scripts/seed-demo-sales-orders.sql` after `scripts/seed-demo-quotations.sql`.
 
+## Shipping orders & delivery trips (status lock)
+
+| Entity | Statuses (migration `266`) |
+|--------|------------------------------|
+| Shipping order | `draft` \| `confirmed` \| `shipped` \| `cancelled` |
+| Delivery trip | `planned` \| `in_progress` \| `completed` \| `cancelled` |
+
+API rejects other values (`NormalizeShippingOrderStatus` / `NormalizeDeliveryTripStatus`). Load Slip picker excludes shipping orders with status `cancelled`. Creates default to `draft` / `planned`.
+
+Routes: `/app/sales-order/shipping/orders`, `/rules`, `/trips`
+
 ## Production
 
-Run migration `013` on Render Postgres (Session pooler URI). Redeploy API and Vercel web after env is unchanged.
+Run migrations on Render Postgres (Session pooler URI). Redeploy API and Vercel web after env is unchanged.

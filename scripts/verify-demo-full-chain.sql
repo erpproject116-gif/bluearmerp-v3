@@ -156,6 +156,36 @@ begin
       raise exception 'verify-full-chain [%]: S9 SO→reserve→DR→SI chain missing', v_code;
     end if;
 
+    -- S13: perishable catch-weight FEFO
+    if not exists (
+      select 1 from public.pr_purchase_requests pr
+      join public.po_purchase_orders po on po.purchase_request_id = pr.id
+      join public.gr_goods_receipts gr on gr.purchase_order_id = po.id and gr.status = 'posted'
+      where pr.tenant_id = v_tenant and pr.purchase_request_no = 'DEMO-S13-PR'
+    ) then
+      raise exception 'verify-full-chain [%]: S13 PR→PO→GR chain missing — run scripts/seed-demo-golden-s13-perishable.sql', v_code;
+    end if;
+
+    select lb.qty_on_hand into v_lot_qty
+    from public.inv_lot_batches lb
+    where lb.tenant_id = v_tenant and lb.lot_no = 'LOT-S13-A';
+    if v_lot_qty is null then
+      raise exception 'verify-full-chain [%]: S13 lot LOT-S13-A missing', v_code;
+    end if;
+    if v_lot_qty > 0.0001 then
+      raise exception 'verify-full-chain [%]: S13 FEFO should deplete older lot LOT-S13-A, qty=%', v_code, v_lot_qty;
+    end if;
+
+    if not exists (
+      select 1 from public.sa_sales s
+      join public.sa_sales_line_lot_allocations a on a.sales_line_id in (
+        select id from public.sa_sales_lines where sales_id = s.id
+      )
+      where s.tenant_id = v_tenant and s.sales_no = 'DEMO-S13-SI'
+    ) then
+      raise exception 'verify-full-chain [%]: DEMO-S13-SI lot allocations missing', v_code;
+    end if;
+
     -- Platform feature gap closure: default doc generation rules seeded
     select count(*) into v_count
     from public.doc_generation_rules

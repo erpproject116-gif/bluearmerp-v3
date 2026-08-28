@@ -23,10 +23,11 @@ type LotFilters = {
   q?: string;
   item_id?: number | null;
   location_id?: number | null;
+  expires_in_days?: number | null;
 };
 
 function defaultLotFilters(): LotFilters {
-  return { q: "", item_id: null, location_id: null };
+  return { q: "", item_id: null, location_id: null, expires_in_days: null };
 }
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
@@ -64,8 +65,8 @@ export default function LotBatchesListPage() {
   const [locationLabel, setLocationLabel] = createSignal("");
   const [itemLabel, setItemLabel] = createSignal("");
   const [page, setPage] = createSignal(1);
-  const [sort, setSort] = createSignal("updated_at");
-  const [order, setOrder] = createSignal<"asc" | "desc">("desc");
+  const [sort, setSort] = createSignal("expiry_date");
+  const [order, setOrder] = createSignal<"asc" | "desc">("asc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [urlFilterActive, setUrlFilterActive] = createSignal(false);
   const pageSize = 25;
@@ -80,6 +81,7 @@ export default function LotBatchesListPage() {
       q: f.q || undefined,
       item_id: f.item_id ?? undefined,
       location_id: f.location_id ?? undefined,
+      expires_in_days: f.expires_in_days ?? undefined,
       enabled: true,
     };
   });
@@ -109,6 +111,9 @@ export default function LotBatchesListPage() {
     if (f.q) parts.push(f.q);
     if (f.item_id) parts.push(`item #${f.item_id}`);
     if (f.location_id) parts.push(`location #${f.location_id}`);
+    if (f.expires_in_days != null && f.expires_in_days >= 0) {
+      parts.push(`expires within ${f.expires_in_days} days`);
+    }
     return parts.length ? parts.join(" · ") : "";
   };
 
@@ -128,11 +133,15 @@ export default function LotBatchesListPage() {
     const q = one("q");
     const itemId = Number(one("item_id"));
     const locationId = Number(one("location_id"));
-    if (q || itemId > 0 || locationId > 0) {
+    const expiresRaw = one("expires_in_days");
+    const expiresDays = expiresRaw !== "" ? Number(expiresRaw) : NaN;
+    const hasExpires = Number.isFinite(expiresDays) && expiresDays >= 0;
+    if (q || itemId > 0 || locationId > 0 || hasExpires) {
       const next: LotFilters = {
         q: q || "",
         item_id: itemId > 0 ? itemId : null,
         location_id: locationId > 0 ? locationId : null,
+        expires_in_days: hasExpires ? expiresDays : null,
       };
       setDraftFilters(next);
       setSubmittedFilters(next);
@@ -270,6 +279,19 @@ export default function LotBatchesListPage() {
             }}
             fetchOptions={fetchLocations}
           />
+          <Field label="Expires within (days)">
+            <input
+              type="number"
+              min="0"
+              class={inputClass}
+              value={draftFilters().expires_in_days ?? ""}
+              onInput={(e) => {
+                const v = e.currentTarget.value.trim();
+                patch({ expires_in_days: v === "" ? null : Number(v) });
+              }}
+              placeholder="e.g. 7 for next week"
+            />
+          </Field>
         </div>
       </CollapsibleFilterPanel>
 

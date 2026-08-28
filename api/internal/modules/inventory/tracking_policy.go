@@ -27,10 +27,14 @@ func IsTrackingPolicyRequired(policy string) bool {
 }
 
 type ItemTrackingSettings struct {
-	TrackSerial  bool
-	TrackLot     bool
-	SerialPolicy string
-	LotPolicy    string
+	TrackSerial            bool
+	TrackLot               bool
+	SerialPolicy           string
+	LotPolicy              string
+	CatchWeight            bool
+	DefaultShelfLifeDays   *int
+	LotAllocationMethod    string
+	PriceBasis             string
 }
 
 type pgxQueryRow interface {
@@ -41,15 +45,22 @@ func LoadItemTrackingSettings(ctx context.Context, q pgxQueryRow, tenantID, item
 	var s ItemTrackingSettings
 	err := q.QueryRow(ctx, `
 		select coalesce(track_serial, false), coalesce(track_lot, false),
-		  coalesce(serial_policy, 'required'), coalesce(lot_policy, 'required')
+		  coalesce(serial_policy, 'required'), coalesce(lot_policy, 'required'),
+		  coalesce(catch_weight, false), default_shelf_life_days,
+		  coalesce(lot_allocation_method, 'manual'), coalesce(price_basis, 'unit')
 		from public.inv_items
 		where id = $1 and tenant_id = $2 and deleted_at is null`,
-		itemID, tenantID).Scan(&s.TrackSerial, &s.TrackLot, &s.SerialPolicy, &s.LotPolicy)
+		itemID, tenantID).Scan(
+		&s.TrackSerial, &s.TrackLot, &s.SerialPolicy, &s.LotPolicy,
+		&s.CatchWeight, &s.DefaultShelfLifeDays, &s.LotAllocationMethod, &s.PriceBasis,
+	)
 	if err != nil {
 		return s, err
 	}
 	s.SerialPolicy = NormalizeTrackingPolicy(s.SerialPolicy)
 	s.LotPolicy = NormalizeTrackingPolicy(s.LotPolicy)
+	s.LotAllocationMethod = NormalizeLotAllocationMethod(s.LotAllocationMethod)
+	s.PriceBasis = NormalizePriceBasis(s.PriceBasis)
 	return s, nil
 }
 

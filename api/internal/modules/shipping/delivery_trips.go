@@ -103,9 +103,10 @@ func createDeliveryTrip(pool *pgxpool.Pool) http.HandlerFunc {
 		if tripDate == "" {
 			tripDate = time.Now().Format("2006-01-02")
 		}
-		status := strings.TrimSpace(body.Status)
-		if status == "" {
-			status = "planned"
+		status, ok := NormalizeDeliveryTripStatus(body.Status)
+		if !ok {
+			response.Validation(w, map[string]string{"status": "Must be planned, in_progress, completed, or cancelled."})
+			return
 		}
 		var seq int
 		_ = pool.QueryRow(r.Context(), `
@@ -143,9 +144,10 @@ func patchDeliveryTrip(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		status := strings.TrimSpace(body.Status)
-		if status == "" {
-			status = "planned"
+		status, ok := NormalizeDeliveryTripStatus(body.Status)
+		if !ok {
+			response.Validation(w, map[string]string{"status": "Must be planned, in_progress, completed, or cancelled."})
+			return
 		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.dl_delivery_trips set

@@ -30,6 +30,17 @@ export const TRACKING_POLICY_OPTIONS = [
   { value: "required", label: "Required on transactions" },
 ] as const;
 
+export const LOT_ALLOCATION_OPTIONS = [
+  { value: "manual", label: "Manual pick" },
+  { value: "fefo", label: "FEFO (first expired)" },
+  { value: "fifo", label: "FIFO (first received)" },
+] as const;
+
+export const PRICE_BASIS_OPTIONS = [
+  { value: "unit", label: "Per unit / line qty" },
+  { value: "per_kg", label: "Per kg (catch weight)" },
+] as const;
+
 export const ITEM_CATEGORY_OPTIONS = [
   { value: "raw_material", label: "Raw Material" },
   { value: "sub_material", label: "Sub Material" },

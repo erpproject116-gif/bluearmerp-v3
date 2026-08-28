@@ -74,6 +74,9 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerInventoryReportRoutes(ir, pool)
 		registerPriceListRoutes(ir, pool)
 		registerProductBundleRoutes(ir, pool)
+		registerContainerRoutes(ir, pool)
+		registerPackSessionRoutes(ir, pool)
+		registerPickWaveRoutes(ir, pool)
 	})
 }
 

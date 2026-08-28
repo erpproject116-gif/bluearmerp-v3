@@ -38,6 +38,8 @@ type Policy struct {
 	InventoryGLHybridEnabled                 bool   `json:"inventory_gl_hybrid_enabled"`
 	InventoryRequireSerialAdjustmentApproval bool   `json:"inventory_require_serial_adjustment_approval"`
 	InventoryRequireStockAdjustmentApproval  bool   `json:"inventory_require_stock_adjustment_approval"`
+	InventoryBlockExpiredLotSales            bool   `json:"inventory_block_expired_lot_sales"`
+	InventoryDefaultLotAllocation            string `json:"inventory_default_lot_allocation"`
 	ARPaymentDiscountAccountID               *int64 `json:"ar_payment_discount_account_id"`
 	APPaymentDiscountAccountID               *int64 `json:"ap_payment_discount_account_id"`
 }
@@ -69,6 +71,8 @@ type Patch struct {
 	InventoryGLHybridEnabled           *bool   `json:"inventory_gl_hybrid_enabled,omitempty"`
 	InventoryRequireSerialAdjustmentApproval *bool `json:"inventory_require_serial_adjustment_approval,omitempty"`
 	InventoryRequireStockAdjustmentApproval  *bool `json:"inventory_require_stock_adjustment_approval,omitempty"`
+	InventoryBlockExpiredLotSales            *bool   `json:"inventory_block_expired_lot_sales,omitempty"`
+	InventoryDefaultLotAllocation            *string `json:"inventory_default_lot_allocation,omitempty"`
 	ARPaymentDiscountAccountID         *int64  `json:"ar_payment_discount_account_id,omitempty"`
 	APPaymentDiscountAccountID         *int64  `json:"ap_payment_discount_account_id,omitempty"`
 }
@@ -102,6 +106,8 @@ const selectCols = `
   coalesce(inventory_gl_hybrid_enabled, false),
   coalesce(inventory_require_serial_adjustment_approval, false),
   coalesce(inventory_require_stock_adjustment_approval, true),
+  coalesce(inventory_block_expired_lot_sales, false),
+  coalesce(inventory_default_lot_allocation, 'manual'),
   ar_payment_discount_account_id,
   ap_payment_discount_account_id
 `
@@ -147,6 +153,8 @@ func LoadStored(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy
 		&p.InventoryGLHybridEnabled,
 		&p.InventoryRequireSerialAdjustmentApproval,
 		&p.InventoryRequireStockAdjustmentApproval,
+		&p.InventoryBlockExpiredLotSales,
+		&p.InventoryDefaultLotAllocation,
 		&p.ARPaymentDiscountAccountID,
 		&p.APPaymentDiscountAccountID,
 	)
@@ -298,6 +306,17 @@ func ApplyPatch(current Policy, patch Patch) Policy {
 	if patch.InventoryRequireStockAdjustmentApproval != nil {
 		next.InventoryRequireStockAdjustmentApproval = *patch.InventoryRequireStockAdjustmentApproval
 	}
+	if patch.InventoryBlockExpiredLotSales != nil {
+		next.InventoryBlockExpiredLotSales = *patch.InventoryBlockExpiredLotSales
+	}
+	if patch.InventoryDefaultLotAllocation != nil {
+		mode := strings.TrimSpace(*patch.InventoryDefaultLotAllocation)
+		if mode == "fefo" || mode == "fifo" {
+			next.InventoryDefaultLotAllocation = mode
+		} else {
+			next.InventoryDefaultLotAllocation = "manual"
+		}
+	}
 	if patch.ARPaymentDiscountAccountID != nil {
 		if *patch.ARPaymentDiscountAccountID <= 0 {
 			next.ARPaymentDiscountAccountID = nil
@@ -345,6 +364,8 @@ func writePolicyArgs(tenantID, userID int64, next Policy) []any {
 		next.InventoryGLHybridEnabled,
 		next.InventoryRequireSerialAdjustmentApproval,
 		next.InventoryRequireStockAdjustmentApproval,
+		next.InventoryBlockExpiredLotSales,
+		next.InventoryDefaultLotAllocation,
 		next.ARPaymentDiscountAccountID,
 		next.APPaymentDiscountAccountID,
 		userID,
@@ -378,9 +399,11 @@ const updatePolicySQL = `
 		  inventory_gl_hybrid_enabled = $24,
 		  inventory_require_serial_adjustment_approval = $25,
 		  inventory_require_stock_adjustment_approval = $26,
-		  ar_payment_discount_account_id = $27,
-		  ap_payment_discount_account_id = $28,
-		  updated_by_user_id = $29,
+		  inventory_block_expired_lot_sales = $27,
+		  inventory_default_lot_allocation = $28,
+		  ar_payment_discount_account_id = $29,
+		  ap_payment_discount_account_id = $30,
+		  updated_by_user_id = $31,
 		  updated_at = now()
 		where tenant_id = $1`
 
@@ -462,6 +485,8 @@ func loadStoredTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error
 		&p.InventoryGLHybridEnabled,
 		&p.InventoryRequireSerialAdjustmentApproval,
 		&p.InventoryRequireStockAdjustmentApproval,
+		&p.InventoryBlockExpiredLotSales,
+		&p.InventoryDefaultLotAllocation,
 		&p.ARPaymentDiscountAccountID,
 		&p.APPaymentDiscountAccountID,
 	)

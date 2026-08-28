@@ -47,6 +47,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/inventory/serial-lot/reports/reconciliation": "inventory.serial_registry",
   "/app/inventory/serial-lot/trace": "inventory.serial_trace",
   "/app/inventory/serial-lot/receive": "inventory.serial_receive",
+  "/app/inventory/serial-lot/receive-station": "inventory.serial_receive",
   "/app/inventory/serial-lot/settings": "inventory.serial_settings",
   "/app/inventory/serial-lot/manufacturing/boms": "manufacturing.boms",
   "/app/inventory/serial-lot/manufacturing/work-orders": "manufacturing.work_orders",

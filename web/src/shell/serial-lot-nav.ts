@@ -17,6 +17,12 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
+    label: "Receive Station",
+    href: "/app/inventory/serial-lot/receive-station",
+    permissionCode: "inventory.serial_receive",
+    headerPriority: "primary",
+  },
+  {
     label: "Lots",
     href: "/app/inventory/serial-lot/lots",
     permissionCode: "inventory.serial_registry",
@@ -29,10 +35,22 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
+    label: "Receive station",
+    href: "/app/inventory/serial-lot/receive-station",
+    permissionCode: "inventory.receive_station",
+    headerPriority: "primary",
+  },
+  {
     /** Deep-link / typed lookup; open a row from Serials for day-to-day work. */
     label: "Serial detail",
     href: "/app/inventory/serial-lot/trace",
     permissionCode: "inventory.serial_trace",
+    headerPriority: "overflow",
+  },
+  {
+    label: "Pack station",
+    href: "/app/inventory/serial-lot/pack-station",
+    permissionCode: "inventory.pack_station",
     headerPriority: "overflow",
   },
   {

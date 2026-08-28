@@ -56,6 +56,8 @@ import {
   SerialMovementsListPage,
   SerialTracePage,
   SerialReceivePage,
+  ReceiveStationPage,
+  PackStationPage,
   SerialLotSettingsPage,
   SerialStatusReportPage,
   SerialBookReportPage,
@@ -538,6 +540,8 @@ export default function App() {
           <Route path="/inventory/serial-lot/reports/balance" component={SerialBalanceReportPage} />
           <Route path="/inventory/serial-lot/reports/reconciliation" component={SerialReconciliationReportPage} />
           <Route path="/inventory/serial-lot/trace" component={SerialTracePage} />
+          <Route path="/inventory/serial-lot/receive-station" component={ReceiveStationPage} />
+          <Route path="/inventory/serial-lot/pack-station" component={PackStationPage} />
           <Route path="/inventory/serial-lot/receive" component={SerialReceivePage} />
           <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
           <Route path="/inventory/serial-lot/manufacturing/work-orders" component={() => (
