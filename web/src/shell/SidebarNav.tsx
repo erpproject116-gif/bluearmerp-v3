@@ -253,6 +253,23 @@ export function SidebarNav() {
     if (area.id === "serial_lot") {
       return pathStarts(p, ["/app/inventory/serial-lot"]);
     }
+    if (area.id === "production") {
+      return false;
+    }
+    if (area.id === "production_workspace") {
+      return p === "/app/production" || p === "/app/production/";
+    }
+    if (area.id === "production_boms") {
+      return pathStarts(p, ["/app/production/boms"]);
+    }
+    if (area.id === "production_work_orders") {
+      return (
+        pathStarts(p, ["/app/production/work-orders", "/app/production/issue-station", "/app/production/receive-station"])
+      );
+    }
+    if (area.id === "production_reports") {
+      return pathStarts(p, ["/app/production/reports"]);
+    }
     if (area.id === "sell") {
       return false;
     }
@@ -399,12 +416,14 @@ export function SidebarNav() {
     >
       <For each={HOME_SIDEBAR_AREAS}>
         {(area) => (
-          <HomeAreaBlock
-            area={area}
-            active={homeActive}
-            childrenOf={childrenOf}
-            badgeCount={area.id === "comms" ? chatUnread.unreadTotal() : undefined}
-          />
+          <Show when={areaEnabled(area, auth.me)}>
+            <HomeAreaBlock
+              area={area}
+              active={homeActive}
+              childrenOf={childrenOf}
+              badgeCount={area.id === "comms" ? chatUnread.unreadTotal() : undefined}
+            />
+          </Show>
         )}
       </For>
     </nav>
