@@ -451,12 +451,12 @@ export function SalesOrderLineGrid(props: Props) {
                     <DecimalInput mode="qty" class={`${inputClass} w-full text-right`} value={line().qty} onValue={(v) => void updateLine(idx, { qty: v })} />
                   </ResizableTd>
                   <Show when={hasCol("making")}>
-                    <ResizableTd width={widthFor("making")} class="px-2 py-1 text-right text-text-secondary" title="Open work orders (draft/released)">
+                    <ResizableTd width={widthFor("making")} class="px-2 py-1 text-right text-text-secondary">
                       {(line().open_wo_qty ?? 0).toLocaleString("en-PH", { maximumFractionDigits: 4 })}
                     </ResizableTd>
                   </Show>
                   <Show when={hasCol("made")}>
-                    <ResizableTd width={widthFor("made")} class="px-2 py-1 text-right text-text-secondary" title="Completed work order qty produced">
+                    <ResizableTd width={widthFor("made")} class="px-2 py-1 text-right text-text-secondary">
                       {(line().completed_wo_qty ?? 0).toLocaleString("en-PH", { maximumFractionDigits: 4 })}
                     </ResizableTd>
                   </Show>
