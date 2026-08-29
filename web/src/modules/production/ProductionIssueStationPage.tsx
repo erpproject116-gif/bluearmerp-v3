@@ -1,4 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, createEffect } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
@@ -84,6 +85,7 @@ async function resolveLotBatchIds(
 
 export default function ProductionIssueStationPage() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [woLabel, setWoLabel] = createSignal("");
   const [woId, setWoId] = createSignal<number | null>(null);
   const [context, setContext] = createSignal<ScanContext | null>(null);
@@ -96,14 +98,16 @@ export default function ProductionIssueStationPage() {
   const [lotQty, setLotQty] = createSignal("1");
   const [busy, setBusy] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
+  const [prefilled, setPrefilled] = createSignal(false);
 
   const activeComponent = () => context()?.components.find((c) => c.component_item_id === activeComponentId());
 
   const loadWo = async (id: number) => {
     setLoading(true);
-    const [ctxRes, needsRes] = await Promise.all([
+    const [ctxRes, needsRes, woRes] = await Promise.all([
       apiFetch<ScanContext>(`/api/v1/manufacturing/work-orders/${id}/scan-context`),
       apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${id}/material-needs`),
+      apiFetch<WorkOrderOption>(`/api/v1/manufacturing/work-orders/${id}`),
     ]);
     setLoading(false);
     if (!ctxRes.success || !ctxRes.data) {
@@ -118,15 +122,28 @@ export default function ProductionIssueStationPage() {
       setNeeds(null);
       return;
     }
+    setWoId(id);
+    if (woRes.success && woRes.data) {
+      setWoLabel(
+        `${woRes.data.work_order_no} — ${woRes.data.finished_item_name ?? woRes.data.bom_code ?? ""}`.trim(),
+      );
+    } else {
+      setWoLabel(ctxRes.data.work_order_no);
+    }
     setContext(ctxRes.data);
-    setNeeds(needsRes.success && needsRes.data ? needsRes.data : null);
-    const first = ctxRes.data.components[0];
-    setActiveComponentId(first?.component_item_id ?? null);
-    setSerialPaste("");
-    setLotPaste("");
-    setLotBatchId(null);
-    setLotNo("");
+    setNeeds(needsRes.success ? needsRes.data ?? null : null);
+    const firstTracked = ctxRes.data.components.find((c) => c.track_serial || c.track_lot);
+    setActiveComponentId(firstTracked?.component_item_id ?? ctxRes.data.components[0]?.component_item_id ?? null);
   };
+
+  createEffect(() => {
+    if (prefilled()) return;
+    const raw = String(searchParams.woId ?? "").trim();
+    const id = Number(raw);
+    if (!raw || !Number.isFinite(id) || id <= 0) return;
+    setPrefilled(true);
+    void loadWo(id);
+  });
 
   const refreshContext = async () => {
     const id = woId();

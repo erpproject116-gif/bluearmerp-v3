@@ -36,6 +36,7 @@ type ProcessPolicy = {
   purchase_order_require_attachment: boolean;
   supplier_invoice_require_attachment: boolean;
   manufacturing_require_fg_qc: boolean;
+  sales_count_completed_wo_toward_release: boolean;
   ar_payment_discount_account_id?: number | null;
   ap_payment_discount_account_id?: number | null;
 };
@@ -220,6 +221,11 @@ const SECTIONS: PolicySection[] = [
         key: "manufacturing_require_fg_qc",
         label: "Require FG QC before WO complete",
         help: "When on, new work orders start with inspection pending until Quality releases them. Off = legacy behavior (released by default).",
+      },
+      {
+        key: "sales_count_completed_wo_toward_release",
+        label: "Count completed WO qty toward SO release stock",
+        help: "Off by default. When on, completed work-order qty linked to a sales order line can floor release stock availability (does not change tenants that leave this off).",
       },
     ],
   },

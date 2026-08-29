@@ -13,6 +13,7 @@ import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { useAuth, hasPermission } from "../../../shared/auth-context";
+import { isTenantModuleEnabled } from "../../../shared/moduleAccess";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
@@ -99,6 +100,8 @@ export type SalesOrderDetail = {
     planned_serial_nos?: string[];
     track_serial?: boolean;
     serial_policy?: string;
+    open_wo_qty?: number;
+    completed_wo_qty?: number;
   }>;
 };
 
@@ -151,6 +154,8 @@ function linesFromDetail(lines?: SalesOrderDetail["lines"]): SalesOrderLineRow[]
     planned_serial_nos: ln.planned_serial_nos ?? [],
     track_serial: Boolean(ln.track_serial),
     serial_policy: ln.serial_policy ?? "required",
+    open_wo_qty: ln.open_wo_qty ?? 0,
+    completed_wo_qty: ln.completed_wo_qty ?? 0,
   }));
 }
 
@@ -166,6 +171,7 @@ export function SalesOrderModal(props: Props) {
   const currencies = () => currenciesQuery.data ?? [];
   const { fields, byKey } = useFormFieldSettings(SALES_ORDER_ENTITY.salesOrder);
   const [saving, setSaving] = createSignal(false);
+  const [woBusy, setWoBusy] = createSignal(false);
   const [createdSalesOrder, setCreatedSalesOrder] = createSignal<SalesOrderDetail | null>(null);
   const effectiveEditing = () => props.editing ?? createdSalesOrder();
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
@@ -595,6 +601,32 @@ export function SalesOrderModal(props: Props) {
     props.onClose();
   };
 
+  const canCreateWo = () =>
+    isTenantModuleEnabled(auth.me, "manufacturing") &&
+    hasPermission(auth.me, "manufacturing.work_orders", "write") &&
+    !!effectiveEditing()?.id;
+
+  const createWorkOrders = async () => {
+    const id = effectiveEditing()?.id;
+    if (!id) {
+      toast.warning("Save the sales order first.");
+      return;
+    }
+    setWoBusy(true);
+    const res = await apiFetch<{ id: number; work_order_no?: string }>(
+      `/api/v1/manufacturing/work-orders/from-sales-order/${id}`,
+      { method: "POST" },
+    );
+    setWoBusy(false);
+    if (!res.success) {
+      const detail = res.errors ? Object.values(res.errors).join(" ") : "";
+      toast.warning(detail || res.message || "Failed to create work order.");
+      return;
+    }
+    const woNo = res.data?.work_order_no ? ` (${res.data.work_order_no})` : "";
+    toast.success(`Work order created${woNo}. Open Production → Work orders to release and complete.`);
+  };
+
   return (
     <>
       <WideEntityModal
@@ -881,18 +913,35 @@ export function SalesOrderModal(props: Props) {
           </Field>
         </Show>
         </div>
-        <div class="col-span-full mb-2">
-          <LoadSlipMenu
-            options={filterLoadSlipOptions(SALES_ORDER_LOAD_SLIP_OPTIONS, auth.me)}
-            onSelect={(id) => {
-              if (id === "quotation") setQuotationPickerOpen(true);
-              if (id === "pr") setPrPickerOpen(true);
-              if (id === "po") setPoPickerOpen(true);
-            }}
-          />
-          <p class="mt-1 text-xs text-text-secondary">
-            Selling and Buying sources. Quotation applies residual qty; PR/PO map item lines across modules.
-          </p>
+        <div class="col-span-full mb-2 flex flex-wrap items-end gap-3">
+          <div>
+            <LoadSlipMenu
+              options={filterLoadSlipOptions(SALES_ORDER_LOAD_SLIP_OPTIONS, auth.me)}
+              onSelect={(id) => {
+                if (id === "quotation") setQuotationPickerOpen(true);
+                if (id === "pr") setPrPickerOpen(true);
+                if (id === "po") setPoPickerOpen(true);
+              }}
+            />
+            <p class="mt-1 text-xs text-text-secondary">
+              Selling and Buying sources. Quotation applies residual qty; PR/PO map item lines across modules.
+            </p>
+          </div>
+          <Show when={canCreateWo()}>
+            <div>
+              <button
+                type="button"
+                class="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 hover:bg-brand-100 disabled:opacity-50"
+                disabled={woBusy() || props.readOnly}
+                onClick={() => void createWorkOrders()}
+              >
+                {woBusy() ? "Creating…" : "Create work order(s)"}
+              </button>
+              <p class="mt-1 text-xs text-text-secondary">
+                Make-to-order: creates draft WOs for open lines that have an active BOM.
+              </p>
+            </div>
+          </Show>
         </div>
         <SalesOrderLineGrid
           lines={lines}
@@ -904,6 +953,7 @@ export function SalesOrderModal(props: Props) {
           }}
           locationId={locationId}
           partnerId={partnerId}
+          showProductionCols={() => isTenantModuleEnabled(auth.me, "manufacturing")}
         />
         <ChangeLogPanel targetType="so_sales_order" targetId={effectiveEditing()?.id} />
         <EmailHistoryPanel docType="sales_order" docId={effectiveEditing()?.id} />

@@ -1,4 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, createEffect } from "solid-js";
+import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
@@ -82,11 +83,19 @@ const STATUS_TABS = [
 
 export default function WorkOrdersPage() {
   const auth = useAuth();
+  const [searchParams] = useSearchParams();
   const canRelease = () => hasPermission(auth.me, "manufacturing.work_orders_release", "write");
   const canComplete = () => hasPermission(auth.me, "manufacturing.work_orders_complete", "write");
   const canInspect = () => hasPermission(auth.me, "quality.wo_inspection", "write");
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
     useListState("order_date", 25, { defaultOrder: "desc", defaultStatus: "" });
+
+  createEffect(() => {
+    const st = String(searchParams.status ?? "").trim();
+    if (st && ["draft", "released", "completed", "cancelled"].includes(st) && statusFilter() !== st) {
+      setStatusFilter(st);
+    }
+  });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<WorkOrder | null>(null);
@@ -305,7 +314,9 @@ export default function WorkOrdersPage() {
     const res = await apiFetch(`/api/v1/manufacturing/work-orders/${row.id}/complete`, { method: "POST" });
     setActionId(null);
     if (!res.success) {
-      const detail = res.errors?.stock || res.message;
+      const detail =
+        (res.errors && Object.values(res.errors).filter(Boolean).join(" ")) ||
+        res.message;
       toast.warning(detail ?? "Failed to complete.");
       return;
     }
@@ -315,6 +326,11 @@ export default function WorkOrdersPage() {
 
   return (
     <ProductionLayout>
+      <p class="mb-3 text-sm text-text-secondary">
+        <span class="font-medium text-text-primary">Next steps:</span>{" "}
+        Draft → Release → (FG QC if pending) → Issue/Receive if serial or lot tracked → Complete → sell from stock.
+        Make-to-order: use <span class="font-medium">Sales order</span> (Load Slip) or create work orders from the Sales Order screen.
+      </p>
       <SpreadsheetGrid<WorkOrder>
         columns={[
           { key: "work_order_no", header: "WO no.", clickable: true },
@@ -332,8 +348,11 @@ export default function WorkOrdersPage() {
             header: "Inspection",
             sortable: false,
             render: (r) => (
-              <div class="flex items-center gap-2 capitalize">
+              <div class="flex flex-wrap items-center gap-2 capitalize">
                 <span>{(r.inspection_status ?? "released").replace(/_/g, " ")}</span>
+                <Show when={r.status === "released" && (r.inspection_status === "pending" || r.inspection_status === "held")}>
+                  <span class="text-xs text-amber-700">Release FG inspection before Complete</span>
+                </Show>
                 <Show when={r.status === "released" && canInspect()}>
                   <button
                     type="button"
@@ -357,10 +376,10 @@ export default function WorkOrdersPage() {
           },
           {
             key: "status",
-            header: "Status",
+            header: "Status / actions",
             sortable: false,
             render: (r) => (
-              <div class="flex items-center gap-2 capitalize">
+              <div class="flex flex-wrap items-center gap-2 capitalize">
                 <span>{r.status.replace(/_/g, " ")}</span>
                 <Show when={r.status === "draft" && canRelease()}>
                   <button
@@ -372,11 +391,32 @@ export default function WorkOrdersPage() {
                     Release
                   </button>
                 </Show>
+                <Show when={r.status === "released"}>
+                  <A
+                    href={`/app/production/issue-station?woId=${r.id}`}
+                    class="text-xs text-brand-600 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Issue materials
+                  </A>
+                  <A
+                    href={`/app/production/receive-station?woId=${r.id}`}
+                    class="text-xs text-brand-600 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Receive FG
+                  </A>
+                </Show>
                 <Show when={r.status === "released" && canComplete()}>
                   <button
                     type="button"
                     class="text-xs text-brand-600 hover:underline disabled:opacity-50"
-                    disabled={actionId() === r.id}
+                    disabled={actionId() === r.id || r.inspection_status === "pending" || r.inspection_status === "held"}
+                    title={
+                      r.inspection_status === "pending" || r.inspection_status === "held"
+                        ? "Release FG inspection first"
+                        : undefined
+                    }
                     onClick={(e) => { e.stopPropagation(); void complete(r); }}
                   >
                     Complete
@@ -399,8 +439,9 @@ export default function WorkOrdersPage() {
             class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
             disabled={loadSlipBusy()}
             onClick={() => setSoPickerOpen(true)}
+            title="Load Slip from Sales Order"
           >
-            {loadSlipBusy() ? "Loading…" : "Load Slip"}
+            {loadSlipBusy() ? "Loading…" : "Sales order…"}
           </button>
         }
         codeKey="work_order_no"

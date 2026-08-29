@@ -140,3 +140,38 @@ func TestValidateJournalEntryPost(t *testing.T) {
 		t.Fatalf("unexpected error when policy disabled: %v", errs)
 	}
 }
+
+func TestEffectiveReleaseOnHand(t *testing.T) {
+	off := Policy{SalesCountCompletedWoTowardRelease: false}
+	on := Policy{SalesCountCompletedWoTowardRelease: true}
+
+	if got := EffectiveReleaseOnHand(off, 5, 2, 100); got != 5 {
+		t.Fatalf("policy off must passthrough on-hand: got %v", got)
+	}
+	// Available = 5-2 = 3; completed 10 > 3 → floor to completed + reserved
+	if got := EffectiveReleaseOnHand(on, 5, 2, 10); got != 12 {
+		t.Fatalf("policy on should floor to completed WO: got %v want 12", got)
+	}
+	// Available already covers completed — no change
+	if got := EffectiveReleaseOnHand(on, 20, 0, 10); got != 20 {
+		t.Fatalf("policy on must not inflate when on-hand covers WO: got %v", got)
+	}
+}
+
+func TestValidateSalesReleaseRequiresReservation_policyOffIdentical(t *testing.T) {
+	p := Policy{SalesRequireReservation: true}
+	// Without EffectiveReleaseOnHand adjustment, short stock still fails
+	if errs := ValidateSalesReleaseRequiresReservation(p, true, 0, 0, 5, 2, 0); errs == nil {
+		t.Fatal("expected insufficient stock")
+	}
+	// With completed WO floor applied by caller
+	adj := EffectiveReleaseOnHand(Policy{SalesCountCompletedWoTowardRelease: true}, 2, 0, 5)
+	if errs := ValidateSalesReleaseRequiresReservation(p, true, 0, 0, 5, adj, 0); errs != nil {
+		t.Fatalf("expected pass with completed WO floor: %v", errs)
+	}
+	// Default policy EffectiveReleaseOnHand is bit-identical to raw on-hand
+	raw := 7.0
+	if EffectiveReleaseOnHand(Policy{}, raw, 1, 99) != raw {
+		t.Fatal("default-off EffectiveReleaseOnHand must be identical to qtyOnHand")
+	}
+}

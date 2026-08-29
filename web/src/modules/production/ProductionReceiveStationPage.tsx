@@ -1,4 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, createEffect } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
@@ -59,6 +60,7 @@ async function fetchReleasedWorkOrders(q: string): Promise<LookupOption[]> {
 
 export default function ProductionReceiveStationPage() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [woLabel, setWoLabel] = createSignal("");
   const [woId, setWoId] = createSignal<number | null>(null);
   const [context, setContext] = createSignal<ScanContext | null>(null);
@@ -67,10 +69,14 @@ export default function ProductionReceiveStationPage() {
   const [busy, setBusy] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
   const [lastResults, setLastResults] = createSignal<(BatchSerialResult | BatchLotResult)[]>([]);
+  const [prefilled, setPrefilled] = createSignal(false);
 
   const loadWo = async (id: number) => {
     setLoading(true);
-    const res = await apiFetch<ScanContext>(`/api/v1/manufacturing/work-orders/${id}/scan-context`);
+    const [res, woRes] = await Promise.all([
+      apiFetch<ScanContext>(`/api/v1/manufacturing/work-orders/${id}/scan-context`),
+      apiFetch<WorkOrderOption>(`/api/v1/manufacturing/work-orders/${id}`),
+    ]);
     setLoading(false);
     if (!res.success || !res.data) {
       toast.warning(res.message ?? "Failed to load work order.");
@@ -82,11 +88,28 @@ export default function ProductionReceiveStationPage() {
       setContext(null);
       return;
     }
+    setWoId(id);
+    if (woRes.success && woRes.data) {
+      setWoLabel(
+        `${woRes.data.work_order_no} — ${woRes.data.finished_item_name ?? woRes.data.bom_code ?? ""}`.trim(),
+      );
+    } else {
+      setWoLabel(res.data.work_order_no);
+    }
     setContext(res.data);
     setSerialPaste("");
     setLotPaste("");
     setLastResults([]);
   };
+
+  createEffect(() => {
+    if (prefilled()) return;
+    const raw = String(searchParams.woId ?? "").trim();
+    const id = Number(raw);
+    if (!raw || !Number.isFinite(id) || id <= 0) return;
+    setPrefilled(true);
+    void loadWo(id);
+  });
 
   const refreshContext = async () => {
     const id = woId();

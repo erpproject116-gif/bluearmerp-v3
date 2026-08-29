@@ -135,6 +135,8 @@ func ValidateSupplierInvoiceQtyAgainstReceived(p Policy, qty, receivedQty float6
 
 // ValidateSalesReleaseRequiresReservation enforces stock reservation before SO release (split mode)
 // or available unreserved stock (legacy combined mode).
+// Callers that honor SalesCountCompletedWoTowardRelease should pass an adjusted qtyOnHand
+// (see salesorder releases) before invoking this; with the default policy the raw on-hand is used.
 func ValidateSalesReleaseRequiresReservation(
 	p Policy,
 	legacyCombined bool,
@@ -162,6 +164,18 @@ func ValidateSalesReleaseRequiresReservation(
 		}
 	}
 	return nil
+}
+
+// EffectiveReleaseOnHand applies the optional completed-WO release floor (default off = passthrough).
+func EffectiveReleaseOnHand(p Policy, qtyOnHand, qtyReservedAtLocation, completedWoQty float64) float64 {
+	if !p.SalesCountCompletedWoTowardRelease {
+		return qtyOnHand
+	}
+	available := qtyOnHand - qtyReservedAtLocation
+	if completedWoQty > available {
+		return completedWoQty + qtyReservedAtLocation
+	}
+	return qtyOnHand
 }
 
 // ValidateDeliveryRequiresRelease blocks DR qty above released minus delivered when reservation policy is on.

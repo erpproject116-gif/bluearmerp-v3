@@ -142,6 +142,14 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
     ],
     modulesHref: "/app/user-management/tenant-modules",
   },
+  production: {
+    id: "production",
+    title: "Production setup",
+    blurb:
+      "Finished-goods QC and optional sales-release bridge. Turn off Manufacturing under Modules & Features if you only trade finished goods.",
+    policyKeys: ["manufacturing_require_fg_qc", "sales_count_completed_wo_toward_release"],
+    modulesHref: "/app/user-management/tenant-modules",
+  },
 };
 
 /** Map pathname → setup scope id (first matching base). */
@@ -158,6 +166,7 @@ export function setupScopeFromPath(pathname: string): string | null {
     ["/app/pos/", "pos"],
     ["/app/finance/", "finance"],
     ["/app/inventory/", "inventory"],
+    ["/app/production/", "production"],
   ];
   for (const [prefix, id] of pairs) {
     if (pathname.startsWith(prefix) || pathname === prefix.slice(0, -1)) return id;

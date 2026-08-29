@@ -566,6 +566,9 @@ export default function App() {
           <Route path="/production/reports" component={() => (
             <ManufacturingRoute><ProductionReportsPage /></ManufacturingRoute>
           )} />
+          <Route path="/production/setup" component={() => (
+            <ManufacturingRoute><ModuleSetupHubPage /></ManufacturingRoute>
+          )} />
           <Route path="/inventory/serial-lot/manufacturing/work-orders" component={() => (
             <Navigate href="/app/production/work-orders" />
           )} />

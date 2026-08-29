@@ -41,6 +41,7 @@ type Policy struct {
 	InventoryBlockExpiredLotSales            bool   `json:"inventory_block_expired_lot_sales"`
 	InventoryDefaultLotAllocation            string `json:"inventory_default_lot_allocation"`
 	ManufacturingRequireFgQc                 bool   `json:"manufacturing_require_fg_qc"`
+	SalesCountCompletedWoTowardRelease       bool   `json:"sales_count_completed_wo_toward_release"`
 	ARPaymentDiscountAccountID               *int64 `json:"ar_payment_discount_account_id"`
 	APPaymentDiscountAccountID               *int64 `json:"ap_payment_discount_account_id"`
 }
@@ -75,6 +76,7 @@ type Patch struct {
 	InventoryBlockExpiredLotSales            *bool   `json:"inventory_block_expired_lot_sales,omitempty"`
 	InventoryDefaultLotAllocation            *string `json:"inventory_default_lot_allocation,omitempty"`
 	ManufacturingRequireFgQc                 *bool   `json:"manufacturing_require_fg_qc,omitempty"`
+	SalesCountCompletedWoTowardRelease       *bool   `json:"sales_count_completed_wo_toward_release,omitempty"`
 	ARPaymentDiscountAccountID         *int64  `json:"ar_payment_discount_account_id,omitempty"`
 	APPaymentDiscountAccountID         *int64  `json:"ap_payment_discount_account_id,omitempty"`
 }
@@ -111,6 +113,7 @@ const selectCols = `
   coalesce(inventory_block_expired_lot_sales, false),
   coalesce(inventory_default_lot_allocation, 'manual'),
   coalesce(manufacturing_require_fg_qc, false),
+  coalesce(sales_count_completed_wo_toward_release, false),
   ar_payment_discount_account_id,
   ap_payment_discount_account_id
 `
@@ -159,6 +162,7 @@ func LoadStored(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Policy
 		&p.InventoryBlockExpiredLotSales,
 		&p.InventoryDefaultLotAllocation,
 		&p.ManufacturingRequireFgQc,
+		&p.SalesCountCompletedWoTowardRelease,
 		&p.ARPaymentDiscountAccountID,
 		&p.APPaymentDiscountAccountID,
 	)
@@ -324,6 +328,9 @@ func ApplyPatch(current Policy, patch Patch) Policy {
 	if patch.ManufacturingRequireFgQc != nil {
 		next.ManufacturingRequireFgQc = *patch.ManufacturingRequireFgQc
 	}
+	if patch.SalesCountCompletedWoTowardRelease != nil {
+		next.SalesCountCompletedWoTowardRelease = *patch.SalesCountCompletedWoTowardRelease
+	}
 	if patch.ARPaymentDiscountAccountID != nil {
 		if *patch.ARPaymentDiscountAccountID <= 0 {
 			next.ARPaymentDiscountAccountID = nil
@@ -374,6 +381,7 @@ func writePolicyArgs(tenantID, userID int64, next Policy) []any {
 		next.InventoryBlockExpiredLotSales,
 		next.InventoryDefaultLotAllocation,
 		next.ManufacturingRequireFgQc,
+		next.SalesCountCompletedWoTowardRelease,
 		next.ARPaymentDiscountAccountID,
 		next.APPaymentDiscountAccountID,
 		userID,
@@ -410,9 +418,10 @@ const updatePolicySQL = `
 		  inventory_block_expired_lot_sales = $27,
 		  inventory_default_lot_allocation = $28,
 		  manufacturing_require_fg_qc = $29,
-		  ar_payment_discount_account_id = $30,
-		  ap_payment_discount_account_id = $31,
-		  updated_by_user_id = $32,
+		  sales_count_completed_wo_toward_release = $30,
+		  ar_payment_discount_account_id = $31,
+		  ap_payment_discount_account_id = $32,
+		  updated_by_user_id = $33,
 		  updated_at = now()
 		where tenant_id = $1`
 
@@ -497,6 +506,7 @@ func loadStoredTx(ctx context.Context, tx pgx.Tx, tenantID int64) (Policy, error
 		&p.InventoryBlockExpiredLotSales,
 		&p.InventoryDefaultLotAllocation,
 		&p.ManufacturingRequireFgQc,
+		&p.SalesCountCompletedWoTowardRelease,
 		&p.ARPaymentDiscountAccountID,
 		&p.APPaymentDiscountAccountID,
 	)

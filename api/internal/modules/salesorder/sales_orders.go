@@ -48,6 +48,8 @@ type SalesOrderLine struct {
 	PlannedSerialNos      []string `json:"planned_serial_nos,omitempty"`
 	TrackSerial           bool     `json:"track_serial,omitempty"`
 	SerialPolicy          string   `json:"serial_policy,omitempty"`
+	OpenWoQty             float64  `json:"open_wo_qty,omitempty"`
+	CompletedWoQty        float64  `json:"completed_wo_qty,omitempty"`
 }
 
 type SalesOrder struct {
@@ -442,9 +444,25 @@ func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID i
 		  ln.unit_vat_inc::float8, ln.line_total::float8, ln.remark, ln.source_quotation_line_id,
 		  coalesce(ln.planned_serial_nos, '{}'),
 		  coalesce(i.track_serial, false),
-		  coalesce(i.serial_policy, 'required')
+		  coalesce(i.serial_policy, 'required'),
+		  coalesce(wo_open.open_qty, 0)::float8,
+		  coalesce(wo_done.completed_qty, 0)::float8
 		from public.so_sales_order_lines ln
 		left join public.inv_items i on i.id = ln.item_id
+		left join (
+		  select source_sales_order_line_id, sum(qty_to_produce)::float8 as open_qty
+		  from public.mfg_work_orders
+		  where source_sales_order_line_id is not null
+		    and status in ('draft', 'released')
+		  group by source_sales_order_line_id
+		) wo_open on wo_open.source_sales_order_line_id = ln.id
+		left join (
+		  select source_sales_order_line_id, sum(qty_produced)::float8 as completed_qty
+		  from public.mfg_work_orders
+		  where source_sales_order_line_id is not null
+		    and status = 'completed'
+		  group by source_sales_order_line_id
+		) wo_done on wo_done.source_sales_order_line_id = ln.id
 		where ln.sales_order_id = $1
 		order by ln.line_no`, salesOrderID)
 	if err != nil {
@@ -458,7 +476,8 @@ func loadSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, salesOrderID i
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.DeliveredQty, &ln.BilledQty, &ln.UnitID, &ln.UnitCode,
 			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount,
-			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.SourceQuotationLineID, &ln.PlannedSerialNos, &ln.TrackSerial, &ln.SerialPolicy); err != nil {
+			&ln.UnitVatInc, &ln.LineTotal, &ln.Remark, &ln.SourceQuotationLineID, &ln.PlannedSerialNos, &ln.TrackSerial, &ln.SerialPolicy,
+			&ln.OpenWoQty, &ln.CompletedWoQty); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)

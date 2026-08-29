@@ -254,8 +254,17 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 
 			if trackInventory && itemID != nil {
+				var completedWoQty float64
+				if policy.SalesCountCompletedWoTowardRelease {
+					_ = tx.QueryRow(r.Context(), `
+						select coalesce(sum(qty_produced), 0)::float8
+						from public.mfg_work_orders
+						where source_sales_order_line_id = $1 and status = 'completed'`,
+						item.SalesOrderLineID).Scan(&completedWoQty)
+				}
+				qtyOnHandForCheck := processpolicy.EffectiveReleaseOnHand(policy, qtyOnHand, qtyReservedAtLoc, completedWoQty)
 				if v := processpolicy.ValidateSalesReleaseRequiresReservation(
-					policy, legacyCombined, lineQtyReserved, released, item.ReleaseQty, qtyOnHand, qtyReservedAtLoc,
+					policy, legacyCombined, lineQtyReserved, released, item.ReleaseQty, qtyOnHandForCheck, qtyReservedAtLoc,
 				); v != nil {
 					for k, msg := range v {
 						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].%s", i, k): msg})

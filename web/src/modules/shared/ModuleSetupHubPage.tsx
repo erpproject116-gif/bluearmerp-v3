@@ -133,6 +133,14 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
     label: "Stock quantity adjustments require approval (always on)",
     help: "Always on. Stock quantity changes update inventory only after store admin or owner confirmation.",
   },
+  manufacturing_require_fg_qc: {
+    label: "Require FG QC before WO complete",
+    help: "When on, new work orders start with inspection pending until Quality releases them.",
+  },
+  sales_count_completed_wo_toward_release: {
+    label: "Count completed WO qty toward SO release stock",
+    help: "Off by default. When on, completed linked work-order qty can floor sales-order release stock availability.",
+  },
   finance_require_je_approval: {
     label: "Require approval before posting journals",
     help: "On = journal entries must be approved before they post.",

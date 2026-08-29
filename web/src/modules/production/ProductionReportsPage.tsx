@@ -215,8 +215,22 @@ export default function ProductionReportsPage() {
             <tbody>
               <For each={(report.data?.rows ?? []) as WoStatusRow[]}>
                 {(row) => (
-                  <tr class="border-t border-stroke/60">
-                    <td class="px-3 py-2">{row.work_order_no}</td>
+                  <tr
+                    class="cursor-pointer border-t border-stroke/60 hover:bg-brand-50/40"
+                    onClick={() => {
+                      window.location.href = `/app/production/work-orders?status=${encodeURIComponent(row.status)}`;
+                    }}
+                    title="Open work orders list"
+                  >
+                    <td class="px-3 py-2">
+                      <a
+                        class="text-brand-700 underline-offset-2 hover:underline"
+                        href={`/app/production/work-orders?status=${encodeURIComponent(row.status)}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {row.work_order_no}
+                      </a>
+                    </td>
                     <td class="px-3 py-2">{row.order_date?.slice(0, 10)}</td>
                     <td class="px-3 py-2 capitalize">{row.status.replace(/_/g, " ")}</td>
                     <td class="px-3 py-2 capitalize">{row.inspection_status.replace(/_/g, " ")}</td>

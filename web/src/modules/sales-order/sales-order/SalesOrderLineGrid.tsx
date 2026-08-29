@@ -61,6 +61,8 @@ export type SalesOrderLineRow = {
   track_serial?: boolean;
   serial_policy?: string;
   planned_serial_nos?: string[];
+  open_wo_qty?: number;
+  completed_wo_qty?: number;
 };
 
 export function emptySalesOrderLine(
@@ -95,6 +97,8 @@ const SALES_ORDER_LINE_COLUMNS = [
   { key: "item_name", header: "Item Name", width: 140 },
   { key: "description", header: "Description", width: 140 },
   { key: "qty", header: "Qty", width: 72 },
+  { key: "making", header: "Making", width: 72 },
+  { key: "made", header: "Made", width: 72 },
   { key: "unit", header: "UoM", width: 80 },
   { key: "basis", header: "Basis", width: 100 },
   { key: "unit_price", header: "Unit Price", width: 100 },
@@ -161,6 +165,8 @@ type Props = {
   taxTypeMeta: () => TaxTypeMeta | null;
   locationId: () => number | null;
   partnerId?: () => number | null;
+  /** When true (manufacturing module on), show Making / Made WO qty columns. */
+  showProductionCols?: () => boolean;
 };
 
 export function SalesOrderLineGrid(props: Props) {
@@ -365,7 +371,11 @@ export function SalesOrderLineGrid(props: Props) {
 
   const columns = createMemo(() => {
     props.taxTypeId();
-    const base = filterTaxLineColumns(SALES_ORDER_LINE_COLUMNS, props.taxTypeMeta()?.tax_mode);
+    const showProd = props.showProductionCols?.() ?? false;
+    const baseCols = showProd
+      ? SALES_ORDER_LINE_COLUMNS
+      : SALES_ORDER_LINE_COLUMNS.filter((c) => c.key !== "making" && c.key !== "made");
+    const base = filterTaxLineColumns(baseCols, props.taxTypeMeta()?.tax_mode);
     return applyColumnLabels(base, lineLabels.columnLabel);
   });
   const hasCol = (key: string) => columns().some((c) => c.key === key);
@@ -440,6 +450,16 @@ export function SalesOrderLineGrid(props: Props) {
                   <ResizableTd width={widthFor("qty")} class="px-2 py-1">
                     <DecimalInput mode="qty" class={`${inputClass} w-full text-right`} value={line().qty} onValue={(v) => void updateLine(idx, { qty: v })} />
                   </ResizableTd>
+                  <Show when={hasCol("making")}>
+                    <ResizableTd width={widthFor("making")} class="px-2 py-1 text-right text-text-secondary" title="Open work orders (draft/released)">
+                      {(line().open_wo_qty ?? 0).toLocaleString("en-PH", { maximumFractionDigits: 4 })}
+                    </ResizableTd>
+                  </Show>
+                  <Show when={hasCol("made")}>
+                    <ResizableTd width={widthFor("made")} class="px-2 py-1 text-right text-text-secondary" title="Completed work order qty produced">
+                      {(line().completed_wo_qty ?? 0).toLocaleString("en-PH", { maximumFractionDigits: 4 })}
+                    </ResizableTd>
+                  </Show>
                   <ResizableTd width={widthFor("unit")} class="px-2 py-1">
                     <LineUnitSelect
                       unitId={line().unit_id}
@@ -513,6 +533,12 @@ export function SalesOrderLineGrid(props: Props) {
                 Totals
               </td>
               <td class="px-2 py-2 text-right">{totals().qty.toLocaleString("en-PH", { maximumFractionDigits: 4 })}</td>
+              <Show when={hasCol("making")}>
+                <td />
+              </Show>
+              <Show when={hasCol("made")}>
+                <td />
+              </Show>
               <td />
               <Show when={hasCol("basis")}>
                 <td />

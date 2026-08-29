@@ -75,7 +75,7 @@ flowchart TB
 | SO Release (split) | Serial | Units `reserved` |
 | Sales invoice | Serial | Units `sold` |
 | BOM | Work Order | Materials plan |
-| Sales Order line | Work Order | Load Slip on New Work Order copies open SO lines (`source_sales_order_line_id`); MTO golden S14 |
+| Sales Order line | Work Order | **Create work order(s)** on SO (push) or Production Load Slip (pull); both set `source_sales_order_line_id`. SO lines show Making/Made. Optional policy `sales_count_completed_wo_toward_release` (default off). MTO golden S14 |
 | Work Order release → complete | Stock | Backflush materials + finished goods receive (`mfg_work_order` stock movements) |
 | WMS scheduled receipt | Goods Receipt | Compare planned vs posted; variance/close |
 | Repair order | Stock location | RMA hold → parts consumption → release to non-RMA |

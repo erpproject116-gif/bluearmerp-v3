@@ -270,6 +270,9 @@ export function SidebarNav() {
     if (area.id === "production_reports") {
       return pathStarts(p, ["/app/production/reports"]);
     }
+    if (area.id === "production_setup") {
+      return pathStarts(p, ["/app/production/setup"]);
+    }
     if (area.id === "sell") {
       return false;
     }

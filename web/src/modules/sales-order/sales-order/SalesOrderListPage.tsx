@@ -1,4 +1,4 @@
-import { createMemo, createSignal, onMount } from "solid-js";
+import { createMemo, createSignal, onMount, Show } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
@@ -21,6 +21,7 @@ import { SalesOrderModal, type SalesOrderDetail } from "./SalesOrderModal";
 import { formatMoney, openSalesOrderPrint } from "./salesOrderPrint";
 import { progressStatusLabel } from "./progressStatus";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
+import { isTenantModuleEnabled } from "../../../shared/moduleAccess";
 import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 
 type PageOptions = {
@@ -45,6 +46,33 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
   const [viewingDeleted, setViewingDeleted] = createSignal(false);
   const [slipOpen, setSlipOpen] = createSignal(false);
   const [slipSalesOrderId, setSlipSalesOrderId] = createSignal<number | null>(null);
+  const [woBusy, setWoBusy] = createSignal(false);
+
+  const canCreateWo = () =>
+    isTenantModuleEnabled(auth.me, "manufacturing") &&
+    hasPermission(auth.me, "manufacturing.work_orders", "write");
+
+  const createWorkOrdersFromSelected = async () => {
+    const id = selectedId();
+    if (!id) {
+      toast.warning("Select a sales order first.");
+      return;
+    }
+    setWoBusy(true);
+    const res = await apiFetch<{ id: number; work_order_no?: string }>(
+      `/api/v1/manufacturing/work-orders/from-sales-order/${id}`,
+      { method: "POST" },
+    );
+    setWoBusy(false);
+    if (!res.success) {
+      const detail = res.errors ? Object.values(res.errors).join(" ") : "";
+      toast.warning(detail || res.message || "Failed to create work order.");
+      return;
+    }
+    const woNo = res.data?.work_order_no ? ` ${res.data.work_order_no}` : "";
+    toast.success(`Work order created${woNo}. Open Production → Work orders.`);
+    invalidate();
+  };
 
   const lifecycle = useDocumentLifecycle({
     apiBase: "/api/v1/sales-order/sales-orders",
@@ -238,6 +266,17 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
         settingsHref={SALES_ORDER_SETTINGS_HREF.salesOrder}
         toolbarExtra={
           <div class="flex flex-wrap items-end gap-2">
+            <Show when={canCreateWo()}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                disabled={woBusy() || selectedId() == null}
+                title="Create work order(s) for open lines with an active BOM"
+                onClick={() => void createWorkOrdersFromSelected()}
+              >
+                {woBusy() ? "Creating…" : "Create work order(s)"}
+              </button>
+            </Show>
             <GenerateOtherSlipsMenu
               sourceEntity="sales_order"
               targets={[

@@ -6,21 +6,22 @@ Production (sidebar **Production**) covers in-house assembly, make-to-order (MTO
 
 | Tab | Route | Purpose |
 |-----|-------|---------|
-| Workspace | `/app/production` | KPI shortcuts into BOMs, work orders, and reports |
+| Workspace | `/app/production` | Job-board queues (draft, QC, in production, completed) + primary CTAs |
 | BOMs | `/app/production/boms` | Bills of material (assembly + disassembly) |
-| Work Orders | `/app/production/work-orders` | Draft → released → completed lifecycle |
-| Issue station | `/app/production/issue-station` | Stage serial/lot component issues before complete |
-| Receive station | `/app/production/receive-station` | Register serial/lot finished goods before complete |
-| Reports | `/app/production/reports` | WO status, progress, and stock movement audit |
+| Work Orders | `/app/production/work-orders` | Draft → released → completed lifecycle; deep-links to stations |
+| Reports | `/app/production/reports` | WO status (incl. source SO), progress, and stock movement audit |
+| Setup | `/app/production/setup` | FG QC + optional completed-WO release policy; link to Modules & Features |
 
-Enable under **User Management → Module & Features** (`manufacturing` module). Permissions: `manufacturing.boms`, `manufacturing.work_orders`, `manufacturing.work_orders_release`, `manufacturing.work_orders_complete`, `quality.wo_inspection`.
+Issue / Receive stations remain valid URLs (`/app/production/issue-station`, `receive-station`) opened from a released work order with `?woId=` (overflow, not primary tabs).
+
+Enable under **User Management → Module & Features** (`manufacturing` module). Turn Manufacturing off if you only trade finished goods — Production nav is hidden. Permissions: `manufacturing.boms`, `manufacturing.work_orders`, `manufacturing.work_orders_release`, `manufacturing.work_orders_complete`, `quality.wo_inspection`.
 
 ## Work order flow
 
 ```mermaid
 flowchart LR
   BOM[BOM] --> WO[Work Order draft]
-  SO[Sales Order line] -->|Load Slip MTO| WO
+  SO[Sales Order line] -->|Create WO or Load Slip| WO
   WO --> REL[Release]
   REL --> QC{FG QC required?}
   QC -->|Held| HOLD[Cannot complete]
@@ -30,10 +31,10 @@ flowchart LR
   COMP --> FG[Receive station optional]
 ```
 
-1. **Create** — pick BOM, plant location, qty to produce. Optional **Load Slip → Sales Order** sets `source_sales_order_line_id` (MTO).
+1. **Create** — pick BOM, plant location, qty to produce. MTO: **Sales Order → Create work order(s)** or Production **Load Slip → Sales Order** sets `source_sales_order_id` / `source_sales_order_line_id`.
 2. **Materials preview** — work order detail shows on-hand vs required (respects UoM conversion, scrap/spare qty, yield %).
-3. **Release** — status `released`; records `released_at`.
-4. **FG inspection** — default `released`; when **Process policies → Manufacturing require FG QC** is on, new WOs start `pending` until Quality releases (`quality.wo_inspection`).
+3. **Release** — status `released`; records `released_at`. From the WO row, open **Issue materials** / **Receive FG** for tracked lines (`?woId=`).
+4. **FG inspection** — default `released`; when **Process policies → Require FG QC** (or Production Setup) is on, new WOs start `pending` until Quality releases (`quality.wo_inspection`).
 5. **Complete** — backflush (assembly) or consume input + receive outputs (disassembly). Sets `qty_produced`, `completed_at`, and optional `actual_input_qty` / `input_lot_batch_id`.
 
 ### BOM types
@@ -68,12 +69,15 @@ Non-tracked items still backflush via qty-only `inv_stock_movements` (`wo_backfl
 
 Perishable catch-weight lots use the same lot staging pattern as Inventory Receive station; see `20-PERISHABLE-CATCH-WEIGHT.md`.
 
-## Sales order Load Slip
+## Sales order ↔ Production
 
-**New Work Order → Load Slip → Sales Order** lists open SO lines with balance qty. Selecting a line:
+**Push (Sales):** On a saved sales order (list or modal), **Create work order(s)** calls `POST /manufacturing/work-orders/from-sales-order/{id}` when Manufacturing is enabled and the user has WO write. Lines need an active BOM.
 
-- Creates a work order linked via `source_sales_order_id` and `source_sales_order_line_id`.
-- Doc generation rule seeds: `Default SO to Work Order` (migration 274).
+**Pull (Production):** **New Work Order → Load Slip → Sales Order** lists open SO lines with balance qty (same API family as PR Load Slip).
+
+Linked lines show **Making** (open WO qty) and **Made** (completed WO `qty_produced`) on the sales order line grid.
+
+**Optional release bridge** (default **off**): `tenant_process_policies.sales_count_completed_wo_toward_release` (migration 276). When on, completed linked WO qty can floor SO release stock availability. Leave off for bit-identical legacy release math.
 
 Golden **S14**: `DEMO-S14-SO` (item 00001 × 1) → `DEMO-S14-WO` completed, FG QC released.
 

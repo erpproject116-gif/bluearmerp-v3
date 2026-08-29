@@ -745,18 +745,18 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Production is its own sidebar module. Define a BOM (assembly or disassembly), create a work order from scratch or from a sales order line (Load Slip), review materials needed, release, pass FG inspection when your policy requires it, then complete to backflush components and receive finished goods. Issue and Receive stations under Production handle serial/lot staging for tracked items.",
+        text: "Production is its own sidebar module. Happy path for non-tracked make-to-stock: BOM → Work order → Release → Complete → Stock → Sell. Create work orders from a sales order (Create work order(s)) or from Production Load Slip. FG QC and Issue/Receive stations appear only when policy or serial/lot tracking requires them. Use Production → Setup for FG QC and the optional completed-WO release bridge.",
       },
       {
         type: "steps",
         items: [
-          "Enable Production under User Management → Module & Features if it is missing.",
+          "Enable Production under User Management → Module & Features if it is missing (turn Manufacturing off if you only trade finished goods).",
           "Set item base units and conversions under Inventory → Units.",
           "Open Production → BOMs — create assembly BOMs (finished item + components) or disassembly BOMs (input item + yield outputs).",
-          "Open Work Orders — New row, or Load Slip → Sales Order for make-to-order lines.",
-          "Release the work order, set FG inspection to Released (Quality) when required, then Complete.",
-          "Use Issue station and Receive station for serial/lot-tracked components and finished goods.",
-          "Open Production → Reports for work order status, progress, and stock movement audit.",
+          "Open Work Orders — New row, Sales order… (Load Slip), or from a Sales Order use Create work order(s).",
+          "Release the work order; for tracked items open Issue / Receive from the WO row (?woId=). Set FG inspection to Released when required, then Complete.",
+          "On the sales order, Making / Made columns show linked open and completed WO qty.",
+          "Open Production → Reports for work order status (source SO), progress, and stock movement audit. Use Production → Setup for process toggles.",
         ],
       },
       {

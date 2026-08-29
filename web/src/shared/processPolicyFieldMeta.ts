@@ -97,6 +97,14 @@ export const PROCESS_POLICY_FIELD_META: Record<string, { label: string; help: st
     label: "Stock quantity adjustments require approval (always on)",
     help: "Always on. Stock quantity changes never update on-hand inventory until a store admin or owner confirms in Approvals.",
   },
+  manufacturing_require_fg_qc: {
+    label: "Require FG QC before WO complete",
+    help: "When on, new work orders start with inspection pending until Quality releases them.",
+  },
+  sales_count_completed_wo_toward_release: {
+    label: "Count completed WO qty toward SO release stock",
+    help: "Off by default. When on, completed linked work-order qty can floor sales-order release stock availability.",
+  },
 };
 
 /** Map form-settings entity types → module Setup hub. */
@@ -133,5 +141,10 @@ export const ENTITY_PROCESS_SETUP: Record<
     scopeId: "purchases",
     setupHref: "/app/purchases/setup",
     title: "Purchase invoice process rules",
+  },
+  mfg_work_order: {
+    scopeId: "production",
+    setupHref: "/app/production/setup",
+    title: "Production process rules",
   },
 };

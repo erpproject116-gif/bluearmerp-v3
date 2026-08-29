@@ -131,6 +131,7 @@ export const appModules: AppModule[] = [
       { label: "Issue station", href: "/app/production/issue-station", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "overflow" },
       { label: "Receive station", href: "/app/production/receive-station", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "overflow" },
       { label: "Reports", href: "/app/production/reports", settingsHref: "/app/production/reports", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
+      setupFeatureTab("/app/production"),
     ],
   },
   {
