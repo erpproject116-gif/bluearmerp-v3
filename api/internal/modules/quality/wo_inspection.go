@@ -2,11 +2,13 @@ package quality
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
@@ -44,7 +46,11 @@ func patchWoInspection(pool *pgxpool.Pool) http.HandlerFunc {
 		err = pool.QueryRow(r.Context(), `
 			select status from public.mfg_work_orders where id=$1 and tenant_id=$2`, woID, tu.TenantID).Scan(&docStatus)
 		if err != nil {
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			if errors.Is(err, pgx.ErrNoRows) {
+				response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to load work order.", "ERR_INTERNAL")
 			return
 		}
 		if docStatus != "released" {
@@ -61,8 +67,12 @@ func patchWoInspection(pool *pgxpool.Pool) http.HandlerFunc {
 			  updated_at = now()
 			where id = $4 and tenant_id = $5 and status = 'released'`,
 			st, body.InspectionNotes, tu.AppUserID, woID, tu.TenantID)
-		if err != nil || tag.RowsAffected() == 0 {
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update inspection.", "ERR_INTERNAL")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			response.Validation(w, map[string]string{"status": "Work order is no longer released."})
 			return
 		}
 

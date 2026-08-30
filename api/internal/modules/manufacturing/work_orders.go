@@ -3,6 +3,7 @@ package manufacturing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
@@ -198,7 +200,11 @@ func getWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		row, err := loadWorkOrder(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			if errors.Is(err, pgx.ErrNoRows) {
+				response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to load work order.", "ERR_INTERNAL")
 			return
 		}
 		response.OK(w, row, "OK")
@@ -415,7 +421,11 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			&wo.ID, &wo.WorkOrderNo, &wo.BomID, &wo.FinishedItemID, &wo.LocationID,
 			&wo.QtyToProduce, &wo.QtyProduced, &status, &inspectionStatus)
 		if err != nil {
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			if errors.Is(err, pgx.ErrNoRows) {
+				response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to load work order.", "ERR_INTERNAL")
 			return
 		}
 		if status != "released" {
@@ -585,7 +595,11 @@ func getWorkOrderMaterialNeeds(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		wo, err := loadWorkOrder(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			if errors.Is(err, pgx.ErrNoRows) {
+				response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to load work order.", "ERR_INTERNAL")
 			return
 		}
 		bom, err := loadBom(r.Context(), pool, tu.TenantID, wo.BomID)
