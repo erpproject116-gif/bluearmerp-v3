@@ -286,8 +286,12 @@ export default function WorkOrdersPage() {
     let ok = 0;
     for (const soId of soIds) {
       const res = await apiFetch(`/api/v1/manufacturing/work-orders/from-sales-order/${soId}`, { method: "POST" });
-      if (res.success) ok++;
-      else toast.warning(res.message ?? `Failed to create work order from SO #${soId}.`);
+      if (res.success) {
+        ok++;
+        continue;
+      }
+      const detail = res.errors ? Object.values(res.errors).filter(Boolean).join(" ") : "";
+      toast.warning(detail || res.message || `Failed to create work order from SO #${soId}.`);
     }
     setLoadSlipBusy(false);
     if (ok > 0) {

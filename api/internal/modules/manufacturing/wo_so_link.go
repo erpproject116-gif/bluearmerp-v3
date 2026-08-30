@@ -132,7 +132,14 @@ func listOpenSalesOrderSlipLinesForWO(pool *pgxpool.Pool) http.HandlerFunc {
 
 		where := `so.tenant_id = $1 and so.deleted_at is null
 			and so.progress_status in ('unconfirmed', 'e_approval', 'in_progress', 'completed')
-			and (ln.qty - coalesce(req.requested, 0)) > 0.0001`
+			and ln.item_id is not null
+			and (ln.qty - coalesce(req.requested, 0)) > 0.0001
+			and exists (
+			  select 1 from public.mfg_boms b
+			  where b.tenant_id = so.tenant_id
+			    and b.finished_item_id = ln.item_id
+			    and b.is_active = true
+			)`
 		args := []any{tu.TenantID}
 		argN := 2
 
@@ -286,9 +293,10 @@ func CreateWorkOrdersFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu 
 	defer rows.Close()
 
 	type soLine struct {
-		lineID  int64
-		itemID  *int64
-		openQty float64
+		lineID   int64
+		itemID   *int64
+		itemCode string
+		openQty  float64
 	}
 	var lines []soLine
 	for rows.Next() {
@@ -300,7 +308,7 @@ func CreateWorkOrdersFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu 
 		if ln.OpenQty <= 0.0001 || ln.ItemID == nil {
 			continue
 		}
-		lines = append(lines, soLine{lineID: ln.SalesOrderLineID, itemID: ln.ItemID, openQty: ln.OpenQty})
+		lines = append(lines, soLine{lineID: ln.SalesOrderLineID, itemID: ln.ItemID, itemCode: ln.ItemCode, openQty: ln.OpenQty})
 	}
 	if len(lines) == 0 {
 		return 0, docflowValidation(map[string]string{"lines": "No open lines available on this sales order."})
@@ -315,6 +323,7 @@ func CreateWorkOrdersFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu 
 	orderDate := time.Now()
 	var firstID int64
 	created := 0
+	var missingBOM []string
 	inspectionStatus := initialWorkOrderInspectionStatus(ctx, pool, tu.TenantID)
 	for _, ln := range lines {
 		var bomID int64
@@ -324,6 +333,11 @@ func CreateWorkOrdersFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu 
 			order by id desc limit 1`, tu.TenantID, *ln.itemID).Scan(&bomID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				label := strings.TrimSpace(ln.itemCode)
+				if label == "" {
+					label = fmt.Sprintf("item#%d", *ln.itemID)
+				}
+				missingBOM = append(missingBOM, label)
 				continue
 			}
 			return 0, err
@@ -350,7 +364,11 @@ func CreateWorkOrdersFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu 
 		created++
 	}
 	if created == 0 {
-		return 0, docflowValidation(map[string]string{"lines": "No open lines with an active BOM on this sales order."})
+		msg := "No open lines with an active BOM on this sales order."
+		if len(missingBOM) > 0 {
+			msg = fmt.Sprintf("No active BOM for item(s): %s. Create a BOM under Production → BOMs first.", strings.Join(missingBOM, ", "))
+		}
+		return 0, docflowValidation(map[string]string{"lines": msg})
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return 0, err
