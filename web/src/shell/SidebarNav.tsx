@@ -256,14 +256,13 @@ export function SidebarNav() {
     if (area.id === "production") {
       return false;
     }
-    if (area.id === "production_workspace") {
-      return p === "/app/production" || p === "/app/production/";
-    }
     if (area.id === "production_boms") {
       return pathStarts(p, ["/app/production/boms"]);
     }
     if (area.id === "production_work_orders") {
       return (
+        p === "/app/production" ||
+        p === "/app/production/" ||
         pathStarts(p, ["/app/production/work-orders", "/app/production/issue-station", "/app/production/receive-station"])
       );
     }

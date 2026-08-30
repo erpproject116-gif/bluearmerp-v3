@@ -122,14 +122,11 @@ export const appModules: AppModule[] = [
   {
     id: "production",
     label: "Production",
-    href: "/app/production",
+    href: "/app/production/work-orders",
     basePath: "/app/production",
     features: [
-      { label: "Workspace", href: "/app/production", settingsHref: "/app/production", headerPriority: "primary" },
-      { label: "BOMs", href: "/app/production/boms", settingsHref: "/app/production/boms", featureCode: "manufacturing.boms", headerPriority: "primary" },
       { label: "Work Orders", href: "/app/production/work-orders", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
-      { label: "Issue station", href: "/app/production/issue-station", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "overflow" },
-      { label: "Receive station", href: "/app/production/receive-station", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "overflow" },
+      { label: "BOMs", href: "/app/production/boms", settingsHref: "/app/production/boms", featureCode: "manufacturing.boms", headerPriority: "primary" },
       { label: "Reports", href: "/app/production/reports", settingsHref: "/app/production/reports", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
       setupFeatureTab("/app/production"),
     ],

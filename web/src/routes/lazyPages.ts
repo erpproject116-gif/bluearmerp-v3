@@ -252,7 +252,6 @@ export const FixedAssetsPage = lazy(() => import("../modules/fixedassets/FixedAs
 export const JobCostingPage = lazy(() => import("../modules/jobcosting/JobCostingPage"));
 export const BomsPage = lazy(() => import("../modules/manufacturing/BomsPage"));
 export const WorkOrdersPage = lazy(() => import("../modules/manufacturing/WorkOrdersPage"));
-export const ProductionWorkspacePage = lazy(() => import("../modules/production/ProductionWorkspacePage"));
 export const ProductionReportsPage = lazy(() => import("../modules/production/ProductionReportsPage"));
 export const ProductionIssueStationPage = lazy(() => import("../modules/production/ProductionIssueStationPage"));
 export const ProductionReceiveStationPage = lazy(() => import("../modules/production/ProductionReceiveStationPage"));

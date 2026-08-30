@@ -240,7 +240,6 @@ import {
   JobCostingPage,
   BomsPage,
   WorkOrdersPage,
-  ProductionWorkspacePage,
   ProductionReportsPage,
   ProductionIssueStationPage,
   ProductionReceiveStationPage,
@@ -549,7 +548,7 @@ export default function App() {
           <Route path="/inventory/serial-lot/receive" component={SerialReceivePage} />
           <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
           <Route path="/production" component={() => (
-            <ManufacturingRoute><ProductionWorkspacePage /></ManufacturingRoute>
+            <Navigate href="/app/production/work-orders" />
           )} />
           <Route path="/production/boms" component={() => (
             <ManufacturingRoute><BomsPage /></ManufacturingRoute>

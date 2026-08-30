@@ -1,5 +1,5 @@
 import { createSignal, For, Show, createEffect } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
@@ -179,7 +179,10 @@ export default function ProductionReceiveStationPage() {
     <ProductionLayout>
       <div class="space-y-6">
         <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-          <h2 class="text-lg font-semibold text-text-primary">Receive station</h2>
+          <A href="/app/production/work-orders?status=released" class="text-xs font-medium text-brand-700 hover:underline">
+            ← Work orders
+          </A>
+          <h2 class="mt-2 text-lg font-semibold text-text-primary">Receive station</h2>
           <p class="mt-1 text-sm text-text-secondary">
             Stage finished-good serials or lots on a released work order before completion posts them to stock.
           </p>

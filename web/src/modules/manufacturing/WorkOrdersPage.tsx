@@ -76,7 +76,7 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 const STATUS_TABS = [
   { value: "", label: "All" },
   { value: "draft", label: "Draft" },
-  { value: "released", label: "Released" },
+  { value: "released", label: "In production" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
 ];
@@ -275,7 +275,7 @@ export default function WorkOrdersPage() {
       toast.warning(res.message ?? "Failed to update inspection.");
       return;
     }
-    toast.success(status === "released" ? "FG inspection released." : "Work order placed on hold.");
+    toast.success(status === "released" ? "FG QC passed." : "Work order held for QC.");
     invalidate();
   };
 
@@ -331,9 +331,9 @@ export default function WorkOrdersPage() {
   return (
     <ProductionLayout>
       <p class="mb-3 text-sm text-text-secondary">
-        <span class="font-medium text-text-primary">Next steps:</span>{" "}
-        Draft → Release → (FG QC if pending) → Issue/Receive if serial or lot tracked → Complete → sell from stock.
-        Make-to-order: use <span class="font-medium">Sales order</span> (Load Slip) or create work orders from the Sales Order screen.
+        <span class="font-medium text-text-primary">Flow:</span>{" "}
+        Draft → Release to floor → Pass FG QC (if required) → Issue / Receive when serial or lot tracked → Complete → sell from stock.
+        Make-to-order: use <span class="font-medium">From sales order</span> (Load Slip).
       </p>
       <SpreadsheetGrid<WorkOrder>
         columns={[
@@ -355,7 +355,7 @@ export default function WorkOrdersPage() {
               <div class="flex flex-wrap items-center gap-2 capitalize">
                 <span>{(r.inspection_status ?? "released").replace(/_/g, " ")}</span>
                 <Show when={r.status === "released" && (r.inspection_status === "pending" || r.inspection_status === "held")}>
-                  <span class="text-xs text-amber-700">Release FG inspection before Complete</span>
+                  <span class="text-xs text-amber-700">Pass FG QC before Complete</span>
                 </Show>
                 <Show when={r.status === "released" && canInspect()}>
                   <button
@@ -364,7 +364,7 @@ export default function WorkOrdersPage() {
                     disabled={inspectingId() === r.id}
                     onClick={(e) => { e.stopPropagation(); void patchInspection(r, "released"); }}
                   >
-                    Release
+                    Pass QC
                   </button>
                   <button
                     type="button"
@@ -392,7 +392,7 @@ export default function WorkOrdersPage() {
                     disabled={actionId() === r.id}
                     onClick={(e) => { e.stopPropagation(); void release(r); }}
                   >
-                    Release
+                    Release to floor
                   </button>
                 </Show>
                 <Show when={r.status === "released"}>
@@ -401,7 +401,7 @@ export default function WorkOrdersPage() {
                     class="text-xs text-brand-600 hover:underline"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Issue materials
+                    Issue
                   </A>
                   <A
                     href={`/app/production/receive-station?woId=${r.id}`}
@@ -418,7 +418,7 @@ export default function WorkOrdersPage() {
                     disabled={actionId() === r.id || r.inspection_status === "pending" || r.inspection_status === "held"}
                     title={
                       r.inspection_status === "pending" || r.inspection_status === "held"
-                        ? "Release FG inspection first"
+                        ? "Pass FG QC first"
                         : undefined
                     }
                     onClick={(e) => { e.stopPropagation(); void complete(r); }}
@@ -443,9 +443,9 @@ export default function WorkOrdersPage() {
             class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
             disabled={loadSlipBusy()}
             onClick={() => setSoPickerOpen(true)}
-            title="Load Slip from Sales Order"
+            title="Create work orders from a sales order (Load Slip)"
           >
-            {loadSlipBusy() ? "Loading…" : "Sales order…"}
+            {loadSlipBusy() ? "Loading…" : "From sales order…"}
           </button>
         }
         codeKey="work_order_no"
