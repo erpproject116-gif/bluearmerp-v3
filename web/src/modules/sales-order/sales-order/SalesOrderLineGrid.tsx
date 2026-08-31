@@ -41,6 +41,7 @@ async function fetchExplodedBundleLines(bundleId: number): Promise<ExplodedBundl
 }
 
 export type SalesOrderLineRow = {
+  id?: number | null;
   line_no: number;
   item_id?: number | null;
   item_code: string;
@@ -71,6 +72,7 @@ export function emptySalesOrderLine(
   inputBasis: SalesOrderLineRow["input_basis"] = "vat_inc_unit",
 ): SalesOrderLineRow {
   return {
+    id: null,
     line_no: lineNo,
     item_id: null,
     item_code: "",

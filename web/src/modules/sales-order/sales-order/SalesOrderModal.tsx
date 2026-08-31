@@ -82,6 +82,7 @@ export type SalesOrderDetail = {
   source_quotation_id?: number | null;
   created_by_name?: string;
   lines?: Array<{
+    id?: number;
     line_no: number;
     item_id?: number | null;
     item_code: string;
@@ -134,6 +135,7 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
 function linesFromDetail(lines?: SalesOrderDetail["lines"]): SalesOrderLineRow[] {
   if (!lines?.length) return [emptySalesOrderLine(1)];
   return lines.map((ln) => ({
+    id: ln.id ?? null,
     line_no: ln.line_no,
     item_id: ln.item_id,
     item_code: ln.item_code ?? "",
@@ -569,6 +571,7 @@ export function SalesOrderModal(props: Props) {
       progress_status: status,
       source_quotation_id: sourceQuotationId(),
       lines: lines().map((ln, i) => ({
+        id: ln.id || null,
         line_no: i + 1,
         item_id: ln.item_id || null,
         item_code: ln.item_code,

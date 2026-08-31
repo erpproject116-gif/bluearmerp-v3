@@ -92,11 +92,19 @@ export default function WorkOrdersPage() {
     useListState("order_date", 25, { defaultOrder: "desc", defaultStatus: "" });
 
   createEffect(() => {
-    const st = String(searchParams.status ?? "").trim();
+    const st = String(searchParams.status ?? "").trim().toLowerCase();
     if (st && ["draft", "released", "completed", "cancelled"].includes(st) && statusFilter() !== st) {
       setStatusFilter(st);
     }
   });
+
+  const setStatusAndUrl = (st: string) => {
+    setStatusFilter(st);
+    const url = new URL(window.location.href);
+    if (st) url.searchParams.set("status", st);
+    else url.searchParams.delete("status");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  };
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = createSignal(false);
@@ -287,10 +295,14 @@ export default function WorkOrdersPage() {
     const soIds = [...new Set(picked.map((l) => l.sales_order_id))];
     setLoadSlipBusy(true);
     let ok = 0;
+    let lastWo: WorkOrder | null = null;
     for (const soId of soIds) {
-      const res = await apiFetch(`/api/v1/manufacturing/work-orders/from-sales-order/${soId}`, { method: "POST" });
+      const res = await apiFetch<WorkOrder>(`/api/v1/manufacturing/work-orders/from-sales-order/${soId}`, {
+        method: "POST",
+      });
       if (res.success) {
         ok++;
+        if (res.data) lastWo = res.data;
         continue;
       }
       const detail = res.errors ? Object.values(res.errors).filter(Boolean).join(" ") : "";
@@ -298,7 +310,16 @@ export default function WorkOrdersPage() {
     }
     setLoadSlipBusy(false);
     if (ok > 0) {
-      toast.success(`Created work order(s) from ${ok} sales order(s).`);
+      const woLabel = lastWo?.work_order_no ? ` (${lastWo.work_order_no})` : "";
+      toast.success(`Created work order(s) from ${ok} sales order(s)${woLabel}.`);
+      // Show the tab that matches the WO we got back (draft by default).
+      const st = (lastWo?.status || "draft").trim().toLowerCase();
+      if (["draft", "released", "completed", "cancelled"].includes(st)) {
+        setStatusAndUrl(st);
+      } else {
+        setStatusAndUrl("");
+      }
+      if (lastWo?.id) setSelectedId(lastWo.id);
       invalidate();
     }
   };
@@ -557,7 +578,7 @@ export default function WorkOrdersPage() {
         onSearchChange={setQ}
         searchPlaceholder="Search WO, BOM, item…"
         status={statusFilter()}
-        onStatusChange={setStatusFilter}
+        onStatusChange={setStatusAndUrl}
         statusLabel="Status"
         statusOptions={STATUS_TABS}
         onRefresh={invalidate}

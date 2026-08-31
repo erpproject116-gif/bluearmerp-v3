@@ -239,8 +239,16 @@ func createWorkOrderFromSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create work order.", "ERR_INTERNAL")
 			return
 		}
-		row, _ := loadWorkOrder(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, row, "Created.")
+		row, loadErr := loadWorkOrder(r.Context(), pool, tu.TenantID, id)
+		if loadErr != nil {
+			response.OK(w, map[string]any{"id": id}, "Created.")
+			return
+		}
+		msg := "Created."
+		if row.Status != "draft" {
+			msg = "Linked work order ready."
+		}
+		response.OK(w, row, msg)
 	}
 }
 
@@ -259,12 +267,14 @@ func openSalesOrderLineBalanceSQL() string {
 }
 
 // CreateWorkOrdersFromSalesOrder creates draft work orders from open sales order lines.
-// Returns the first created work order id, or an existing one when already linked.
+// Returns the first created work order id, or an existing open one when already linked.
+// Cancelled/completed WOs do not block creating new drafts for remaining open qty.
 func CreateWorkOrdersFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, soID int64) (int64, error) {
 	var existingID int64
 	err := pool.QueryRow(ctx, `
 		select id from public.mfg_work_orders
 		where tenant_id = $1 and source_sales_order_id = $2
+		  and status not in ('cancelled', 'completed')
 		order by id desc limit 1`, tu.TenantID, soID).Scan(&existingID)
 	if err == nil {
 		return existingID, nil

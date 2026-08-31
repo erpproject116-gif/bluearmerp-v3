@@ -3,6 +3,7 @@
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
@@ -94,6 +96,7 @@ type SalesOrder struct {
 }
 
 type salesOrderLineBody struct {
+	ID                    *int64   `json:"id,omitempty"`
 	LineNo                int      `json:"line_no"`
 	ItemID                *int64   `json:"item_id"`
 	ItemCode              string   `json:"item_code"`
@@ -133,6 +136,7 @@ type salesOrderBody struct {
 }
 
 type computedLine struct {
+	ID                    *int64
 	LineNo                int
 	ItemID                *int64
 	ItemCode              string
@@ -788,6 +792,11 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if err := replaceSalesOrderLines(r.Context(), tx, id, computed); err != nil {
+			var blocked *lineSyncBlockedError
+			if errors.As(err, &blocked) {
+				response.Validation(w, map[string]string{"lines": blocked.Error()})
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
 			return
 		}
@@ -859,12 +868,162 @@ func insertSalesOrderLines(ctx context.Context, tx pgx.Tx, salesOrderID int64, l
 	return ids, nil
 }
 
-func replaceSalesOrderLines(ctx context.Context, tx pgx.Tx, salesOrderID int64, lines []computedLine) error {
-	if _, err := tx.Exec(ctx, `delete from public.so_sales_order_lines where sales_order_id = $1`, salesOrderID); err != nil {
+type existingSOLine struct {
+	ID     int64
+	LineNo int
+}
+
+type lineSyncPlan struct {
+	Updates []computedLine // ID set
+	Inserts []computedLine // ID nil
+	Deletes []int64
+}
+
+type lineSyncBlockedError struct {
+	msg string
+}
+
+func (e *lineSyncBlockedError) Error() string { return e.msg }
+
+// planSalesOrderLineSync matches incoming lines to existing rows so line IDs stay
+// stable across saves (Load Slip / invoice / release links keep working).
+// Prefer client-sent id when it belongs to this SO; otherwise match leftover rows by line_no.
+func planSalesOrderLineSync(existing []existingSOLine, incoming []computedLine) lineSyncPlan {
+	byID := make(map[int64]existingSOLine, len(existing))
+	byLineNo := make(map[int]int64, len(existing))
+	for _, ex := range existing {
+		byID[ex.ID] = ex
+		byLineNo[ex.LineNo] = ex.ID
+	}
+
+	used := make(map[int64]bool, len(existing))
+	plan := lineSyncPlan{}
+
+	for _, ln := range incoming {
+		line := ln
+		lineNo := line.LineNo
+		if lineNo <= 0 {
+			lineNo = len(plan.Updates) + len(plan.Inserts) + 1
+			line.LineNo = lineNo
+		}
+
+		var matchID int64
+		if line.ID != nil && *line.ID > 0 {
+			if _, ok := byID[*line.ID]; ok && !used[*line.ID] {
+				matchID = *line.ID
+			}
+		}
+		if matchID == 0 {
+			if id, ok := byLineNo[lineNo]; ok && !used[id] {
+				matchID = id
+			}
+		}
+
+		if matchID > 0 {
+			idCopy := matchID
+			line.ID = &idCopy
+			plan.Updates = append(plan.Updates, line)
+			used[matchID] = true
+			continue
+		}
+		line.ID = nil
+		plan.Inserts = append(plan.Inserts, line)
+	}
+
+	for _, ex := range existing {
+		if !used[ex.ID] {
+			plan.Deletes = append(plan.Deletes, ex.ID)
+		}
+	}
+	return plan
+}
+
+func loadExistingSOLines(ctx context.Context, tx pgx.Tx, salesOrderID int64) ([]existingSOLine, error) {
+	rows, err := tx.Query(ctx, `
+		select id, line_no from public.so_sales_order_lines
+		where sales_order_id = $1 order by line_no`, salesOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []existingSOLine
+	for rows.Next() {
+		var row existingSOLine
+		if err := rows.Scan(&row.ID, &row.LineNo); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func updateSalesOrderLineRow(ctx context.Context, tx pgx.Tx, salesOrderID int64, ln computedLine) error {
+	if ln.ID == nil || *ln.ID <= 0 {
+		return errors.New("missing line id for update")
+	}
+	tag, err := tx.Exec(ctx, `
+		update public.so_sales_order_lines set
+		  line_no = $1, item_id = $2, item_code = $3, item_name = $4, description = $5,
+		  qty = $6, unit_id = $7, unit_code = $8,
+		  unit_non_vat = $9, non_vat_total = $10, tax_amount = $11,
+		  unit_vat_inc = $12, line_total = $13, remark = $14,
+		  source_quotation_line_id = $15, planned_serial_nos = $16
+		where id = $17 and sales_order_id = $18`,
+		ln.LineNo, ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName), ln.Description,
+		ln.Qty, ln.UnitID, ln.UnitCode,
+		ln.Amounts.UnitNonVat, ln.Amounts.NonVatTotal, ln.Amounts.TaxAmount,
+		ln.Amounts.UnitVatInc, ln.Amounts.LineTotal, ln.Remark,
+		ln.SourceQuotationLineID, ln.PlannedSerialNos,
+		*ln.ID, salesOrderID)
+	if err != nil {
 		return err
 	}
-	_, err := insertSalesOrderLines(ctx, tx, salesOrderID, lines)
-	return err
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("sales order line %d not found", *ln.ID)
+	}
+	return nil
+}
+
+// replaceSalesOrderLines updates lines in place when possible so downstream
+// references (sales invoices, releases, shipping, WO) keep valid line IDs.
+func replaceSalesOrderLines(ctx context.Context, tx pgx.Tx, salesOrderID int64, lines []computedLine) error {
+	existing, err := loadExistingSOLines(ctx, tx, salesOrderID)
+	if err != nil {
+		return err
+	}
+	plan := planSalesOrderLineSync(existing, lines)
+
+	// Avoid unique (sales_order_id, line_no) collisions while rewriting line_no.
+	if _, err := tx.Exec(ctx, `
+		update public.so_sales_order_lines
+		set line_no = -id
+		where sales_order_id = $1`, salesOrderID); err != nil {
+		return err
+	}
+
+	for _, ln := range plan.Updates {
+		if err := updateSalesOrderLineRow(ctx, tx, salesOrderID, ln); err != nil {
+			return err
+		}
+	}
+	if _, err := insertSalesOrderLines(ctx, tx, salesOrderID, plan.Inserts); err != nil {
+		return err
+	}
+	if len(plan.Deletes) == 0 {
+		return nil
+	}
+	if _, err := tx.Exec(ctx, `
+		delete from public.so_sales_order_lines
+		where sales_order_id = $1 and id = any($2)`, salesOrderID, plan.Deletes); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return &lineSyncBlockedError{
+				msg: "Cannot remove a sales order line that is already linked to a sale, shipping order, delivery, or work order. Clear those documents first.",
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func computeSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, tt taxcalc.TaxType, lines []salesOrderLineBody) ([]computedLine, map[string]string) {
@@ -894,6 +1053,7 @@ func computeSalesOrderLines(ctx context.Context, pool *pgxpool.Pool, tenantID in
 		amounts := taxcalc.ComputeLine(tt, ln.UnitPrice, ln.Qty, inputBasis)
 		unitID, unitCode := inventory.ResolveLineUnit(ctx, pool, tenantID, ln.ItemID, ln.UnitID, ln.UnitCode)
 		out = append(out, computedLine{
+			ID:                    ln.ID,
 			LineNo:                ln.LineNo,
 			ItemID:                ln.ItemID,
 			ItemCode:              ln.ItemCode,
