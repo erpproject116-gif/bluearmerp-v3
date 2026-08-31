@@ -34,6 +34,13 @@ const MASTERS: EntityCard[] = [
     href: "/app/inventory/items",
     optional: true,
   },
+  {
+    kind: "boms",
+    title: "Bills of material (BOMs)",
+    blurb: "Optional. Import recipes by bom_code — one row per component line. Match items by item_code.",
+    href: "/app/production/boms",
+    optional: true,
+  },
 ];
 
 const OPENING: EntityCard[] = [
@@ -42,6 +49,13 @@ const OPENING: EntityCard[] = [
     title: "Opening stock",
     blurb: "Optional. Current on-hand as of go-live (one receipt per location). Serial/lot items are skipped — receive those separately.",
     href: "/app/inventory/stock-entries",
+    optional: true,
+  },
+  {
+    kind: "opening_lots",
+    title: "Opening lots",
+    blurb: "Optional. Opening qty for lot-tracked items only — one row per lot/location. Use catch_weight when qty is empty.",
+    href: "/app/inventory/serial-lot/lots",
     optional: true,
   },
 ];

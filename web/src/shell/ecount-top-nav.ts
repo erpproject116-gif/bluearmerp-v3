@@ -233,7 +233,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     children: [
       {
         id: "production_work_orders",
-        label: "Work Orders",
+        label: "Jobs (work orders)",
         href: "/app/production/work-orders",
         iconId: "production_wo",
         topId: "inv1",
@@ -242,7 +242,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "production_boms",
-        label: "BOMs",
+        label: "Recipes (BOMs)",
         href: "/app/production/boms",
         iconId: "production_bom",
         topId: "inv1",

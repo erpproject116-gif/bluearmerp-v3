@@ -91,8 +91,18 @@ type workOrderPatchBody struct {
 }
 
 type workOrderCompleteBody struct {
-	ActualInputQty  *float64 `json:"actual_input_qty"`
-	InputLotBatchID *int64   `json:"input_lot_batch_id"`
+	ActualInputQty  *float64         `json:"actual_input_qty"`
+	InputLotBatchID *int64           `json:"input_lot_batch_id"`
+	OutputWeighs    []woOutputWeigh  `json:"output_weighs"`
+}
+
+// woOutputWeigh is a weighed cut/output lot on disassembly complete (overrides scaled BOM qty).
+type woOutputWeigh struct {
+	ComponentItemID int64    `json:"component_item_id"`
+	LotNo           string   `json:"lot_no"`
+	Qty             float64  `json:"qty"`
+	CatchWeight     *float64 `json:"catch_weight,omitempty"`
+	ExpiryDate      *string  `json:"expiry_date,omitempty"`
 }
 
 func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
@@ -495,22 +505,76 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 			for _, ln := range bom.Lines {
-				recvQty, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, actualInputQty, bom.OutputQty, bom.YieldPct)
+				plannedRecv, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, actualInputQty, bom.OutputQty, bom.YieldPct)
 				if err != nil {
 					response.Validation(w, map[string]string{"stock": err.Error()})
 					return
 				}
-				if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, recvQty, tu.AppUserID, "mfg_work_order", id, "wo_disassembly_receipt"); err != nil {
-					label := ln.ComponentCode
-					if label == "" {
-						label = fmt.Sprintf("item %d", ln.ComponentItemID)
-					}
-					msg := err.Error()
-					if strings.Contains(msg, "insufficient") || strings.Contains(msg, "no balance") {
-						msg = fmt.Sprintf("failed to receive %s: %.4f %s", label, recvQty, unitCode)
-					}
-					response.Validation(w, map[string]string{"stock": msg})
+				compSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, ln.ComponentItemID)
+				if err != nil {
+					response.Validation(w, map[string]string{"stock": err.Error()})
 					return
+				}
+				weighs := filterOutputWeighs(completeBody.OutputWeighs, ln.ComponentItemID)
+				if len(weighs) == 0 {
+					weighs, err = loadStagedComponentOutputWeighs(r.Context(), tx, tu.TenantID, id, ln.ComponentItemID)
+					if err != nil {
+						response.Validation(w, map[string]string{"stock": err.Error()})
+						return
+					}
+				}
+				if compSettings.TrackLot {
+					if len(weighs) == 0 {
+						weighs = []woOutputWeigh{{
+							ComponentItemID: ln.ComponentItemID,
+							LotNo:           fmt.Sprintf("WO-%s-C%d", wo.WorkOrderNo, ln.ComponentItemID),
+							Qty:             plannedRecv,
+						}}
+					}
+					for i := range weighs {
+						ow := &weighs[i]
+						qty := ow.Qty
+						if ow.CatchWeight != nil && *ow.CatchWeight > 0 {
+							qty = *ow.CatchWeight
+						}
+						if qty <= 0 {
+							response.Validation(w, map[string]string{"output_weighs": "Cut lot qty must be greater than zero."})
+							return
+						}
+						if err := receiveDisassemblyCutLot(r.Context(), tx, tu.TenantID, wo.LocationID, ln.ComponentItemID, ow.LotNo, qty, ow.ExpiryDate, compSettings.DefaultShelfLifeDays, tu.AppUserID, id); err != nil {
+							label := ln.ComponentCode
+							if label == "" {
+								label = fmt.Sprintf("item %d", ln.ComponentItemID)
+							}
+							response.Validation(w, map[string]string{"stock": fmt.Sprintf("failed to receive cut lot for %s: %v", label, err)})
+							return
+						}
+					}
+					_ = markStagedComponentLotsPosted(r.Context(), tx, id, ln.ComponentItemID)
+				} else {
+					recvQty := plannedRecv
+					if len(weighs) > 0 {
+						recvQty = 0
+						for _, w := range weighs {
+							q := w.Qty
+							if w.CatchWeight != nil && *w.CatchWeight > 0 {
+								q = *w.CatchWeight
+							}
+							recvQty += q
+						}
+					}
+					if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, recvQty, tu.AppUserID, "mfg_work_order", id, "wo_disassembly_receipt"); err != nil {
+						label := ln.ComponentCode
+						if label == "" {
+							label = fmt.Sprintf("item %d", ln.ComponentItemID)
+						}
+						msg := err.Error()
+						if strings.Contains(msg, "insufficient") || strings.Contains(msg, "no balance") {
+							msg = fmt.Sprintf("failed to receive %s: %.4f %s", label, recvQty, unitCode)
+						}
+						response.Validation(w, map[string]string{"stock": msg})
+						return
+					}
 				}
 			}
 		} else {
@@ -711,4 +775,94 @@ func initialWorkOrderInspectionStatus(ctx context.Context, pool *pgxpool.Pool, t
 		return "released"
 	}
 	return "pending"
+}
+
+func filterOutputWeighs(weighs []woOutputWeigh, componentItemID int64) []woOutputWeigh {
+	var out []woOutputWeigh
+	for _, w := range weighs {
+		if w.ComponentItemID == componentItemID {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func loadStagedComponentOutputWeighs(ctx context.Context, tx pgx.Tx, tenantID, woID, componentItemID int64) ([]woOutputWeigh, error) {
+	rows, err := tx.Query(ctx, `
+		select lot_no, qty::float8, catch_weight::float8, expiry_date::text
+		from public.mfg_wo_output_lots
+		where tenant_id = $1 and work_order_id = $2 and component_item_id = $3 and status = 'staged'
+		order by id`, tenantID, woID, componentItemID)
+	if err != nil {
+		// Column may be missing before migration 279 — treat as no staged cuts.
+		if strings.Contains(err.Error(), "component_item_id") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []woOutputWeigh
+	for rows.Next() {
+		var lotNo string
+		var qty float64
+		var cw *float64
+		var exp *string
+		if err := rows.Scan(&lotNo, &qty, &cw, &exp); err != nil {
+			return nil, err
+		}
+		out = append(out, woOutputWeigh{
+			ComponentItemID: componentItemID,
+			LotNo:           lotNo,
+			Qty:             qty,
+			CatchWeight:     cw,
+			ExpiryDate:      exp,
+		})
+	}
+	return out, rows.Err()
+}
+
+func markStagedComponentLotsPosted(ctx context.Context, tx pgx.Tx, woID, componentItemID int64) error {
+	_, err := tx.Exec(ctx, `
+		update public.mfg_wo_output_lots set status = 'posted'
+		where work_order_id = $1 and component_item_id = $2 and status = 'staged'`, woID, componentItemID)
+	if err != nil && strings.Contains(err.Error(), "component_item_id") {
+		return nil
+	}
+	return err
+}
+
+func receiveDisassemblyCutLot(
+	ctx context.Context, tx pgx.Tx, tenantID, locationID, itemID int64,
+	lotNo string, qty float64, expiryDate *string, shelfDays *int, userID, woID int64,
+) error {
+	lotNo = strings.TrimSpace(lotNo)
+	if lotNo == "" {
+		return fmt.Errorf("lot number required")
+	}
+	var expiry any
+	if expiryDate != nil && strings.TrimSpace(*expiryDate) != "" {
+		d, err := parseDate(strings.TrimSpace(*expiryDate))
+		if err != nil {
+			return fmt.Errorf("invalid expiry date")
+		}
+		expiry = d
+	} else if shelfDays != nil && *shelfDays > 0 {
+		expiry = time.Now().UTC().AddDate(0, 0, *shelfDays)
+	} else {
+		expiry = nil
+	}
+	_, err := tx.Exec(ctx, `
+		insert into public.inv_lot_batches (
+		  tenant_id, item_id, lot_no, location_id, qty_on_hand, expiry_date
+		) values ($1, $2, $3, $4, $5, $6)
+		on conflict (tenant_id, item_id, lot_no, location_id)
+		do update set
+		  qty_on_hand = inv_lot_batches.qty_on_hand + excluded.qty_on_hand,
+		  expiry_date = coalesce(excluded.expiry_date, inv_lot_batches.expiry_date),
+		  updated_at = now()`,
+		tenantID, itemID, lotNo, locationID, qty, expiry)
+	if err != nil {
+		return err
+	}
+	return inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, qty, userID, "mfg_work_order", woID, "wo_disassembly_receipt")
 }

@@ -255,6 +255,7 @@ export const WorkOrdersPage = lazy(() => import("../modules/manufacturing/WorkOr
 export const ProductionReportsPage = lazy(() => import("../modules/production/ProductionReportsPage"));
 export const ProductionIssueStationPage = lazy(() => import("../modules/production/ProductionIssueStationPage"));
 export const ProductionReceiveStationPage = lazy(() => import("../modules/production/ProductionReceiveStationPage"));
+export const ProductionWeighPartsPage = lazy(() => import("../modules/production/ProductionWeighPartsPage"));
 export const NcrsPage = lazy(() => import("../modules/quality/NcrsPage"));
 export const CapaPage = lazy(() => import("../modules/quality/CapaPage"));
 export const QcRequestsPage = lazy(() => import("../modules/quality/QcRequestsPage"));

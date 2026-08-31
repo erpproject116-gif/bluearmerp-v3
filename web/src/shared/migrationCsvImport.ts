@@ -6,6 +6,8 @@ export type MigKind =
   | "partners"
   | "accounts"
   | "opening_stock"
+  | "opening_lots"
+  | "boms"
   | "open_si"
   | "open_ap"
   | "open_po"
@@ -72,6 +74,8 @@ export const MIG_ENTITY_FIELDS: Record<MigKind, string[]> = {
   ],
   accounts: ["account_code", "account_name", "account_type", "is_group", "is_active", "sort_order"],
   opening_stock: ["item_code", "item", "quantity", "location", "as_of_date"],
+  opening_lots: ["item_code", "lot_no", "qty", "catch_weight", "expiry_date", "location", "as_of_date"],
+  boms: ["bom_code", "bom_name", "finished_item_code", "bom_type", "component_item_code", "qty", "scrap_qty", "yield_pct"],
   open_si: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount", "si_dr_no"],
   open_ap: ["source_doc_no", "partner", "date", "item_code", "item", "quantity", "amount", "vendor_invoice_no"],
   open_po: [...openDocFields],
@@ -87,6 +91,8 @@ export const MIG_REQUIRED: Record<MigKind, string[]> = {
   partners: ["company_name", "partner_kind"],
   accounts: ["account_code", "account_name", "account_type"],
   opening_stock: ["quantity", "location"],
+  opening_lots: ["item_code", "lot_no", "location"],
+  boms: ["bom_code", "finished_item_code", "component_item_code", "qty"],
   open_si: ["source_doc_no", "partner", "date", "amount"],
   open_ap: ["source_doc_no", "partner", "date", "amount"],
   open_po: ["source_doc_no", "partner", "date"],
@@ -102,6 +108,8 @@ export const MIG_NEEDS_JOB_DEFAULTS: Record<MigKind, boolean> = {
   partners: false,
   accounts: false,
   opening_stock: false,
+  opening_lots: false,
+  boms: false,
   open_si: true,
   open_ap: true,
   open_po: true,
@@ -118,6 +126,8 @@ export const MIG_NEEDS_ITEM: Record<MigKind, boolean> = {
   partners: false,
   accounts: false,
   opening_stock: true,
+  opening_lots: true,
+  boms: true,
   open_si: false,
   open_ap: false,
   open_po: false,
@@ -133,6 +143,8 @@ export const MIG_TEMPLATE_FILENAME: Record<MigKind, string> = {
   partners: "mig-partners-import-template.csv",
   accounts: "mig-accounts-import-template.csv",
   opening_stock: "mig-opening-stock-import-template.csv",
+  opening_lots: "mig-opening-lots-import-template.csv",
+  boms: "mig-boms-import-template.csv",
   open_si: "mig-open-si-import-template.csv",
   open_ap: "mig-open-ap-import-template.csv",
   open_po: "mig-open-po-import-template.csv",
@@ -148,6 +160,8 @@ const MIG_KIND_PATH: Record<MigKind, string> = {
   partners: "/partners",
   accounts: "/accounts",
   opening_stock: "/opening-stock",
+  opening_lots: "/opening-lots",
+  boms: "/boms",
   open_si: "/open-si",
   open_ap: "/open-ap",
   open_po: "/open-po",
@@ -177,6 +191,8 @@ const MIG_KINDS: MigKind[] = [
   "partners",
   "accounts",
   "opening_stock",
+  "opening_lots",
+  "boms",
   "open_si",
   "open_ap",
   "open_po",

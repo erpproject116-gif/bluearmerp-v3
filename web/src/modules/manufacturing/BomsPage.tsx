@@ -9,6 +9,7 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useListState } from "../../shared/useListState";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { hasPermission, useAuth } from "../../shared/auth-context";
 import { ManufacturingLayout } from "./ManufacturingLayout";
 
 type BomLine = {
@@ -114,12 +115,16 @@ function emptyLine(): BomLine {
 }
 
 export default function BomsPage() {
+  const auth = useAuth();
+  const canBulkDeactivate = () => hasPermission(auth.me, "manufacturing.boms_bulk", "write");
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
     "updated_at",
     25,
     { defaultOrder: "desc" },
   );
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = createSignal(false);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Bom | null>(null);
   const [bomCode, setBomCode] = createSignal("");
@@ -322,18 +327,43 @@ export default function BomsPage() {
     await invalidate();
   };
 
+  const bulkDeactivate = async () => {
+    const ids = [...selectedIds()];
+    if (ids.length === 0 || !canBulkDeactivate()) return;
+    if (!window.confirm(`Deactivate ${ids.length} selected BOM(s)? Active recipes will be marked inactive.`)) return;
+    setBulkBusy(true);
+    const res = await apiFetch<{ updated: number; skipped: number }>(
+      "/api/v1/manufacturing/boms/actions/bulk-deactivate",
+      { method: "POST", body: JSON.stringify({ ids }) },
+      { silent: true },
+    );
+    setBulkBusy(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Bulk deactivate failed.");
+      return;
+    }
+    toast.success(`Deactivated ${res.data.updated} BOM(s); ${res.data.skipped} skipped.`);
+    setSelectedIds(new Set<number>());
+    await invalidate();
+  };
+
   return (
     <ManufacturingLayout>
+      <p class="mb-3 text-sm text-text-secondary">
+        <span class="font-medium text-text-primary">Recipes (BOMs):</span>{" "}
+        Define how a finished item is built, or how a whole item is cut apart into parts (disassembly). Yields and scrap live on the recipe lines.
+      </p>
       <SpreadsheetGrid<Bom>
         columns={[
-          { key: "bom_code", header: "BOM code", clickable: true },
+          { key: "bom_code", header: "Recipe code", clickable: true },
           { key: "bom_name", header: "Name", clickable: true },
-          { key: "finished_item_name", header: "Finished item" },
+          { key: "finished_item_name", header: "Finished / whole item" },
           {
             key: "bom_type",
             header: "Type",
             sortable: false,
-            render: (r) => (r.bom_type === "disassembly" ? "Disassembly" : "Assembly"),
+            render: (r) =>
+              r.bom_type === "disassembly" ? "Cut apart (disassembly)" : "Assembly",
           },
           { key: "components", header: "Components" },
           { key: "default_location_name", header: "Default location" },
@@ -348,6 +378,9 @@ export default function BomsPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={selectedIds()}
+        onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={openNew}
         onEdit={openEdit}
         settingsHref="/app/production/boms"
@@ -372,6 +405,18 @@ export default function BomsPage() {
           { value: "inactive", label: "Inactive" },
         ]}
         onRefresh={() => void invalidate()}
+        toolbarExtra={
+          <Show when={canBulkDeactivate() && statusFilter() !== "inactive"}>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+              disabled={selectedIds().size === 0 || bulkBusy()}
+              onClick={() => void bulkDeactivate()}
+            >
+              Bulk deactivate{selectedIds().size > 0 ? ` (${selectedIds().size})` : ""}
+            </button>
+          </Show>
+        }
       />
       <Show when={list.isError}>
         <p class="mt-2 text-sm text-red-600">{list.error instanceof Error ? list.error.message : "Failed to load BOMs."}</p>
@@ -401,7 +446,7 @@ export default function BomsPage() {
             onChange={(e) => setBomType(e.currentTarget.value === "disassembly" ? "disassembly" : "assembly")}
           >
             <option value="assembly">Assembly — consume components, receive finished item</option>
-            <option value="disassembly">Disassembly — consume input item, receive components</option>
+            <option value="disassembly">Cut apart (disassembly) — consume whole, receive parts</option>
           </select>
         </Field>
         <label class="flex items-end gap-2 pb-2 text-sm">

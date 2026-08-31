@@ -18,7 +18,8 @@ import (
 
 var allowedKinds = map[string]bool{
 	"items": true, "partners": true, "accounts": true,
-	"opening_stock": true, "open_si": true, "open_ap": true, "open_po": true, "in_transit": true,
+	"opening_stock": true, "opening_lots": true, "boms": true,
+	"open_si": true, "open_ap": true, "open_po": true, "in_transit": true,
 	"open_quo": true, "open_so": true, "open_pr": true, "open_rfq": true,
 }
 
@@ -262,7 +263,8 @@ func lookupLocation(ctx context.Context, q interface {
 	var id int64
 	err := q.QueryRow(ctx, `
 		select id from public.inv_locations
-		where tenant_id = $1 and deleted_at is null and lower(location_name) = lower($2)
+		where tenant_id = $1 and deleted_at is null
+		  and (lower(location_name) = lower($2) or location_code = $2)
 		limit 2`, tenantID, name).Scan(&id)
 	if err != nil {
 		return 0, fmt.Sprintf("unmatched location: %s", name)

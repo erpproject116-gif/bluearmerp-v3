@@ -1,20 +1,21 @@
 # Production module guide
 
-Production (sidebar **Production**) covers in-house assembly, make-to-order (MTO), make-to-stock (MTS), and disassembly with finished-goods QC.
+Production (sidebar **Production**) covers in-house assembly, make-to-order (MTO), make-to-stock (MTS), and cut-apart (disassembly) with finished-goods QC. Nav labels use **Jobs (work orders)** and **Recipes (BOMs)**.
 
 ## Navigation
 
 | Tab | Route | Purpose |
 |-----|-------|---------|
-| Workspace | `/app/production` | Job-board queues (draft, QC, in production, completed) + primary CTAs |
-| BOMs | `/app/production/boms` | Bills of material (assembly + disassembly) |
-| Work Orders | `/app/production/work-orders` | Draft → released → completed lifecycle; deep-links to stations |
-| Reports | `/app/production/reports` | WO status (incl. source SO), progress, and stock movement audit |
+| Jobs (work orders) | `/app/production/work-orders` | Draft → released → completed lifecycle; deep-links to stations |
+| Recipes (BOMs) | `/app/production/boms` | Bills of material (assembly + cut-apart / disassembly) |
+| Reports | `/app/production/reports` | Job status (incl. source SO), progress, and stock movement audit |
 | Setup | `/app/production/setup` | FG QC + optional completed-WO release policy; link to Modules & Features |
 
-Issue / Receive stations remain valid URLs (`/app/production/issue-station`, `receive-station`) opened from a released work order with `?woId=` (overflow, not primary tabs).
+Issue / Receive / Weigh stations remain valid URLs (`/app/production/issue-station`, `receive-station`) opened from a released job with `?woId=` (overflow, not primary tabs).
 
-Enable under **User Management → Module & Features** (`manufacturing` module). Turn Manufacturing off if you only trade finished goods — Production nav is hidden. Permissions: `manufacturing.boms`, `manufacturing.work_orders`, `manufacturing.work_orders_release`, `manufacturing.work_orders_complete`, `quality.wo_inspection`.
+Enable under **User Management → Module & Features** (`manufacturing` module). Turn Manufacturing off if you only trade finished goods — Production nav is hidden. Permissions: `manufacturing.boms`, `manufacturing.work_orders`, `manufacturing.work_orders_release`, `manufacturing.work_orders_complete`, `manufacturing.boms_bulk`, `manufacturing.work_orders_bulk`, `quality.wo_inspection`.
+
+**Costing:** Disassembly and assembly complete post **stock quantities (and lots)** only. There is **no carcass→cut cost allocation** on work-order complete until a future inventory costing project.
 
 ## Work order flow
 
@@ -93,17 +94,20 @@ Golden **S14**: `DEMO-S14-SO` (item 00001 × 1) → `DEMO-S14-WO` completed, FG 
 
 CSV export follows the same list APIs as other module reports.
 
-## Golden demo scenarios (S14–S16)
+## Golden demo scenarios (S14–S17)
 
-Seed: `scripts/seed-demo-golden-s14-s16-production.sql` (after golden scenarios + inventory).
+Seed: `scripts/seed-demo-golden-s14-s16-production.sql` and `scripts/seed-demo-golden-s17-meat-cut.sql` (after golden scenarios + inventory).
 
 | Scenario | Doc nos | Story |
 |----------|---------|-------|
 | **S14 MTO** | `DEMO-S14-SO`, `DEMO-S14-WO`, `DEMO-S14-BOM` | SO line for Modular Sofa (00001) → completed WO with SO link |
 | **S15 MTS** | `DEMO-S15-WO` | Completed WO, no SO link, same assembly BOM |
 | **S16 Disassembly** | `DEMO-S16-WO`, `DEMO-S16-BOM` | Fabric (00004) disassembly with `actual_input_qty = 9.2` |
+| **S17 Meat cut** | `DEMO-S17-*`, partners `M17A`/`M17B`, items `S17WH`/`S17BL`/`S17PT`/`S17RB` | Disassembly + catch-weight lots + pack/ship for Cust A + FEFO belly sale |
 
-Verify: `scripts/verify-demo-full-chain.sql` (S14–S16 checks before final notice).
+Verify: `scripts/verify-demo-full-chain.sql` (S14–S17 checks). Demo walkthrough: `21-PRODUCTION-S17-MEAT-DEMO.md`.
+
+**Meat delivery unit (v1):** pack session on the customer sales order + shipping order — not a separate BOX master. One box → one customer.
 
 Assembly BOM **DEMO-S14-BOM** at location **00002**: finished 00001 ← 00002×2 + 00003×1 + 00004×3.
 

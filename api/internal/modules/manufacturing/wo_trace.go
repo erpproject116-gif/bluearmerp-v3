@@ -46,11 +46,12 @@ type woOutputSerialBatchBody struct {
 }
 
 type woOutputLotScan struct {
-	LotNo          string   `json:"lot_no"`
-	Qty            float64  `json:"qty"`
-	ExpiryDate     *string  `json:"expiry_date,omitempty"`
-	CatchWeight    *float64 `json:"catch_weight,omitempty"`
-	ClientScanID   string   `json:"client_scan_id,omitempty"`
+	LotNo           string   `json:"lot_no"`
+	Qty             float64  `json:"qty"`
+	ExpiryDate      *string  `json:"expiry_date,omitempty"`
+	CatchWeight     *float64 `json:"catch_weight,omitempty"`
+	ClientScanID    string   `json:"client_scan_id,omitempty"`
+	ComponentItemID *int64   `json:"component_item_id,omitempty"`
 }
 
 type woOutputLotBatchBody struct {
@@ -358,6 +359,58 @@ func batchWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
 			return
 		}
+		bom, err := loadBom(r.Context(), tx, tu.TenantID, wo.BomID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "BOM not found.", "ERR_INTERNAL")
+			return
+		}
+		disassembly := normalizeBomType(bom.BomType) == "disassembly"
+		hasComponentScans := false
+		for _, sc := range body.Scans {
+			if sc.ComponentItemID != nil && *sc.ComponentItemID > 0 {
+				hasComponentScans = true
+				break
+			}
+		}
+		if hasComponentScans {
+			if !disassembly {
+				response.Validation(w, map[string]string{"component_item_id": "Cut SKU lots are only valid on cut-apart (disassembly) jobs."})
+				return
+			}
+			allowed := map[int64]BomLine{}
+			for _, ln := range bom.Lines {
+				allowed[ln.ComponentItemID] = ln
+			}
+			for _, sc := range body.Scans {
+				if sc.ComponentItemID == nil || *sc.ComponentItemID <= 0 {
+					response.Validation(w, map[string]string{"component_item_id": "Each cut weigh row needs component_item_id."})
+					return
+				}
+				ln, ok := allowed[*sc.ComponentItemID]
+				if !ok {
+					response.Validation(w, map[string]string{"component_item_id": "Component is not on this recipe."})
+					return
+				}
+				st, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, *sc.ComponentItemID)
+				if err != nil || !st.TrackLot {
+					response.Validation(w, map[string]string{"item": fmt.Sprintf("%s must be lot-tracked.", ln.ComponentCode)})
+					return
+				}
+			}
+			results, err := processWoOutputLotScans(r.Context(), tx, tu.TenantID, woID, wo.FinishedItemCode, nil, body.Scans)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to stage output lots.", "ERR_INTERNAL")
+				return
+			}
+			if err := tx.Commit(r.Context()); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to stage output lots.", "ERR_INTERNAL")
+				return
+			}
+			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.wo_output_lot_batch", "mfg_work_order", &woID, nil, map[string]any{"count": len(body.Scans), "cut": true})
+			response.OK(w, map[string]any{"results": results}, "Batch processed.")
+			return
+		}
+
 		fgSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, wo.FinishedItemID)
 		if err != nil || !fgSettings.TrackLot {
 			response.Validation(w, map[string]string{"item": "Finished item does not track lots."})
@@ -573,10 +626,19 @@ func processWoOutputLotScans(ctx context.Context, tx pgx.Tx, tenantID, woID int6
 			continue
 		}
 		res.Qty = qty
+		codeForLot := itemCode
+		var shelfForScan = shelfDays
+		if sc.ComponentItemID != nil && *sc.ComponentItemID > 0 {
+			_ = tx.QueryRow(ctx, `select coalesce(item_code, '') from public.inv_items where id = $1`, *sc.ComponentItemID).Scan(&codeForLot)
+			st, errSt := inventory.LoadItemTrackingSettings(ctx, tx, tenantID, *sc.ComponentItemID)
+			if errSt == nil && st.DefaultShelfLifeDays != nil {
+				shelfForScan = st.DefaultShelfLifeDays
+			}
+		}
 		lotNo := normalizeWoLotNo(sc.LotNo)
 		if lotNo == "" {
 			seq++
-			lotNo = autoWoLotNo(itemCode, seq)
+			lotNo = autoWoLotNo(codeForLot, seq)
 		}
 		res.LotNo = lotNo
 		if seen[lotNo] {
@@ -598,23 +660,34 @@ func processWoOutputLotScans(ctx context.Context, tx pgx.Tx, tenantID, woID int6
 			}
 			expiry = &d
 		} else {
-			expiry = defaultWoExpiry(shelfDays)
+			expiry = defaultWoExpiry(shelfForScan)
 		}
 
 		var clientScanArg any
 		if sc.ClientScanID != "" {
 			clientScanArg = sc.ClientScanID
 		}
+		var componentArg any
+		if sc.ComponentItemID != nil && *sc.ComponentItemID > 0 {
+			componentArg = *sc.ComponentItemID
+		}
 		var rowID int64
 		err := tx.QueryRow(ctx, `
-			insert into public.mfg_wo_output_lots (tenant_id, work_order_id, lot_no, qty, expiry_date, catch_weight, client_scan_id, status)
-			values ($1, $2, $3, $4, $5, $6, $7, 'staged')
-			returning id`, tenantID, woID, lotNo, qty, expiry, sc.CatchWeight, clientScanArg).Scan(&rowID)
+			insert into public.mfg_wo_output_lots (tenant_id, work_order_id, lot_no, qty, expiry_date, catch_weight, client_scan_id, status, component_item_id)
+			values ($1, $2, $3, $4, $5, $6, $7, 'staged', $8)
+			returning id`, tenantID, woID, lotNo, qty, expiry, sc.CatchWeight, clientScanArg, componentArg).Scan(&rowID)
 		if err != nil {
-			res.Status = "duplicate"
-			res.Message = "Failed to record lot."
-			results = append(results, res)
-			continue
+			// Fallback without component_item_id when migration 279 not applied.
+			err2 := tx.QueryRow(ctx, `
+				insert into public.mfg_wo_output_lots (tenant_id, work_order_id, lot_no, qty, expiry_date, catch_weight, client_scan_id, status)
+				values ($1, $2, $3, $4, $5, $6, $7, 'staged')
+				returning id`, tenantID, woID, lotNo, qty, expiry, sc.CatchWeight, clientScanArg).Scan(&rowID)
+			if err2 != nil {
+				res.Status = "duplicate"
+				res.Message = "Failed to record lot."
+				results = append(results, res)
+				continue
+			}
 		}
 		res.Status = "accepted"
 		res.ID = &rowID

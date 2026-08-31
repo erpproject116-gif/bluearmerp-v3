@@ -263,7 +263,7 @@ export function SidebarNav() {
       return (
         p === "/app/production" ||
         p === "/app/production/" ||
-        pathStarts(p, ["/app/production/work-orders", "/app/production/issue-station", "/app/production/receive-station"])
+        pathStarts(p, ["/app/production/work-orders", "/app/production/issue-station", "/app/production/receive-station", "/app/production/weigh-parts"])
       );
     }
     if (area.id === "production_reports") {

@@ -7,9 +7,9 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/csvmap"
 )
 
-var dateField = map[string]bool{"date": true, "as_of_date": true}
+var dateField = map[string]bool{"date": true, "as_of_date": true, "expiry_date": true}
 var amountField = map[string]bool{
-	"amount": true, "quantity": true,
+	"amount": true, "quantity": true, "qty": true, "catch_weight": true, "scrap_qty": true, "yield_pct": true,
 	"purchase_price": true, "sales_price": true, "vip_price": true, "oe_price": true,
 }
 
@@ -37,6 +37,8 @@ func TestTemplatesShareImporterSlices(t *testing.T) {
 		"partners":       {partnerCanonical, partnerRequired},
 		"accounts":       {accountCanonical, accountRequired},
 		"opening_stock":  {openingStockCanonical, openingStockRequired},
+		"opening_lots":   {openingLotsCanonical, openingLotsRequired},
+		"boms":           {bomCanonical, bomRequired},
 		"open_si":        {openSICanonical, openSIRequired},
 		"open_ap":        {openAPCanonical, openAPRequired},
 		"open_po":        {openPOCanonical, openPORequired},
@@ -131,6 +133,8 @@ func TestTemplateFilenames(t *testing.T) {
 		"partners":      "mig-partners-import-template.csv",
 		"accounts":      "mig-accounts-import-template.csv",
 		"opening_stock": "mig-opening-stock-import-template.csv",
+		"opening_lots":  "mig-opening-lots-import-template.csv",
+		"boms":          "mig-boms-import-template.csv",
 		"open_si":       "mig-open-si-import-template.csv",
 		"open_ap":       "mig-open-ap-import-template.csv",
 		"open_po":       "mig-open-po-import-template.csv",

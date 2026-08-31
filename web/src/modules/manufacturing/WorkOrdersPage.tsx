@@ -85,6 +85,7 @@ export default function WorkOrdersPage() {
   const auth = useAuth();
   const [searchParams] = useSearchParams();
   const canRelease = () => hasPermission(auth.me, "manufacturing.work_orders_release", "write");
+  const canBulkWo = () => hasPermission(auth.me, "manufacturing.work_orders_bulk", "write");
   const canComplete = () => hasPermission(auth.me, "manufacturing.work_orders_complete", "write");
   const canInspect = () => hasPermission(auth.me, "quality.wo_inspection", "write");
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
@@ -97,6 +98,8 @@ export default function WorkOrdersPage() {
     }
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = createSignal(false);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<WorkOrder | null>(null);
   const [bomId, setBomId] = createSignal<number | null>(null);
@@ -307,15 +310,36 @@ export default function WorkOrdersPage() {
     const linesSummary = (needs?.lines ?? [])
       .map((l) => `• ${l.component_code}: ${l.stock_to_issue.toFixed(4)} ${l.stock_unit_code} (on hand ${l.qty_on_hand.toFixed(4)})`)
       .join("\n");
-    const msg = [
-      `Complete ${row.work_order_no}?`,
-      `Will receive ${row.qty_to_produce} ${unit} finished.`,
-      linesSummary ? `\nMaterials to issue:\n${linesSummary}` : "",
-      "\nUses live BOM (used + scrap/spare, convert, yield).",
-    ].join("\n");
-    if (!window.confirm(msg)) return;
+    const planned = row.qty_to_produce;
+    const actualRaw = window.prompt(
+      [
+        `Complete ${row.work_order_no}?`,
+        `Planned input / qty: ${planned} ${unit}`,
+        "Enter actual input qty (kg or units). Leave blank to use planned.",
+        "For cut-apart (disassembly) jobs, enter the weighed whole carcass kg.",
+        linesSummary ? `\nMaterials / yields:\n${linesSummary}` : "",
+      ].join("\n"),
+      String(planned),
+    );
+    if (actualRaw === null) return;
+    const trimmed = actualRaw.trim();
+    let actualInputQty: number | undefined;
+    if (trimmed !== "") {
+      const n = Number(trimmed);
+      if (!Number.isFinite(n) || n <= 0) {
+        toast.warning("Actual input qty must be a positive number.");
+        return;
+      }
+      actualInputQty = n;
+    }
+    if (!window.confirm(`Confirm complete ${row.work_order_no} with actual input ${actualInputQty ?? planned} ${unit}?`)) return;
     setActionId(row.id);
-    const res = await apiFetch(`/api/v1/manufacturing/work-orders/${row.id}/complete`, { method: "POST" });
+    const body: { actual_input_qty?: number } = {};
+    if (actualInputQty != null) body.actual_input_qty = actualInputQty;
+    const res = await apiFetch(`/api/v1/manufacturing/work-orders/${row.id}/complete`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
     setActionId(null);
     if (!res.success) {
       const detail =
@@ -328,12 +352,52 @@ export default function WorkOrdersPage() {
     invalidate();
   };
 
+  const bulkCancelDrafts = async () => {
+    const ids = [...selectedIds()];
+    if (ids.length === 0 || !canBulkWo()) return;
+    if (!window.confirm(`Cancel ${ids.length} selected draft work order(s)?`)) return;
+    setBulkBusy(true);
+    const res = await apiFetch<{ updated: number; skipped: number }>(
+      "/api/v1/manufacturing/work-orders/actions/bulk-cancel",
+      { method: "POST", body: JSON.stringify({ ids }) },
+      { silent: true },
+    );
+    setBulkBusy(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Bulk cancel failed.");
+      return;
+    }
+    toast.success(`Cancelled ${res.data.updated} work order(s); ${res.data.skipped} skipped.`);
+    setSelectedIds(new Set<number>());
+    invalidate();
+  };
+
+  const bulkReleaseDrafts = async () => {
+    const ids = [...selectedIds()];
+    if (ids.length === 0 || !canBulkWo()) return;
+    if (!window.confirm(`Release ${ids.length} selected draft work order(s) to the floor?`)) return;
+    setBulkBusy(true);
+    const res = await apiFetch<{ updated: number; skipped: number }>(
+      "/api/v1/manufacturing/work-orders/actions/bulk-release",
+      { method: "POST", body: JSON.stringify({ ids }) },
+      { silent: true },
+    );
+    setBulkBusy(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Bulk release failed.");
+      return;
+    }
+    toast.success(`Released ${res.data.updated} work order(s); ${res.data.skipped} skipped.`);
+    setSelectedIds(new Set<number>());
+    invalidate();
+  };
+
   return (
     <ProductionLayout>
       <p class="mb-3 text-sm text-text-secondary">
-        <span class="font-medium text-text-primary">Flow:</span>{" "}
-        Draft → Release to floor → Pass FG QC (if required) → Issue / Receive when serial or lot tracked → Complete → sell from stock.
-        Make-to-order: use <span class="font-medium">From sales order</span> (Load Slip).
+        <span class="font-medium text-text-primary">Jobs (work orders):</span>{" "}
+        Draft → Release to floor → Pass FG QC (if required) → Issue / Weigh parts when lot tracked → Complete → pack or sell from stock.
+        From a customer order: use <span class="font-medium">From customer order</span> (Load Slip).
       </p>
       <SpreadsheetGrid<WorkOrder>
         columns={[
@@ -410,6 +474,13 @@ export default function WorkOrdersPage() {
                   >
                     Receive FG
                   </A>
+                  <A
+                    href={`/app/production/weigh-parts?woId=${r.id}`}
+                    class="text-xs text-brand-600 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Weigh parts
+                  </A>
                 </Show>
                 <Show when={r.status === "released" && canComplete()}>
                   <button
@@ -434,19 +505,44 @@ export default function WorkOrdersPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={selectedIds()}
+        onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={openNew}
         onEdit={(row) => void openEdit(row)}
         settingsHref="/app/production/work-orders"
         toolbarExtra={
-          <button
+          <>
+            <Show when={canBulkWo()}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                disabled={selectedIds().size === 0 || bulkBusy()}
+                onClick={() => void bulkCancelDrafts()}
+              >
+                Cancel drafts{selectedIds().size > 0 ? ` (${selectedIds().size})` : ""}
+              </button>
+              <Show when={canRelease()}>
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                  disabled={selectedIds().size === 0 || bulkBusy()}
+                  onClick={() => void bulkReleaseDrafts()}
+                >
+                  Release selected{selectedIds().size > 0 ? ` (${selectedIds().size})` : ""}
+                </button>
+              </Show>
+            </Show>
+            <button
             type="button"
             class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
             disabled={loadSlipBusy()}
             onClick={() => setSoPickerOpen(true)}
             title="Create work orders from a sales order (Load Slip)"
           >
-            {loadSlipBusy() ? "Loading…" : "From sales order…"}
+            {loadSlipBusy() ? "Loading…" : "From customer order…"}
           </button>
+          </>
         }
         codeKey="work_order_no"
         nameKey="bom_code"

@@ -156,8 +156,9 @@ export default function ProductionReceiveStationPage() {
     const scans = rows.map((row) => ({
       client_scan_id: newClientScanId(),
       lot_no: row.lot_no,
-      qty: row.qty,
+      qty: row.catch_weight && row.catch_weight > 0 ? row.catch_weight : row.qty,
       expiry_date: row.expiry_date ?? undefined,
+      catch_weight: row.catch_weight && row.catch_weight > 0 ? row.catch_weight : undefined,
     }));
     const res = await apiFetch<{ results: BatchLotResult[] }>(
       `/api/v1/manufacturing/work-orders/${id}/output-lots/batch`,
@@ -182,9 +183,11 @@ export default function ProductionReceiveStationPage() {
           <A href="/app/production/work-orders?status=released" class="text-xs font-medium text-brand-700 hover:underline">
             ← Work orders
           </A>
-          <h2 class="mt-2 text-lg font-semibold text-text-primary">Receive station</h2>
+          <h2 class="mt-2 text-lg font-semibold text-text-primary">Receive / weigh station</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            Stage finished-good serials or lots on a released work order before completion posts them to stock.
+            Stage finished-good serials or lots on a released job before completion posts them to stock.
+            For catch-weight, paste <span class="font-medium">lot · qty · expiry · catch-weight kg</span> (4th column optional; when set it becomes stock qty).
+            Multi-cut disassembly lot posting on complete is available after weighing cut SKUs (see Weigh parts on the job).
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo
@@ -242,11 +245,11 @@ export default function ProductionReceiveStationPage() {
               </Show>
 
               <Show when={ctx().track_lot && !ctx().track_serial}>
-                <Field label="Paste finished-good lots (lot no. tab qty per line)">
+                <Field label="Paste lots (lot no. tab qty [tab expiry] [tab catch-weight kg])">
                   <textarea
                     class={`${inputClass} mt-2`}
                     rows={5}
-                    placeholder={"LOT-001\t10\nLOT-002\t5"}
+                    placeholder={"LOT-001\t10\t2025-07-01\t9.85\nLOT-002\t5"}
                     value={lotPaste()}
                     onInput={(e) => setLotPaste(e.currentTarget.value)}
                   />

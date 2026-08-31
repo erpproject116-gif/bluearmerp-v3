@@ -1,8 +1,9 @@
-/** One lot row from bulk paste (lot no., qty, optional expiry). */
+/** One lot row from bulk paste (lot no., qty, optional expiry, optional catch-weight). */
 export type LotBulkRow = {
   lot_no: string;
   qty: number;
   expiry_date?: string | null;
+  catch_weight?: number | null;
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,7 +36,8 @@ export function parseLotBulkInput(raw: string, defaultQty = 1): LotBulkRow[] {
     const qty = parts.length >= 2 ? parseQty(parts[1]) : defaultQty;
     if (!lotNo || qty == null) continue;
     const expiry = parts.length >= 3 ? normalizeExpiry(parts[2]) : null;
-    out.push({ lot_no: lotNo, qty, expiry_date: expiry });
+    const cw = parts.length >= 4 ? parseQty(parts[3]) : null;
+    out.push({ lot_no: lotNo, qty, expiry_date: expiry, catch_weight: cw });
   }
   return out;
 }

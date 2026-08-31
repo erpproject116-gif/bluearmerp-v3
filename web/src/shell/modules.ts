@@ -125,8 +125,8 @@ export const appModules: AppModule[] = [
     href: "/app/production/work-orders",
     basePath: "/app/production",
     features: [
-      { label: "Work Orders", href: "/app/production/work-orders", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
-      { label: "BOMs", href: "/app/production/boms", settingsHref: "/app/production/boms", featureCode: "manufacturing.boms", headerPriority: "primary" },
+      { label: "Jobs (work orders)", href: "/app/production/work-orders", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
+      { label: "Recipes (BOMs)", href: "/app/production/boms", settingsHref: "/app/production/boms", featureCode: "manufacturing.boms", headerPriority: "primary" },
       { label: "Reports", href: "/app/production/reports", settingsHref: "/app/production/reports", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
       setupFeatureTab("/app/production"),
     ],

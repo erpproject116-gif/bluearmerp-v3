@@ -243,6 +243,7 @@ import {
   ProductionReportsPage,
   ProductionIssueStationPage,
   ProductionReceiveStationPage,
+  ProductionWeighPartsPage,
   NcrsPage,
   CapaPage,
   QcRequestsPage,
@@ -561,6 +562,9 @@ export default function App() {
           )} />
           <Route path="/production/receive-station" component={() => (
             <ManufacturingRoute><ProductionReceiveStationPage /></ManufacturingRoute>
+          )} />
+          <Route path="/production/weigh-parts" component={() => (
+            <ManufacturingRoute><ProductionWeighPartsPage /></ManufacturingRoute>
           )} />
           <Route path="/production/reports" component={() => (
             <ManufacturingRoute><ProductionReportsPage /></ManufacturingRoute>

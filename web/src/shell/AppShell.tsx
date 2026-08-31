@@ -50,6 +50,7 @@ import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
 import { JoinCompanyConfirm } from "../shared/JoinCompanyConfirm";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
 import { CommandPalette, useCommandPaletteHotkey } from "./CommandPalette";
+import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -402,9 +403,10 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               </Show>
             </div>
             <div class="flex shrink-0 items-center gap-2">
+              <WorkflowGuideHeaderControl />
               <button
                 type="button"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm text-text-secondary transition hover:bg-slate-50 hover:text-text-primary"
+                class="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary transition hover:bg-slate-50 hover:text-text-primary md:min-w-[7.5rem]"
                 title="Search (Ctrl+K)"
                 onClick={() => setPaletteOpen(true)}
               >

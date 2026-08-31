@@ -269,6 +269,77 @@ begin
       raise notice 'verify-full-chain [%]: S16 skipped — migration 270_mfg_disassembly_phase3.sql (bom_type) not applied', v_code;
     end if;
 
+    -- S17: meat cut disassembly + catch-weight lots + pack/ship + FEFO sale
+    if v_has_bom_type then
+      if not exists (
+        select 1 from public.mfg_work_orders wo
+        join public.mfg_boms b on b.id = wo.bom_id and b.bom_type = 'disassembly'
+        where wo.tenant_id = v_tenant and wo.work_order_no = 'DEMO-S17-WO'
+          and wo.status = 'completed' and wo.actual_input_qty is not null
+          and b.bom_code = 'DEMO-S17-BOM'
+      ) then
+        raise exception 'verify-full-chain [%]: S17 meat WO missing — run scripts/seed-demo-golden-s17-meat-cut.sql', v_code;
+      end if;
+
+      if not exists (
+        select 1 from public.inv_lot_batches lb
+        join public.inv_items i on i.id = lb.item_id
+        where lb.tenant_id = v_tenant and i.item_code = 'S17BL'
+          and lb.lot_no in ('LOT-S17-BELLY-OLD', 'LOT-S17-BELLY-NEW')
+          and lb.qty_on_hand >= 0 and lb.expiry_date is not null
+      ) then
+        raise exception 'verify-full-chain [%]: S17 belly cut lots missing', v_code;
+      end if;
+
+      if not exists (
+        select 1 from public.inv_lot_batches lb
+        join public.inv_items i on i.id = lb.item_id
+        where lb.tenant_id = v_tenant and i.item_code = 'S17PT'
+          and lb.lot_no = 'LOT-S17-PATA-1' and lb.qty_on_hand > 0 and lb.expiry_date is not null
+      ) then
+        raise exception 'verify-full-chain [%]: S17 pata cut lot missing', v_code;
+      end if;
+
+      if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'inv_pack_sessions') then
+        if not exists (
+          select 1 from public.inv_pack_sessions ps
+          join public.so_sales_orders so on so.id = ps.sales_order_id
+          where ps.tenant_id = v_tenant and ps.pack_no = 'DEMO-S17-PACK'
+            and so.sales_order_no = 'DEMO-S17-SO-A'
+        ) then
+          raise exception 'verify-full-chain [%]: S17 pack DEMO-S17-PACK for Cust A missing', v_code;
+        end if;
+      end if;
+
+      if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'sh_shipping_orders') then
+        if not exists (
+          select 1 from public.sh_shipping_orders sh
+          where sh.tenant_id = v_tenant and sh.shipping_no = 'DEMO-S17-SHIP-A'
+        ) then
+          raise exception 'verify-full-chain [%]: S17 shipping DEMO-S17-SHIP-A missing', v_code;
+        end if;
+      end if;
+
+      -- FEFO: older belly lot fully depleted by DEMO-S17-SI
+      select lb.qty_on_hand into v_lot_qty
+      from public.inv_lot_batches lb
+      where lb.tenant_id = v_tenant and lb.lot_no = 'LOT-S17-BELLY-OLD';
+      if v_lot_qty is null then
+        raise exception 'verify-full-chain [%]: S17 lot LOT-S17-BELLY-OLD missing', v_code;
+      end if;
+      if v_lot_qty > 0.0001 then
+        raise exception 'verify-full-chain [%]: S17 FEFO should deplete older lot LOT-S17-BELLY-OLD, qty=%', v_code, v_lot_qty;
+      end if;
+      if not exists (
+        select 1 from public.sa_sales_line_lot_allocations a
+        join public.sa_sales_lines sl on sl.id = a.sales_line_id
+        join public.sa_sales s on s.id = sl.sales_id
+        where s.tenant_id = v_tenant and s.sales_no = 'DEMO-S17-SI'
+      ) then
+        raise exception 'verify-full-chain [%]: DEMO-S17-SI lot allocations missing', v_code;
+      end if;
+    end if;
+
     -- Platform feature gap closure: default doc generation rules seeded
     select count(*) into v_count
     from public.doc_generation_rules

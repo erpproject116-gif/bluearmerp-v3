@@ -5,7 +5,7 @@ import { defaultReportDateRange, ReportPageLayout } from "../../shared/reports/R
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { ProductionLayout } from "./ProductionLayout";
 
-type ReportTab = "work-order-status" | "progress" | "stock-movements";
+type ReportTab = "work-order-status" | "progress" | "stock-movements" | "disassembly-yield";
 
 type WoStatusRow = {
   work_order_id: number;
@@ -51,12 +51,26 @@ type WoStockMovementRow = {
   created_at: string;
 };
 
+type YieldRow = {
+  work_order_id: number;
+  work_order_no: string;
+  bom_code: string;
+  component_code: string;
+  component_name: string;
+  planned_qty: number;
+  actual_qty: number;
+  variance_qty: number;
+  actual_input_qty: number;
+  qty_to_produce: number;
+};
+
 type DateFilters = { date_from: string; date_to: string; status?: string; work_order_id?: number };
 
 const TAB_LABELS: Record<ReportTab, string> = {
-  "work-order-status": "Work order status",
+  "work-order-status": "Job status",
   progress: "Progress",
   "stock-movements": "Stock movements",
+  "disassembly-yield": "Cut yield",
 };
 
 function reportPath(tab: ReportTab): string {
@@ -67,6 +81,8 @@ function reportPath(tab: ReportTab): string {
       return "/api/v1/manufacturing/reports/progress";
     case "stock-movements":
       return "/api/v1/manufacturing/reports/stock-movements";
+    case "disassembly-yield":
+      return "/api/v1/manufacturing/reports/disassembly-yield";
   }
 }
 
@@ -126,7 +142,7 @@ export default function ProductionReportsPage() {
   return (
     <ProductionLayout>
       <div class="mb-4 flex flex-wrap gap-2">
-        <For each={(["work-order-status", "progress", "stock-movements"] as ReportTab[])}>
+        <For each={(["work-order-status", "progress", "stock-movements", "disassembly-yield"] as ReportTab[])}>
           {(t) => (
             <button
               type="button"
@@ -144,7 +160,7 @@ export default function ProductionReportsPage() {
 
       <ReportPageLayout
         title={TAB_LABELS[tab()]}
-        description="Set date range and filters, then Search (F8)."
+        description="Production reports for jobs (work orders): status, progress (planned vs weighed lots), and stock movements. Set date range and filters, then Search (F8)."
         dateFrom={() => draftFilters().date_from}
         dateTo={() => draftFilters().date_to}
         onDateFromChange={(v) => patch({ date_from: v })}
@@ -306,6 +322,37 @@ export default function ProductionReportsPage() {
                     <td class="px-3 py-2">{row.location_name}</td>
                     <td class="px-3 py-2 text-right">{row.qty_delta.toFixed(4)}</td>
                     <td class="px-3 py-2">{row.movement_type}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </Show>
+
+        <Show when={tab() === "disassembly-yield"}>
+          <table class="erp-grid min-w-full text-left text-sm">
+            <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+              <tr>
+                <th class="px-3 py-2">Job no.</th>
+                <th class="px-3 py-2">Recipe</th>
+                <th class="px-3 py-2">Cut SKU</th>
+                <th class="px-3 py-2 text-right">Planned kg</th>
+                <th class="px-3 py-2 text-right">Actual kg</th>
+                <th class="px-3 py-2 text-right">Variance</th>
+                <th class="px-3 py-2 text-right">Actual input</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={(report.data?.rows ?? []) as YieldRow[]}>
+                {(row) => (
+                  <tr class="border-t border-stroke/60">
+                    <td class="px-3 py-2">{row.work_order_no}</td>
+                    <td class="px-3 py-2">{row.bom_code}</td>
+                    <td class="px-3 py-2">{row.component_code} — {row.component_name}</td>
+                    <td class="px-3 py-2 text-right">{row.planned_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2 text-right">{row.actual_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2 text-right">{row.variance_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2 text-right">{row.actual_input_qty.toFixed(4)}</td>
                   </tr>
                 )}
               </For>

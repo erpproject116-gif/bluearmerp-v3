@@ -319,3 +319,75 @@ func parseWoReportDateRange(r *http.Request) (woReportDateRange, map[string]stri
 	}
 	return woReportDateRange{DateFrom: from, DateTo: to}, errs
 }
+
+type disassemblyYieldRow struct {
+	WorkOrderID      int64   `json:"work_order_id"`
+	WorkOrderNo      string  `json:"work_order_no"`
+	BomCode          string  `json:"bom_code"`
+	ComponentCode    string  `json:"component_code"`
+	ComponentName    string  `json:"component_name"`
+	PlannedQty       float64 `json:"planned_qty"`
+	ActualQty        float64 `json:"actual_qty"`
+	VarianceQty      float64 `json:"variance_qty"`
+	ActualInputQty   float64 `json:"actual_input_qty"`
+	QtyToProduce     float64 `json:"qty_to_produce"`
+}
+
+func listDisassemblyYieldReport(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		filters, verr := parseWoReportDateRange(r)
+		if len(verr) > 0 {
+			response.Validation(w, verr)
+			return
+		}
+		p := httputil.ParseListParams(r, "work_order_no", map[string]string{"work_order_no": "wo.work_order_no"})
+		offset := httputil.Offset(p)
+
+		q := `
+			select wo.id, wo.work_order_no, b.bom_code,
+			  coalesce(ci.item_code, ''), coalesce(ci.item_name, ''),
+			  (bl.qty * (coalesce(wo.actual_input_qty, wo.qty_to_produce) / nullif(b.output_qty, 0))
+			    / greatest(coalesce(b.yield_pct, 100) / 100.0, 0.0001))::float8 as planned_qty,
+			  coalesce((
+			    select sum(m.qty_delta)::float8 from public.inv_stock_movements m
+			    where m.tenant_id = wo.tenant_id and m.ref_type = 'mfg_work_order' and m.ref_id = wo.id
+			      and m.item_id = bl.component_item_id and m.movement_type = 'wo_disassembly_receipt'
+			  ), 0)::float8 as actual_qty,
+			  coalesce(wo.actual_input_qty, wo.qty_to_produce)::float8,
+			  wo.qty_to_produce::float8,
+			  count(*) over()
+			from public.mfg_work_orders wo
+			join public.mfg_boms b on b.id = wo.bom_id and coalesce(b.bom_type, 'assembly') = 'disassembly'
+			join public.mfg_bom_lines bl on bl.bom_id = b.id
+			join public.inv_items ci on ci.id = bl.component_item_id
+			where wo.tenant_id = $1
+			  and wo.order_date >= $2::date and wo.order_date <= $3::date
+			  and wo.status = 'completed'
+			order by wo.work_order_no, bl.line_no
+			limit $4 offset $5`
+		rows, err := pool.Query(r.Context(), q, tu.TenantID, filters.DateFrom.Format("2006-01-02"), filters.DateTo.Format("2006-01-02"), p.PageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load yield report.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		var out []disassemblyYieldRow
+		var total int64
+		for rows.Next() {
+			var row disassemblyYieldRow
+			if err := rows.Scan(
+				&row.WorkOrderID, &row.WorkOrderNo, &row.BomCode,
+				&row.ComponentCode, &row.ComponentName,
+				&row.PlannedQty, &row.ActualQty,
+				&row.ActualInputQty, &row.QtyToProduce, &total,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read yield report.", "ERR_INTERNAL")
+				return
+			}
+			row.VarianceQty = row.ActualQty - row.PlannedQty
+			out = append(out, row)
+		}
+		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}

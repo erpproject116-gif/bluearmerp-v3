@@ -52,6 +52,22 @@ var importTemplates = map[string]importTemplate{
 		Required: openingStockRequired,
 		Example:  []string{"EXAMPLE-ITEM", "EXAMPLE Widget", "10.5", "EXAMPLE Warehouse", "2026-01-31"},
 	},
+	"opening_lots": {
+		Kind:     "opening_lots",
+		Filename: "mig-opening-lots-import-template.csv",
+		Headers:  openingLotsCanonical,
+		Required: openingLotsRequired,
+		Example:  []string{"EXAMPLE-LOT-ITEM", "LOT-001", "25.5", "", "2026-06-30", "EXAMPLE Warehouse", "2026-01-31"},
+	},
+	"boms": {
+		Kind:     "boms",
+		Filename: "mig-boms-import-template.csv",
+		Headers:  bomCanonical,
+		Required: bomRequired,
+		Example: []string{
+			"EXAMPLE-BOM", "EXAMPLE Assembly", "EXAMPLE-FG", "assembly", "EXAMPLE-RM", "2", "0.1", "95",
+		},
+	},
 	"open_si": {
 		Kind:     "open_si",
 		Filename: "mig-open-si-import-template.csv",
