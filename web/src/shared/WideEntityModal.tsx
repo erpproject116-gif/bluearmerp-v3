@@ -24,8 +24,13 @@ export function WideEntityModal(props: {
   return (
     <Show when={props.open}>
       <Portal>
-        <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6">
-          <div class="my-4 w-full max-w-6xl rounded-2xl border border-stroke bg-surface p-6 shadow-xl">
+        <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6" role="presentation">
+          <div
+            class="my-4 w-full max-w-6xl rounded-2xl border border-stroke bg-surface p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wide-entity-modal-title"
+          >
             <div class="flex items-center justify-between gap-3">
               <div class="flex min-w-0 items-center gap-2">
                 <Show when={props.icon}>
@@ -33,7 +38,9 @@ export function WideEntityModal(props: {
                     {props.icon}
                   </span>
                 </Show>
-                <h2 class="truncate text-lg font-semibold text-text-primary">{props.title}</h2>
+                <h2 id="wide-entity-modal-title" class="truncate text-lg font-semibold text-text-primary">
+                  {props.title}
+                </h2>
               </div>
               <Show when={props.headerActions}>
                 <div class="flex items-center gap-2">{props.headerActions}</div>

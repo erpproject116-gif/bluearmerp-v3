@@ -266,16 +266,27 @@ export function validateCustomFields(
   values: Record<string, unknown>,
   defs: { field_key: string; label: string; is_required: boolean }[],
 ): string | null {
-  const missing = defs
-    .filter((d) => {
-      if (!d.is_required) return false;
-      const v = values[d.field_key];
-      if (v == null) return true;
-      if (typeof v === "string") return !v.trim();
-      if (typeof v === "boolean") return false;
-      return false;
-    })
-    .map((d) => d.label);
-  if (missing.length === 0) return null;
-  return `Please fill in required custom fields: ${missing.join(", ")}.`;
+  const errors = collectCustomFieldErrors(values, defs);
+  const messages = Object.values(errors).filter(Boolean) as string[];
+  if (messages.length === 0) return null;
+  return messages.length === 1 ? messages[0]! : `Please fill in required custom fields: ${messages.join(", ")}.`;
+}
+
+export function collectCustomFieldErrors(
+  values: Record<string, unknown>,
+  defs: { field_key: string; label: string; is_required: boolean }[],
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const d of defs) {
+    if (!d.is_required) continue;
+    const v = values[d.field_key];
+    if (v == null) {
+      errors[d.field_key] = `${d.label} is required.`;
+      continue;
+    }
+    if (typeof v === "string" && !v.trim()) {
+      errors[d.field_key] = `${d.label} is required.`;
+    }
+  }
+  return errors;
 }

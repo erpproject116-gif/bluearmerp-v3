@@ -23,11 +23,12 @@ describe("ModalField", () => {
       partner_id: setting({ field_key: "partner_id", label: "Customer", is_required: true }),
     });
     render(() => (
-      <ModalField settings={settings} fieldKey="partner_id" fallbackLabel="Partner">
-        {(m) => <input aria-label={m.label} disabled={m.disabled} />}
+      <ModalField settings={settings} fieldKey="partner_id" fallbackLabel="Partner" formId="test-form">
+        {(m) => <input {...m.inputProps} aria-label={m.label} disabled={m.disabled} />}
       </ModalField>
     ));
     expect(screen.getByLabelText(/Customer/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Customer/)).toHaveAttribute("id", "test-form-partner_id");
   });
 
   it("hides when settings mark field invisible", () => {
@@ -52,5 +53,19 @@ describe("ModalField", () => {
       </ModalField>
     ));
     expect(screen.getByLabelText("Code field")).toBeDisabled();
+  });
+
+  it("shows inline error from errors map", () => {
+    const settings = () => ({
+      email: setting({ field_key: "email", label: "Email" }),
+    });
+    const errors = () => ({ email: "Enter a valid email address." });
+    render(() => (
+      <ModalField settings={settings} fieldKey="email" fallbackLabel="Email" errors={errors} formId="partner-form">
+        {(m) => <input {...m.inputProps} />}
+      </ModalField>
+    ));
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid email address.");
+    expect(screen.getByRole("textbox")).toHaveAttribute("aria-invalid", "true");
   });
 });

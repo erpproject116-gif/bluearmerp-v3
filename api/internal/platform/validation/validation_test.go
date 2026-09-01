@@ -33,11 +33,15 @@ func TestNormalizePHMobileLocal(t *testing.T) {
 func TestNormalizePHTIN(t *testing.T) {
 	got, ok := NormalizePHTIN("209-161-308- 000")
 	if !ok || got != "209-161-308-000" {
-		t.Fatalf("NormalizePHTIN 12-digit = (%q, %v)", got, ok)
+		t.Fatalf("NormalizePHTIN 12-digit corporate = (%q, %v)", got, ok)
 	}
-	got, ok = NormalizePHTIN("311263954")
-	if !ok || got != "311-263-954" {
-		t.Fatalf("NormalizePHTIN 9-digit = (%q, %v)", got, ok)
+	got, ok = NormalizePHTIN("123456789")
+	if !ok || got != "123-456-789" {
+		t.Fatalf("NormalizePHTIN 9-digit individual = (%q, %v)", got, ok)
+	}
+	got, ok = NormalizePHTIN("123-456-789-001")
+	if !ok || got != "123-456-789-001" {
+		t.Fatalf("NormalizePHTIN branch office = (%q, %v)", got, ok)
 	}
 	if _, ok := NormalizePHTIN("12345"); ok {
 		t.Fatal("expected invalid TIN")

@@ -804,13 +804,19 @@ export function EntityModal(props: {
       <Portal>
         <div
           class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-6 sm:items-center ${props.stacked ? "z-[70]" : "z-50"}`}
+          role="presentation"
         >
           <div
             class="erp-surface w-full rounded-2xl border border-stroke p-6 shadow-xl"
             classList={{ "max-w-6xl": props.wide, "max-w-4xl": !props.wide }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="entity-modal-title"
           >
             <div class="flex items-center justify-between gap-3">
-              <h2 class="text-lg font-semibold text-text-primary">{props.title}</h2>
+              <h2 id="entity-modal-title" class="text-lg font-semibold text-text-primary">
+                {props.title}
+              </h2>
               <Show when={props.headerActions}>
                 <div class="flex items-center gap-2">{props.headerActions}</div>
               </Show>
@@ -863,15 +869,54 @@ export function Field(props: {
   span?: "full";
   /** Use div for contenteditable / rich text so the browser does not steal clicks. */
   as?: "label" | "div";
+  /** Associates label with control when as="div" (htmlFor). */
+  controlId?: string;
+  description?: string;
+  descriptionId?: string;
+  error?: string;
+  errorId?: string;
+  required?: boolean;
   children: JSX.Element;
 }) {
   const cls = () => (props.span === "full" ? "col-span-full block" : "block");
+  const labelEl = () => (
+    <span class="mb-1 block text-sm font-medium" style={{ color: "var(--color-label, var(--color-text-primary))" }}>
+      {props.label}
+      <Show when={props.required}>
+        <span class="text-red-600" aria-hidden="true">
+          {" "}
+          *
+        </span>
+      </Show>
+    </span>
+  );
   const inner = () => (
     <>
-      <span class="mb-1 block text-sm font-medium" style={{ color: "var(--color-label, var(--color-text-primary))" }}>
-        {props.label}
-      </span>
+      <Show
+        when={props.as === "div" && props.controlId}
+        fallback={labelEl()}
+      >
+        <label class="mb-1 block text-sm font-medium" for={props.controlId} style={{ color: "var(--color-label, var(--color-text-primary))" }}>
+          {props.label}
+          <Show when={props.required}>
+            <span class="text-red-600" aria-hidden="true">
+              {" "}
+              *
+            </span>
+          </Show>
+        </label>
+      </Show>
+      <Show when={props.description}>
+        <p id={props.descriptionId} class="mb-1 text-xs text-text-secondary">
+          {props.description}
+        </p>
+      </Show>
       {props.children}
+      <Show when={props.error}>
+        <p id={props.errorId} class="mt-1 text-xs text-red-600" role="alert">
+          {props.error}
+        </p>
+      </Show>
     </>
   );
   return props.as === "div" ? <div class={cls()}>{inner()}</div> : <label class={cls()}>{inner()}</label>;

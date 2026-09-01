@@ -1,4 +1,6 @@
 import type { ApiResult } from "./api";
+import type { FormErrors } from "./formValidation";
+import { formErrorsSummary } from "./formValidation";
 import { resolvePolicyActionHint } from "./policyActionHints";
 
 export function formatApiErrors(errors?: Record<string, string>): string {
@@ -14,12 +16,30 @@ export function isFieldValueMissing(v: unknown): boolean {
   return false;
 }
 
+export function collectRequiredFieldErrors(
+  values: Record<string, unknown>,
+  fields: { key: string; label: string }[],
+): FormErrors {
+  const errors: FormErrors = {};
+  for (const f of fields) {
+    if (isFieldValueMissing(values[f.key])) {
+      errors[f.key] = `${f.label} is required.`;
+    }
+  }
+  return errors;
+}
+
 export function requireFields(values: Record<string, unknown>, fields: { key: string; label: string }[]): string | null {
-  const missing = fields
-    .filter((f) => isFieldValueMissing(values[f.key]))
-    .map((f) => f.label);
-  if (missing.length === 0) return null;
-  return `Please fill in required fields: ${missing.join(", ")}.`;
+  return formErrorsSummary(collectRequiredFieldErrors(values, fields));
+}
+
+export function applyApiFieldErrors(
+  errors: Record<string, string> | undefined,
+  setFieldErrors?: (errors: FormErrors) => void,
+): FormErrors {
+  const map: FormErrors = { ...(errors ?? {}) };
+  if (setFieldErrors && Object.keys(map).length > 0) setFieldErrors(map);
+  return map;
 }
 
 type ToastLike = {
@@ -39,6 +59,7 @@ export function handleSaveResult(
   res: ApiResult<unknown>,
   toast: ToastLike,
   successMessage = "Saved successfully.",
+  options?: { onFieldErrors?: (errors: FormErrors) => void },
 ): boolean {
   if (res.success) {
     toast.success(successMessage);
@@ -63,6 +84,7 @@ export function handleSaveResult(
     return false;
   }
 
+  applyApiFieldErrors(res.errors, options?.onFieldErrors);
   const fieldErrors = formatApiErrors(res.errors);
   const hint = resolvePolicyActionHint(res.errors);
   if (fieldErrors && hint && toast.action) {

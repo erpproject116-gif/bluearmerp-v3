@@ -8,7 +8,10 @@ import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
-import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
+import { submitEntity, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../../shared/FormErrorSummary";
+import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
+import { mergeFormErrors } from "../../../shared/formValidation";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { coalesceSpecDescription } from "../../../shared/itemLineSpecDescription";
@@ -167,6 +170,8 @@ export function PurchaseRequestModal(props: Props) {
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
   const { fields, byKey } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseRequest);
+  const PR_FORM_ID = "purchase-request-form";
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [saving, setSaving] = createSignal(false);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
@@ -482,18 +487,7 @@ export function PurchaseRequestModal(props: Props) {
 
   const save = async () => {
     if (props.readOnly) return;
-    if (!taxTypeId()) {
-      toast.warning("Please select a transaction type.");
-      return;
-    }
-    if (!currencyId()) {
-      toast.warning("Please select a currency.");
-      return;
-    }
-    if (!locationId()) {
-      toast.warning("Please select a location.");
-      return;
-    }
+    setFieldErrors({});
     const status = (progressStatus() || "unconfirmed").trim() || "unconfirmed";
     if (progressStatus() !== status) setProgressStatus(status);
     const { checks, values: formValues } = buildRequiredChecksForSave(
@@ -510,9 +504,21 @@ export function PurchaseRequestModal(props: Props) {
         progress_status: status,
       },
     );
-    const clientError = requireFields(formValues, checks);
-    if (clientError) {
-      toast.warning(clientError);
+    const validationErrors = mergeFormErrors(
+      collectDocumentLookupErrors(
+        {
+          tax_type_id: taxTypeId(),
+          currency_id: currencyId(),
+          location_id: locationId(),
+        },
+        {},
+        { includePartner: false },
+      ),
+      collectRequiredFieldErrors(formValues, checks),
+    );
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
       return;
     }
 
@@ -591,6 +597,7 @@ export function PurchaseRequestModal(props: Props) {
     >
       <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
       <ModalFormGuide guideId="purchase_request" />
+      <FormErrorSummary errors={fieldErrors} />
       <draft.DraftBanner />
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label="Date-no">
@@ -620,6 +627,8 @@ export function PurchaseRequestModal(props: Props) {
         fieldKey="tax_type_id"
         fallbackLabel="Transaction type"
         fallbackRequired
+        formId={PR_FORM_ID}
+        errors={fieldErrors}
         value={taxTypeLabel}
         selectedId={taxTypeId}
         onInput={setTaxTypeLabel}

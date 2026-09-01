@@ -9,7 +9,10 @@ import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ENTITY } from "../../../shared/entityTypes";
-import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
+import { handleSaveResult, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../../shared/FormErrorSummary";
+import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
+import { mergeFormErrors } from "../../../shared/formValidation";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
@@ -75,7 +78,7 @@ import { ReturnSaleLinesModal } from "./ReturnSaleLinesModal";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { TermHint } from "../../../shared/TermHint";
 import { A } from "@solidjs/router";
-import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
+import { CustomFieldsSection, collectCustomFieldErrors } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import {
   SalesCommissionPanel,
@@ -233,6 +236,8 @@ export function SalesModal(props: Props) {
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
   const { fields, byKey, activeCustomFields } = useFormFieldSettings(SALES_ENTITY.sales);
+  const SALES_FORM_ID = "sales-form";
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const [saving, setSaving] = createSignal(false);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
@@ -871,22 +876,7 @@ export function SalesModal(props: Props) {
 
   const save = async () => {
     if (props.readOnly) return;
-    if (!taxTypeId()) {
-      toast.warning("Please select a transaction type.");
-      return;
-    }
-    if (!currencyId()) {
-      toast.warning("Please select a currency.");
-      return;
-    }
-    if (!partnerId()) {
-      toast.warning("Please select a customer.");
-      return;
-    }
-    if (!locationId()) {
-      toast.warning("Please select a location.");
-      return;
-    }
+    setFieldErrors({});
     const status = (progressStatus() || "unconfirmed").trim() || "unconfirmed";
     if (progressStatus() !== status) setProgressStatus(status);
     const { checks, values: formValues } = buildRequiredChecksForSave(
@@ -906,10 +896,19 @@ export function SalesModal(props: Props) {
         progress_status: status,
       },
     );
-    const clientError =
-      requireFields(formValues, checks) ?? validateCustomFields(customValues(), activeCustomFields());
-    if (clientError) {
-      toast.warning(clientError);
+    const validationErrors = mergeFormErrors(
+      collectDocumentLookupErrors({
+        tax_type_id: taxTypeId(),
+        currency_id: currencyId(),
+        partner_id: partnerId(),
+        location_id: locationId(),
+      }),
+      collectRequiredFieldErrors(formValues, checks),
+      collectCustomFieldErrors(customValues(), activeCustomFields()),
+    );
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
       return;
     }
     const attachmentErr = validateAttachmentBeforeConfirm(
@@ -985,7 +984,7 @@ export function SalesModal(props: Props) {
       : apiFetch<SalesDetail>("/api/v1/sales", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, ed ? "Sales updated." : "Sales created.");
+      handleSaveResult(res, toast, ed ? "Sales updated." : "Sales created.", { onFieldErrors: setFieldErrors });
       return;
     }
     toast.success(ed ? "Sales updated." : "Sales created.");
@@ -1091,6 +1090,7 @@ export function SalesModal(props: Props) {
       >
         <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
         <ModalFormGuide guideId="sales" />
+        <FormErrorSummary errors={fieldErrors} />
         <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/50 px-3 py-2 text-xs text-slate-700">
           <p class="font-medium text-text-primary">
             <TermHint term="sales" />
@@ -1166,6 +1166,8 @@ export function SalesModal(props: Props) {
           fieldKey="tax_type_id"
           fallbackLabel="Transaction type"
           fallbackRequired
+          formId={SALES_FORM_ID}
+          errors={fieldErrors}
           value={taxTypeLabel}
           selectedId={taxTypeId}
           onInput={setTaxTypeLabel}

@@ -9,12 +9,22 @@ import {
   labelWithRequired,
   DEFAULTED_STATUS_FIELDS,
 } from "./useFormFieldSettings";
+import { inputAriaProps } from "./formValidation";
+
+export type ModalFieldInputProps = {
+  id: string;
+  "aria-invalid"?: true;
+  "aria-describedby"?: string;
+  "aria-required"?: true;
+};
 
 export type ModalFieldMeta = {
   label: string;
   required: boolean;
   disabled: boolean;
   placeholder?: string;
+  error?: string;
+  inputProps: ModalFieldInputProps;
 };
 
 type Props = {
@@ -23,6 +33,10 @@ type Props = {
   fallbackLabel: string;
   fallbackRequired?: boolean;
   fallbackPlaceholder?: string;
+  /** Prefix for stable input ids inside a modal (e.g. "partner-form"). */
+  formId?: string;
+  /** Field-keyed validation messages from the parent form. */
+  errors?: () => Record<string, string | undefined>;
   /** When true, field stays visible even if form settings hide it. */
   forceVisible?: boolean;
   /** When true, field is always treated as required. */
@@ -45,8 +59,15 @@ export function ModalField(props: Props) {
   const disabled = () => fieldDisabled(setting());
   const placeholder = () => fieldPlaceholder(setting(), props.fallbackPlaceholder) || undefined;
   const label = () => labelWithRequired(setting()?.label?.trim() || props.fallbackLabel, required());
+  const plainLabel = () => setting()?.label?.trim() || props.fallbackLabel;
+  const error = () => props.errors?.()[props.fieldKey];
+  const aria = () =>
+    inputAriaProps(props.fieldKey, {
+      formId: props.formId,
+      error: error(),
+      required: required(),
+    });
 
-  // Live meta object with getters so children see updates without remounting on object identity.
   const meta = (): ModalFieldMeta => ({
     get label() {
       return label();
@@ -60,12 +81,31 @@ export function ModalField(props: Props) {
     get placeholder() {
       return placeholder();
     },
+    get error() {
+      return error();
+    },
+    get inputProps() {
+      const a = aria();
+      return {
+        id: a.id,
+        "aria-invalid": a["aria-invalid"],
+        "aria-describedby": a["aria-describedby"],
+        "aria-required": a["aria-required"],
+      };
+    },
   });
 
-  // Boolean `when` — avoid remount when a new plain meta object would change Show's key.
   return (
     <Show when={visible()}>
-      <Field label={label()} span={props.span} as={props.as}>
+      <Field
+        label={plainLabel()}
+        required={required()}
+        span={props.span}
+        as={props.as}
+        controlId={props.as === "div" ? aria().id : undefined}
+        error={error()}
+        errorId={aria().errorId}
+      >
         {props.children(meta())}
       </Field>
     </Show>

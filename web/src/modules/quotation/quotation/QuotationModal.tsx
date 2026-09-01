@@ -9,15 +9,18 @@ import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
-import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
+import { handleSaveResult, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../../shared/FormErrorSummary";
+import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
+import { mergeFormErrors } from "../../../shared/formValidation";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import {
   CustomFieldsSection,
+  collectCustomFieldErrors,
   isPersonalBirthdayCustomField,
-  validateCustomFields,
 } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
@@ -232,6 +235,8 @@ export function QuotationModal(props: Props) {
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
   const { fields, byKey, activeCustomFields } = useFormFieldSettings(QUOTATION_ENTITY.quotation);
+  const QUOTATION_FORM_ID = "quotation-form";
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const [saving, setSaving] = createSignal(false);
   const [createdQuotation, setCreatedQuotation] = createSignal<QuotationDetail | null>(null);
@@ -540,22 +545,7 @@ export function QuotationModal(props: Props) {
 
   const save = async () => {
     if (props.readOnly) return;
-    if (!taxTypeId()) {
-      toast.warning("Please select a transaction type.");
-      return;
-    }
-    if (!currencyId()) {
-      toast.warning("Please select a currency.");
-      return;
-    }
-    if (!partnerId()) {
-      toast.warning("Please select a customer.");
-      return;
-    }
-    if (!locationId()) {
-      toast.warning("Please select a location.");
-      return;
-    }
+    setFieldErrors({});
     const status = (progressStatus() || "unconfirmed").trim() || "unconfirmed";
     if (progressStatus() !== status) setProgressStatus(status);
     const { checks, values: formValues } = buildRequiredChecksForSave(fields(), {
@@ -573,11 +563,19 @@ export function QuotationModal(props: Props) {
       progress_status: status,
     });
     const processCustomFields = activeCustomFields().filter((d) => !isPersonalBirthdayCustomField(d));
-    const clientError =
-      requireFields(formValues, checks) ??
-      validateCustomFields(customValues(), processCustomFields);
-    if (clientError) {
-      toast.warning(clientError);
+    const validationErrors = mergeFormErrors(
+      collectDocumentLookupErrors({
+        tax_type_id: taxTypeId(),
+        currency_id: currencyId(),
+        partner_id: partnerId(),
+        location_id: locationId(),
+      }),
+      collectRequiredFieldErrors(formValues, checks),
+      collectCustomFieldErrors(customValues(), processCustomFields),
+    );
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
       return;
     }
     const attachmentErr = validateAttachmentBeforeConfirm(
@@ -631,7 +629,9 @@ export function QuotationModal(props: Props) {
       : apiFetch<QuotationDetail>("/api/v1/quotation/quotations", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, props.editing ? "Quotation updated." : "Quotation created.");
+      handleSaveResult(res, toast, props.editing ? "Quotation updated." : "Quotation created.", {
+        onFieldErrors: setFieldErrors,
+      });
       return;
     }
     toast.success(props.editing ? "Quotation updated." : "Quotation created.");
@@ -790,6 +790,7 @@ export function QuotationModal(props: Props) {
     >
       <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
       <ModalFormGuide guideId="quotation" />
+      <FormErrorSummary errors={fieldErrors} />
       <draft.DraftBanner />
       <CoaSetupReminder />
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -811,6 +812,8 @@ export function QuotationModal(props: Props) {
         fallbackRequired
         forceVisible
         forceRequired
+        formId={QUOTATION_FORM_ID}
+        errors={fieldErrors}
         value={taxTypeLabel}
         selectedId={taxTypeId}
         onInput={setTaxTypeLabel}
@@ -832,13 +835,30 @@ export function QuotationModal(props: Props) {
           <p class="mt-1 text-xs text-text-secondary md:col-span-2">{formatRateSummary(t().tax_mode, t().rate_percent)}</p>
         )}
       </Show>
-      <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired forceVisible forceRequired>
+      <ModalField
+        settings={byKey}
+        fieldKey="currency_id"
+        fallbackLabel="Currency"
+        fallbackRequired
+        forceVisible
+        forceRequired
+        formId={QUOTATION_FORM_ID}
+        errors={fieldErrors}
+      >
         {(m) => (
           <select
+            {...m.inputProps}
             class={inputClass}
             value={currencyId() ?? ""}
             disabled={m.disabled}
-            onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
+            onChange={(e) => {
+              setFieldErrors((prev) => {
+                const next = { ...prev };
+                delete next.currency_id;
+                return next;
+              });
+              setCurrencyId(Number(e.currentTarget.value) || null);
+            }}
           >
             <option value="">Select…</option>
             <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
@@ -850,6 +870,8 @@ export function QuotationModal(props: Props) {
         fieldKey="partner_id"
         fallbackLabel="Customer"
         fallbackRequired
+        formId={QUOTATION_FORM_ID}
+        errors={fieldErrors}
         value={customerLabel}
         selectedId={partnerId}
         onInput={setCustomerLabel}
@@ -890,6 +912,8 @@ export function QuotationModal(props: Props) {
         fieldKey="location_id"
         fallbackLabel="Location-Out"
         fallbackRequired
+        formId={QUOTATION_FORM_ID}
+        errors={fieldErrors}
         value={locationLabel}
         selectedId={locationId}
         onInput={setLocationLabel}

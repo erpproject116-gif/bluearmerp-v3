@@ -6,6 +6,7 @@ import { handleSaveResult } from "./handleSaveResult";
 import { useToast } from "./toast";
 import {
   buildPartnerContactPayload,
+  PHTIN_PLACEHOLDER,
   validatePartnerContact,
   type PartnerContactErrors,
 } from "./validation/phContact";
@@ -173,7 +174,7 @@ export function QuickCustomerModal(props: Props) {
             <input
               class={inputClass}
               value={tin()}
-              placeholder="000-000-000-000"
+              placeholder={PHTIN_PLACEHOLDER}
               onInput={(e) => setTin(e.currentTarget.value)}
             />
             <Show when={fieldError("tin")}>

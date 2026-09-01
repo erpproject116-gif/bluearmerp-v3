@@ -38,7 +38,7 @@ func ValidatePartnerContact(c PartnerContact) map[string]string {
 	}
 	if c.Tin != nil && strings.TrimSpace(*c.Tin) != "" {
 		if _, ok := NormalizePHTIN(*c.Tin); !ok {
-			errs["tin"] = "Enter a valid TIN (9 or 12 digits, e.g. 000-000-000-000)."
+			errs["tin"] = "Enter a valid TIN: " + PHTINFormatHint + "."
 		}
 	}
 	if len(errs) == 0 {

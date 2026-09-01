@@ -68,6 +68,12 @@ export function validateEmailOptional(raw: string): string | null {
   return null;
 }
 
+export const PHTIN_PLACEHOLDER = "123-456-789 or 123-456-789-000";
+
+export const PHTIN_VALIDATION_MESSAGE =
+  "Enter a valid TIN: 123-456-789 (individual) or 123-456-789-000 (corporate/branch).";
+
+/** Individual (9 digits) or corporate/branch (12 digits with branch suffix). */
 export function normalizePHTIN(raw: string): string | null {
   const d = digitsOnly(raw);
   if (d.length === 9) {
@@ -83,7 +89,7 @@ export function validatePHTINOptional(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   if (!normalizePHTIN(trimmed)) {
-    return "Enter a valid TIN (9 or 12 digits, e.g. 000-000-000-000).";
+    return PHTIN_VALIDATION_MESSAGE;
   }
   return null;
 }

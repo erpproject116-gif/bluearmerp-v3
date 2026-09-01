@@ -7,7 +7,10 @@ import { DateInput } from "../../../shared/DateInput";
 import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
-import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
+import { handleSaveResult, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../../shared/FormErrorSummary";
+import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
+import { mergeFormErrors } from "../../../shared/formValidation";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
@@ -207,6 +210,8 @@ export function PurchaseOrderModal(props: Props) {
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
   const { fields, byKey } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseOrder);
+  const PO_FORM_ID = "purchase-order-form";
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [_attachmentCount, setAttachmentCount] = createSignal(0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
@@ -555,16 +560,8 @@ export function PurchaseOrderModal(props: Props) {
 
   const save = async () => {
     if (!isDraft()) return;
-    if (!taxTypeId() || !currencyId() || !locationId()) {
-      toast.warning("Transaction type, currency, and location are required.");
-      return;
-    }
+    setFieldErrors({});
     const vendorId = partnerId();
-    if (!vendorId) {
-      toast.warning("Vendor is required.");
-      return;
-    }
-
     const formValues = {
       order_date: orderDate(),
       partner_id: vendorId,
@@ -576,9 +573,21 @@ export function PurchaseOrderModal(props: Props) {
       notes: notes(),
       project_id: projectId(),
     };
-    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
-    if (clientError) {
-      toast.warning(clientError);
+    const validationErrors = mergeFormErrors(
+      collectDocumentLookupErrors(
+        {
+          tax_type_id: taxTypeId(),
+          currency_id: currencyId(),
+          partner_id: vendorId,
+          location_id: locationId(),
+        },
+        { partner_id: "Vendor" },
+      ),
+      collectRequiredFieldErrors(formValues as Record<string, unknown>, buildRequiredChecks(fields())),
+    );
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
       return;
     }
 
@@ -634,7 +643,9 @@ export function PurchaseOrderModal(props: Props) {
         }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, isCreate() ? "Purchase order created." : "Purchase order updated.");
+      handleSaveResult(res, toast, isCreate() ? "Purchase order created." : "Purchase order updated.", {
+        onFieldErrors: setFieldErrors,
+      });
       return;
     }
     toast.success(isCreate() ? "Purchase order created." : "Purchase order updated.");
@@ -690,6 +701,7 @@ export function PurchaseOrderModal(props: Props) {
     >
       <LifecycleReadOnlyShell readOnly={props.readOnly ?? false}>
       <ModalFormGuide guideId="purchase_order" />
+      <FormErrorSummary errors={fieldErrors} />
       <Show when={loading()}>
         <LoadingText class="text-sm text-text-secondary" as="p" />
       </Show>
@@ -796,6 +808,8 @@ export function PurchaseOrderModal(props: Props) {
                   fieldKey="partner_id"
                   fallbackLabel="Vendor / Supplier"
                   fallbackRequired
+                  formId={PO_FORM_ID}
+                  errors={fieldErrors}
                   value={partnerLabel}
                   selectedId={partnerId}
                   onInput={setPartnerLabel}

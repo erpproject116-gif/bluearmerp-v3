@@ -1,11 +1,18 @@
 import { createEffect, createSignal, For, Show, onMount } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
 import { LoadingText } from "../shared/LoadingText";
+import { inputAriaProps } from "./formValidation";
 
 export type LookupOption = { id: number; label: string; sublabel?: string; meta?: Record<string, unknown> };
 
 type Props = {
   label: string;
+  /** Appended to label text (e.g. " *" for required). */
+  labelSuffix?: string;
+  fieldKey?: string;
+  formId?: string;
+  description?: string;
+  error?: string;
   value: () => string;
   selectedId: () => number | null;
   onInput: (text: string) => void;
@@ -24,12 +31,19 @@ export function LookupCombo(props: Props) {
   const [open, setOpen] = createSignal(false);
   const [options, setOptions] = createSignal<LookupOption[]>([]);
   const [loading, setLoading] = createSignal(false);
-  /** Local draft while focused so typing stays smooth even if parents remount list rows. */
   const [focused, setFocused] = createSignal(false);
   const [draft, setDraft] = createSignal("");
   let debounce: ReturnType<typeof setTimeout> | undefined;
 
   const displayValue = () => (focused() ? draft() : props.value());
+  const aria = () =>
+    inputAriaProps(props.fieldKey ?? props.label, {
+      formId: props.formId ?? "lookup",
+      error: props.error,
+      description: props.description,
+      required: props.required,
+    });
+  const listId = () => `${aria().id}-listbox`;
 
   createEffect(() => {
     if (!focused()) setDraft(props.value());
@@ -48,7 +62,6 @@ export function LookupCombo(props: Props) {
   };
 
   const clearSelection = () => {
-    // Clear text here so callers that only null the id still wipe the visible value.
     setDraft("");
     props.onInput("");
     props.onClear();
@@ -66,17 +79,38 @@ export function LookupCombo(props: Props) {
   return (
     <div class="block">
       <Show when={props.label}>
-        <span class="mb-1 block text-sm font-medium text-text-primary">
+        <label class="mb-1 block text-sm font-medium text-text-primary" for={aria().id}>
           {props.label}
-          {props.required ? " *" : ""}
-        </span>
+          <Show when={props.labelSuffix}>
+            <span aria-hidden="true">{props.labelSuffix}</span>
+          </Show>
+          <Show when={props.required && !props.labelSuffix}>
+            <span class="text-red-600" aria-hidden="true">
+              {" "}
+              *
+            </span>
+          </Show>
+        </label>
+      </Show>
+      <Show when={props.description}>
+        <p id={aria().hintId} class="mb-1 text-xs text-text-secondary">
+          {props.description}
+        </p>
       </Show>
       <div class="relative">
         <input
+          id={aria().id}
           class={`${inputClass} pr-14`}
           value={displayValue()}
           placeholder={props.placeholder ?? "Search…"}
           disabled={props.disabled}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open()}
+          aria-controls={listId()}
+          aria-invalid={aria()["aria-invalid"]}
+          aria-describedby={aria()["aria-describedby"]}
+          aria-required={aria()["aria-required"]}
           onFocus={() => {
             if (props.disabled) return;
             setDraft(props.value());
@@ -104,7 +138,6 @@ export function LookupCombo(props: Props) {
             tabIndex={-1}
             aria-label="Clear"
             onMouseDown={(e) => {
-              // mousedown (not click): avoids label/focus races and Show-unmount dropping click.
               e.preventDefault();
               e.stopPropagation();
               clearSelection();
@@ -118,13 +151,17 @@ export function LookupCombo(props: Props) {
           </button>
         </Show>
         <Show when={open() && (options().length > 0 || loading() || !!props.onCreate)}>
-          <ul class="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-stroke bg-white py-1 shadow-lg">
+          <ul
+            id={listId()}
+            role="listbox"
+            class="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-stroke bg-white py-1 shadow-lg"
+          >
             <Show when={loading()}>
               <LoadingText class="px-3 py-2 text-sm text-text-secondary" as="li" />
             </Show>
             <For each={options()}>
               {(opt) => (
-                <li>
+                <li role="option">
                   <button
                     type="button"
                     class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50"
@@ -166,6 +203,11 @@ export function LookupCombo(props: Props) {
           </ul>
         </Show>
       </div>
+      <Show when={props.error}>
+        <p id={aria().errorId} class="mt-1 text-xs text-red-600" role="alert">
+          {props.error}
+        </p>
+      </Show>
     </div>
   );
 }

@@ -1,13 +1,15 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
-import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
+import { CustomFieldsSection, collectCustomFieldErrors } from "../../shared/CustomFieldsSection";
 import { DRAFT_ENTITY, INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
-import { requireFields, handleSaveResult } from "../../shared/handleSaveResult";
+import { collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../shared/FormErrorSummary";
+import { mergeFormErrors } from "../../shared/formValidation";
 import { ModalField } from "../../shared/ModalField";
 import { useToast } from "../../shared/toast";
 import { useCustomValues } from "../../shared/useCustomValues";
@@ -19,9 +21,11 @@ import { useMasterLifecycle } from "../../shared/masterLifecycle";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import {
   buildPartnerContactPayload,
+  PHTIN_PLACEHOLDER,
   validatePartnerContact,
-  type PartnerContactErrors,
 } from "../../shared/validation/phContact";
+
+const PARTNER_FORM_ID = "partner-form";
 
 export type Partner = {
   id: number;
@@ -63,7 +67,7 @@ export default function PartnersPage() {
     default_price_list_id: "",
   });
   const [saving, setSaving] = createSignal(false);
-  const [fieldErrors, setFieldErrors] = createSignal<PartnerContactErrors>({});
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const lifecycle = useMasterLifecycle({
@@ -75,7 +79,16 @@ export default function PartnersPage() {
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.partners);
 
-  const fieldError = (key: keyof PartnerContactErrors) => fieldErrors()[key];
+  const fieldError = (key: string) => fieldErrors()[key];
+
+  const clearFieldError = (key: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
 
   const priceLists = createQuery(() => ({
     queryKey: ["price-lists"],
@@ -158,22 +171,19 @@ export default function PartnersPage() {
   const save = async () => {
     setFieldErrors({});
     const ed = editing();
-    const clientError =
-      requireFields(form(), buildRequiredChecks(fields())) ??
-      validateCustomFields(customValues(), activeCustomFields());
-    const contactErrors = validatePartnerContact({
-      mobile: form().mobile,
-      phone: form().phone,
-      email: form().email,
-      tin: form().tin,
-    });
-    if (Object.keys(contactErrors).length > 0) {
-      setFieldErrors(contactErrors);
-      toast.error(Object.values(contactErrors)[0] ?? "Check the highlighted fields.");
-      return;
-    }
-    if (clientError) {
-      toast.error(clientError);
+    const validationErrors = mergeFormErrors(
+      collectRequiredFieldErrors(form(), buildRequiredChecks(fields())),
+      collectCustomFieldErrors(customValues(), activeCustomFields()),
+      validatePartnerContact({
+        mobile: form().mobile,
+        phone: form().phone,
+        email: form().email,
+        tin: form().tin,
+      }),
+    );
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      toast.error(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
       return;
     }
 
@@ -202,16 +212,10 @@ export default function PartnersPage() {
       const res = await (ed
         ? apiFetch(`/api/v1/inventory/partners/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
         : apiFetch("/api/v1/inventory/partners", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
-      const ok = handleSaveResult(res, toast, ed ? "Partner updated." : "Partner created.");
+      const ok = handleSaveResult(res, toast, ed ? "Partner updated." : "Partner created.", {
+        onFieldErrors: setFieldErrors,
+      });
       if (!ok) {
-        if (res.errors) {
-          setFieldErrors({
-            mobile: res.errors.mobile,
-            phone: res.errors.phone,
-            email: res.errors.email,
-            tin: res.errors.tin,
-          });
-        }
         return;
       }
       await draft.clearOnSave();
@@ -305,17 +309,29 @@ export default function PartnersPage() {
         }
       >
         <ModalFormGuide guideId="partner" spanFull />
+        <FormErrorSummary errors={fieldErrors} />
         <draft.DraftBanner />
         <Field label="Customer/Vendor code">
           <input class={inputClass} value={nextCode()} readOnly />
         </Field>
-        <ModalField settings={byKey} fieldKey="partner_kind" fallbackLabel="Kind" fallbackRequired>
+        <ModalField
+          settings={byKey}
+          fieldKey="partner_kind"
+          fallbackLabel="Kind"
+          fallbackRequired
+          formId={PARTNER_FORM_ID}
+          errors={fieldErrors}
+        >
           {(m) => (
             <select
+              {...m.inputProps}
               class={inputClass}
               value={form().partner_kind}
               disabled={m.disabled}
-              onChange={(e) => setForm((f) => ({ ...f, partner_kind: e.currentTarget.value }))}
+              onChange={(e) => {
+                clearFieldError("partner_kind");
+                setForm((f) => ({ ...f, partner_kind: e.currentTarget.value }));
+              }}
             >
               <option value="customer">Customer</option>
               <option value="vendor">Vendor</option>
@@ -323,103 +339,162 @@ export default function PartnersPage() {
             </select>
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="company_name" fallbackLabel="Company name" fallbackRequired>
+        <ModalField
+          settings={byKey}
+          fieldKey="company_name"
+          fallbackLabel="Company name"
+          fallbackRequired
+          formId={PARTNER_FORM_ID}
+          errors={fieldErrors}
+        >
           {(m) => (
             <input
+              {...m.inputProps}
               class={inputClass}
               value={form().company_name}
               disabled={m.disabled}
-              onInput={(e) => setForm((f) => ({ ...f, company_name: e.currentTarget.value }))}
+              placeholder={m.placeholder}
+              onInput={(e) => {
+                clearFieldError("company_name");
+                setForm((f) => ({ ...f, company_name: e.currentTarget.value }));
+              }}
             />
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="ceo_name" fallbackLabel="CEO name">
+        <ModalField
+          settings={byKey}
+          fieldKey="ceo_name"
+          fallbackLabel="CEO name"
+          formId={PARTNER_FORM_ID}
+          errors={fieldErrors}
+        >
           {(m) => (
             <input
+              {...m.inputProps}
               class={inputClass}
               value={form().ceo_name}
               disabled={m.disabled}
+              placeholder={m.placeholder}
               onInput={(e) => setForm((f) => ({ ...f, ceo_name: e.currentTarget.value }))}
             />
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="phone" fallbackLabel="Phone">
+        <ModalField
+          settings={byKey}
+          fieldKey="phone"
+          fallbackLabel="Phone"
+          formId={PARTNER_FORM_ID}
+          errors={fieldErrors}
+        >
           {(m) => (
-            <>
-              <input
-                class={inputClass}
-                value={form().phone}
-                disabled={m.disabled}
-                placeholder="(032) 123 4567"
-                onInput={(e) => setForm((f) => ({ ...f, phone: e.currentTarget.value }))}
-              />
-              <Show when={fieldError("phone")}>
-                <p class="mt-1 text-xs text-red-600">{fieldError("phone")}</p>
-              </Show>
-            </>
+            <input
+              {...m.inputProps}
+              class={inputClass}
+              value={form().phone}
+              disabled={m.disabled}
+              placeholder={m.placeholder ?? "(032) 123 4567"}
+              onInput={(e) => {
+                clearFieldError("phone");
+                setForm((f) => ({ ...f, phone: e.currentTarget.value }));
+              }}
+            />
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="mobile" fallbackLabel="Mobile">
+        <ModalField
+          settings={byKey}
+          fieldKey="mobile"
+          fallbackLabel="Mobile"
+          formId={PARTNER_FORM_ID}
+          errors={fieldErrors}
+        >
           {(m) => (
-            <>
-              <input
-                class={inputClass}
-                value={form().mobile}
-                disabled={m.disabled}
-                placeholder="0917 123 4567"
-                onInput={(e) => setForm((f) => ({ ...f, mobile: e.currentTarget.value }))}
-              />
-              <Show when={fieldError("mobile")}>
-                <p class="mt-1 text-xs text-red-600">{fieldError("mobile")}</p>
-              </Show>
-            </>
+            <input
+              {...m.inputProps}
+              class={inputClass}
+              value={form().mobile}
+              disabled={m.disabled}
+              placeholder={m.placeholder ?? "0917 123 4567"}
+              onInput={(e) => {
+                clearFieldError("mobile");
+                setForm((f) => ({ ...f, mobile: e.currentTarget.value }));
+              }}
+            />
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="email" fallbackLabel="Email">
+        <ModalField
+          settings={byKey}
+          fieldKey="email"
+          fallbackLabel="Email"
+          formId={PARTNER_FORM_ID}
+          errors={fieldErrors}
+        >
           {(m) => (
-            <>
-              <input
-                class={inputClass}
-                value={form().email}
-                disabled={m.disabled}
-                placeholder="name@company.com"
-                onInput={(e) => setForm((f) => ({ ...f, email: e.currentTarget.value }))}
-              />
-              <Show when={fieldError("email")}>
-                <p class="mt-1 text-xs text-red-600">{fieldError("email")}</p>
-              </Show>
-            </>
+            <input
+              {...m.inputProps}
+              class={inputClass}
+              value={form().email}
+              disabled={m.disabled}
+              placeholder={m.placeholder ?? "name@company.com"}
+              onInput={(e) => {
+                clearFieldError("email");
+                setForm((f) => ({ ...f, email: e.currentTarget.value }));
+              }}
+            />
           )}
         </ModalField>
-        <Field label="TIN (BIR 2307 payee)">
+        <Field label="TIN (BIR 2307 payee)" error={fieldError("tin")} required={false}>
           <input
             class={inputClass}
             value={form().tin}
-            placeholder="000-000-000-000"
-            onInput={(e) => setForm((f) => ({ ...f, tin: e.currentTarget.value }))}
+            placeholder={PHTIN_PLACEHOLDER}
+            aria-invalid={fieldError("tin") ? true : undefined}
+            onInput={(e) => {
+              clearFieldError("tin");
+              setForm((f) => ({ ...f, tin: e.currentTarget.value }));
+            }}
           />
-          <Show when={fieldError("tin")}>
-            <p class="mt-1 text-xs text-red-600">{fieldError("tin")}</p>
-          </Show>
         </Field>
-        <ModalField settings={byKey} fieldKey="address" fallbackLabel="Address" span="full">
+        <ModalField
+          settings={byKey}
+          fieldKey="address"
+          fallbackLabel="Address"
+          span="full"
+          formId={PARTNER_FORM_ID}
+          errors={fieldErrors}
+        >
           {(m) => (
             <textarea
+              {...m.inputProps}
               class={inputClass}
               rows={2}
               value={form().address}
               disabled={m.disabled}
-              onInput={(e) => setForm((f) => ({ ...f, address: e.currentTarget.value }))}
+              placeholder={m.placeholder}
+              onInput={(e) => {
+                clearFieldError("address");
+                setForm((f) => ({ ...f, address: e.currentTarget.value }));
+              }}
             />
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="status" fallbackLabel="Status" fallbackRequired>
+        <ModalField
+          settings={byKey}
+          fieldKey="status"
+          fallbackLabel="Status"
+          fallbackRequired
+          formId={PARTNER_FORM_ID}
+          errors={fieldErrors}
+        >
           {(m) => (
             <select
+              {...m.inputProps}
               class={inputClass}
               value={form().status}
               disabled={m.disabled}
-              onChange={(e) => setForm((f) => ({ ...f, status: e.currentTarget.value }))}
+              onChange={(e) => {
+                clearFieldError("status");
+                setForm((f) => ({ ...f, status: e.currentTarget.value }));
+              }}
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>

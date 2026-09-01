@@ -39,7 +39,7 @@ describe("LookupCombo", () => {
     }
 
     render(() => <Harness />);
-    const input = screen.getByRole("textbox");
+    const input = screen.getByRole("combobox", { name: "Customer Select" });
     await waitFor(() => expect(fetchOptions).toHaveBeenCalled());
 
     await fireEvent.focus(input);
@@ -78,6 +78,6 @@ describe("LookupCombo", () => {
     const clearBtn = screen.getByRole("button", { name: "Clear" });
     await fireEvent.mouseDown(clearBtn);
     expect(onClear).toHaveBeenCalled();
-    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Customer Clear" })).toHaveValue("");
   });
 });
