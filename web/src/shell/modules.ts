@@ -122,11 +122,13 @@ export const appModules: AppModule[] = [
   {
     id: "production",
     label: "Production",
-    href: "/app/production/work-orders",
+    href: "/app/production/assembly/jobs",
     basePath: "/app/production",
     features: [
-      { label: "Jobs (work orders)", href: "/app/production/work-orders", settingsHref: "/app/production/work-orders", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
-      { label: "Recipes (BOMs)", href: "/app/production/boms", settingsHref: "/app/production/boms", featureCode: "manufacturing.boms", headerPriority: "primary" },
+      { label: "Assembly · Recipes", href: "/app/production/assembly/recipes", settingsHref: "/app/production/assembly/recipes", featureCode: "manufacturing.boms", headerPriority: "primary" },
+      { label: "Assembly · Jobs", href: "/app/production/assembly/jobs", settingsHref: "/app/production/assembly/jobs", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
+      { label: "Disassembly · Recipes", href: "/app/production/disassembly/recipes", settingsHref: "/app/production/disassembly/recipes", featureCode: "manufacturing.boms", headerPriority: "primary" },
+      { label: "Disassembly · Jobs", href: "/app/production/disassembly/jobs", settingsHref: "/app/production/disassembly/jobs", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
       { label: "Reports", href: "/app/production/reports", settingsHref: "/app/production/reports", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
       setupFeatureTab("/app/production"),
     ],

@@ -740,7 +740,7 @@ export const documentationSections: DocSection[] = [
     title: "Manufacturing",
     iconId: "manufacturing",
     intro: "Production module: single-level BOMs, make-to-order and make-to-stock work orders, FG QC, issue/receive stations, and production reports.",
-    primaryHref: "/app/production/boms",
+    primaryHref: "/app/production/assembly/recipes",
     primaryLabel: "Open Bills of Material",
     blocks: [
       {

@@ -6,6 +6,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { DateInput } from "../../shared/DateInput";
 import { useToast } from "../../shared/toast";
 import { ProductionLayout } from "./ProductionLayout";
+import { jobsHref, parseMfgMode } from "./mfgProductionMode";
 
 type WorkOrderOption = {
   id: number;
@@ -53,6 +54,7 @@ async function fetchReleasedWorkOrders(q: string): Promise<LookupOption[]> {
 export default function ProductionWeighPartsPage() {
   const toast = useToast();
   const [searchParams] = useSearchParams();
+  const jobsBackHref = () => `${jobsHref(parseMfgMode(String(searchParams.mode ?? "")) ?? "disassembly")}?status=released`;
   const [woLabel, setWoLabel] = createSignal("");
   const [woId, setWoId] = createSignal<number | null>(null);
   const [wo, setWo] = createSignal<WorkOrderDetail | null>(null);
@@ -144,7 +146,7 @@ export default function ProductionWeighPartsPage() {
     <ProductionLayout>
       <div class="space-y-6">
         <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-          <A href="/app/production/work-orders?status=released" class="text-xs font-medium text-brand-700 hover:underline">
+          <A href={jobsBackHref()} class="text-xs font-medium text-brand-700 hover:underline">
             ← Jobs
           </A>
           <h2 class="mt-2 text-lg font-semibold text-text-primary">Weigh parts</h2>

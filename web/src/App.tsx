@@ -354,6 +354,7 @@ import { BookingRoute } from "./shared/BookingRoute";
 import { FixedAssetsRoute } from "./shared/FixedAssetsRoute";
 import { JobCostingRoute } from "./shared/JobCostingRoute";
 import { ManufacturingRoute } from "./shared/ManufacturingRoute";
+import { ProductionModeLayout } from "./modules/production/ProductionModeLayout";
 import { QualityRoute } from "./shared/QualityRoute";
 import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
 import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
@@ -549,13 +550,19 @@ export default function App() {
           <Route path="/inventory/serial-lot/receive" component={SerialReceivePage} />
           <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
           <Route path="/production" component={() => (
-            <Navigate href="/app/production/work-orders" />
+            <Navigate href="/app/production/assembly/jobs" />
+          )} />
+          <Route path="/production/:mode/recipes" component={() => (
+            <ManufacturingRoute><ProductionModeLayout><BomsPage /></ProductionModeLayout></ManufacturingRoute>
+          )} />
+          <Route path="/production/:mode/jobs" component={() => (
+            <ManufacturingRoute><ProductionModeLayout><WorkOrdersPage /></ProductionModeLayout></ManufacturingRoute>
           )} />
           <Route path="/production/boms" component={() => (
-            <ManufacturingRoute><BomsPage /></ManufacturingRoute>
+            <Navigate href="/app/production/assembly/recipes" />
           )} />
           <Route path="/production/work-orders" component={() => (
-            <ManufacturingRoute><WorkOrdersPage /></ManufacturingRoute>
+            <Navigate href="/app/production/assembly/jobs" />
           )} />
           <Route path="/production/issue-station" component={() => (
             <ManufacturingRoute><ProductionIssueStationPage /></ManufacturingRoute>
@@ -573,22 +580,22 @@ export default function App() {
             <ManufacturingRoute><ModuleSetupHubPage /></ManufacturingRoute>
           )} />
           <Route path="/inventory/serial-lot/manufacturing/work-orders" component={() => (
-            <Navigate href="/app/production/work-orders" />
+            <Navigate href="/app/production/assembly/jobs" />
           )} />
           <Route path="/inventory/serial-lot/manufacturing/boms" component={() => (
-            <Navigate href="/app/production/boms" />
+            <Navigate href="/app/production/assembly/recipes" />
           )} />
           <Route path="/manufacturing/work-orders" component={() => (
-            <Navigate href="/app/production/work-orders" />
+            <Navigate href="/app/production/assembly/jobs" />
           )} />
           <Route path="/manufacturing/boms" component={() => (
-            <Navigate href="/app/production/boms" />
+            <Navigate href="/app/production/assembly/recipes" />
           )} />
           <Route path="/inventory/work-orders" component={() => (
-            <Navigate href="/app/production/work-orders" />
+            <Navigate href="/app/production/assembly/jobs" />
           )} />
           <Route path="/inventory/boms" component={() => (
-            <Navigate href="/app/production/boms" />
+            <Navigate href="/app/production/assembly/recipes" />
           )} />
           <Route path="/after-sales/repair-orders/new" component={RepairOrderNewPage} />
           <Route path="/after-sales/repair-orders/status" component={RepairOrderStatusPage} />

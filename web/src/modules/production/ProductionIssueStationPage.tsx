@@ -10,6 +10,7 @@ import { resolveSerialBulk } from "../../shared/resolveSerialBulk";
 import { LotLineCell } from "../../shared/LotLineCell";
 import type { LotBatchRow } from "../../shared/useSerialLotList";
 import { ProductionLayout } from "./ProductionLayout";
+import { jobsHref } from "./mfgProductionMode";
 
 type WorkOrderOption = {
   id: number;
@@ -247,7 +248,7 @@ export default function ProductionIssueStationPage() {
     <ProductionLayout>
       <div class="space-y-6">
         <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-          <A href="/app/production/work-orders?status=released" class="text-xs font-medium text-brand-700 hover:underline">
+          <A href={`${jobsHref("assembly")}?status=released`} class="text-xs font-medium text-brand-700 hover:underline">
             ← Work orders
           </A>
           <h2 class="mt-2 text-lg font-semibold text-text-primary">Issue station</h2>

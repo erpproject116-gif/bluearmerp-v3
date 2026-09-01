@@ -21,6 +21,7 @@ type woStatusReportRow struct {
 	InspectionStatus  string  `json:"inspection_status"`
 	BomCode           string  `json:"bom_code"`
 	BomName           string  `json:"bom_name"`
+	BomType           string  `json:"bom_type"`
 	FinishedItemCode  string  `json:"finished_item_code"`
 	FinishedItemName  string  `json:"finished_item_name"`
 	LocationName      string  `json:"location_name"`
@@ -86,10 +87,16 @@ func listWorkOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *id)
 			argN++
 		}
+		if bt := parseBomTypeListFilter(r.URL.Query().Get("bom_type")); bt != "" {
+			where += fmt.Sprintf(" and coalesce(b.bom_type, 'assembly') = $%d", argN)
+			args = append(args, bt)
+			argN++
+		}
 
 		q := fmt.Sprintf(`
 			select wo.id, wo.work_order_no, wo.order_date::text, wo.status, wo.inspection_status,
-			  b.bom_code, b.bom_name, coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
+			  b.bom_code, b.bom_name, coalesce(b.bom_type, 'assembly'),
+			  coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
 			  coalesce(loc.location_name, ''),
 			  wo.qty_to_produce::float8, wo.qty_produced::float8,
 			  so.sales_order_no, wo.released_at::text, wo.completed_at::text,
@@ -119,7 +126,7 @@ func listWorkOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			var released, completed *string
 			if err := rows.Scan(
 				&row.WorkOrderID, &row.WorkOrderNo, &row.OrderDate, &row.Status, &row.InspectionStatus,
-				&row.BomCode, &row.BomName, &row.FinishedItemCode, &row.FinishedItemName, &row.LocationName,
+				&row.BomCode, &row.BomName, &row.BomType, &row.FinishedItemCode, &row.FinishedItemName, &row.LocationName,
 				&row.QtyToProduce, &row.QtyProduced, &soNo, &released, &completed, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read work order status.", "ERR_INTERNAL")

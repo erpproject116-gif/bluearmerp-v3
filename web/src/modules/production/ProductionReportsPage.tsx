@@ -15,6 +15,7 @@ type WoStatusRow = {
   inspection_status: string;
   bom_code: string;
   bom_name: string;
+  bom_type?: string;
   finished_item_code: string;
   finished_item_name: string;
   location_name: string;
@@ -64,13 +65,13 @@ type YieldRow = {
   qty_to_produce: number;
 };
 
-type DateFilters = { date_from: string; date_to: string; status?: string; work_order_id?: number };
+type DateFilters = { date_from: string; date_to: string; status?: string; work_order_id?: number; bom_type?: string };
 
 const TAB_LABELS: Record<ReportTab, string> = {
   "work-order-status": "Job status",
   progress: "Progress",
   "stock-movements": "Stock movements",
-  "disassembly-yield": "Cut yield",
+  "disassembly-yield": "Disassembly yield",
 };
 
 function reportPath(tab: ReportTab): string {
@@ -105,6 +106,7 @@ export default function ProductionReportsPage() {
       date_to: f.date_to,
     });
     if (f.status) qs.set("status", f.status);
+    if (f.bom_type) qs.set("bom_type", f.bom_type);
     if (f.work_order_id) qs.set("work_order_id", String(f.work_order_id));
     return {
       queryKey: ["mfg-report", tab(), page(), pageSize, f],
@@ -180,6 +182,19 @@ export default function ProductionReportsPage() {
         }}
         filterExtra={
           <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <Show when={tab() === "work-order-status"}>
+              <Field label="Type">
+                <select
+                  class={inputClass}
+                  value={draftFilters().bom_type ?? ""}
+                  onChange={(e) => patch({ bom_type: e.currentTarget.value || undefined })}
+                >
+                  <option value="">All</option>
+                  <option value="assembly">Assembly</option>
+                  <option value="disassembly">Disassembly</option>
+                </select>
+              </Field>
+            </Show>
             <Show when={tab() !== "stock-movements"}>
               <Field label="WO status">
                 <select
@@ -220,7 +235,8 @@ export default function ProductionReportsPage() {
                 <th class="px-3 py-2">Date</th>
                 <th class="px-3 py-2">Status</th>
                 <th class="px-3 py-2">Inspection</th>
-                <th class="px-3 py-2">BOM</th>
+                <th class="px-3 py-2">Type</th>
+                <th class="px-3 py-2">Recipe</th>
                 <th class="px-3 py-2">Finished item</th>
                 <th class="px-3 py-2">Location</th>
                 <th class="px-3 py-2 text-right">Qty</th>
@@ -234,14 +250,15 @@ export default function ProductionReportsPage() {
                   <tr
                     class="cursor-pointer border-t border-stroke/60 hover:bg-brand-50/40"
                     onClick={() => {
-                      window.location.href = `/app/production/work-orders?status=${encodeURIComponent(row.status)}`;
+                      const branch = row.bom_type === "disassembly" ? "disassembly" : "assembly";
+                      window.location.href = `/app/production/${branch}/jobs?status=${encodeURIComponent(row.status)}`;
                     }}
-                    title="Open work orders list"
+                    title="Open jobs list"
                   >
                     <td class="px-3 py-2">
                       <a
                         class="text-brand-700 underline-offset-2 hover:underline"
-                        href={`/app/production/work-orders?status=${encodeURIComponent(row.status)}`}
+                        href={`/app/production/${row.bom_type === "disassembly" ? "disassembly" : "assembly"}/jobs?status=${encodeURIComponent(row.status)}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {row.work_order_no}
@@ -250,6 +267,7 @@ export default function ProductionReportsPage() {
                     <td class="px-3 py-2">{row.order_date?.slice(0, 10)}</td>
                     <td class="px-3 py-2 capitalize">{row.status.replace(/_/g, " ")}</td>
                     <td class="px-3 py-2 capitalize">{row.inspection_status.replace(/_/g, " ")}</td>
+                    <td class="px-3 py-2 capitalize">{row.bom_type === "disassembly" ? "Disassembly" : "Assembly"}</td>
                     <td class="px-3 py-2">{row.bom_code}</td>
                     <td class="px-3 py-2">{row.finished_item_code} — {row.finished_item_name}</td>
                     <td class="px-3 py-2">{row.location_name}</td>

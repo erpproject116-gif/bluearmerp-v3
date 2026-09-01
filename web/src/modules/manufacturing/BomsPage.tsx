@@ -1,17 +1,21 @@
 import { createSignal, For, Show, createResource } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { UnitLookupCombo, formatUnitLabel } from "../../shared/UnitLookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
+import { FormErrorSummary } from "../../shared/FormErrorSummary";
+import { collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
+import type { FormErrors } from "../../shared/formValidation";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useListState } from "../../shared/useListState";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
-import { ManufacturingLayout } from "./ManufacturingLayout";
-
+import { useProductionMode } from "../production/ProductionModeLayout";
+import { recipesHref } from "../production/mfgProductionMode";
 type BomLine = {
   id?: number;
   line_no: number;
@@ -43,6 +47,8 @@ type Bom = {
   output_unit_code?: string;
   yield_pct?: number;
   bom_type?: string;
+  expected_yield_pct_min?: number | null;
+  expected_yield_pct_max?: number | null;
   is_active: boolean;
   notes?: string | null;
   components?: string;
@@ -115,6 +121,8 @@ function emptyLine(): BomLine {
 }
 
 export default function BomsPage() {
+  const { mode, copy } = useProductionMode();
+  const navigate = useNavigate();
   const auth = useAuth();
   const canBulkDeactivate = () => hasPermission(auth.me, "manufacturing.boms_bulk", "write");
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
@@ -138,7 +146,9 @@ export default function BomsPage() {
   const [outputUnitId, setOutputUnitId] = createSignal<number | null>(null);
   const [outputUnitLabel, setOutputUnitLabel] = createSignal("");
   const [yieldPct, setYieldPct] = createSignal("100");
-  const [bomType, setBomType] = createSignal<"assembly" | "disassembly">("assembly");
+  const [expectedYieldMin, setExpectedYieldMin] = createSignal("");
+  const [expectedYieldMax, setExpectedYieldMax] = createSignal("");
+  const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
   const [notes, setNotes] = createSignal("");
   const [lines, setLines] = createSignal<BomLine[]>([emptyLine()]);
   const [lineLabels, setLineLabels] = createSignal<Record<number, string>>({});
@@ -161,8 +171,9 @@ export default function BomsPage() {
     });
     if (q()) qs.set("q", q());
     if (statusFilter()) qs.set("status", statusFilter());
+    qs.set("bom_type", mode);
     return {
-      queryKey: ["mfg-boms", page(), pageSize, sort(), order(), q(), statusFilter()],
+      queryKey: ["mfg-boms", mode, page(), pageSize, sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<Bom[]>(`/api/v1/manufacturing/boms?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -189,7 +200,9 @@ export default function BomsPage() {
     setOutputUnitId(null);
     setOutputUnitLabel("");
     setYieldPct("100");
-    setBomType("assembly");
+    setExpectedYieldMin("");
+    setExpectedYieldMax("");
+    setFieldErrors({});
     setNotes("");
     setLines([emptyLine()]);
     setLineLabels({});
@@ -204,6 +217,12 @@ export default function BomsPage() {
       return;
     }
     const detail = res.data;
+    const detailType = detail.bom_type === "disassembly" ? "disassembly" : "assembly";
+    if (detailType !== mode) {
+      toast.warning(`This recipe is ${detailType === "disassembly" ? "Disassembly" : "Assembly"}. Opening in the correct section.`);
+      navigate(recipesHref(detailType));
+      return;
+    }
     setEditing(detail);
     setBomCode(detail.bom_code);
     setBomName(detail.bom_name);
@@ -216,7 +235,9 @@ export default function BomsPage() {
     setOutputUnitId(detail.output_unit_id ?? null);
     setOutputUnitLabel(detail.output_unit_code ?? "");
     setYieldPct(String(detail.yield_pct ?? 100));
-    setBomType(detail.bom_type === "disassembly" ? "disassembly" : "assembly");
+    setExpectedYieldMin(detail.expected_yield_pct_min != null ? String(detail.expected_yield_pct_min) : "");
+    setExpectedYieldMax(detail.expected_yield_pct_max != null ? String(detail.expected_yield_pct_max) : "");
+    setFieldErrors({});
     setNotes(detail.notes ?? "");
     const loaded = detail.lines?.length ? detail.lines : [emptyLine()];
     setLines(
@@ -245,7 +266,9 @@ export default function BomsPage() {
       output_unit_id: outputUnitId(),
       output_unit_label: outputUnitLabel(),
       yield_pct: yieldPct(),
-      bom_type: bomType(),
+      expected_yield_min: expectedYieldMin(),
+      expected_yield_max: expectedYieldMax(),
+      bom_type: mode,
       notes: notes(),
       lines: lines(),
       line_labels: lineLabels(),
@@ -263,7 +286,8 @@ export default function BomsPage() {
       setOutputUnitId(payload.output_unit_id ?? null);
       setOutputUnitLabel(payload.output_unit_label ?? "");
       setYieldPct(payload.yield_pct ?? "100");
-      setBomType(payload.bom_type === "disassembly" ? "disassembly" : "assembly");
+      setExpectedYieldMin(payload.expected_yield_min ?? "");
+      setExpectedYieldMax(payload.expected_yield_max ?? "");
       setNotes(payload.notes ?? "");
       setLines(payload.lines?.length ? payload.lines : [emptyLine()]);
       setLineLabels(payload.line_labels ?? {});
@@ -276,23 +300,38 @@ export default function BomsPage() {
   const addLine = () => setLines((prev) => [...prev, { ...emptyLine(), line_no: prev.length + 1 }]);
 
   const save = async () => {
-    if (!bomCode().trim() || !bomName().trim() || !finishedItemId()) {
-      toast.warning("BOM code, name, and finished item are required.");
-      return;
-    }
+    const errs = collectRequiredFieldErrors(
+      {
+        bom_code: bomCode(),
+        bom_name: bomName(),
+        finished_item_id: finishedItemId(),
+      },
+      [
+        { key: "bom_code", label: "Recipe code" },
+        { key: "bom_name", label: "Name" },
+        { key: "finished_item_id", label: copy.headerItemLabel },
+      ],
+    );
     const bodyLines = lines()
       .filter((ln) => ln.component_item_id > 0 && Number(ln.qty) > 0)
       .map((ln) => ({
         component_item_id: ln.component_item_id,
         qty: Number(ln.qty),
         unit_id: ln.unit_id || null,
-        scrap_qty: lineScrapQty(ln),
+        scrap_qty: copy.showScrap ? lineScrapQty(ln) : 0,
       }));
     if (bodyLines.length === 0) {
-      toast.warning("Add at least one component line.");
+      errs.lines =
+        mode === "disassembly"
+          ? "Add at least one output piece."
+          : "Add at least one raw material line.";
+    }
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
-    const payload = {
+    setFieldErrors({});
+    const payload: Record<string, unknown> = {
       bom_code: bomCode().trim(),
       bom_name: bomName().trim(),
       finished_item_id: finishedItemId(),
@@ -300,11 +339,17 @@ export default function BomsPage() {
       output_qty: Number(outputQty()) || 1,
       output_unit_id: outputUnitId(),
       yield_pct: Number(yieldPct()) || 100,
-      bom_type: bomType(),
+      bom_type: mode,
       is_active: isActive(),
       notes: notes().trim() || null,
       lines: bodyLines,
     };
+    if (mode === "disassembly") {
+      const minRaw = expectedYieldMin().trim();
+      const maxRaw = expectedYieldMax().trim();
+      payload.expected_yield_pct_min = minRaw ? Number(minRaw) : null;
+      payload.expected_yield_pct_max = maxRaw ? Number(maxRaw) : null;
+    }
     const ed = editing();
     setSaving(true);
     const res = await apiFetch(
@@ -313,12 +358,10 @@ export default function BomsPage() {
       { silent: true },
     );
     setSaving(false);
-    if (!res.success) {
-      const detail = res.errors ? Object.values(res.errors).join(" ") : "";
-      toast.warning(detail || res.message || "Failed to save BOM.");
-      return;
-    }
-    toast.success(ed ? "BOM updated." : "BOM created.");
+    const ok = handleSaveResult(res, toast, ed ? "Recipe updated." : "Recipe created.", {
+      onFieldErrors: setFieldErrors,
+    });
+    if (!ok) return;
     await draft.clearOnSave();
     setModalOpen(false);
     setQ("");
@@ -348,24 +391,17 @@ export default function BomsPage() {
   };
 
   return (
-    <ManufacturingLayout>
+    <>
       <p class="mb-3 text-sm text-text-secondary">
-        <span class="font-medium text-text-primary">Recipes (BOMs):</span>{" "}
-        Define how a finished item is built, or how a whole item is cut apart into parts (disassembly). Yields and scrap live on the recipe lines.
+        <span class="font-medium text-text-primary">{copy.recipeTitle}:</span>{" "}
+        {copy.stockHint}. Amounts are per one recipe batch.
       </p>
       <SpreadsheetGrid<Bom>
         columns={[
           { key: "bom_code", header: "Recipe code", clickable: true },
           { key: "bom_name", header: "Name", clickable: true },
-          { key: "finished_item_name", header: "Finished / whole item" },
-          {
-            key: "bom_type",
-            header: "Type",
-            sortable: false,
-            render: (r) =>
-              r.bom_type === "disassembly" ? "Cut apart (disassembly)" : "Assembly",
-          },
-          { key: "components", header: "Components" },
+          { key: "finished_item_name", header: copy.headerItemLabel },
+          { key: "components", header: mode === "disassembly" ? "Outputs" : "Materials" },
           { key: "default_location_name", header: "Default location" },
           {
             key: "is_active",
@@ -383,7 +419,7 @@ export default function BomsPage() {
         onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={openNew}
         onEdit={openEdit}
-        settingsHref="/app/production/boms"
+        settingsHref={recipesHref(mode)}
         codeKey="bom_code"
         nameKey="bom_name"
         sortKey={sort()}
@@ -424,7 +460,7 @@ export default function BomsPage() {
 
       <EntityModal
         open={modalOpen()}
-        title={editing() ? "Edit BOM" : "New BOM"}
+        title={editing() ? `Edit ${copy.recipeTitle.replace(/s$/, "")}` : copy.newRecipeTitle}
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
         saving={saving()}
@@ -432,22 +468,13 @@ export default function BomsPage() {
         <div class="col-span-full">
           <draft.DraftBanner />
         </div>
-        <ModalFormGuide guideId="mfg_bom" spanFull />
-        <Field label="BOM code *">
+        <FormErrorSummary errors={fieldErrors} />
+        <ModalFormGuide guideId={copy.bomGuideId} spanFull />
+        <Field label="Recipe code *">
           <input class={inputClass} value={bomCode()} onInput={(e) => setBomCode(e.currentTarget.value)} />
         </Field>
         <Field label="Name *">
           <input class={inputClass} value={bomName()} onInput={(e) => setBomName(e.currentTarget.value)} />
-        </Field>
-        <Field label="BOM type">
-          <select
-            class={inputClass}
-            value={bomType()}
-            onChange={(e) => setBomType(e.currentTarget.value === "disassembly" ? "disassembly" : "assembly")}
-          >
-            <option value="assembly">Assembly — consume components, receive finished item</option>
-            <option value="disassembly">Cut apart (disassembly) — consume whole, receive parts</option>
-          </select>
         </Field>
         <label class="flex items-end gap-2 pb-2 text-sm">
           <input type="checkbox" checked={isActive()} onChange={(e) => setIsActive(e.currentTarget.checked)} />
@@ -455,7 +482,7 @@ export default function BomsPage() {
         </label>
         <div class="sm:col-span-2 lg:col-span-2">
           <LookupCombo
-            label="Finished item"
+            label={copy.headerItemLabel}
             required
             value={finishedItemLabel}
             selectedId={finishedItemId}
@@ -482,11 +509,11 @@ export default function BomsPage() {
           onClear={() => { setLocationId(null); setLocationLabel(""); }}
           fetchOptions={fetchLocations}
         />
-        <Field label="Output qty *">
+        <Field label={`${copy.batchQtyLabel} *`}>
           <input class={inputClass} type="number" min="0" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
         </Field>
         <UnitLookupCombo
-          label="Output UoM"
+          label="Batch UoM"
           selectedId={outputUnitId}
           value={outputUnitLabel}
           onInput={setOutputUnitLabel}
@@ -503,21 +530,32 @@ export default function BomsPage() {
         <Field label="Yield %">
           <input class={inputClass} type="number" min="0" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
         </Field>
+        <Show when={mode === "disassembly"}>
+          <Field label="Expected yield min %">
+            <input class={inputClass} type="number" min="0" value={expectedYieldMin()} onInput={(e) => setExpectedYieldMin(e.currentTarget.value)} />
+          </Field>
+          <Field label="Expected yield max %">
+            <input class={inputClass} type="number" min="0" value={expectedYieldMax()} onInput={(e) => setExpectedYieldMax(e.currentTarget.value)} />
+          </Field>
+        </Show>
         <div class="col-span-full sm:col-span-2 lg:col-span-3">
           <Field label="Notes">
             <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
           </Field>
         </div>
-        <p class="col-span-full text-xs text-text-secondary">
-          Stock issue uses <strong>Used + Scrap/spare</strong> (numeric only). Blank scrap/spare is fine.
-        </p>
+        <Show when={copy.showScrap}>
+          <p class="col-span-full text-xs text-text-secondary">
+            Stock issue uses <strong>{copy.lineQtyLabel} + {copy.scrapLabel}</strong> (numeric only). Blank scrap is fine.
+          </p>
+        </Show>
+        <p class="col-span-full text-xs text-text-secondary">{copy.stockHint}</p>
         <div class="col-span-full space-y-2">
-          <p class="text-sm font-medium text-text-primary">Components (per output batch)</p>
+          <p class="text-sm font-medium text-text-primary">{copy.lineSectionTitle}</p>
           <For each={lines()}>
             {(ln, idx) => {
               const preview = () => liveStockPreview(ln, conversions() ?? []);
               return (
-                <div class="grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_5.5rem_auto]">
+                <div class={`grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 ${copy.showScrap ? "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_5.5rem_auto]" : "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_auto]"}`}>
                   <LookupCombo
                     label={`Line ${idx() + 1}`}
                     required
@@ -555,7 +593,7 @@ export default function BomsPage() {
                     fetchOptions={fetchItems}
                   />
                   <label class="text-sm">
-                    <span class="text-text-secondary">Used</span>
+                    <span class="text-text-secondary">{copy.lineQtyLabel}</span>
                     <input
                       type="number"
                       class={`${inputClass} mt-1`}
@@ -584,20 +622,22 @@ export default function BomsPage() {
                       setLineUnitLabels((p) => ({ ...p, [idx()]: "" }));
                     }}
                   />
-                  <label class="text-sm">
-                    <span class="text-text-secondary">Scrap/spare</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      class={`${inputClass} mt-1`}
-                      placeholder="0"
-                      value={ln.scrap_input ?? ""}
-                      onInput={(e) => {
-                        const v = e.currentTarget.value;
-                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_input: v } : row)));
-                      }}
-                    />
-                  </label>
+                  <Show when={copy.showScrap}>
+                    <label class="text-sm">
+                      <span class="text-text-secondary">{copy.scrapLabel}</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        class={`${inputClass} mt-1`}
+                        placeholder="0"
+                        value={ln.scrap_input ?? ""}
+                        onInput={(e) => {
+                          const v = e.currentTarget.value;
+                          setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_input: v } : row)));
+                        }}
+                      />
+                    </label>
+                  </Show>
                   {(() => {
                     const prev = preview();
                     if (!prev) return <span class="hidden sm:block" />;
@@ -612,10 +652,10 @@ export default function BomsPage() {
             }}
           </For>
           <button type="button" class="text-sm text-brand-600 hover:underline" onClick={addLine}>
-            + Add component
+            + {mode === "disassembly" ? "Add output" : "Add material"}
           </button>
         </div>
       </EntityModal>
-    </ManufacturingLayout>
+    </>
   );
 }

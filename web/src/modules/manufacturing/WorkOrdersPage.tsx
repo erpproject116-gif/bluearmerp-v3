@@ -4,13 +4,18 @@ import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
+import { FormErrorSummary } from "../../shared/FormErrorSummary";
+import { collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
+import type { FormErrors } from "../../shared/formValidation";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useListState } from "../../shared/useListState";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
-import { ProductionLayout } from "../production/ProductionLayout";
+import { useProductionMode } from "../production/ProductionModeLayout";
+import { jobsHref, type MfgMode } from "../production/mfgProductionMode";
+import { CompleteWorkOrderModal } from "./CompleteWorkOrderModal";
 import {
   WoSalesOrderLinePickerModal,
   type PickedWoSalesOrderLine,
@@ -32,6 +37,7 @@ type WorkOrder = {
   inspection_status?: string;
   order_date: string;
   notes?: string | null;
+  bom_type?: string;
 };
 
 type BomOption = { id: number; bom_code: string; bom_name: string };
@@ -51,19 +57,23 @@ type MaterialNeedLine = {
 
 type MaterialNeeds = {
   work_order_id: number;
+  bom_type?: string;
   qty_to_produce: number;
   finished_base_unit_code: string;
   output_qty: number;
   yield_pct: number;
   receive_qty: number;
+  input_line?: MaterialNeedLine;
   lines: MaterialNeedLine[];
 };
 
-async function fetchBoms(q: string): Promise<LookupOption[]> {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
-  if (q) qs.set("q", q);
-  const res = await apiFetch<BomOption[]>(`/api/v1/manufacturing/boms?${qs}`);
-  return (res.data ?? []).map((b) => ({ id: b.id, label: `${b.bom_code} — ${b.bom_name}` }));
+function makeFetchBoms(mode: MfgMode) {
+  return async (q: string): Promise<LookupOption[]> => {
+    const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", bom_type: mode });
+    if (q) qs.set("q", q);
+    const res = await apiFetch<BomOption[]>(`/api/v1/manufacturing/boms?${qs}`);
+    return (res.data ?? []).map((b) => ({ id: b.id, label: `${b.bom_code} — ${b.bom_name}` }));
+  };
 }
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
@@ -82,6 +92,7 @@ const STATUS_TABS = [
 ];
 
 export default function WorkOrdersPage() {
+  const { mode, copy } = useProductionMode();
   const auth = useAuth();
   const [searchParams] = useSearchParams();
   const canRelease = () => hasPermission(auth.me, "manufacturing.work_orders_release", "write");
@@ -122,6 +133,8 @@ export default function WorkOrdersPage() {
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [loadSlipBusy, setLoadSlipBusy] = createSignal(false);
   const [inspectingId, setInspectingId] = createSignal<number | null>(null);
+  const [completeTarget, setCompleteTarget] = createSignal<WorkOrder | null>(null);
+  const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
   const toast = useToast();
   const client = useQueryClient();
 
@@ -134,8 +147,9 @@ export default function WorkOrdersPage() {
     });
     if (q()) qs.set("q", q());
     if (statusFilter()) qs.set("status", statusFilter());
+    qs.set("bom_type", mode);
     return {
-      queryKey: ["mfg-work-orders", page(), pageSize, sort(), order(), q(), statusFilter()],
+      queryKey: ["mfg-work-orders", mode, page(), pageSize, sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<WorkOrder[]>(`/api/v1/manufacturing/work-orders?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -208,14 +222,24 @@ export default function WorkOrdersPage() {
   });
 
   const saveWo = async () => {
-    if (!editing() && (!bomId() || Number(qty()) <= 0)) {
-      toast.warning("Select BOM and quantity.");
-      return;
-    }
     if (editing() && editing()!.status !== "draft") {
-      toast.warning("Only draft work orders can be edited.");
+      toast.warning("Only draft jobs can be edited.");
       return;
     }
+    const errs = editing()
+      ? collectRequiredFieldErrors({ qty_to_produce: qty() }, [{ key: "qty_to_produce", label: copy.jobQtyLabel }])
+      : collectRequiredFieldErrors(
+          { bom_id: bomId(), qty_to_produce: qty() },
+          [
+            { key: "bom_id", label: "Recipe" },
+            { key: "qty_to_produce", label: copy.jobQtyLabel },
+          ],
+        );
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      return;
+    }
+    setFieldErrors({});
     setSaving(true);
     const ed = editing();
     let res;
@@ -246,11 +270,8 @@ export default function WorkOrdersPage() {
       );
     }
     setSaving(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Failed to save work order.");
-      return;
-    }
-    toast.success(ed ? "Work order updated." : "Work order created.");
+    const ok = handleSaveResult(res, toast, ed ? "Job updated." : "Job created.", { onFieldErrors: setFieldErrors });
+    if (!ok) return;
     await draft.clearOnSave();
     const saved = res.data as WorkOrder | undefined;
     if (saved?.id) {
@@ -324,57 +345,8 @@ export default function WorkOrdersPage() {
     }
   };
 
-  const complete = async (row: WorkOrder) => {
-    const needsRes = await apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${row.id}/material-needs`);
-    const needs = needsRes.data;
-    const unit = needs?.finished_base_unit_code || row.finished_base_unit_code || "";
-    const linesSummary = (needs?.lines ?? [])
-      .map((l) => `• ${l.component_code}: ${l.stock_to_issue.toFixed(4)} ${l.stock_unit_code} (on hand ${l.qty_on_hand.toFixed(4)})`)
-      .join("\n");
-    const planned = row.qty_to_produce;
-    const actualRaw = window.prompt(
-      [
-        `Complete ${row.work_order_no}?`,
-        `Planned input / qty: ${planned} ${unit}`,
-        "Enter actual input qty (kg or units). Leave blank to use planned.",
-        "For cut-apart (disassembly) jobs, enter the weighed whole carcass kg.",
-        linesSummary ? `\nMaterials / yields:\n${linesSummary}` : "",
-      ].join("\n"),
-      String(planned),
-    );
-    if (actualRaw === null) return;
-    const trimmed = actualRaw.trim();
-    let actualInputQty: number | undefined;
-    if (trimmed !== "") {
-      const n = Number(trimmed);
-      if (!Number.isFinite(n) || n <= 0) {
-        toast.warning("Actual input qty must be a positive number.");
-        return;
-      }
-      actualInputQty = n;
-    }
-    if (!window.confirm(`Confirm complete ${row.work_order_no} with actual input ${actualInputQty ?? planned} ${unit}?`)) return;
-    setActionId(row.id);
-    const body: { actual_input_qty?: number } = {};
-    if (actualInputQty != null) body.actual_input_qty = actualInputQty;
-    const res = await apiFetch(`/api/v1/manufacturing/work-orders/${row.id}/complete`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    setActionId(null);
-    if (!res.success) {
-      const detail =
-        (res.errors && Object.values(res.errors).filter(Boolean).join(" ")) ||
-        res.message;
-      toast.warning(detail ?? "Failed to complete.");
-      return;
-    }
-    toast.success("Work order completed.");
-    invalidate();
-  };
 
-  const bulkCancelDrafts = async () => {
-    const ids = [...selectedIds()];
+  const bulkCancelDrafts = async () => {    const ids = [...selectedIds()];
     if (ids.length === 0 || !canBulkWo()) return;
     if (!window.confirm(`Cancel ${ids.length} selected draft work order(s)?`)) return;
     setBulkBusy(true);
@@ -413,19 +385,22 @@ export default function WorkOrdersPage() {
     invalidate();
   };
 
+  const stationQuery = (woId: number) => `?woId=${woId}&mode=${mode}`;
+
+  const woType = (r: WorkOrder) => (r.bom_type === "disassembly" ? "disassembly" : "assembly") as MfgMode;
+
   return (
-    <ProductionLayout>
+    <>
       <p class="mb-3 text-sm text-text-secondary">
-        <span class="font-medium text-text-primary">Jobs (work orders):</span>{" "}
-        Use the sequence strip above. On each row, the next action is highlighted.
-        From a customer order: use <span class="font-medium">From customer order</span> (Load Slip).
+        <span class="font-medium text-text-primary">{copy.jobTitle}:</span>{" "}
+        Release and finish from each row. {copy.stockHint}.
       </p>
       <SpreadsheetGrid<WorkOrder>
         columns={[
           { key: "work_order_no", header: "WO no.", clickable: true },
           { key: "order_date", header: "Date" },
-          { key: "bom_code", header: "BOM" },
-          { key: "finished_item_name", header: "Finished item" },
+          { key: "bom_code", header: "Recipe" },
+          { key: "finished_item_name", header: copy.headerItemLabel },
           { key: "location_name", header: "Location" },
           {
             key: "qty_to_produce",
@@ -482,27 +457,38 @@ export default function WorkOrdersPage() {
                 </Show>
                 <Show when={r.status === "released"}>
                   <span class="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Floor</span>
-                  <A
-                    href={`/app/production/issue-station?woId=${r.id}`}
-                    class="text-xs font-medium text-brand-600 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Issue materials
-                  </A>
-                  <A
-                    href={`/app/production/receive-station?woId=${r.id}`}
-                    class="text-xs font-medium text-brand-600 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Receive FG
-                  </A>
-                  <A
-                    href={`/app/production/weigh-parts?woId=${r.id}`}
-                    class="text-xs font-medium text-brand-600 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Weigh parts
-                  </A>
+                  <Show when={woType(r) === "assembly"}>
+                    <A
+                      href={`/app/production/issue-station${stationQuery(r.id)}`}
+                      class="text-xs font-medium text-brand-600 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Issue materials
+                    </A>
+                    <A
+                      href={`/app/production/receive-station${stationQuery(r.id)}`}
+                      class="text-xs font-medium text-brand-600 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Receive FG
+                    </A>
+                  </Show>
+                  <Show when={woType(r) === "disassembly"}>
+                    <A
+                      href={`/app/production/weigh-parts${stationQuery(r.id)}`}
+                      class="text-xs font-medium text-brand-600 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Weigh whole
+                    </A>
+                    <A
+                      href={`/app/production/receive-station${stationQuery(r.id)}`}
+                      class="text-xs font-medium text-brand-600 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Receive pieces
+                    </A>
+                  </Show>
                 </Show>
                 <Show when={r.status === "released" && canComplete()}>
                   <button
@@ -514,7 +500,7 @@ export default function WorkOrdersPage() {
                         ? "Pass FG QC first"
                         : undefined
                     }
-                    onClick={(e) => { e.stopPropagation(); void complete(r); }}
+                    onClick={(e) => { e.stopPropagation(); setCompleteTarget(r); }}
                   >
                     Next: Complete
                   </button>
@@ -541,7 +527,7 @@ export default function WorkOrdersPage() {
         onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={openNew}
         onEdit={(row) => void openEdit(row)}
-        settingsHref="/app/production/work-orders"
+        settingsHref={jobsHref(mode)}
         toolbarExtra={
           <>
             <Show when={canBulkWo()}>
@@ -564,15 +550,17 @@ export default function WorkOrdersPage() {
                 </button>
               </Show>
             </Show>
-            <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
-            disabled={loadSlipBusy()}
-            onClick={() => setSoPickerOpen(true)}
-            title="Create work orders from a sales order (Load Slip)"
-          >
-            {loadSlipBusy() ? "Loading…" : "From customer order…"}
-          </button>
+            <Show when={mode === "assembly"}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                disabled={loadSlipBusy()}
+                onClick={() => setSoPickerOpen(true)}
+                title="Create Assembly jobs from a sales order"
+              >
+                {loadSlipBusy() ? "Loading…" : "From customer order…"}
+              </button>
+            </Show>
           </>
         }
         codeKey="work_order_no"
@@ -596,7 +584,7 @@ export default function WorkOrdersPage() {
 
       <EntityModal
         open={modalOpen()}
-        title={editing() ? `Work Order ${editing()!.work_order_no}` : "New Work Order"}
+        title={editing() ? `Job ${editing()!.work_order_no}` : copy.newJobTitle}
         onClose={() => setModalOpen(false)}
         onSave={() => {
           if (editing() && editing()!.status !== "draft") {
@@ -612,16 +600,17 @@ export default function WorkOrdersPage() {
         <Show when={!editing()}>
           <draft.DraftBanner />
         </Show>
-        <ModalFormGuide guideId="mfg_work_order" spanFull />
+        <FormErrorSummary errors={fieldErrors} />
+        <ModalFormGuide guideId={copy.jobGuideId} spanFull />
         <LookupCombo
-          label="BOM"
+          label="Recipe"
           required
           value={bomLabel}
           selectedId={bomId}
           onInput={setBomLabel}
           onSelect={(o) => { setBomId(o.id); setBomLabel(o.label); }}
           onClear={() => { setBomId(null); setBomLabel(""); }}
-          fetchOptions={fetchBoms}
+          fetchOptions={makeFetchBoms(mode)}
           disabled={!!editing()}
         />
         <div class="mt-3">
@@ -636,7 +625,7 @@ export default function WorkOrdersPage() {
             disabled={!!editing() && editing()!.status !== "draft"}
           />
         </div>
-        <Field label={`Quantity to produce *${finishedUnit() ? ` (${finishedUnit()} — finished base UoM)` : " (finished base UoM)"}`}>
+        <Field label={`${copy.jobQtyLabel} *${finishedUnit() ? ` (${finishedUnit()})` : ""}`}>
           <input
             class={inputClass}
             type="number"
@@ -650,18 +639,34 @@ export default function WorkOrdersPage() {
         <Show when={materials()}>
           {(m) => (
             <div class="mt-4 space-y-2">
-              <p class="text-sm font-medium text-text-primary">Materials needed</p>
+              <Show when={m().input_line}>
+                {(input) => (
+                  <div class="rounded border border-stroke p-2 text-xs">
+                    <p class="font-medium text-text-primary">{copy.materialsInputLabel}</p>
+                    <p>
+                      {input().component_code}: {input().stock_to_issue.toFixed(4)} {input().stock_unit_code}
+                    </p>
+                  </div>
+                )}
+              </Show>
+              <p class="text-sm font-medium text-text-primary">
+                {mode === "disassembly" ? copy.materialsOutputLabel : "Materials needed"}
+              </p>
               <p class="text-xs text-text-secondary">
-                Will receive {m().receive_qty} {m().finished_base_unit_code || finishedUnit()} · BOM output {m().output_qty} · yield {m().yield_pct}%
+                {mode === "disassembly"
+                  ? `Batch ${m().output_qty} · yield ${m().yield_pct}%`
+                  : `Will receive ${m().receive_qty} ${m().finished_base_unit_code || finishedUnit()} · batch ${m().output_qty} · yield ${m().yield_pct}%`}
               </p>
               <div class="overflow-x-auto rounded border border-stroke">
                 <table class="min-w-full text-left text-xs">
                   <thead class="bg-slate-50 text-text-secondary">
                     <tr>
-                      <th class="px-2 py-1.5">Component</th>
-                      <th class="px-2 py-1.5">Used</th>
-                      <th class="px-2 py-1.5">Scrap/spare</th>
-                      <th class="px-2 py-1.5">To issue (stock)</th>
+                      <th class="px-2 py-1.5">Item</th>
+                      <th class="px-2 py-1.5">Recipe qty</th>
+                      <Show when={mode === "assembly"}>
+                        <th class="px-2 py-1.5">Scrap/spare</th>
+                      </Show>
+                      <th class="px-2 py-1.5">{mode === "disassembly" ? "Expected" : "To issue"}</th>
                       <th class="px-2 py-1.5">On hand</th>
                     </tr>
                   </thead>
@@ -671,7 +676,9 @@ export default function WorkOrdersPage() {
                         <tr class={ln.shortage > 0 ? "bg-red-50 text-red-800" : ""}>
                           <td class="px-2 py-1.5">{ln.component_code} — {ln.component_name}</td>
                           <td class="px-2 py-1.5">{ln.bom_qty} {ln.bom_unit_code}</td>
-                          <td class="px-2 py-1.5">{ln.scrap_qty} {ln.bom_unit_code}</td>
+                          <Show when={mode === "assembly"}>
+                            <td class="px-2 py-1.5">{ln.scrap_qty} {ln.bom_unit_code}</td>
+                          </Show>
                           <td class="px-2 py-1.5">{ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}</td>
                           <td class="px-2 py-1.5">
                             {ln.qty_on_hand.toFixed(4)}
@@ -689,11 +696,18 @@ export default function WorkOrdersPage() {
           )}
         </Show>
       </EntityModal>
+      <CompleteWorkOrderModal
+        open={!!completeTarget()}
+        workOrder={completeTarget()}
+        mode={mode}
+        onClose={() => setCompleteTarget(null)}
+        onCompleted={() => invalidate()}
+      />
       <WoSalesOrderLinePickerModal
         open={soPickerOpen()}
         onClose={() => setSoPickerOpen(false)}
         onConfirm={(picked) => void applySalesOrderLines(picked)}
       />
-    </ProductionLayout>
+    </>
   );
 }

@@ -48,6 +48,7 @@ type WorkOrder struct {
 	InspectedAt        *string  `json:"inspected_at,omitempty"`
 	SourceSalesOrderID     *int64 `json:"source_sales_order_id,omitempty"`
 	SourceSalesOrderLineID *int64 `json:"source_sales_order_line_id,omitempty"`
+	BomType                string `json:"bom_type,omitempty"`
 }
 
 type MaterialNeedLine struct {
@@ -65,11 +66,13 @@ type MaterialNeedLine struct {
 
 type MaterialNeeds struct {
 	WorkOrderID          int64              `json:"work_order_id"`
+	BomType              string             `json:"bom_type"`
 	QtyToProduce         float64            `json:"qty_to_produce"`
 	FinishedBaseUnitCode string             `json:"finished_base_unit_code"`
 	OutputQty            float64            `json:"output_qty"`
 	YieldPct             float64            `json:"yield_pct"`
 	ReceiveQty           float64            `json:"receive_qty"`
+	InputLine            *MaterialNeedLine  `json:"input_line,omitempty"`
 	Lines                []MaterialNeedLine `json:"lines"`
 }
 
@@ -132,6 +135,11 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, st)
 			n++
 		}
+		if bt := parseBomTypeListFilter(r.URL.Query().Get("bom_type")); bt != "" {
+			where += fmt.Sprintf(" and coalesce(b.bom_type, 'assembly') = $%d", n)
+			args = append(args, bt)
+			n++
+		}
 
 		sortCol := allowed[p.Sort]
 		if sortCol == "" {
@@ -139,6 +147,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		q := fmt.Sprintf(`
 			select wo.id, wo.work_order_no, wo.bom_id, b.bom_code, b.bom_name,
+			  coalesce(b.bom_type, 'assembly'),
 			  wo.finished_item_id, coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
 			  coalesce(bu.code, coalesce(nullif(trim(fi.unit), ''), 'ea')),
 			  wo.location_id, coalesce(loc.location_name, ''),
@@ -174,7 +183,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			var released, completed, inspectedAt *string
 			var inspectionNotes *string
 			if err := rows.Scan(
-				&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName,
+				&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName, &row.BomType,
 				&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 				&row.LocationID, &row.LocationName,
 				&row.QtyToProduce, &row.QtyProduced, &row.Status,
@@ -671,49 +680,98 @@ func getWorkOrderMaterialNeeds(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "BOM not found.", "ERR_INTERNAL")
 			return
 		}
-		out := MaterialNeeds{
-			WorkOrderID:          wo.ID,
-			QtyToProduce:         wo.QtyToProduce,
-			FinishedBaseUnitCode: wo.FinishedBaseUnit,
-			OutputQty:            bom.OutputQty,
-			YieldPct:             bom.YieldPct,
-			ReceiveQty:           wo.QtyToProduce,
-			Lines:                []MaterialNeedLine{},
-		}
-		for _, ln := range bom.Lines {
-			stock, unitCode, err := StockIssueForLine(r.Context(), pool, tu.TenantID, ln, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
-			if err != nil {
-				response.Validation(w, map[string]string{"lines": err.Error()})
-				return
-			}
-			var onHand float64
-			_ = pool.QueryRow(r.Context(), `
-				select coalesce(qty_on_hand, 0)::float8 from public.inv_item_location_balances
-				where tenant_id=$1 and item_id=$2 and location_id=$3`,
-				tu.TenantID, ln.ComponentItemID, wo.LocationID).Scan(&onHand)
-			shortage := 0.0
-			if stock > onHand+0.0001 {
-				shortage = stock - onHand
-			}
-			unitCodeBom := ln.UnitCode
-			if unitCodeBom == "" {
-				unitCodeBom = ln.BaseUnitCode
-			}
-			out.Lines = append(out.Lines, MaterialNeedLine{
-				ComponentItemID: ln.ComponentItemID,
-				ComponentCode:   ln.ComponentCode,
-				ComponentName:   ln.ComponentName,
-				BomQty:          ln.Qty,
-				BomUnitCode:     unitCodeBom,
-				ScrapQty:        ln.ScrapQty,
-				StockToIssue:    stock,
-				StockUnitCode:   unitCode,
-				QtyOnHand:       onHand,
-				Shortage:        shortage,
-			})
+		out, err := buildMaterialNeeds(r.Context(), pool, tu.TenantID, wo, bom)
+		if err != nil {
+			response.Validation(w, map[string]string{"lines": err.Error()})
+			return
 		}
 		response.OK(w, out, "OK")
 	}
+}
+
+func buildMaterialNeeds(ctx context.Context, pool *pgxpool.Pool, tenantID int64, wo WorkOrder, bom Bom) (MaterialNeeds, error) {
+	bomType := normalizeBomType(bom.BomType)
+	out := MaterialNeeds{
+		WorkOrderID:          wo.ID,
+		BomType:              bomType,
+		QtyToProduce:         wo.QtyToProduce,
+		FinishedBaseUnitCode: wo.FinishedBaseUnit,
+		OutputQty:            bom.OutputQty,
+		YieldPct:             bom.YieldPct,
+		ReceiveQty:           wo.QtyToProduce,
+		Lines:                []MaterialNeedLine{},
+	}
+
+	itemOnHand := func(itemID int64) float64 {
+		var onHand float64
+		_ = pool.QueryRow(ctx, `
+			select coalesce(qty_on_hand, 0)::float8 from public.inv_item_location_balances
+			where tenant_id=$1 and item_id=$2 and location_id=$3`,
+			tenantID, itemID, wo.LocationID).Scan(&onHand)
+		return onHand
+	}
+
+	appendLine := func(ln BomLine, stock float64, unitCode string) MaterialNeedLine {
+		onHand := itemOnHand(ln.ComponentItemID)
+		shortage := 0.0
+		if stock > onHand+0.0001 {
+			shortage = stock - onHand
+		}
+		unitCodeBom := ln.UnitCode
+		if unitCodeBom == "" {
+			unitCodeBom = ln.BaseUnitCode
+		}
+		return MaterialNeedLine{
+			ComponentItemID: ln.ComponentItemID,
+			ComponentCode:   ln.ComponentCode,
+			ComponentName:   ln.ComponentName,
+			BomQty:          ln.Qty,
+			BomUnitCode:     unitCodeBom,
+			ScrapQty:        ln.ScrapQty,
+			StockToIssue:    stock,
+			StockUnitCode:   unitCode,
+			QtyOnHand:       onHand,
+			Shortage:        shortage,
+		}
+	}
+
+	if bomType == "disassembly" {
+		inputStock, unitCode, err := StockIssueForLine(ctx, pool, tenantID, BomLine{
+			ComponentItemID: wo.FinishedItemID,
+			ComponentCode:   wo.FinishedItemCode,
+			ComponentName:   wo.FinishedItemName,
+		}, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
+		if err != nil {
+			return MaterialNeeds{}, err
+		}
+		inputLine := appendLine(BomLine{
+			ComponentItemID: wo.FinishedItemID,
+			ComponentCode:   wo.FinishedItemCode,
+			ComponentName:   wo.FinishedItemName,
+			BaseUnitCode:    wo.FinishedBaseUnit,
+		}, inputStock, unitCode)
+		out.InputLine = &inputLine
+		out.ReceiveQty = 0
+		for _, ln := range bom.Lines {
+			plannedRecv, recvUnit, err := StockIssueForLine(ctx, pool, tenantID, ln, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
+			if err != nil {
+				return MaterialNeeds{}, err
+			}
+			line := appendLine(ln, plannedRecv, recvUnit)
+			out.Lines = append(out.Lines, line)
+			out.ReceiveQty += plannedRecv
+		}
+		return out, nil
+	}
+
+	for _, ln := range bom.Lines {
+		stock, unitCode, err := StockIssueForLine(ctx, pool, tenantID, ln, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
+		if err != nil {
+			return MaterialNeeds{}, err
+		}
+		out.Lines = append(out.Lines, appendLine(ln, stock, unitCode))
+	}
+	return out, nil
 }
 
 func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (WorkOrder, error) {
@@ -723,6 +781,7 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 	var inspectionNotes *string
 	err := pool.QueryRow(ctx, `
 		select wo.id, wo.work_order_no, wo.bom_id, b.bom_code, b.bom_name,
+		  coalesce(b.bom_type, 'assembly'),
 		  wo.finished_item_id, coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
 		  coalesce(bu.code, coalesce(nullif(trim(fi.unit), ''), 'ea')),
 		  wo.location_id, coalesce(loc.location_name, ''),
@@ -737,7 +796,7 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		left join public.inv_units bu on bu.id = fi.base_unit_id
 		left join public.inv_locations loc on loc.id = wo.location_id
 		where wo.id=$1 and wo.tenant_id=$2`, id, tenantID).Scan(
-		&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName,
+		&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName, &row.BomType,
 		&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 		&row.LocationID, &row.LocationName,
 		&row.QtyToProduce, &row.QtyProduced, &row.Status,

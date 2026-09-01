@@ -7,6 +7,7 @@ import { useToast } from "../../shared/toast";
 import { parseAndDedupeSerialBulkInput } from "../../shared/serialBulkParse";
 import { parseAndDedupeLotBulkInput } from "../../shared/lotBulkParse";
 import { ProductionLayout } from "./ProductionLayout";
+import { jobsHref, parseMfgMode } from "./mfgProductionMode";
 
 type WorkOrderOption = {
   id: number;
@@ -61,6 +62,10 @@ async function fetchReleasedWorkOrders(q: string): Promise<LookupOption[]> {
 export default function ProductionReceiveStationPage() {
   const toast = useToast();
   const [searchParams] = useSearchParams();
+  const jobsBackHref = () => {
+    const mode = parseMfgMode(String(searchParams.mode ?? "")) ?? "assembly";
+    return `${jobsHref(mode)}?status=released`;
+  };
   const [woLabel, setWoLabel] = createSignal("");
   const [woId, setWoId] = createSignal<number | null>(null);
   const [context, setContext] = createSignal<ScanContext | null>(null);
@@ -180,7 +185,7 @@ export default function ProductionReceiveStationPage() {
     <ProductionLayout>
       <div class="space-y-6">
         <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-          <A href="/app/production/work-orders?status=released" class="text-xs font-medium text-brand-700 hover:underline">
+          <A href={jobsBackHref()} class="text-xs font-medium text-brand-700 hover:underline">
             ← Work orders
           </A>
           <h2 class="mt-2 text-lg font-semibold text-text-primary">Receive / weigh station</h2>

@@ -104,6 +104,11 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, p.Status == "active")
 			argN++
 		}
+		if bt := parseBomTypeListFilter(r.URL.Query().Get("bom_type")); bt != "" {
+			where += fmt.Sprintf(" and coalesce(b.bom_type, 'assembly') = $%d", argN)
+			args = append(args, bt)
+			argN++
+		}
 
 		sortCol := allowed[p.Sort]
 		if sortCol == "" {
@@ -606,5 +611,17 @@ func normalizeBomType(v string) string {
 		return "disassembly"
 	default:
 		return "assembly"
+	}
+}
+
+// parseBomTypeListFilter returns normalized bom_type for list queries, or "" when unset/invalid.
+func parseBomTypeListFilter(raw string) string {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "assembly":
+		return "assembly"
+	case "disassembly":
+		return "disassembly"
+	default:
+		return ""
 	}
 }
