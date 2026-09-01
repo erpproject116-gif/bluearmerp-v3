@@ -51,6 +51,8 @@ func boolOrFalse(v *bool) bool {
 
 func createWithCode[T any](ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, entity string, insert func(context.Context, pgxpoolConn, string) (int64, T, error)) (int64, T, error) {
 	var zero T
+	// Align sequence with existing codes before first allocate (imports/seeds often skip the counter).
+	syncCodeSequence(ctx, pool, tu.TenantID, entity)
 	const maxAttempts = 5
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		tx, err := pool.Begin(ctx)

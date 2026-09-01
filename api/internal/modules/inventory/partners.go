@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -192,46 +193,41 @@ func createPartner(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		tx, err := pool.Begin(r.Context())
+		// Same retry path as items/locations: imports/seeds can leave partner_code
+		// sequences behind existing rows, causing unique (tenant_id, partner_code) failures.
+		id, _, err := createWithCode(r.Context(), pool, tu, "partner", func(ctx context.Context, tx pgxpoolConn, code string) (int64, Partner, error) {
+			var row Partner
+			err := tx.QueryRow(ctx, `
+				insert into public.inv_partners
+				  (tenant_id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, address, tin, status,
+				   credit_limit, credit_limit_on_hold, default_price_list_id)
+				values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+				returning id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, address, tin, status,
+				  credit_limit::float8, coalesce(credit_limit_on_hold, false), default_price_list_id`,
+				tu.TenantID, code, body.PartnerKind, strings.TrimSpace(body.CompanyName),
+				body.CeoName, body.Phone, body.Mobile, body.Email, body.Address, body.Tin, defaultStatus(body.Status),
+				body.CreditLimit, body.CreditLimitOnHold != nil && *body.CreditLimitOnHold, body.DefaultPriceListID).
+				Scan(&row.ID, &row.PartnerCode, &row.PartnerKind, &row.CompanyName,
+					&row.CeoName, &row.Phone, &row.Mobile, &row.Email, &row.Address, &row.Tin, &row.Status,
+					&row.CreditLimit, &row.CreditLimitOnHold, &row.DefaultPriceListID)
+			return row.ID, row, err
+		})
 		if err != nil {
+			log.Printf("inventory.partner.create tenant=%d: %v", tu.TenantID, err)
+			if strings.Contains(strings.ToLower(err.Error()), "value too long") {
+				response.Validation(w, map[string]string{"body": "One or more fields exceed the maximum length."})
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to create partner.", "ERR_INTERNAL")
 			return
 		}
-		defer tx.Rollback(r.Context())
 
-		var code string
-		if err := tx.QueryRow(r.Context(), `select public.allocate_tenant_code($1, 'partner')`, tu.TenantID).Scan(&code); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to allocate code.", "ERR_INTERNAL")
-			return
-		}
-
-		var id int64
-		err = tx.QueryRow(r.Context(), `
-			insert into public.inv_partners
-			  (tenant_id, partner_code, partner_kind, company_name, ceo_name, phone, mobile, email, address, tin, status,
-			   credit_limit, credit_limit_on_hold, default_price_list_id)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-			returning id`,
-			tu.TenantID, code, body.PartnerKind, strings.TrimSpace(body.CompanyName),
-			body.CeoName, body.Phone, body.Mobile, body.Email, body.Address, body.Tin, defaultStatus(body.Status),
-			body.CreditLimit, body.CreditLimitOnHold != nil && *body.CreditLimitOnHold, body.DefaultPriceListID).
-			Scan(&id)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create partner.", "ERR_INTERNAL")
-			return
-		}
-
-		if errs := saveCustom(r.Context(), tx, tu.TenantID, entityPartner, id, body.CustomValues); errs != nil {
+		if errs := persistCustom(r.Context(), pool, tu.TenantID, entityPartner, id, body.CustomValues); errs != nil {
 			response.Validation(w, errs)
 			return
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.partner.create", "inv_partner", &id, nil, body)
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save partner.", "ERR_INTERNAL")
-			return
-		}
-
 		row, _ := getPartner(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Created.")
 	}
@@ -339,6 +335,9 @@ func validatePartner(b partnerBody, create bool) map[string]string {
 	}
 	if b.Status != "" && b.Status != "active" && b.Status != "inactive" {
 		errs["status"] = "Must be active or inactive."
+	}
+	if b.Tin != nil && len([]rune(strings.TrimSpace(*b.Tin))) > 32 {
+		errs["tin"] = "TIN must be 32 characters or fewer."
 	}
 	if len(errs) > 0 {
 		return errs
