@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
@@ -7,7 +7,7 @@ import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
 import { DRAFT_ENTITY, INVENTORY_ENTITY, INVENTORY_SETTINGS_HREF } from "../../shared/entityTypes";
-import { requireFields, submitEntity } from "../../shared/handleSaveResult";
+import { requireFields, handleSaveResult } from "../../shared/handleSaveResult";
 import { ModalField } from "../../shared/ModalField";
 import { useToast } from "../../shared/toast";
 import { useCustomValues } from "../../shared/useCustomValues";
@@ -17,6 +17,11 @@ import { useInventoryList, useInvalidateInventoryList } from "../../shared/useIn
 import { useListState } from "../../shared/useListState";
 import { useMasterLifecycle } from "../../shared/masterLifecycle";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import {
+  buildPartnerContactPayload,
+  validatePartnerContact,
+  type PartnerContactErrors,
+} from "../../shared/validation/phContact";
 
 export type Partner = {
   id: number;
@@ -58,6 +63,7 @@ export default function PartnersPage() {
     default_price_list_id: "",
   });
   const [saving, setSaving] = createSignal(false);
+  const [fieldErrors, setFieldErrors] = createSignal<PartnerContactErrors>({});
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const lifecycle = useMasterLifecycle({
@@ -68,6 +74,8 @@ export default function PartnersPage() {
   });
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(INVENTORY_ENTITY.partners);
+
+  const fieldError = (key: keyof PartnerContactErrors) => fieldErrors()[key];
 
   const priceLists = createQuery(() => ({
     queryKey: ["price-lists"],
@@ -107,6 +115,7 @@ export default function PartnersPage() {
       default_price_list_id: "",
     });
     loadCustom({});
+    setFieldErrors({});
     setModalOpen(true);
   };
 
@@ -128,6 +137,7 @@ export default function PartnersPage() {
       default_price_list_id: row.default_price_list_id != null ? String(row.default_price_list_id) : "",
     });
     loadCustom(row.custom_values ?? {});
+    setFieldErrors({});
     setModalOpen(true);
   };
 
@@ -146,12 +156,24 @@ export default function PartnersPage() {
   });
 
   const save = async () => {
+    setFieldErrors({});
     const ed = editing();
     const clientError =
       requireFields(form(), buildRequiredChecks(fields())) ??
       validateCustomFields(customValues(), activeCustomFields());
+    const contactErrors = validatePartnerContact({
+      mobile: form().mobile,
+      phone: form().phone,
+      email: form().email,
+      tin: form().tin,
+    });
+    if (Object.keys(contactErrors).length > 0) {
+      setFieldErrors(contactErrors);
+      toast.error(Object.values(contactErrors)[0] ?? "Check the highlighted fields.");
+      return;
+    }
     if (clientError) {
-      toast.warning(clientError);
+      toast.error(clientError);
       return;
     }
 
@@ -160,32 +182,46 @@ export default function PartnersPage() {
     const creditLimit = creditLimitRaw === "" ? null : Number(creditLimitRaw);
     const plRaw = form().default_price_list_id.trim();
     const defaultPriceListId = plRaw === "" ? null : Number(plRaw);
+    const contactPayload = buildPartnerContactPayload({
+      mobile: form().mobile,
+      phone: form().phone,
+      email: form().email,
+      tin: form().tin,
+    });
     const body = {
       ...form(),
       ceo_name: form().ceo_name || null,
-      phone: form().phone || null,
-      mobile: form().mobile || null,
-      email: form().email || null,
+      ...contactPayload,
       address: form().address || null,
-      tin: form().tin.trim() || null,
       credit_limit: creditLimit != null && Number.isFinite(creditLimit) ? creditLimit : null,
       credit_limit_on_hold: form().credit_limit_on_hold,
       default_price_list_id: defaultPriceListId != null && Number.isFinite(defaultPriceListId) ? defaultPriceListId : null,
       custom_values: customValues(),
     };
-    const ok = await submitEntity(
-      () =>
-        ed
-          ? apiFetch(`/api/v1/inventory/partners/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
-          : apiFetch("/api/v1/inventory/partners", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
-      toast,
-      ed ? "Partner updated." : "Partner created.",
-    );
-    setSaving(false);
-    if (!ok) return;
-    await draft.clearOnSave();
-    setModalOpen(false);
-    invalidate("partners");
+    try {
+      const res = await (ed
+        ? apiFetch(`/api/v1/inventory/partners/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
+        : apiFetch("/api/v1/inventory/partners", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
+      const ok = handleSaveResult(res, toast, ed ? "Partner updated." : "Partner created.");
+      if (!ok) {
+        if (res.errors) {
+          setFieldErrors({
+            mobile: res.errors.mobile,
+            phone: res.errors.phone,
+            email: res.errors.email,
+            tin: res.errors.tin,
+          });
+        }
+        return;
+      }
+      await draft.clearOnSave();
+      setModalOpen(false);
+      invalidate("partners");
+    } catch {
+      toast.error("Could not reach the API. Check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -309,36 +345,62 @@ export default function PartnersPage() {
         </ModalField>
         <ModalField settings={byKey} fieldKey="phone" fallbackLabel="Phone">
           {(m) => (
-            <input
-              class={inputClass}
-              value={form().phone}
-              disabled={m.disabled}
-              onInput={(e) => setForm((f) => ({ ...f, phone: e.currentTarget.value }))}
-            />
+            <>
+              <input
+                class={inputClass}
+                value={form().phone}
+                disabled={m.disabled}
+                placeholder="(032) 123 4567"
+                onInput={(e) => setForm((f) => ({ ...f, phone: e.currentTarget.value }))}
+              />
+              <Show when={fieldError("phone")}>
+                <p class="mt-1 text-xs text-red-600">{fieldError("phone")}</p>
+              </Show>
+            </>
           )}
         </ModalField>
         <ModalField settings={byKey} fieldKey="mobile" fallbackLabel="Mobile">
           {(m) => (
-            <input
-              class={inputClass}
-              value={form().mobile}
-              disabled={m.disabled}
-              onInput={(e) => setForm((f) => ({ ...f, mobile: e.currentTarget.value }))}
-            />
+            <>
+              <input
+                class={inputClass}
+                value={form().mobile}
+                disabled={m.disabled}
+                placeholder="0917 123 4567"
+                onInput={(e) => setForm((f) => ({ ...f, mobile: e.currentTarget.value }))}
+              />
+              <Show when={fieldError("mobile")}>
+                <p class="mt-1 text-xs text-red-600">{fieldError("mobile")}</p>
+              </Show>
+            </>
           )}
         </ModalField>
         <ModalField settings={byKey} fieldKey="email" fallbackLabel="Email">
           {(m) => (
-            <input
-              class={inputClass}
-              value={form().email}
-              disabled={m.disabled}
-              onInput={(e) => setForm((f) => ({ ...f, email: e.currentTarget.value }))}
-            />
+            <>
+              <input
+                class={inputClass}
+                value={form().email}
+                disabled={m.disabled}
+                placeholder="name@company.com"
+                onInput={(e) => setForm((f) => ({ ...f, email: e.currentTarget.value }))}
+              />
+              <Show when={fieldError("email")}>
+                <p class="mt-1 text-xs text-red-600">{fieldError("email")}</p>
+              </Show>
+            </>
           )}
         </ModalField>
         <Field label="TIN (BIR 2307 payee)">
-          <input class={inputClass} value={form().tin} onInput={(e) => setForm((f) => ({ ...f, tin: e.currentTarget.value }))} placeholder="000-000-000-000" />
+          <input
+            class={inputClass}
+            value={form().tin}
+            placeholder="000-000-000-000"
+            onInput={(e) => setForm((f) => ({ ...f, tin: e.currentTarget.value }))}
+          />
+          <Show when={fieldError("tin")}>
+            <p class="mt-1 text-xs text-red-600">{fieldError("tin")}</p>
+          </Show>
         </Field>
         <ModalField settings={byKey} fieldKey="address" fallbackLabel="Address" span="full">
           {(m) => (

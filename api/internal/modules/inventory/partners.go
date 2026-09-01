@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/validation"
 )
 
 type Partner struct {
@@ -188,7 +189,7 @@ func createPartner(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if err := validatePartner(body, true); err != nil {
+		if err := validatePartner(&body, true); err != nil {
 			response.Validation(w, err)
 			return
 		}
@@ -246,7 +247,7 @@ func updatePartner(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if err := validatePartner(body, false); err != nil {
+		if err := validatePartner(&body, false); err != nil {
 			response.Validation(w, err)
 			return
 		}
@@ -322,7 +323,7 @@ func getPartner(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Pa
 	return row, nil
 }
 
-func validatePartner(b partnerBody, create bool) map[string]string {
+func validatePartner(b *partnerBody, create bool) map[string]string {
 	errs := map[string]string{}
 	if create && strings.TrimSpace(b.CompanyName) == "" {
 		errs["company_name"] = "Company name is required."
@@ -336,12 +337,23 @@ func validatePartner(b partnerBody, create bool) map[string]string {
 	if b.Status != "" && b.Status != "active" && b.Status != "inactive" {
 		errs["status"] = "Must be active or inactive."
 	}
-	if b.Tin != nil && len([]rune(strings.TrimSpace(*b.Tin))) > 32 {
-		errs["tin"] = "TIN must be 32 characters or fewer."
+	for k, v := range validation.ValidatePartnerContact(validation.PartnerContact{
+		Mobile: b.Mobile,
+		Phone:  b.Phone,
+		Email:  b.Email,
+		Tin:    b.Tin,
+	}) {
+		errs[k] = v
 	}
 	if len(errs) > 0 {
 		return errs
 	}
+	validation.NormalizePartnerContactFields(validation.PartnerContactFields{
+		Mobile: &b.Mobile,
+		Phone:  &b.Phone,
+		Email:  &b.Email,
+		Tin:    &b.Tin,
+	})
 	return nil
 }
 

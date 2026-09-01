@@ -7,11 +7,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"net/mail"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/validation"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/config"
@@ -40,15 +41,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 }
 
 func isValidEmail(s string) bool {
-	s = strings.TrimSpace(s)
-	if s == "" || len(s) > 320 {
-		return false
-	}
-	addr, err := mail.ParseAddress(s)
-	if err != nil {
-		return false
-	}
-	return addr.Address == s && strings.Contains(s, ".")
+	return validation.IsValidEmail(s)
 }
 
 // leadgenTenantID resolves the home tenant that owns demo-signup CRM leads.
