@@ -417,7 +417,7 @@ export default function WorkOrdersPage() {
     <ProductionLayout>
       <p class="mb-3 text-sm text-text-secondary">
         <span class="font-medium text-text-primary">Jobs (work orders):</span>{" "}
-        Draft → Release to floor → Pass FG QC (if required) → Issue / Weigh parts when lot tracked → Complete → pack or sell from stock.
+        Use the sequence strip above. On each row, the next action is highlighted.
         From a customer order: use <span class="font-medium">From customer order</span> (Load Slip).
       </p>
       <SpreadsheetGrid<WorkOrder>
@@ -473,31 +473,32 @@ export default function WorkOrdersPage() {
                 <Show when={r.status === "draft" && canRelease()}>
                   <button
                     type="button"
-                    class="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                    class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
                     disabled={actionId() === r.id}
                     onClick={(e) => { e.stopPropagation(); void release(r); }}
                   >
-                    Release to floor
+                    Next: Release to floor
                   </button>
                 </Show>
                 <Show when={r.status === "released"}>
+                  <span class="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Floor</span>
                   <A
                     href={`/app/production/issue-station?woId=${r.id}`}
-                    class="text-xs text-brand-600 hover:underline"
+                    class="text-xs font-medium text-brand-600 hover:underline"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Issue
+                    Issue materials
                   </A>
                   <A
                     href={`/app/production/receive-station?woId=${r.id}`}
-                    class="text-xs text-brand-600 hover:underline"
+                    class="text-xs font-medium text-brand-600 hover:underline"
                     onClick={(e) => e.stopPropagation()}
                   >
                     Receive FG
                   </A>
                   <A
                     href={`/app/production/weigh-parts?woId=${r.id}`}
-                    class="text-xs text-brand-600 hover:underline"
+                    class="text-xs font-medium text-brand-600 hover:underline"
                     onClick={(e) => e.stopPropagation()}
                   >
                     Weigh parts
@@ -506,7 +507,7 @@ export default function WorkOrdersPage() {
                 <Show when={r.status === "released" && canComplete()}>
                   <button
                     type="button"
-                    class="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                    class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
                     disabled={actionId() === r.id || r.inspection_status === "pending" || r.inspection_status === "held"}
                     title={
                       r.inspection_status === "pending" || r.inspection_status === "held"
@@ -515,8 +516,17 @@ export default function WorkOrdersPage() {
                     }
                     onClick={(e) => { e.stopPropagation(); void complete(r); }}
                   >
-                    Complete
+                    Next: Complete
                   </button>
+                </Show>
+                <Show when={r.status === "completed"}>
+                  <A
+                    href="/app/inventory/serial-lot/pack-station"
+                    class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Next: Pack
+                  </A>
                 </Show>
               </div>
             ),

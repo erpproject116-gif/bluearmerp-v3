@@ -236,10 +236,10 @@ export const workflowGuides: WorkflowGuide[] = [
     steps: [
       {
         id: "partners",
-        short: "Partners",
-        title: "Add customers and suppliers (Partners)",
-        what: "Create partner records for the people and companies you sell to or buy from. Documents pick partners from this list.",
-        href: "/app/inventory/partners",
+        short: "Customers",
+        title: "Add customers and vendors",
+        what: "Create customer and vendor records once. Documents pick them from this list. Sales shows Customers; Purchase shows Vendors.",
+        href: "/app/inventory/partners?kind=customer",
         routePrefixes: ["/app/inventory/partners"],
         moduleCode: "inventory",
       },

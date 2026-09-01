@@ -128,6 +128,13 @@ func listPartners(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, p.Status)
 			argN++
 		}
+		kind := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("kind")))
+		switch kind {
+		case "customer":
+			where += " and partner_kind in ('customer', 'both')"
+		case "vendor":
+			where += " and partner_kind in ('vendor', 'both')"
+		}
 
 		order := "asc"
 		if p.Order == "desc" {

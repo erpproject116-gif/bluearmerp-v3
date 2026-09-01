@@ -8,6 +8,7 @@ export type InventoryListParams = {
   order: "asc" | "desc";
   q?: string;
   status?: string;
+  kind?: string;
   lifecycle?: string;
   item_code?: string;
   item_name?: string;
@@ -36,6 +37,7 @@ export function useInventoryList<T>(entity: string, params: () => InventoryListP
     });
     if (p.q) qs.set("q", p.q);
     if (p.status) qs.set("status", p.status);
+    if (p.kind) qs.set("kind", p.kind);
     if (p.lifecycle && p.lifecycle !== "active") qs.set("lifecycle", p.lifecycle);
     if (p.item_code) qs.set("item_code", p.item_code);
     if (p.item_name) qs.set("item_name", p.item_name);

@@ -27,6 +27,9 @@ const QUICK_ACTIONS: QuickAction[] = [
   { label: "New purchase receive", href: "/app/purchases/purchase-receive/new", group: "Quick action", permission: "purchases.purchases_new" },
   { label: "New receivable payment", href: "/app/finance/receivables", group: "Quick action", permission: "finance.official_receipts_new" },
   { label: "New payable payment", href: "/app/finance/payables", group: "Quick action", permission: "finance.payment_vouchers_new" },
+  { label: "Customers", href: "/app/inventory/partners?kind=customer", group: "Quick action", permission: "inventory.partners" },
+  { label: "Vendors", href: "/app/inventory/partners?kind=vendor", group: "Quick action", permission: "inventory.partners" },
+  { label: "New customer", href: "/app/inventory/partners?kind=customer", group: "Quick action", permission: "inventory.partners" },
 ];
 
 function readRecent(): NavCatalogEntry[] {

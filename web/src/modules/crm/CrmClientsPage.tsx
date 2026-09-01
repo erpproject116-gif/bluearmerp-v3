@@ -14,10 +14,10 @@ export default function CrmClientsPage() {
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="text-lg font-semibold text-text-primary">Clients</h1>
-          <p class="text-sm text-text-secondary">Account health across partners (read-only). Edit master data in Partners.</p>
+          <p class="text-sm text-text-secondary">Account health across customers and vendors (read-only). Edit master data in Customers & vendors.</p>
         </div>
         <A href="/app/inventory/partners" class="text-sm font-medium text-brand-600 hover:underline">
-          Open Partners
+          Open customers & vendors
         </A>
       </div>
 

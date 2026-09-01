@@ -5,7 +5,7 @@ export default function PartnersSettingsPage() {
   return (
     <EntityFormSettingsPage
       entityType={INVENTORY_ENTITY.partners}
-      featureLabel="Partners"
+      featureLabel="Customers & vendors"
       listHref="/app/inventory/partners"
     />
   );

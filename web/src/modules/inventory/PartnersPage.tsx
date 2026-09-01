@@ -1,4 +1,5 @@
-import { createSignal } from "solid-js";
+import { createSignal, For } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
@@ -27,6 +28,12 @@ import {
 
 const PARTNER_FORM_ID = "partner-form";
 
+const KIND_TABS = [
+  { value: "", label: "All" },
+  { value: "customer", label: "Customers" },
+  { value: "vendor", label: "Vendors" },
+] as const;
+
 export type Partner = {
   id: number;
   partner_code: string;
@@ -47,6 +54,16 @@ export type Partner = {
 
 export default function PartnersPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("partner_code");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const kindFilter = () => {
+    const k = String(searchParams.kind ?? "").toLowerCase();
+    return k === "customer" || k === "vendor" ? k : "";
+  };
+  const setKindFilter = (kind: string) => {
+    setSearchParams({ kind: kind || undefined }, { replace: true });
+  };
+  const pageTitle = () =>
+    kindFilter() === "customer" ? "Customers" : kindFilter() === "vendor" ? "Vendors" : "Customers & vendors";
   const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -106,6 +123,7 @@ export default function PartnersPage() {
     order: order(),
     q: q() || undefined,
     status: statusFilter() || undefined,
+    kind: kindFilter() || undefined,
     lifecycle: lifecycle.filter(),
   }));
 
@@ -114,7 +132,7 @@ export default function PartnersPage() {
     setNextCode(res.data?.next_code ?? "-----");
     setEditing(null);
     setForm({
-      partner_kind: "customer",
+      partner_kind: kindFilter() === "vendor" ? "vendor" : "customer",
       company_name: "",
       ceo_name: "",
       phone: "",
@@ -230,6 +248,12 @@ export default function PartnersPage() {
 
   return (
     <div>
+      <div class="mb-3">
+        <h1 class="text-lg font-semibold text-text-primary">{pageTitle()}</h1>
+        <p class="text-sm text-text-secondary">
+          Master list for people you sell to or buy from. Same records appear on Sales and Purchase.
+        </p>
+      </div>
       <SpreadsheetGrid
         columns={[
           { key: "partner_code", header: "Code", clickable: true },
@@ -287,6 +311,18 @@ export default function PartnersPage() {
         settingsHref={INVENTORY_SETTINGS_HREF.partners}
         toolbarExtra={
           <div class="flex flex-wrap items-end gap-2">
+            <label class="flex flex-col gap-1 text-xs font-medium text-text-primary">
+              Show
+              <select
+                class={inputClass}
+                value={kindFilter()}
+                onChange={(e) => setKindFilter(e.currentTarget.value)}
+              >
+                <For each={KIND_TABS}>
+                  {(tab) => <option value={tab.value}>{tab.label}</option>}
+                </For>
+              </select>
+            </label>
             <lifecycle.BulkToolbar />
             <lifecycle.FilterControl />
           </div>
@@ -295,7 +331,7 @@ export default function PartnersPage() {
       <lifecycle.BulkDialog />
       <EntityModal
         open={modalOpen()}
-        title={editing() ? "Edit partner" : "New partner"}
+        title={editing() ? `Edit ${form().partner_kind === "vendor" ? "vendor" : "customer"}` : `New ${kindFilter() === "vendor" ? "vendor" : "customer"}`}
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
         saving={saving()}

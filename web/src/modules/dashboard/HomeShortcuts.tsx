@@ -20,7 +20,7 @@ export function HomeShortcuts() {
     }
     if (isTenantModuleEnabled(m, "inventory") && (hasModuleAccess(m, "inventory") || hasPermission(m, "inventory", "write"))) {
       out.push({ href: "/app/inventory/items", label: "Add product", blurb: "Open the item list" });
-      out.push({ href: "/app/inventory/partners", label: "Customers & vendors", blurb: "People you sell to or buy from" });
+      out.push({ href: "/app/inventory/partners?kind=customer", label: "Customers", blurb: "People you sell to" });
     }
     if (isTenantModuleEnabled(m, "purchases") && (hasModuleAccess(m, "purchases") || hasPermission(m, "purchases", "write"))) {
       out.push({ href: "/app/purchases/purchase-receive/new", label: "Purchase Receive", blurb: "Bring stock in" });

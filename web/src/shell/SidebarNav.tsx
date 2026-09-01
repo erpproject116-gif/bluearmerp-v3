@@ -241,7 +241,8 @@ export function SidebarNav() {
       return (
         (p === "/app/inventory" || p.startsWith("/app/inventory/")) &&
         !p.startsWith("/app/inventory/serial-lot") &&
-        !p.startsWith("/app/inventory/wms")
+        !p.startsWith("/app/inventory/wms") &&
+        !p.startsWith("/app/inventory/partners")
       );
     }
     if (area.id === "after_sales") {
@@ -276,7 +277,8 @@ export function SidebarNav() {
       return false;
     }
     if (area.id === "customers") {
-      return pathStarts(p, ["/app/inventory/partners"]);
+      const kind = new URLSearchParams(loc.search).get("kind");
+      return pathStarts(p, ["/app/inventory/partners"]) && kind !== "vendor";
     }
     if (area.id === "quotation") {
       return pathStarts(p, ["/app/quotation"]) && !p.startsWith("/app/quotation/tax-mngt");
@@ -316,7 +318,7 @@ export function SidebarNav() {
       return false;
     }
     if (area.id === "vendors") {
-      return pathStarts(p, ["/app/inventory/partners"]);
+      return pathStarts(p, ["/app/inventory/partners"]) && new URLSearchParams(loc.search).get("kind") === "vendor";
     }
     if (area.id === "purchase_request") {
       return pathStarts(p, ["/app/purchase-request"]);

@@ -74,7 +74,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/inventory",
     features: [
       { label: "Workspace", href: "/app/inventory", settingsHref: "/app/inventory", headerPriority: "overflow" },
-      { label: "Partners", href: "/app/inventory/partners", settingsHref: "/app/inventory/partners/settings", headerHidden: true },
+      { label: "Customers & vendors", href: "/app/inventory/partners", settingsHref: "/app/inventory/partners/settings", headerPriority: "overflow" },
       { label: "Locations", href: "/app/inventory/locations", settingsHref: "/app/inventory/locations/settings", headerPriority: "overflow" },
       { label: "Units", href: "/app/inventory/units", settingsHref: "/app/inventory/units", headerPriority: "overflow" },
       { label: "Projects", href: "/app/inventory/projects", settingsHref: "/app/inventory/projects/settings", headerPriority: "overflow" },

@@ -3,7 +3,8 @@ import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
-import { submitEntity } from "../../shared/handleSaveResult";
+import { submitEntity, collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { AttachmentsField } from "../../shared/AttachmentsField";
@@ -33,12 +34,14 @@ function linesToPayload(lines: StockAdjustmentLineRow[]) {
 export function StockAdjustmentModal(props: Props) {
   const toast = useToast();
   const [saving, setSaving] = createSignal(false);
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [lines, setLines] = createSignal<StockAdjustmentLineRow[]>([emptyStockAdjustmentLine(1)]);
   const [reason, setReason] = createSignal("");
   const [draftRequestId, setDraftRequestId] = createSignal<number | null>(null);
   const [requestStatus, setRequestStatus] = createSignal<string | null>(null);
 
   const reset = () => {
+    setFieldErrors({});
     setLines([emptyStockAdjustmentLine(1)]);
     setReason("");
     setDraftRequestId(null);
@@ -128,21 +131,26 @@ export function StockAdjustmentModal(props: Props) {
   });
 
   const validate = () => {
+    setFieldErrors({});
+    const errors: Record<string, string | undefined> = {
+      ...collectRequiredFieldErrors({ reason: reason().trim() }, [{ key: "reason", label: "Reason" }]),
+    };
     const rowLines = lines();
-    if (!reason().trim()) {
-      toast.warning("Reason is required.");
-      return false;
-    }
     for (const ln of rowLines) {
       if (!ln.item_id || !ln.location_id) {
-        toast.warning("Each line needs an item and location.");
-        return false;
+        errors.lines = "Each line needs an item and location.";
+        break;
       }
       const qty = Number(ln.qty_delta);
       if (!ln.qty_delta || qty === 0 || Number.isNaN(qty)) {
-        toast.warning("Each line needs a non-zero quantity change.");
-        return false;
+        errors.lines = "Each line needs a non-zero quantity change.";
+        break;
       }
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      toast.warning(Object.values(errors).find(Boolean) ?? "Check the highlighted fields.");
+      return false;
     }
     return true;
   };
@@ -176,6 +184,7 @@ export function StockAdjustmentModal(props: Props) {
           }, { silent: true }),
         toast,
         "Sent for approval. Inventory updates only after an approver confirms.",
+        { onFieldErrors: setFieldErrors },
       );
       setSaving(false);
       if (!ok) return;
@@ -194,6 +203,7 @@ export function StockAdjustmentModal(props: Props) {
         }, { silent: true }),
       toast,
       "Sent for approval. Inventory updates only after an approver confirms.",
+      { onFieldErrors: setFieldErrors },
     );
     setSaving(false);
     if (!ok) return;
@@ -213,7 +223,7 @@ export function StockAdjustmentModal(props: Props) {
     );
     setSaving(false);
     if (!res.success) {
-      toast.error(res.message ?? "Failed to save draft.");
+      handleSaveResult(res, toast, "Draft saved.", { onFieldErrors: setFieldErrors });
       return;
     }
     if (res.data?.id) setDraftRequestId(res.data.id);
@@ -242,6 +252,7 @@ export function StockAdjustmentModal(props: Props) {
     >
       <draft.DraftBanner />
       <ModalFormGuide guideId="stock_adjustment" spanFull />
+      <FormErrorSummary errors={fieldErrors} />
       <p class="col-span-full text-sm text-text-secondary">
         Document with one or more item/location lines. Quantity on hand does not change until a store admin or owner approves.
       </p>
@@ -250,15 +261,25 @@ export function StockAdjustmentModal(props: Props) {
           Status: <span class="font-medium text-text-primary">{requestStatus()}</span>
         </p>
       </Show>
-      <Field label="Reason *" span="full">
+      <Field label="Reason *" span="full" error={fieldErrors().reason}>
         <textarea
           class={inputClass}
           rows={2}
           value={reason()}
           disabled={readOnly()}
-          onInput={(e) => setReason(e.currentTarget.value)}
+          onInput={(e) => {
+            setFieldErrors((prev) => {
+              const next = { ...prev };
+              delete next.reason;
+              return next;
+            });
+            setReason(e.currentTarget.value);
+          }}
         />
       </Field>
+      <Show when={fieldErrors().lines}>
+        <p class="col-span-full text-sm text-red-700" role="alert">{fieldErrors().lines}</p>
+      </Show>
       <StockAdjustmentLineGrid lines={lines} onChange={setLines} disabled={readOnly()} />
       <Show when={draftRequestId()}>
         <div class="col-span-full">

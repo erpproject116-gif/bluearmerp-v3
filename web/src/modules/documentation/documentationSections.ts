@@ -138,7 +138,7 @@ export const documentationSections: DocSection[] = [
       {
         type: "steps",
         items: [
-          "Open Partners to add customers and suppliers.",
+          "Open Customers (Sales) or Vendors (Purchase) to add people you sell to or buy from.",
           "Open Locations to define where stock is kept.",
           "Open Items to create product records with prices and descriptions.",
           "Open Stock Movements to review increases and decreases in quantity over time.",

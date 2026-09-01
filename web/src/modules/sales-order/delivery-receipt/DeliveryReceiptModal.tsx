@@ -3,6 +3,7 @@ import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { submitEntity } from "../../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
@@ -33,6 +34,7 @@ function todayISO() {
 export function DeliveryReceiptModal(props: Props) {
   const toast = useToast();
   const [saving, setSaving] = createSignal(false);
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [deliveryDate, setDeliveryDate] = createSignal(todayISO());
   const [dateNoDisplay, setDateNoDisplay] = createSignal("");
   const [deliveryNo, setDeliveryNo] = createSignal("");
@@ -52,6 +54,7 @@ export function DeliveryReceiptModal(props: Props) {
   };
 
   const reset = () => {
+    setFieldErrors({});
     setDeliveryDate(todayISO());
     setNotes("");
     setLines([]);
@@ -126,6 +129,7 @@ export function DeliveryReceiptModal(props: Props) {
   };
 
   const save = async () => {
+    setFieldErrors({});
     const bodyLines = lines()
       .filter((l) => Number(l.qty) > 0)
       .map((l) => ({
@@ -133,16 +137,21 @@ export function DeliveryReceiptModal(props: Props) {
         sales_order_release_line_id: l.sales_order_release_line_id,
         qty: Number(l.qty),
       }));
+    const errors: Record<string, string | undefined> = {};
     if (bodyLines.length === 0) {
-      toast.warning("Add at least one released sales order line.");
-      return;
+      errors.lines = "Add at least one released sales order line with quantity.";
     }
     for (const l of lines()) {
       const qty = Number(l.qty);
       if (qty > l.balance_qty + 0.0001) {
-        toast.warning(`Quantity exceeds balance for ${l.label}.`);
-        return;
+        errors.lines = `Quantity exceeds balance for ${l.label}.`;
+        break;
       }
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      toast.warning(Object.values(errors).find(Boolean) ?? "Check the highlighted fields.");
+      return;
     }
 
     setSaving(true);
@@ -159,6 +168,7 @@ export function DeliveryReceiptModal(props: Props) {
         }),
       toast,
       "Delivery receipt saved.",
+      { onFieldErrors: setFieldErrors },
     );
     setSaving(false);
     if (ok) {
@@ -177,6 +187,7 @@ export function DeliveryReceiptModal(props: Props) {
     >
       <draft.DraftBanner />
       <ModalFormGuide guideId="delivery_receipt" />
+      <FormErrorSummary errors={fieldErrors} />
       <div class="grid gap-4 md:grid-cols-3">
         <Field label="Delivery date">
           <DateInput value={deliveryDate()} onChange={setDeliveryDate} class={inputClass} />
@@ -217,6 +228,9 @@ export function DeliveryReceiptModal(props: Props) {
         </div>
         <div>
           <h3 class="mb-2 text-sm font-semibold text-text-primary">Lines to deliver</h3>
+          <Show when={fieldErrors().lines}>
+            <p class="mb-2 text-sm text-red-700" role="alert">{fieldErrors().lines}</p>
+          </Show>
           <Show when={lines().length > 0} fallback={<p class="text-sm text-text-secondary">Pick released lines from the left.</p>}>
             <div class="space-y-2">
               <For each={lines()}>
@@ -232,6 +246,11 @@ export function DeliveryReceiptModal(props: Props) {
                         value={line.qty}
                         onInput={(e) => {
                           const v = e.currentTarget.value;
+                          setFieldErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.lines;
+                            return next;
+                          });
                           setLines((rows) => rows.map((r, i) => (i === idx() ? { ...r, qty: v } : r)));
                         }}
                       />

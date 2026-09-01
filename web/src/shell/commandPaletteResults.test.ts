@@ -35,6 +35,25 @@ describe("buildPaletteResults", () => {
     expect(paletteItemLabel(results[0]!)).toContain("Ask Baiko");
   });
 
+  it("surfaces the customers list for a customer query", () => {
+    const results = buildPaletteResults({
+      query: "customer",
+      catalog: [
+        {
+          label: "Customers",
+          href: "/app/inventory/partners?kind=customer",
+          group: "Sales",
+          keywords: ["customer", "partner"],
+        },
+      ],
+      quickActions: [],
+      recent: [],
+      pathname: "/app/dashboard",
+      canAccess: () => true,
+    });
+    expect(results.some((r) => r.kind === "nav" && r.entry.href.includes("/inventory/partners"))).toBe(true);
+  });
+
   it("includes a go-to row for typed paths", () => {
     const results = buildPaletteResults({
       query: "/app/sales/sales",

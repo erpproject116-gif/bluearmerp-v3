@@ -3,7 +3,8 @@ import { formatPeso } from "../../../shared/money";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { apiFetch } from "../../../shared/api";
 import { FINANCE_ENTITY } from "../../../shared/entityTypes";
-import { requireFields, submitEntity } from "../../../shared/handleSaveResult";
+import { submitEntity, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -90,6 +91,7 @@ export function OfficialReceiptModal(props: Props) {
   const auth = useAuth();
   const { fields, byKey } = useFormFieldSettings(FINANCE_ENTITY.officialReceipt);
   const [saving, setSaving] = createSignal(false);
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [newCustomerName, setNewCustomerName] = createSignal("");
   const [receiptDate, setReceiptDate] = createSignal(todayISO());
@@ -159,6 +161,7 @@ export function OfficialReceiptModal(props: Props) {
   };
 
   const resetForm = () => {
+    setFieldErrors({});
     const ed = props.editing;
     if (ed) {
       setReceiptDate(ed.receipt_date);
@@ -205,6 +208,7 @@ export function OfficialReceiptModal(props: Props) {
   };
 
   const save = async () => {
+    setFieldErrors({});
     const formValues = {
       receipt_date: receiptDate(),
       partner_id: partnerId(),
@@ -213,13 +217,9 @@ export function OfficialReceiptModal(props: Props) {
       reference_no: referenceNo(),
       notes: notes(),
     };
-    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
-    if (clientError) {
-      toast.warning(clientError);
-      return;
-    }
-    if (!partnerId()) return;
-
+    const validationErrors = {
+      ...collectRequiredFieldErrors(formValues as Record<string, unknown>, buildRequiredChecks(fields())),
+    };
     const apps = applications()
       .filter((a) => a.sales_id && Number(a.applied_amount) > 0)
       .map((a) => ({
@@ -227,7 +227,11 @@ export function OfficialReceiptModal(props: Props) {
         applied_amount: Number(a.applied_amount),
       }));
     if (apps.length === 0) {
-      toast.warning("Add at least one sales application with an amount.");
+      validationErrors.applications = "Add at least one sales application with an amount.";
+    }
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
       return;
     }
 
@@ -249,6 +253,7 @@ export function OfficialReceiptModal(props: Props) {
         }, { silent: true }),
       toast,
       props.editing ? "Official receipt updated." : "Official receipt created.",
+      { onFieldErrors: setFieldErrors },
     );
     setSaving(false);
     if (ok) {
@@ -275,13 +280,21 @@ export function OfficialReceiptModal(props: Props) {
       }
     >
       <ModalFormGuide guideId="official_receipt" />
+      <FormErrorSummary errors={fieldErrors} />
       <draft.DraftBanner />
-      <ModalField settings={byKey} fieldKey="receipt_date" fallbackLabel="Date" fallbackRequired>
+      <ModalField settings={byKey} fieldKey="receipt_date" fallbackLabel="Date" fallbackRequired errors={fieldErrors}>
           {(m) => (
             <DateInput
               value={receiptDate()}
               disabled={m.disabled}
-              onInput={(e) => setReceiptDate(e.currentTarget.value)}
+              onInput={(e) => {
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.receipt_date;
+                  return next;
+                });
+                setReceiptDate(e.currentTarget.value);
+              }}
             />
           )}
         </ModalField>
@@ -291,7 +304,7 @@ export function OfficialReceiptModal(props: Props) {
         <Field label="Receipt No.">
           <input class={inputClass} value={receiptNo()} disabled />
         </Field>
-        <ModalField settings={byKey} fieldKey="partner_id" fallbackLabel="Customer" fallbackRequired>
+        <ModalField settings={byKey} fieldKey="partner_id" fallbackLabel="Customer" fallbackRequired errors={fieldErrors}>
           {() => (
             <LookupCombo
               label=""
@@ -299,6 +312,11 @@ export function OfficialReceiptModal(props: Props) {
               selectedId={() => partnerId()}
               onInput={setCustomerLabel}
               onSelect={(o) => {
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.partner_id;
+                  return next;
+                });
                 setPartnerId(o.id);
                 setCustomerLabel(o.label);
                 setApplications([emptyApplication()]);
@@ -321,20 +339,27 @@ export function OfficialReceiptModal(props: Props) {
             />
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired>
+        <ModalField settings={byKey} fieldKey="currency_id" fallbackLabel="Currency" fallbackRequired errors={fieldErrors}>
           {(m) => (
             <select
               class={inputClass}
               value={currencyId() ?? ""}
               disabled={m.disabled}
-              onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
+              onChange={(e) => {
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.currency_id;
+                  return next;
+                });
+                setCurrencyId(Number(e.currentTarget.value) || null);
+              }}
             >
               <option value="">Select currency</option>
               <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code}</option>}</For>
             </select>
           )}
         </ModalField>
-        <ModalField settings={byKey} fieldKey="payment_method" fallbackLabel="Payment method" fallbackRequired>
+        <ModalField settings={byKey} fieldKey="payment_method" fallbackLabel="Payment method" fallbackRequired errors={fieldErrors}>
           {(m) => (
             <select
               class={inputClass}
@@ -382,6 +407,9 @@ export function OfficialReceiptModal(props: Props) {
             + Add row
           </button>
         </div>
+        <Show when={fieldErrors().applications}>
+          <p class="mb-2 text-sm text-red-700" role="alert">{fieldErrors().applications}</p>
+        </Show>
         <div class="overflow-x-auto rounded border border-stroke">
           <table class="min-w-full text-sm">
             <thead class="bg-slate-50 text-xs uppercase text-text-secondary">

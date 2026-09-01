@@ -67,8 +67,8 @@ export const navGroups: NavGroup[] = [
       {
         kind: "link",
         moduleId: "inventory",
-        label: "Customers & vendors",
-        href: "/app/inventory/partners",
+        label: "Customers",
+        href: "/app/inventory/partners?kind=customer",
         basePath: "/app/inventory/partners",
       },
       { kind: "module", moduleId: "quotation" },
@@ -99,8 +99,8 @@ export const navGroups: NavGroup[] = [
       {
         kind: "link",
         moduleId: "inventory",
-        label: "Customers & vendors",
-        href: "/app/inventory/partners",
+        label: "Vendors",
+        href: "/app/inventory/partners?kind=vendor",
         basePath: "/app/inventory/partners",
       },
       { kind: "module", moduleId: "purchase_request" },

@@ -19,7 +19,7 @@ type FlowRow = {
 };
 
 const MASTERS: FlowNode[] = [
-  { label: "Partners", href: "/app/inventory/partners", sub: "Customer / vendor" },
+  { label: "Customers", href: "/app/inventory/partners?kind=customer", sub: "Buyers / vendors" },
   { label: "Items", href: "/app/inventory/items", sub: "Track qty on" },
   { label: "Locations", href: "/app/inventory/locations", sub: "Warehouse" },
   { label: "Tax", href: "/app/quotation/tax-mngt/tax-types", sub: "VAT types" },

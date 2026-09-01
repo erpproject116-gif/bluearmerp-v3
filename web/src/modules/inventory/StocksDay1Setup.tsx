@@ -29,7 +29,7 @@ const STEPS: Step[] = [
     title: "2. Add customers and suppliers",
     why: "Who you buy from and sell to. You can add them as you go, but having a few ready helps.",
     href: "/app/inventory/partners",
-    cta: "Open partners",
+    cta: "Open customers",
     done: () => false,
     optional: true,
   },

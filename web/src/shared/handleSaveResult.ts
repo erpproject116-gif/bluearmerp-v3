@@ -134,10 +134,11 @@ export async function submitEntity(
   request: () => Promise<ApiResult<unknown>>,
   toast: ToastLike,
   successMessage: string,
+  options?: { onFieldErrors?: (errors: FormErrors) => void },
 ): Promise<boolean> {
   try {
     const res = await request();
-    return handleSaveResult(res, toast, successMessage);
+    return handleSaveResult(res, toast, successMessage, options);
   } catch {
     toast.error("Could not reach the API. Check your connection and try again.");
     return false;

@@ -1,4 +1,10 @@
 import type { ParentComponent } from "solid-js";
+import { ProductionSequenceStrip } from "./ProductionSequenceStrip";
 
-/** Passthrough wrapper — Production section tabs live in the app header/sidebar. */
-export const ProductionLayout: ParentComponent = (props) => <>{props.children}</>;
+/** Production section wrapper — sequence strip lives above every Production page. */
+export const ProductionLayout: ParentComponent = (props) => (
+  <>
+    <ProductionSequenceStrip />
+    {props.children}
+  </>
+);

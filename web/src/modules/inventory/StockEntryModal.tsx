@@ -2,6 +2,9 @@ import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { modalDismissClass } from "../../shared/Modal";
+import { collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../shared/FormErrorSummary";
+import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 
 export type StockEntryType = "transfer" | "issue" | "receipt";
@@ -31,6 +34,17 @@ function titleFor(type: StockEntryType, reason: StockEntryReasonPreset) {
   return "Stock Receipt";
 }
 
+function clearField(
+  setFieldErrors: (fn: (prev: Record<string, string | undefined>) => Record<string, string | undefined>) => void,
+  key: string,
+) {
+  setFieldErrors((prev) => {
+    const next = { ...prev };
+    delete next[key];
+    return next;
+  });
+}
+
 export function StockEntryModal(props: {
   open: boolean;
   onClose: () => void;
@@ -55,9 +69,11 @@ export function StockEntryModal(props: {
   const [itemLabel, setItemLabel] = createSignal("");
   const [qty, setQty] = createSignal("1");
   const [creating, setCreating] = createSignal(false);
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
 
   createEffect(() => {
     if (!props.open) return;
+    setFieldErrors({});
     setEntryType(props.initialType ?? "receipt");
     setReason(props.initialReason ?? "");
     setFromLocId(null);
@@ -72,40 +88,56 @@ export function StockEntryModal(props: {
   const close = () => props.onClose();
 
   const createEntry = async () => {
-    const iid = itemId();
-    const q = Number(qty());
-    if (!iid || q <= 0) {
-      toast.warning("Select item and quantity.");
-      return;
-    }
+    setFieldErrors({});
     const type = entryType();
-    if ((type === "issue" || type === "transfer") && !fromLocId()) {
-      toast.warning("Select source location.");
+    const checks: { key: string; label: string }[] = [
+      { key: "item_id", label: "Item" },
+      { key: "qty", label: "Quantity" },
+    ];
+    if (type === "issue" || type === "transfer") {
+      checks.push({ key: "from_location_id", label: "From location" });
+    }
+    if (type === "receipt" || type === "transfer") {
+      checks.push({ key: "to_location_id", label: "To location" });
+    }
+    const validationErrors = collectRequiredFieldErrors(
+      {
+        item_id: itemId(),
+        qty: Number(qty()),
+        from_location_id: fromLocId(),
+        to_location_id: toLocId(),
+      },
+      checks,
+    );
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
       return;
     }
-    if ((type === "receipt" || type === "transfer") && !toLocId()) {
-      toast.warning("Select destination location.");
-      return;
-    }
+
     const notes = reason() || undefined;
     setCreating(true);
-    const res = await apiFetch<{ id: number; entry_no: string }>("/api/v1/inventory/stock-entries", {
-      method: "POST",
-      body: JSON.stringify({
-        entry_type: type,
-        from_location_id: fromLocId() ?? undefined,
-        to_location_id: toLocId() ?? undefined,
-        notes: notes || undefined,
-        lines: [{ item_id: iid, qty: q }],
-      }),
-    });
+    const res = await apiFetch<{ id: number; entry_no: string }>(
+      "/api/v1/inventory/stock-entries",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          entry_type: type,
+          from_location_id: fromLocId() ?? undefined,
+          to_location_id: toLocId() ?? undefined,
+          notes: notes || undefined,
+          lines: [{ item_id: itemId()!, qty: Number(qty()) }],
+        }),
+      },
+      { silent: true },
+    );
     if (!res.success || !res.data?.id) {
       setCreating(false);
-      toast.warning(res.message ?? "Failed to create entry.");
+      handleSaveResult(res, toast, "Stock entry created.", { onFieldErrors: setFieldErrors });
       return;
     }
     if (props.autoPost !== false) {
-      const postRes = await apiFetch(`/api/v1/inventory/stock-entries/${res.data.id}/post`, { method: "POST" });
+      const postRes = await apiFetch(`/api/v1/inventory/stock-entries/${res.data.id}/post`, { method: "POST" }, { silent: true });
       setCreating(false);
       if (!postRes.success) {
         toast.warning(postRes.message ?? "Entry created as draft but post failed. Open Stock Entries to post.");
@@ -132,6 +164,7 @@ export function StockEntryModal(props: {
               Close
             </button>
           </div>
+          <FormErrorSummary errors={fieldErrors} />
           <Show when={!props.lockType}>
             <label class="mb-3 block text-sm">
               <span class="text-text-secondary">Type</span>
@@ -141,6 +174,7 @@ export function StockEntryModal(props: {
                 onChange={(e) => {
                   setEntryType(e.currentTarget.value as StockEntryType);
                   setReason("");
+                  setFieldErrors({});
                 }}
               >
                 <option value="receipt">Receipt</option>
@@ -169,8 +203,10 @@ export function StockEntryModal(props: {
               required
               value={fromLocLabel}
               selectedId={fromLocId}
+              error={fieldErrors().from_location_id}
               onInput={setFromLocLabel}
               onSelect={(o) => {
+                clearField(setFieldErrors, "from_location_id");
                 setFromLocId(o.id);
                 setFromLocLabel(o.label);
               }}
@@ -188,8 +224,10 @@ export function StockEntryModal(props: {
                 required
                 value={toLocLabel}
                 selectedId={toLocId}
+                error={fieldErrors().to_location_id}
                 onInput={setToLocLabel}
                 onSelect={(o) => {
+                  clearField(setFieldErrors, "to_location_id");
                   setToLocId(o.id);
                   setToLocLabel(o.label);
                 }}
@@ -207,8 +245,10 @@ export function StockEntryModal(props: {
               required
               value={itemLabel}
               selectedId={itemId}
+              error={fieldErrors().item_id}
               onInput={setItemLabel}
               onSelect={(o) => {
+                clearField(setFieldErrors, "item_id");
                 setItemId(o.id);
                 setItemLabel(o.label);
               }}
@@ -219,16 +259,20 @@ export function StockEntryModal(props: {
               fetchOptions={fetchItems}
             />
           </div>
-          <label class="mt-3 block text-sm">
-            <span class="text-text-secondary">Quantity</span>
-            <input
-              type="number"
-              class="mt-1 w-full rounded border border-stroke px-2 py-1"
-              min="0"
-              value={qty()}
-              onInput={(e) => setQty(e.currentTarget.value)}
-            />
-          </label>
+          <div class="mt-3">
+            <Field label="Quantity" required error={fieldErrors().qty}>
+              <input
+                type="number"
+                class={inputClass}
+                min="0"
+                value={qty()}
+                onInput={(e) => {
+                  clearField(setFieldErrors, "qty");
+                  setQty(e.currentTarget.value);
+                }}
+              />
+            </Field>
+          </div>
           <div class="mt-6 flex justify-end gap-2">
             <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={close}>
               Cancel

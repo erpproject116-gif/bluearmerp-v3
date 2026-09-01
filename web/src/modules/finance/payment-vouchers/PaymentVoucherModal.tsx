@@ -6,7 +6,8 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { formatMoney } from "../../../shared/money";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
-import { submitEntity } from "../../../shared/handleSaveResult";
+import { submitEntity, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../../shared/entityTypes";
 import { useToast } from "../../../shared/toast";
@@ -69,6 +70,7 @@ export function PaymentVoucherModal(props: Props) {
   const toast = useToast();
   const auth = useAuth();
   const [saving, setSaving] = createSignal(false);
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [showNewVendor, setShowNewVendor] = createSignal(false);
   const [newVendorName, setNewVendorName] = createSignal("");
   const [paymentDate, setPaymentDate] = createSignal(todayISO());
@@ -180,15 +182,28 @@ export function PaymentVoucherModal(props: Props) {
   });
 
   const save = async () => {
-    if (!partnerId() || !currencyId()) {
-      toast.warning("Select vendor and currency.");
-      return;
-    }
+    setFieldErrors({});
+    const validationErrors = collectRequiredFieldErrors(
+      {
+        partner_id: partnerId(),
+        currency_id: currencyId(),
+        payment_date: paymentDate(),
+      },
+      [
+        { key: "partner_id", label: "Vendor" },
+        { key: "currency_id", label: "Currency" },
+        { key: "payment_date", label: "Payment date" },
+      ],
+    );
     const apps = applications()
       .filter((a) => a.supplier_invoice_id && Number(a.applied_amount) > 0)
       .map((a) => ({ supplier_invoice_id: a.supplier_invoice_id!, applied_amount: Number(a.applied_amount) }));
     if (apps.length === 0) {
-      toast.warning("Add at least one invoice application.");
+      validationErrors.applications = "Add at least one invoice application.";
+    }
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
       return;
     }
     const wht = withholdingLines()
@@ -216,6 +231,7 @@ export function PaymentVoucherModal(props: Props) {
         ),
       toast,
       "Payment voucher created.",
+      { onFieldErrors: setFieldErrors },
     );
     setSaving(false);
     if (ok) {
@@ -237,20 +253,37 @@ export function PaymentVoucherModal(props: Props) {
     <>
     <WideEntityModal open={props.open} title="New Payment Voucher" onClose={props.onClose} onSave={() => void save()} saving={saving()}>
       <ModalFormGuide guideId="payment_voucher" />
+      <FormErrorSummary errors={fieldErrors} />
       <draft.DraftBanner />
-      <Field label="Payment date">
-        <DateInput value={paymentDate()} onInput={(e) => setPaymentDate(e.currentTarget.value)} />
+      <Field label="Payment date" required error={fieldErrors().payment_date}>
+        <DateInput
+          value={paymentDate()}
+          onInput={(e) => {
+            setFieldErrors((prev) => {
+              const next = { ...prev };
+              delete next.payment_date;
+              return next;
+            });
+            setPaymentDate(e.currentTarget.value);
+          }}
+        />
       </Field>
       <Field label="Date-no / Payment no">
         <input class={inputClass} readOnly value={`${dateNoDisplay()} / ${paymentNo()}`} />
       </Field>
-      <Field label="Vendor">
+      <Field label="Vendor" required error={fieldErrors().partner_id}>
         <LookupCombo
           label=""
           value={vendorLabel}
           selectedId={partnerId}
           onInput={setVendorLabel}
           onSelect={(o) => {
+            setFieldErrors((prev) => {
+              const next = { ...prev };
+              delete next.partner_id;
+              delete next.applications;
+              return next;
+            });
             setPartnerId(o.id);
             setVendorLabel(o.label);
             setApplications([{ supplier_invoice_id: null, label: "", grand_total: 0, applied_amount: "" }]);
@@ -269,10 +302,16 @@ export function PaymentVoucherModal(props: Props) {
                 }
               : undefined
           }
+          error={fieldErrors().partner_id}
         />
       </Field>
-      <Field label="Currency">
-        <input class={inputClass} readOnly value={currencyId() ?? ""} />
+      <Field label="Currency" required error={fieldErrors().currency_id}>
+        <input
+          class={inputClass}
+          readOnly
+          value={currencyId() ?? ""}
+          aria-invalid={fieldErrors().currency_id ? true : undefined}
+        />
       </Field>
       <Field label="Payment method">
         <select class={inputClass} value={paymentMethod()} onChange={(e) => setPaymentMethod(e.currentTarget.value)}>
@@ -296,6 +335,9 @@ export function PaymentVoucherModal(props: Props) {
       </Field>
       <div class="col-span-full space-y-2">
         <p class="text-sm font-medium text-text-primary">Invoice applications</p>
+        <Show when={fieldErrors().applications}>
+          <p class="text-sm text-red-700" role="alert">{fieldErrors().applications}</p>
+        </Show>
         <Index each={applications()}>
           {(app, index) => (
             <div class="grid grid-cols-2 gap-2">

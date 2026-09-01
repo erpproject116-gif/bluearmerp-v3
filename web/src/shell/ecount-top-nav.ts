@@ -280,8 +280,8 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     children: [
       {
         id: "customers",
-        label: "Customers & vendors",
-        href: "/app/inventory/partners",
+        label: "Customers",
+        href: "/app/inventory/partners?kind=customer",
         iconId: "customers",
         topId: "inv1",
         expandGroupId: "sales_process",
@@ -373,8 +373,8 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     children: [
       {
         id: "vendors",
-        label: "Customers & vendors",
-        href: "/app/inventory/partners",
+        label: "Vendors",
+        href: "/app/inventory/partners?kind=vendor",
         iconId: "vendors",
         topId: "inv1",
         expandGroupId: "procurement_process",
