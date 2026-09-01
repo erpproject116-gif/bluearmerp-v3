@@ -308,7 +308,7 @@ export default function BomsPage() {
       },
       [
         { key: "bom_code", label: "Recipe code" },
-        { key: "bom_name", label: "Name" },
+        { key: "bom_name", label: copy.bomNameLabel },
         { key: "finished_item_id", label: copy.headerItemLabel },
       ],
     );
@@ -399,7 +399,7 @@ export default function BomsPage() {
       <SpreadsheetGrid<Bom>
         columns={[
           { key: "bom_code", header: "Recipe code", clickable: true },
-          { key: "bom_name", header: "Name", clickable: true },
+          { key: "bom_name", header: copy.bomNameLabel, clickable: true },
           { key: "finished_item_name", header: copy.headerItemLabel },
           { key: "components", header: mode === "disassembly" ? "Outputs" : "Materials" },
           { key: "default_location_name", header: "Default location" },
@@ -473,7 +473,7 @@ export default function BomsPage() {
         <Field label="Recipe code *">
           <input class={inputClass} value={bomCode()} onInput={(e) => setBomCode(e.currentTarget.value)} />
         </Field>
-        <Field label="Name *">
+        <Field label={`${copy.bomNameLabel} *`}>
           <input class={inputClass} value={bomName()} onInput={(e) => setBomName(e.currentTarget.value)} />
         </Field>
         <label class="flex items-end gap-2 pb-2 text-sm">
@@ -527,14 +527,14 @@ export default function BomsPage() {
             setOutputUnitLabel("");
           }}
         />
-        <Field label="Yield %">
+        <Field label={copy.yieldLabel} description={copy.yieldDescription}>
           <input class={inputClass} type="number" min="0" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
         </Field>
         <Show when={mode === "disassembly"}>
-          <Field label="Expected yield min %">
+          <Field label={copy.expectedYieldMinLabel} description={copy.expectedYieldMinDescription}>
             <input class={inputClass} type="number" min="0" value={expectedYieldMin()} onInput={(e) => setExpectedYieldMin(e.currentTarget.value)} />
           </Field>
-          <Field label="Expected yield max %">
+          <Field label={copy.expectedYieldMaxLabel} description={copy.expectedYieldMaxDescription}>
             <input class={inputClass} type="number" min="0" value={expectedYieldMax()} onInput={(e) => setExpectedYieldMax(e.currentTarget.value)} />
           </Field>
         </Show>
@@ -652,7 +652,7 @@ export default function BomsPage() {
             }}
           </For>
           <button type="button" class="text-sm text-brand-600 hover:underline" onClick={addLine}>
-            + {mode === "disassembly" ? "Add output" : "Add material"}
+            + {copy.addLineLabel}
           </button>
         </div>
       </EntityModal>

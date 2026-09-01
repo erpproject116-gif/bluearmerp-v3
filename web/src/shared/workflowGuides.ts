@@ -501,14 +501,16 @@ export const workflowGuides: WorkflowGuide[] = [
   {
     id: "manufacturing_assembly",
     title: "Assembly",
-    summary: "Write an Assembly recipe, start a job, release it, and finish from the job list.",
+    summary:
+      "Recipe → Jobs (draft, release, QC, complete) → floor stations for issue and receive. Release and QC always happen on the Jobs list row actions.",
     docHref: "/app/documentation/kb/manufacturing-bom",
     steps: [
       {
         id: "recipe",
         short: "Recipe",
         title: "Write the Assembly recipe",
-        what: "List raw materials per batch and the finished item you receive.",
+        what:
+          "Enter recipe code and description, pick the finished product, and list raw materials per batch. Save when the bill of materials looks right.",
         href: "/app/production/assembly/recipes",
         routePrefixes: ["/app/production/assembly/recipes"],
         moduleCode: "manufacturing",
@@ -516,10 +518,21 @@ export const workflowGuides: WorkflowGuide[] = [
       {
         id: "job",
         short: "Jobs",
-        title: "Run Assembly jobs",
-        what: "Start a job, release it, issue materials, receive finished goods, and complete from the row actions.",
+        title: "Create, release, QC, and complete",
+        what:
+          "On Assembly → Jobs: New job → pick recipe and qty (stays Draft). When ready, click Next: Release to floor on the row. After floor work, use Pass QC in the Inspection column if QC is on, then Next: Complete to post stock.",
         href: "/app/production/assembly/jobs",
-        routePrefixes: ["/app/production/assembly/jobs", "/app/production/issue-station"],
+        routePrefixes: ["/app/production/assembly/jobs"],
+        moduleCode: "manufacturing",
+      },
+      {
+        id: "floor",
+        short: "Floor",
+        title: "Issue materials and receive finished goods",
+        what:
+          "On a released job, open Issue materials and Receive FG from the row (or use the floor station links). Scan or enter quantities so stock moves before you complete the job.",
+        href: "/app/production/assembly/jobs",
+        routePrefixes: ["/app/production/issue-station", "/app/production/receive-station"],
         moduleCode: "manufacturing",
       },
     ],
@@ -527,14 +540,16 @@ export const workflowGuides: WorkflowGuide[] = [
   {
     id: "manufacturing_disassembly",
     title: "Disassembly",
-    summary: "Write a Disassembly recipe, start a job, and finish from the job list.",
+    summary:
+      "Recipe → Jobs (draft, release, QC, complete) → weigh whole and receive pieces on the floor. Release and QC stay on the Jobs list.",
     docHref: "/app/documentation/kb/manufacturing-bom",
     steps: [
       {
         id: "recipe",
         short: "Recipe",
         title: "Write the Disassembly recipe",
-        what: "List the whole item you consume and output pieces per batch.",
+        what:
+          "Enter recipe code and description, pick the whole item, set batch input qty and optional yield range, then list expected output pieces per batch.",
         href: "/app/production/disassembly/recipes",
         routePrefixes: ["/app/production/disassembly/recipes"],
         moduleCode: "manufacturing",
@@ -542,10 +557,21 @@ export const workflowGuides: WorkflowGuide[] = [
       {
         id: "job",
         short: "Jobs",
-        title: "Run Disassembly jobs",
-        what: "Start a job, release it, weigh the whole, receive pieces, and complete from the row actions.",
+        title: "Create, release, QC, and complete",
+        what:
+          "On Disassembly → Jobs: New job → pick recipe and qty. Release to floor when ready. After weighing and receiving pieces, Pass QC in Inspection if required, then Next: Complete.",
         href: "/app/production/disassembly/jobs",
-        routePrefixes: ["/app/production/disassembly/jobs", "/app/production/weigh-parts"],
+        routePrefixes: ["/app/production/disassembly/jobs"],
+        moduleCode: "manufacturing",
+      },
+      {
+        id: "floor",
+        short: "Floor",
+        title: "Weigh whole and receive pieces",
+        what:
+          "On a released job, use Weigh whole and Receive pieces links on the row. Record actual weights and output lots before completing the job.",
+        href: "/app/production/disassembly/jobs",
+        routePrefixes: ["/app/production/weigh-parts", "/app/production/receive-station"],
         moduleCode: "manufacturing",
       },
     ],

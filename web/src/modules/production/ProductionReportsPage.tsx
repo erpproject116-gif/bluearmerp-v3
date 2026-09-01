@@ -3,7 +3,6 @@ import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { defaultReportDateRange, ReportPageLayout } from "../../shared/reports/ReportPageLayout";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
-import { ProductionLayout } from "./ProductionLayout";
 
 type ReportTab = "work-order-status" | "progress" | "stock-movements" | "disassembly-yield";
 
@@ -142,7 +141,7 @@ export default function ProductionReportsPage() {
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
 
   return (
-    <ProductionLayout>
+    <>
       <div class="mb-4 flex flex-wrap gap-2">
         <For each={(["work-order-status", "progress", "stock-movements", "disassembly-yield"] as ReportTab[])}>
           {(t) => (
@@ -382,6 +381,6 @@ export default function ProductionReportsPage() {
           <p class="px-5 py-8 text-center text-sm text-text-secondary">No rows in this date range.</p>
         </Show>
       </ReportPageLayout>
-    </ProductionLayout>
+    </>
   );
 }

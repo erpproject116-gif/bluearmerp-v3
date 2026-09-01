@@ -754,6 +754,7 @@ export function featureHeaderTitle(feature: ModuleFeature, pathname: string): st
 
 /** Header tabs: drop redundant New-* shortcuts and report clutter. Always keep Setup. */
 export function visibleHeaderFeatures(module: AppModule, me?: MeData | null): ModuleFeature[] {
+  if (module.id === "production") return [];
   let features = module.features.filter((feature) => {
     if (feature.headerHidden) return false;
     if (feature.href.endsWith("/setup")) return true;

@@ -258,27 +258,15 @@ export function SidebarNav() {
       return false;
     }
     if (area.id === "production_assembly") {
-      return pathStarts(p, ["/app/production/assembly"]);
-    }
-    if (area.id === "production_assembly_recipes") {
-      return pathStarts(p, ["/app/production/assembly/recipes"]);
-    }
-    if (area.id === "production_assembly_jobs") {
       return (
-        pathStarts(p, ["/app/production/assembly/jobs"]) ||
+        pathStarts(p, ["/app/production/assembly"]) ||
         (pathStarts(p, ["/app/production/issue-station", "/app/production/receive-station"]) &&
           new URLSearchParams(loc.search).get("mode") !== "disassembly")
       );
     }
     if (area.id === "production_disassembly") {
-      return pathStarts(p, ["/app/production/disassembly"]);
-    }
-    if (area.id === "production_disassembly_recipes") {
-      return pathStarts(p, ["/app/production/disassembly/recipes"]);
-    }
-    if (area.id === "production_disassembly_jobs") {
       return (
-        pathStarts(p, ["/app/production/disassembly/jobs"]) ||
+        pathStarts(p, ["/app/production/disassembly"]) ||
         pathStarts(p, ["/app/production/weigh-parts"]) ||
         (pathStarts(p, ["/app/production/receive-station"]) &&
           new URLSearchParams(loc.search).get("mode") === "disassembly")

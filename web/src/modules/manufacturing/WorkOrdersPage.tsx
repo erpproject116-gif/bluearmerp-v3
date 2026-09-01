@@ -393,7 +393,7 @@ export default function WorkOrdersPage() {
     <>
       <p class="mb-3 text-sm text-text-secondary">
         <span class="font-medium text-text-primary">{copy.jobTitle}:</span>{" "}
-        Release and finish from each row. {copy.stockHint}.
+        Draft → Release to floor → floor links → Pass QC → Complete. {copy.stockHint}.
       </p>
       <SpreadsheetGrid<WorkOrder>
         columns={[
