@@ -71,7 +71,13 @@ export function QuickCustomerModal(props: Props) {
     });
     setSaving(false);
     if (!res.success || !res.data) {
-      const msg = res.errors?.company_name ?? res.message ?? `Failed to create ${noun()}.`;
+      const msg =
+        res.errors?.company_name ??
+        res.errors?.tin ??
+        res.errors?.partner_kind ??
+        res.errors?.body ??
+        res.message ??
+        `Failed to create ${noun()}.`;
       setError(msg);
       toast.warning(msg);
       return;
