@@ -51,9 +51,10 @@ jobs:
 
       - name: Install Alibaba Cloud CLI
         run: |
-          curl -fsSL -o aliyun-cli.tgz https://aliyuncli.alicdn.com/aliyun-cli-linux-latest-version.tgz
+          curl -fsSL -o aliyun-cli.tgz https://aliyuncli.alicdn.com/aliyun-cli-linux-latest-amd64.tgz
           tar -xzf aliyun-cli.tgz
           sudo install -m 755 aliyun /usr/local/bin/aliyun
+          aliyun version
 
       - name: Deploy on ECS (RunCommand)
         id: deploy
