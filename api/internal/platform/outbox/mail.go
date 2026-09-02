@@ -8,7 +8,7 @@ func MailConfigured() bool {
 	return LoadResendConfig().Enabled() || LoadSMTPConfig().Enabled()
 }
 
-// DeliverText sends a plain-text email. Prefers Resend HTTPS (Render-free friendly), then SMTP.
+// DeliverText sends a plain-text email. Prefers Resend HTTPS when configured, then SMTP.
 func DeliverText(to, subject, body string) error {
 	if r := LoadResendConfig(); r.Enabled() {
 		if err := SendResendEmail(r, to, subject, body, ""); err != nil {

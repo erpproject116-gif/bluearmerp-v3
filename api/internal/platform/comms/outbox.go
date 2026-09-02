@@ -59,7 +59,7 @@ func HandleOutboxEvent(ctx context.Context, pool *pgxpool.Pool, ev outbox.Event)
 	if sm.SentByUserID == nil {
 		gmailErr = fmt.Errorf("sender user missing on sent message")
 	} else if gmailCfg.StubMode || !gmailCfg.OAuthConfigured() {
-		gmailErr = fmt.Errorf("Gmail OAuth not configured on API (set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT on Render and redeploy)")
+		gmailErr = fmt.Errorf("Gmail OAuth not configured on API (set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT and redeploy)")
 	} else {
 		var msgID, threadID string
 		msgID, threadID, gmailErr = SendViaGmail(ctx, pool, gmailCfg, ev.TenantID, *sm.SentByUserID, sm.ToAddrs, sm.CcAddrs, sm.Subject, htmlBody, attachments)

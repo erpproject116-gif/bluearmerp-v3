@@ -51,7 +51,7 @@ function resolveApiBase(siteUrl: string): string {
   if (cms) {
     if (siteHost && hostOf(cms) === siteHost) {
       throw new Error(
-        "CMS_API_BASE_URL must be your Render API URL (e.g. https://bluearmerp-v3.onrender.com), not PUBLIC_SITE_URL.",
+        "CMS_API_BASE_URL must be your Go API host (e.g. https://api.bluearmerp.com), not PUBLIC_SITE_URL.",
       );
     }
     return cms;
@@ -60,7 +60,7 @@ function resolveApiBase(siteUrl: string): string {
   if (vite) {
     if (siteHost && hostOf(vite) === siteHost) {
       throw new Error(
-        "Set CMS_API_BASE_URL to your Render API URL on Vercel. VITE_API_BASE_URL points at the web app, which returns HTML for /api.",
+        "Set CMS_API_BASE_URL to your Go API host on Vercel. VITE_API_BASE_URL points at the web app, which returns HTML for /api.",
       );
     }
     return vite;

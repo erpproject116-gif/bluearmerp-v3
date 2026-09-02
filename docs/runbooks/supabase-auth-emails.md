@@ -23,7 +23,7 @@ Official variable reference: [Auth email templates](https://supabase.com/docs/gu
 | Email signup confirmation | Supabase Auth | `SignUpPage` → `signUp` + `emailRedirectTo` `/auth/callback` | `/auth/callback` |
 | Forgot / reset password | Supabase Auth | `ForgotPasswordPage` → `resetPasswordForEmail` → `/auth/reset-password` | `/auth/reset-password` |
 | Demo OTP | Supabase Auth | `DemoSignupPage` → `signInWithOtp` + `verifyOtp({ type: "email" })` | Enter **6-digit code** in UI (`{{ .Token }}` required in template) |
-| Company / teammate invite | **API SMTP outbox** (`SMTP_*` on Render) | User Management → Invites | Sign in with Google (same email) — **not** this runbook |
+| Company / teammate invite | **API outbox** (`RESEND_*` or `SMTP_*` on ECS) | User Management → Invites | Sign in with Google (same email) — **not** this runbook |
 
 ---
 
@@ -32,7 +32,7 @@ Official variable reference: [Auth email templates](https://supabase.com/docs/gu
 | System | Used for | Configure where |
 |--------|----------|-----------------|
 | **Supabase Auth SMTP** | Confirm signup, reset password, magic link / OTP | Dashboard → Authentication → SMTP (or default Supabase mail for tests) |
-| **API mail** (`RESEND_API_KEY` + `RESEND_FROM`/`SMTP_FROM`, or `SMTP_*`) | Company invites, document email, digests | Render / API env — see [`render-deploy.md`](./render-deploy.md). On **Render free**, use Resend HTTPS (`RESEND_API_KEY`); SMTP ports are blocked. |
+| **API mail** (`RESEND_API_KEY` + `RESEND_FROM`/`SMTP_FROM`, or `SMTP_*`) | Company invites, document email, digests | ECS API env — see [`ops-email-notifications.md`](./ops-email-notifications.md). Prefer Resend HTTPS (`RESEND_API_KEY`). |
 
 Changing Auth templates or Auth SMTP does **not** change invite or Communications mail.
 

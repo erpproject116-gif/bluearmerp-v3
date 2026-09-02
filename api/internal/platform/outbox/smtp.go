@@ -59,7 +59,7 @@ func smtpDialHint(err error) string {
 		strings.Contains(msg, "connection timed out") ||
 		strings.Contains(msg, "deadline exceeded") ||
 		strings.Contains(msg, "connection refused") {
-		return msg + " — if the API runs on Render free tier, outbound SMTP ports 25/465/587 are blocked; set RESEND_API_KEY (+ RESEND_FROM or SMTP_FROM) to send over HTTPS, upgrade the instance, or use Gmail OAuth (Communications → Settings)"
+		return msg + " — set RESEND_API_KEY (+ RESEND_FROM or SMTP_FROM) to send over HTTPS, configure SMTP on your host, or use Gmail OAuth (Communications → Settings)"
 	}
 	return msg
 }

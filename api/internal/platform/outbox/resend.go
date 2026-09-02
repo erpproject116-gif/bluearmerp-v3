@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// ResendConfig holds HTTPS API settings (works on Render free; SMTP ports are blocked there).
+// ResendConfig holds HTTPS API settings (works when SMTP is unavailable).
 type ResendConfig struct {
 	APIKey string
 	From   string

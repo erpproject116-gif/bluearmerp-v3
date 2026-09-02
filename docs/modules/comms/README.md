@@ -68,7 +68,7 @@ Status check: `demo_comms_sent` on Demo Data screen.
 | `CHANGE_ALERT_JOB_SECRET` (or `CRM_JOB_SECRET`) | Hourly owner digest: `POST /api/v1/platform/jobs/change-alert-digest`; daily ops: `.../daily-ops-digest`; weekly/monthly BI: `.../weekly-bi-digest`, `.../monthly-bi-digest` |
 | `CHANGE_ALERT_DIGEST_TO` | Optional override recipient(s), comma-separated. When unset, digests go to the **tenant owner** email. |
 
-**Render free tier:** outbound SMTP ports are blocked. Prefer Gmail connect for document email, or a paid Render instance for SMTP (including owner digests) — see `docs/runbooks/render-deploy.md`.
+**Email:** Prefer **Resend** (`RESEND_API_KEY`) or **Gmail OAuth** for document email and digests — see `docs/runbooks/ops-email-notifications.md` and `docs/runbooks/alibaba-deploy.md`.
 
 **Owner digests:** queued from audit trails (quotation, SO, sales, PO, purchases, etc.); emailed hourly to the **tenant owner only**.
 

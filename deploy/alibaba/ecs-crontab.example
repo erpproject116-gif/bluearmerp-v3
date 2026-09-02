@@ -1,0 +1,34 @@
+# ECS crontab — zero extra cost background jobs (replaces Render Cron)
+# Installed on bluearm-api ECS via RunCommand. Secrets are read live from the
+# bluearm-api Docker container env (CHANGE_ALERT_JOB_SECRET / CRM_JOB_SECRET).
+
+# Helper (on ECS at /usr/local/bin/bluearm-cron-post):
+#   bluearm-cron-post <path> <header-name> <env-key>
+# Example:
+#   bluearm-cron-post /api/v1/platform/jobs/daily-ops-digest X-Change-Alert-Job-Secret CHANGE_ALERT_JOB_SECRET
+
+# --- Schedules (UTC) ---
+# Hourly change digest
+0 * * * * /usr/local/bin/bluearm-cron-post /api/v1/platform/jobs/change-alert-digest X-Change-Alert-Job-Secret CHANGE_ALERT_JOB_SECRET >> /var/log/bluearm-cron.log 2>&1 # bluearm-cron
+
+# Daily ops digest (~18:00 Asia/Manila = 10:00 UTC)
+10 10 * * * /usr/local/bin/bluearm-cron-post /api/v1/platform/jobs/daily-ops-digest X-Change-Alert-Job-Secret CHANGE_ALERT_JOB_SECRET >> /var/log/bluearm-cron.log 2>&1 # bluearm-cron
+
+# Weekly BI (Friday 10:00 UTC)
+10 10 * * 5 /usr/local/bin/bluearm-cron-post /api/v1/platform/jobs/weekly-bi-digest X-Change-Alert-Job-Secret CHANGE_ALERT_JOB_SECRET >> /var/log/bluearm-cron.log 2>&1 # bluearm-cron
+
+# Monthly BI (1st of month 01:00 UTC)
+0 1 1 * * /usr/local/bin/bluearm-cron-post /api/v1/platform/jobs/monthly-bi-digest X-Change-Alert-Job-Secret CHANGE_ALERT_JOB_SECRET >> /var/log/bluearm-cron.log 2>&1 # bluearm-cron
+
+# CRM in-app alert bell (daily 10:30 UTC)
+30 10 * * * /usr/local/bin/bluearm-cron-post /api/v1/crm/jobs/evaluate-alerts X-CRM-Job-Secret CRM_JOB_SECRET >> /var/log/bluearm-cron.log 2>&1 # bluearm-cron
+
+# --- Verify on ECS ---
+# crontab -l | grep bluearm-cron
+# tail -50 /var/log/bluearm-cron.log
+# /usr/local/bin/bluearm-cron-post /api/v1/platform/jobs/change-alert-digest X-Change-Alert-Job-Secret CHANGE_ALERT_JOB_SECRET
+
+# --- Optional (add if you use these features) ---
+# 15 10 * * * ... /api/v1/finance/jobs/run-recurring-invoices ...
+# 20 10 * * * ... /api/v1/finance/jobs/run-recurring-expenses ...
+# */30 * * * * ... /api/v1/platform/jobs/gmail-sync ...  (needs PLATFORM_JOB_SECRET)

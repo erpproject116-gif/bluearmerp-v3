@@ -257,6 +257,10 @@ export function SidebarNav() {
     if (area.id === "production") {
       return false;
     }
+    if (area.id === "production_workflow") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/production";
+    }
     if (area.id === "production_assembly") {
       return (
         pathStarts(p, ["/app/production/assembly"]) ||

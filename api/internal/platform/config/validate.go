@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// DatabaseConfigError explains missing database env vars (e.g. Render dashboard).
+// DatabaseConfigError explains missing database env vars.
 func DatabaseConfigError() string {
 	if u := strings.TrimSpace(os.Getenv("DATABASE_URL")); u != "" {
 		return "database not configured: DATABASE_URL is set but empty or invalid"
@@ -29,7 +29,7 @@ func DatabaseConfigError() string {
 	}
 
 	return fmt.Sprintf(
-		"database not configured: missing %s — add them in Render → Environment (or set DATABASE_URL). See .env.example",
+		"database not configured: missing %s — set them on the API host (or set DATABASE_URL). See .env.example",
 		strings.Join(missing, ", "),
 	)
 }

@@ -27,7 +27,7 @@
 
    For production/staging, use that env’s origin for both Site URL and the same two redirect paths. Full Auth email + SMTP steps: [`supabase-auth-emails.md`](./supabase-auth-emails.md).
 
-   **Auth SMTP ≠ API SMTP:** Supabase Authentication → SMTP sends confirm / reset / magic-link mail. Company invites and Communications use API `SMTP_*` on the server — see [`render-deploy.md`](./render-deploy.md).
+   **Auth SMTP ≠ API SMTP:** Supabase Authentication → SMTP sends confirm / reset / magic-link mail. Company invites and Communications use API `SMTP_*` on the server — see [`alibaba-deploy.md`](./alibaba-deploy.md) and [`ops-email-notifications.md`](./ops-email-notifications.md).
 
 ### `Unable to exchange external code` / `server_error`
 

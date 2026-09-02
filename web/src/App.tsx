@@ -355,6 +355,7 @@ import { FixedAssetsRoute } from "./shared/FixedAssetsRoute";
 import { JobCostingRoute } from "./shared/JobCostingRoute";
 import { ManufacturingRoute } from "./shared/ManufacturingRoute";
 import { ProductionModeLayout } from "./modules/production/ProductionModeLayout";
+import { ProductionHubPage } from "./modules/production/ProductionHubPage";
 import { QualityRoute } from "./shared/QualityRoute";
 import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
 import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
@@ -550,7 +551,7 @@ export default function App() {
           <Route path="/inventory/serial-lot/receive" component={SerialReceivePage} />
           <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
           <Route path="/production" component={() => (
-            <Navigate href="/app/production/assembly/jobs" />
+            <ManufacturingRoute><ProductionHubPage /></ManufacturingRoute>
           )} />
           <Route path="/production/:mode/recipes" component={() => (
             <ManufacturingRoute><ProductionModeLayout><BomsPage /></ProductionModeLayout></ManufacturingRoute>

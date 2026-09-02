@@ -1,6 +1,37 @@
-# Alibaba Cloud deploy (Sprint 2 scaffold)
+# Alibaba Cloud deploy (production API)
 
-This runbook is a **placeholder** for moving the Go API from Render to Alibaba ECS/ACK. Sprint 1 (DashScope/Qwen) is complete; use this when provisioning compute.
+The Go API runs on **Alibaba ECS** at `https://api.bluearmerp.com`. The SPA stays on Vercel; it calls ECS via `VITE_API_BASE_URL` and `CMS_API_BASE_URL`.
+
+## CI/CD — GitHub Actions → ECS
+
+Pushes to `main` that touch `api/**` trigger [`.github/workflows/api-ecs-deploy.yml`](../../.github/workflows/api-ecs-deploy.yml):
+
+1. `go test` + `go build` on the runner
+2. Alibaba ECS **RunCommand** on `i-t4n5tdhzaktd0x6tc34w` runs [`deploy/alibaba/deploy-api-on-ecs.sh`](../../deploy/alibaba/deploy-api-on-ecs.sh) (git pull + Docker rebuild)
+3. Public `GET /health/schema` must return `healthy: true`
+
+### GitHub repository secrets (required)
+
+| Secret | Purpose |
+|--------|---------|
+| `ALIBABA_CLOUD_ACCESS_KEY_ID` | RAM user with `ecs:RunCommand` + `ecs:DescribeInvocationResults` on the API instance |
+| `ALIBABA_CLOUD_ACCESS_KEY_SECRET` | Pair for the access key |
+| `ECS_GIT_DEPLOY_TOKEN` | GitHub PAT with **read** access to `erpproject116-gif/bluearmerp-v3` (ECS `git fetch`) |
+
+Create the PAT under GitHub → Settings → Developer settings → Fine-grained tokens (contents: read).
+
+Manual deploy: **Actions → API ECS deploy → Run workflow**.
+
+### One-time ECS prep
+
+On the VM (`/root/bluearmerp-v3`):
+
+```bash
+git clone https://github.com/erpproject116-gif/bluearmerp-v3.git /root/bluearmerp-v3   # if missing
+docker ps --filter name=bluearm-api    # container must exist with env already configured
+```
+
+First deploy preserves env via `docker inspect bluearm-api` → `/tmp/bluearm-api.env`. Set all API secrets on the container before enabling CI (see [env template](../../deploy/alibaba/env.api.example)).
 
 ## Target stack
 
@@ -133,3 +164,23 @@ During Sprint 2 you can keep Supabase Auth + move only the API host:
 - Tair Redis if running multiple API instances
 
 See [dashscope-rfq-ai.md](./dashscope-rfq-ai.md) for Qwen configuration.
+
+## Background jobs (crontab on ECS — no extra Alibaba charge)
+
+Use Linux `crontab` on the same `bluearm-api` VM (replaces any external cron scheduler):
+
+| Schedule (UTC) | Endpoint | Purpose |
+|----------------|----------|---------|
+| Hourly | `POST /api/v1/platform/jobs/change-alert-digest` | Owner change email |
+| Daily 10:00 | `POST /api/v1/platform/jobs/daily-ops-digest` | Daily ops email (~18:00 Manila) |
+| Fri 10:00 | `POST /api/v1/platform/jobs/weekly-bi-digest` | Weekly BI email |
+| 1st 01:00 | `POST /api/v1/platform/jobs/monthly-bi-digest` | Monthly BI email |
+| Daily 10:30 | `POST /api/v1/crm/jobs/evaluate-alerts` | In-app notification bell |
+
+Jobs call `http://127.0.0.1:8080` with `X-Change-Alert-Job-Secret` / `X-CRM-Job-Secret`. Secrets are read from the `bluearm-api` Docker env at runtime.
+
+Template: [deploy/alibaba/ecs-crontab.example](../../deploy/alibaba/ecs-crontab.example)
+
+**Verify:** `crontab -l | grep bluearm-cron` and `tail /var/log/bluearm-cron.log` on ECS.
+
+**Requires on API container:** `CHANGE_ALERT_JOB_SECRET` and/or `CRM_JOB_SECRET` (digest accepts either; CRM needs `CRM_JOB_SECRET` or the helper falls back to `CHANGE_ALERT_JOB_SECRET`).

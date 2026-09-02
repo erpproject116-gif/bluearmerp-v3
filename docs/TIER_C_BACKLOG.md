@@ -80,7 +80,7 @@ One-page briefs for Tier C modules. **MVP shipped** modules are live in the app 
 
 **Cron:** `POST /api/v1/platform/jobs/change-alert-digest` with `X-Change-Alert-Job-Secret` or `X-CRM-Job-Secret`.
 
-**Delivery:** SMTP (`SMTP_HOST`/`SMTP_FROM`) required for digests. On Render free tier SMTP is blocked — upgrade or leave digests queued until SMTP works. Document email can use Gmail OAuth instead.
+**Delivery:** SMTP (`SMTP_HOST`/`SMTP_FROM`) or Resend (`RESEND_API_KEY`) required for digests. See [`ops-email-notifications.md`](runbooks/ops-email-notifications.md). Document email can use Gmail OAuth instead.
 
 **Still deferred:** Per-user prefs UI, module prefix picker in settings.
 

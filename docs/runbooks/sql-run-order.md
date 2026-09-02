@@ -305,7 +305,7 @@ psql "$DATABASE_URL" -f scripts/verify-demo-inventory.sql
 | Platform retention | `POST /api/v1/platform/jobs/retention` | `X-Platform-Job-Secret` | Daily |
 | Platform billing | `POST /api/v1/platform/jobs/billing` | `X-Platform-Job-Secret` | Daily |
 
-Set `PLATFORM_JOB_SECRET`, `PAYMONGO_SECRET_KEY`, and `PAYMONGO_WEBHOOK_SECRET` on the API (Render) alongside existing `DEMO_JOB_SECRET` and `CRM_JOB_SECRET`.
+Set `PLATFORM_JOB_SECRET`, `PAYMONGO_SECRET_KEY`, and `PAYMONGO_WEBHOOK_SECRET` on the API (ECS) alongside existing `DEMO_JOB_SECRET` and `CRM_JOB_SECRET`.
 
 ---
 

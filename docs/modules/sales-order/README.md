@@ -91,4 +91,4 @@ Routes: `/app/sales-order/shipping/orders`, `/rules`, `/trips`
 
 ## Production
 
-Run migrations on Render Postgres (Session pooler URI). Redeploy API and Vercel web after env is unchanged.
+Run migrations on Supabase (session pooler URI). Redeploy API (ECS) and Vercel web after env is unchanged.

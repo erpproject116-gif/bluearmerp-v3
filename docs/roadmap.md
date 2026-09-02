@@ -17,18 +17,18 @@ Operating plan to reach **Ecount-class trading ERP** reliability, then depth in 
 | 0.1 | `internal/platform/migrate` package shared by CLI + Docker | Done |
 | 0.2 | `MIGRATE_ON_START=true` + Docker entrypoint applies migrations on deploy | Done |
 | 0.3 | `GET /health/schema` — pending migrations + critical tables | Done |
-| 0.4 | Render health check → `/health/schema` | Done |
+| 0.4 | API health check → `/health/schema` | Done |
 | 0.5 | `scripts/golden-path-smoke.mjs` + CI workflow `api-golden-smoke.yml` | Done |
 | 0.6 | Deploy checklist runbook | Done — [`runbooks/deploy-checklist.md`](runbooks/deploy-checklist.md) |
 | 0.7 | Rate-limit / query invalidation regression tests | Done (prior work) |
-| 0.8 | Production: apply migration **142** on Render DB | **Operator** — redeploy API with `MIGRATE_ON_START` |
+| 0.8 | Production: apply migration **142** on hosted DB | **Operator** — redeploy API with `MIGRATE_ON_START` |
 | 0.9 | Production: migration **143** (`sa_sales_holds`) | **Operator** — same redeploy |
 | 0.10 | Production: migration **144** (item price levels + safety stock) | **Operator** — same redeploy |
 
 **Exit gate:** Demo tenant + pilot complete golden path 2 weeks with zero manual SQL fixes.
 
 ```bash
-curl https://YOUR-API.onrender.com/health/schema   # healthy: true
+curl https://api.bluearmerp.com/health/schema   # healthy: true
 node scripts/golden-path-smoke.mjs                 # local, with BENCH_TOKEN
 ```
 
@@ -164,4 +164,4 @@ Promote only modules tied to paying pilots. See [`TIER_C_BACKLOG.md`](TIER_C_BAC
 | [`ecount-audit/gaps-bluearm.md`](ecount-audit/gaps-bluearm.md) | Ecount parity backlog |
 | [`TIER_C_BACKLOG.md`](TIER_C_BACKLOG.md) | Extended modules |
 | [`runbooks/deploy-checklist.md`](runbooks/deploy-checklist.md) | Every production deploy |
-| [`runbooks/render-deploy.md`](runbooks/render-deploy.md) | Render + Supabase pooler |
+| [`runbooks/alibaba-deploy.md`](runbooks/alibaba-deploy.md) | ECS API + Supabase pooler |

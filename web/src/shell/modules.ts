@@ -122,7 +122,7 @@ export const appModules: AppModule[] = [
   {
     id: "production",
     label: "Production",
-    href: "/app/production/assembly/jobs",
+    href: "/app/production",
     basePath: "/app/production",
     features: [
       { label: "Assembly · Recipes", href: "/app/production/assembly/recipes", settingsHref: "/app/production/assembly/recipes", featureCode: "manufacturing.boms", headerPriority: "primary" },

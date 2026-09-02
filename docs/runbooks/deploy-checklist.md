@@ -1,6 +1,6 @@
 # Production deploy checklist
 
-Use this for **every** API + web deploy to Render/Vercel (or any hosted environment).
+Use this for **every** API + web deploy (ECS + Vercel).
 
 ## Before merge
 
@@ -10,36 +10,38 @@ Use this for **every** API + web deploy to Render/Vercel (or any hosted environm
 - [ ] If schema changed: new file in `api/migrations/` (next number after latest)
 - [ ] `go run ./cmd/migrate -check` against a DB with migrations applied (CI does this via golden smoke)
 
-## Deploy API (Render)
+## Deploy API (Alibaba ECS)
 
-1. Push to branch connected to Render (or manual deploy).
-2. Confirm environment variables:
-   - `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `DATABASE_URL` (pooler URI)
-   - `CORS_ORIGIN` = your Vercel URL(s)
+1. Merge to `main` (or run **API ECS deploy** workflow manually).
+2. Workflow runs tests, then `deploy/alibaba/deploy-api-on-ecs.sh` on ECS via RunCommand.
+3. Confirm environment on the `bluearm-api` Docker container (first-time / secret changes only):
+   - `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `DATABASE_URL` (Supabase session pooler URI)
+   - `CORS_ORIGIN` = your Vercel URL(s) + `https://app.bluearmerp.com`
    - `MIGRATE_ON_START=true` (applies pending migrations on container start)
-3. Wait for deploy to finish.
 4. **Schema health** (must be healthy before web QA):
 
    ```bash
-   curl -s https://YOUR-API.onrender.com/health/schema
+   curl -s https://api.bluearmerp.com/health/schema
    ```
 
-   Expect: `"healthy": true`, `"pending_count": 0`, `"missing_tables": []` (includes `fin_supplier_invoice_attachments` from migration **142**).
+   Expect: `"healthy": true`, `"pending_count": 0`, `"missing_tables": []`.
 
 5. **DB connectivity** (optional):
 
    ```bash
-   curl -s https://YOUR-API.onrender.com/health/db
+   curl -s https://api.bluearmerp.com/health/db
    ```
 
 6. If `healthy: false`:
    - Read `pending_migrations` and `missing_tables` in the JSON.
-   - SSH/shell on Render or run locally: `go run ./cmd/migrate` with same `DATABASE_URL`.
-   - Redeploy if you changed `MIGRATE_ON_START` or Dockerfile.
+   - On ECS: `docker logs bluearm-api` or run `go run ./cmd/migrate` locally with the same `DATABASE_URL`.
+   - Redeploy after fixing env or migrations.
+
+Automated check: `node scripts/verify-ecs-production.mjs`
 
 ## Deploy web (Vercel)
 
-1. Confirm `VITE_API_BASE_URL=https://YOUR-API.onrender.com`
+1. Confirm `VITE_API_BASE_URL=https://api.bluearmerp.com` and `CMS_API_BASE_URL=https://api.bluearmerp.com`
 2. Deploy / promote production.
 3. Hard refresh browser (Ctrl+Shift+R) after deploy.
 4. **Supabase Auth URLs + emails** (if first deploy or Auth changed):
@@ -51,10 +53,13 @@ Use this for **every** API + web deploy to Render/Vercel (or any hosted environm
 
 ```bash
 # Public schema check
-curl -s https://YOUR-API.onrender.com/health/schema
+curl -s https://api.bluearmerp.com/health/schema
+
+# Full production gate
+node scripts/verify-ecs-production.mjs
 
 # Authenticated golden path (local or CI pattern)
-export API_BASE=https://YOUR-API.onrender.com
+export API_BASE=https://api.bluearmerp.com
 export BENCH_TOKEN=$(node scripts/mint-bench-jwt.mjs)   # needs valid user in DB
 GOLDEN_CREATE_QUOTATION=true node scripts/golden-path-smoke.mjs
 ```
@@ -74,13 +79,13 @@ Pilot month-end steps: [`month-close-checklist.md`](month-close-checklist.md).
 
 ## Rollback
 
-- **API:** Render → deploy previous image; schema is forward-only — do not delete migrations.
+- **API:** Re-run deploy workflow on a previous `main` commit, or on ECS: `git reset --hard <sha>` and run `deploy/alibaba/deploy-api-on-ecs.sh`. Schema is forward-only — do not delete migrations.
 - **Web:** Vercel → redeploy previous build.
 
 ## When to stop the release
 
 - `/health/schema` not healthy
 - Golden path smoke fails on production
-- New migration failed in Render logs (`Applying:` then error)
+- New migration failed in `docker logs bluearm-api` (`Applying:` then error)
 
-See also: [`render-deploy.md`](render-deploy.md), [`roadmap.md`](../roadmap.md) Phase 0.
+See also: [`alibaba-deploy.md`](./alibaba-deploy.md), [`roadmap.md`](../roadmap.md) Phase 0.

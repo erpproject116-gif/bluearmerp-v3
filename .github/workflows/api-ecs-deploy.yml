@@ -1,0 +1,95 @@
+name: API ECS deploy
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "api/**"
+      - "deploy/alibaba/**"
+      - ".github/workflows/api-ecs-deploy.yml"
+  workflow_dispatch:
+
+env:
+  ECS_REGION: ap-southeast-1
+  ECS_INSTANCE_ID: i-t4n5tdhzaktd0x6tc34w
+  API_PUBLIC_URL: https://api.bluearmerp.com
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Go test
+        working-directory: api
+        run: go test ./...
+
+      - name: Go build
+        working-directory: api
+        run: go build ./...
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Alibaba + git deploy secrets
+        env:
+          AK: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
+          SK: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
+          GIT_TOKEN: ${{ secrets.ECS_GIT_DEPLOY_TOKEN }}
+        run: |
+          test -n "$AK" || { echo "Missing secret ALIBABA_CLOUD_ACCESS_KEY_ID"; exit 1; }
+          test -n "$SK" || { echo "Missing secret ALIBABA_CLOUD_ACCESS_KEY_SECRET"; exit 1; }
+          test -n "$GIT_TOKEN" || { echo "Missing secret ECS_GIT_DEPLOY_TOKEN (repo read PAT for ECS git fetch)"; exit 1; }
+
+      - name: Install Alibaba Cloud CLI
+        run: |
+          curl -fsSL -o aliyun-cli.tgz https://aliyuncli.alicdn.com/aliyun-cli-linux-latest-version.tgz
+          tar -xzf aliyun-cli.tgz
+          sudo install -m 755 aliyun /usr/local/bin/aliyun
+
+      - name: Deploy on ECS (RunCommand)
+        id: deploy
+        env:
+          ALIBABA_CLOUD_ACCESS_KEY_ID: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
+          ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
+          ECS_GIT_DEPLOY_TOKEN: ${{ secrets.ECS_GIT_DEPLOY_TOKEN }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SCRIPT_B64=$(base64 -w0 deploy/alibaba/deploy-api-on-ecs.sh)
+          COMMAND="echo ${SCRIPT_B64} | base64 -d > /tmp/deploy-api-on-ecs.sh && chmod +x /tmp/deploy-api-on-ecs.sh && /tmp/deploy-api-on-ecs.sh ${DEPLOY_SHA} ${ECS_GIT_DEPLOY_TOKEN}"
+          RUN=$(aliyun ecs RunCommand \
+            --region "$ECS_REGION" \
+            --Type RunShellScript \
+            --CommandContent "$COMMAND" \
+            --InstanceId.1 "$ECS_INSTANCE_ID" \
+            --Timeout 900)
+          INVOKE_ID=$(echo "$RUN" | python3 -c "import sys,json; print(json.load(sys.stdin)['InvokeId'])")
+          echo "invoke_id=$INVOKE_ID" >> "$GITHUB_OUTPUT"
+          for i in $(seq 1 120); do
+            RESULT=$(aliyun ecs DescribeInvocationResults \
+              --region "$ECS_REGION" \
+              --InvokeId "$INVOKE_ID" \
+              --ContentEncoding PlainText)
+            STATUS=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['Invocation']['InvocationResults']['InvocationResult'][0]['InvocationStatus'])")
+            if [ "$STATUS" = "Success" ] || [ "$STATUS" = "Failed" ] || [ "$STATUS" = "PartialFailed" ] || [ "$STATUS" = "Stopped" ]; then
+              echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); r=d['Invocation']['InvocationResults']['InvocationResult'][0]; print(r.get('Output','')[-12000:]); exit(0 if r.get('ExitCode')==0 else 1)"
+              exit $?
+            fi
+            sleep 5
+          done
+          echo "RunCommand timed out (invoke $INVOKE_ID)"
+          exit 1
+
+      - name: Public health check
+        run: |
+          curl -sf "$API_PUBLIC_URL/health/schema" | tee /tmp/schema.json
+          node -e "const j=require('/tmp/schema.json'); if(!j.data?.healthy) { console.error(j); process.exit(1); } console.log('healthy:', j.data.latest_migration);"

@@ -18,33 +18,33 @@ Fact-locked runbook for Platform Command invites, hourly change-alert digests, a
 
 **Not in this pipe:** Supabase Auth confirm / reset / demo OTP (Dashboard SMTP). **Not shipped:** per-sale / per-purchase / per-SKU emails (protects free Resend quota).
 
-## Env (Render API only — not Vercel)
+## Env (ECS API only — not Vercel)
 
 | Variable | Required for |
 |----------|----------------|
-| `RESEND_API_KEY` | Invites + digests on free Render |
+| `RESEND_API_KEY` | Invites + digests |
 | `RESEND_FROM` or `SMTP_FROM` | From address (verified domain in Resend) |
 | `APP_PUBLIC_URL` | Absolute `/signin` and `/app/...` links |
 | `CHANGE_ALERT_JOB_SECRET` or `CRM_JOB_SECRET` | Digest cron auth |
 | `CHANGE_ALERT_DIGEST_TO` | Optional full recipient override (ops/debug) |
 
-## Cron
+## Cron (ECS crontab — see alibaba-deploy.md)
 
 ```bash
 # Hourly activity digest
-curl -X POST "https://YOUR-API.onrender.com/api/v1/platform/jobs/change-alert-digest" \
+curl -X POST "https://api.bluearmerp.com/api/v1/platform/jobs/change-alert-digest" \
   -H "X-Change-Alert-Job-Secret: $CHANGE_ALERT_JOB_SECRET"
 
 # Once daily (document timezone; job is idempotent per UTC calendar day)
-curl -X POST "https://YOUR-API.onrender.com/api/v1/platform/jobs/daily-ops-digest" \
+curl -X POST "https://api.bluearmerp.com/api/v1/platform/jobs/daily-ops-digest" \
   -H "X-Change-Alert-Job-Secret: $CHANGE_ALERT_JOB_SECRET"
 
 # Once weekly (idempotent per UTC week)
-curl -X POST "https://YOUR-API.onrender.com/api/v1/platform/jobs/weekly-bi-digest" \
+curl -X POST "https://api.bluearmerp.com/api/v1/platform/jobs/weekly-bi-digest" \
   -H "X-Change-Alert-Job-Secret: $CHANGE_ALERT_JOB_SECRET"
 
 # Once monthly (idempotent per UTC month)
-curl -X POST "https://YOUR-API.onrender.com/api/v1/platform/jobs/monthly-bi-digest" \
+curl -X POST "https://api.bluearmerp.com/api/v1/platform/jobs/monthly-bi-digest" \
   -H "X-Change-Alert-Job-Secret: $CHANGE_ALERT_JOB_SECRET"
 ```
 
@@ -86,5 +86,5 @@ In-app: **Dashboard → Period summary** (`/app/dashboard/period-summary`).
 
 ## Related
 
-- [`render-deploy.md`](./render-deploy.md) — Render env and cron table
+- [`alibaba-deploy.md`](./alibaba-deploy.md) — ECS env and crontab
 - [`supabase-auth-emails.md`](./supabase-auth-emails.md) — Auth SMTP templates

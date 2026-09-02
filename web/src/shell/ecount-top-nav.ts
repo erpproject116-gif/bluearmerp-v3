@@ -224,13 +224,22 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   {
     id: "production",
     label: "Production",
-    href: "/app/production/assembly/jobs",
+    href: "/app/production",
     iconId: "manufacturing",
     topId: "inv1",
     expandGroupId: "production_process",
     moduleId: "production",
     defaultExpanded: false,
     children: [
+      {
+        id: "production_workflow",
+        label: "Workflow",
+        href: "/app/production",
+        iconId: "sop",
+        topId: "inv1",
+        expandGroupId: "production_process",
+        moduleId: "production",
+      },
       {
         id: "production_assembly",
         label: "Assembly",

@@ -36,9 +36,9 @@ export function apiNetworkErrorMessage(): string {
     return "Could not connect to the API. Start the Go server: cd api && go run ./cmd/server";
   }
   if (!apiBase) {
-    return "API URL is not configured. Set VITE_API_BASE_URL on Vercel to your Render URL, then redeploy.";
+    return "API URL is not configured. Set VITE_API_BASE_URL on Vercel to https://api.bluearmerp.com, then redeploy.";
   }
-  return `Could not reach the API at ${apiBase}. If the browser console shows CORS errors, set CORS_ORIGIN on Render to your Vercel URL (no trailing slash), redeploy the API, then hard-refresh. Render free tier may also need 30–60s to wake after idle.`;
+  return `Could not reach the API at ${apiBase}. If the browser console shows CORS errors, set CORS_ORIGIN on the API host to your app origin (no trailing slash), redeploy the API, then hard-refresh.`;
 }
 
 export async function getAccessToken(): Promise<string | null> {
