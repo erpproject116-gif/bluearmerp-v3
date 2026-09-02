@@ -20,6 +20,16 @@ Pushes to `main` that touch `api/**` trigger [`.github/workflows/api-ecs-deploy.
 
 Create the PAT under GitHub → Settings → Developer settings → Fine-grained tokens (contents: read).
 
+**If deploy fails on ECS with `403` / `Write access to repository not granted`:**
+
+1. Token must reach the **private** repo `erpproject116-gif/bluearmerp-v3`
+2. **Fine-grained PAT:** Resource owner = `erpproject116-gif` (or your user with org access) → Repository = `bluearmerp-v3` only → **Contents: Read-only**
+3. **Classic PAT:** enable scope **`repo`** (full control of private repositories)
+4. If the org uses **SAML SSO:** open the token in GitHub → **Configure SSO** → **Authorize** for `erpproject116-gif`
+5. Regenerate the token if unsure → update GitHub secret `ECS_GIT_DEPLOY_TOKEN` → re-run workflow
+
+The PAT is used only on ECS for `git fetch` (read-only). It is not the Actions `GITHUB_TOKEN`.
+
 Manual deploy: **Actions → API ECS deploy → Run workflow**.
 
 ### RAM policy for GitHub deploy user
