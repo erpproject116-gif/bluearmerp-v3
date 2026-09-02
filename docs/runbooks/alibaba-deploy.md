@@ -24,11 +24,30 @@ Manual deploy: **Actions → API ECS deploy → Run workflow**.
 
 ### RAM policy for GitHub deploy user
 
-If the deploy job fails with `Forbidden.RAM` / `ecs:RunCommand` / `ImplicitDeny`, the AccessKey in GitHub secrets belongs to a RAM user **without** RunCommand rights.
+If the deploy job fails with `Forbidden.RAM` / `ecs:RunCommand` / `ImplicitDeny`, the AccessKey in GitHub secrets belongs to a RAM user **without** RunCommand rights — or you updated a **different** user than the one in GitHub secrets.
 
-1. [Alibaba Cloud Console](https://home.console.alibabacloud.com/) → **RAM** → **Users** → open the user tied to `ALIBABA_CLOUD_ACCESS_KEY_ID`
-2. **Add Permissions** → **Create custom policy** → **Script configuration**
-3. Paste this policy (region + instance scoped):
+**Step 0 — find the exact RAM user GitHub uses**
+
+1. Re-run the workflow and open the **Verify Alibaba RAM identity** step log.
+2. Note the `UserId` / `Arn` printed there.
+3. In RAM → **Users**, open **that** user (error logs may show e.g. `AuthPrincipalDisplayName: 214214188313890211` — that is the UID).
+
+**Step 1 — attach permissions to that user (quick test)**
+
+RAM → Users → *(user from step 0)* → **Add Permissions** → attach system policy **`AliyunECSFullAccess`**.
+
+Re-run the workflow. If it passes, you can later replace with a tighter custom policy.
+
+**Step 2 — if still `ResourceGroupLevelIdentityBasedPolicy` / `ImplicitDeny`**
+
+The ECS instance lives in a **resource group** that blocks this RAM user.
+
+1. Console → **Resource Management** → **Resource Groups**
+2. Open the group that contains `bluearm-api` / `i-t4n5tdhzaktd0x6tc34w`
+3. **Permission** (or **Authorize Resource Group**) → add the **same RAM user** from step 0
+4. Grant a role that allows ECS management (or attach `AliyunECSFullAccess` at resource-group scope)
+
+**Step 3 — tighter custom policy (after green deploy)**
 
 ```json
 {
@@ -41,17 +60,17 @@ If the deploy job fails with `Forbidden.RAM` / `ecs:RunCommand` / `ImplicitDeny`
         "ecs:DescribeInvocationResults",
         "ecs:DescribeCloudAssistantStatus"
       ],
-      "Resource": [
-        "acs:ecs:ap-southeast-1:*:instance/i-t4n5tdhzaktd0x6tc34w",
-        "acs:ecs:ap-southeast-1:*:command/*"
-      ]
+      "Resource": "*"
     }
   ]
 }
 ```
 
-4. Name it e.g. `github-ecs-deploy-runcommand` → create → attach to the RAM user
-5. If you still get `ImplicitDeny` from a **resource group** policy, attach the same policy at the resource group that owns `bluearm-api`, or use a broader test policy with `"Resource": "*"` temporarily to confirm, then narrow scope
+**Common mistakes**
+
+- Policy attached to the wrong RAM user (Cursor/MCP may use a different key than GitHub)
+- AccessKey in GitHub secrets is from an old/deleted key — create a new key on the correct user and update both secrets
+- Resource group deny overrides user-level Allow
 
 **Do not** use the root account AccessKey in GitHub. Use a dedicated RAM user.
 

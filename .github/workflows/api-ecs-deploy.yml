@@ -56,6 +56,18 @@ jobs:
           sudo install -m 755 aliyun /usr/local/bin/aliyun
           aliyun version
 
+      - name: Verify Alibaba RAM identity (debug)
+        env:
+          ALIBABA_CLOUD_ACCESS_KEY_ID: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
+          ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
+        run: |
+          aliyun configure set --profile default --mode AK \
+            --access-key-id "$ALIBABA_CLOUD_ACCESS_KEY_ID" \
+            --access-key-secret "$ALIBABA_CLOUD_ACCESS_KEY_SECRET" \
+            --region "$ECS_REGION"
+          echo "GitHub Actions RAM principal (must match the user you granted ecs:RunCommand):"
+          aliyun sts GetCallerIdentity --region "$ECS_REGION"
+
       - name: Deploy on ECS (RunCommand)
         id: deploy
         env:
@@ -65,6 +77,10 @@ jobs:
           DEPLOY_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          aliyun configure set --profile default --mode AK \
+            --access-key-id "$ALIBABA_CLOUD_ACCESS_KEY_ID" \
+            --access-key-secret "$ALIBABA_CLOUD_ACCESS_KEY_SECRET" \
+            --region "$ECS_REGION"
           SCRIPT_B64=$(base64 -w0 deploy/alibaba/deploy-api-on-ecs.sh)
           COMMAND="echo ${SCRIPT_B64} | base64 -d > /tmp/deploy-api-on-ecs.sh && chmod +x /tmp/deploy-api-on-ecs.sh && /tmp/deploy-api-on-ecs.sh ${DEPLOY_SHA} ${ECS_GIT_DEPLOY_TOKEN}"
           RUN=$(aliyun ecs RunCommand \
