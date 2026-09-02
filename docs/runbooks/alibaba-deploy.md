@@ -22,6 +22,41 @@ Create the PAT under GitHub → Settings → Developer settings → Fine-grained
 
 Manual deploy: **Actions → API ECS deploy → Run workflow**.
 
+### RAM policy for GitHub deploy user
+
+If the deploy job fails with `Forbidden.RAM` / `ecs:RunCommand` / `ImplicitDeny`, the AccessKey in GitHub secrets belongs to a RAM user **without** RunCommand rights.
+
+1. [Alibaba Cloud Console](https://home.console.alibabacloud.com/) → **RAM** → **Users** → open the user tied to `ALIBABA_CLOUD_ACCESS_KEY_ID`
+2. **Add Permissions** → **Create custom policy** → **Script configuration**
+3. Paste this policy (region + instance scoped):
+
+```json
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecs:RunCommand",
+        "ecs:DescribeInvocationResults",
+        "ecs:DescribeCloudAssistantStatus"
+      ],
+      "Resource": [
+        "acs:ecs:ap-southeast-1:*:instance/i-t4n5tdhzaktd0x6tc34w",
+        "acs:ecs:ap-southeast-1:*:command/*"
+      ]
+    }
+  ]
+}
+```
+
+4. Name it e.g. `github-ecs-deploy-runcommand` → create → attach to the RAM user
+5. If you still get `ImplicitDeny` from a **resource group** policy, attach the same policy at the resource group that owns `bluearm-api`, or use a broader test policy with `"Resource": "*"` temporarily to confirm, then narrow scope
+
+**Do not** use the root account AccessKey in GitHub. Use a dedicated RAM user.
+
+After fixing RAM: **Actions → API ECS deploy → Re-run failed jobs** (no new commit required).
+
 ### One-time ECS prep
 
 On the VM (`/root/bluearmerp-v3`):
