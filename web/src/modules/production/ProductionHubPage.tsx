@@ -63,8 +63,7 @@ function FlowDiagram(props: { mode: MfgMode }) {
     return flow().steps[0];
   });
 
-  const isYouAreHere = (step: ProductionFlowStep, index: number) =>
-    !selectedId() && routeStepIndex() === index;
+  const isYouAreHere = (index: number) => !selectedId() && routeStepIndex() === index;
 
   return (
     <div>
@@ -83,7 +82,7 @@ function FlowDiagram(props: { mode: MfgMode }) {
               <StepPill
                 step={step}
                 active={selectedStep()?.id === step.id}
-                youAreHere={isYouAreHere(step, i())}
+                youAreHere={isYouAreHere(i())}
                 onSelect={() => setSelectedId(step.id)}
               />
             </>
