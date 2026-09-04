@@ -1,6 +1,13 @@
 import type { ApiResult } from "./api";
 import type { FormErrors } from "./formValidation";
 import { formErrorsSummary } from "./formValidation";
+import {
+  hasSpecificRecoveryHint,
+  NOTIFICATION_DEFAULT_SAVE_ERROR,
+  NOTIFICATION_DEFAULT_SUCCESS,
+  NOTIFICATION_NETWORK_ERROR,
+  recoveryHintFromError,
+} from "./notificationMessageStandard";
 import { resolvePolicyActionHint } from "./policyActionHints";
 
 export function formatApiErrors(errors?: Record<string, string>): string {
@@ -58,14 +65,22 @@ type ToastLike = {
 export function handleSaveResult(
   res: ApiResult<unknown>,
   toast: ToastLike,
-  successMessage = "Saved successfully.",
+  successMessage = NOTIFICATION_DEFAULT_SUCCESS,
   options?: { onFieldErrors?: (errors: FormErrors) => void },
 ): boolean {
   if (res.success) {
     toast.success(successMessage);
     return true;
   }
+  return showBlockerResult(res, toast, options);
+}
 
+/** Show What/Why/How for a failed API result (save or side action). Returns false. */
+export function showBlockerResult(
+  res: ApiResult<unknown>,
+  toast: ToastLike,
+  options?: { onFieldErrors?: (errors: FormErrors) => void; fallbackTitle?: string },
+): false {
   // Smart Assist: server-authored recovery (prefer over generic field toasts).
   const assist = res.assist;
   if (assist?.title && toast.action) {
@@ -91,14 +106,18 @@ export function handleSaveResult(
     toast.action({
       type: "warning",
       title: fieldErrors,
-      message: "Use the button to continue the required step.",
+      message: recoveryHintFromError(fieldErrors),
       actionLabel: hint.label,
       href: hint.href,
     });
     return false;
   }
   if (fieldErrors) {
-    toast.error(fieldErrors);
+    if (hasSpecificRecoveryHint(fieldErrors)) {
+      toast.warning(`${fieldErrors} — ${recoveryHintFromError(fieldErrors)}`);
+    } else {
+      toast.error(fieldErrors);
+    }
     return false;
   }
 
@@ -122,11 +141,20 @@ export function handleSaveResult(
   }
 
   if (res.code === "ERR_VALIDATION") {
-    toast.warning(res.message ?? "Validation failed. Check the form and try again.");
+    toast.warning(res.message ?? "Something on this form needs fixing. Check the highlighted fields and try again.");
     return false;
   }
 
-  toast.error(res.message ?? "Save failed. Please try again.");
+  const msg = (res.message ?? "").trim();
+  if (msg && hasSpecificRecoveryHint(msg)) {
+    toast.warning(`${msg} — ${recoveryHintFromError(msg)}`);
+    return false;
+  }
+  if (msg) {
+    toast.warning(msg);
+    return false;
+  }
+  toast.error(options?.fallbackTitle ?? NOTIFICATION_DEFAULT_SAVE_ERROR);
   return false;
 }
 
@@ -140,7 +168,7 @@ export async function submitEntity(
     const res = await request();
     return handleSaveResult(res, toast, successMessage, options);
   } catch {
-    toast.error("Could not reach the API. Check your connection and try again.");
+    toast.error(NOTIFICATION_NETWORK_ERROR);
     return false;
   }
 }

@@ -57,13 +57,13 @@ func validateSourceSOApproval(ctx context.Context, pool *pgxpool.Pool, tenantID 
 			join public.so_sales_orders so on so.id = ln.sales_order_id
 			where ln.id = any($1) and so.tenant_id = $2`, lineIDs, tenantID)
 		if err != nil {
-			return map[string]string{"lines": "Failed to resolve source sales orders."}
+			return map[string]string{"lines": "Couldn't find the linked sales order. Refresh and try Load Slip again."}
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var soID int64
 			if err := rows.Scan(&soID); err != nil {
-				return map[string]string{"lines": "Failed to resolve source sales orders."}
+				return map[string]string{"lines": "Couldn't find the linked sales order. Refresh and try Load Slip again."}
 			}
 			soIDs[soID] = true
 		}
@@ -217,9 +217,9 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		lineBodies = append(lineBodies, body)
 	}
 	if len(lineBodies) == 0 {
-		msg := "No open sales order quantity available on this sales order."
+		msg := "Nothing left to invoice on this sales order. Pick or deliver remaining qty first, or the order is already fully billed."
 		if useDelivery {
-			msg = "No delivered balance available on this sales order."
+			msg = "Nothing left to invoice from deliveries on this sales order. Post more Delivery notes or check what was already billed."
 		}
 		return 0, docflowValidation(map[string]string{"lines": msg})
 	}

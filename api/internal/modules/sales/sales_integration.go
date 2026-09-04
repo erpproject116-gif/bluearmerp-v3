@@ -189,19 +189,19 @@ func balanceExpr(useDelivery bool) string {
 }
 
 func soMustBeCompletedForSaleMessage() string {
-	return "Sales order progress must be Completed before creating a New Sale (Confirm / In progress is not enough)."
+	return "This sales order is not ready to invoice yet. Set its progress to Completed first (Confirm or In progress is not enough)."
 }
 
 func zeroBalanceMessage(useDelivery bool) string {
 	if useDelivery {
-		return "No delivered balance available. Post a Delivery Receipt against the Completed sales order first."
+		return "Nothing is ready to invoice from delivery yet. Post a Delivery note for the completed sales order first, then use Load Slip."
 	}
-	return "No open sales order quantity available. For serial-tracked items, release quantity on Pick List first."
+	return "This item isn’t ready to invoice yet. For serial items, open the sales order → Pick List → release qty and scan the serial, then use Load Slip on this sale."
 }
 
 func salesOrderLineQtyError(balance, qty float64) string {
 	if qty > balance+0.0001 {
-		return fmt.Sprintf("Exceeds available balance (%.4f).", balance)
+		return fmt.Sprintf("Quantity is higher than what's left to invoice (%.4f). Lower the qty, or pick/deliver more first.", balance)
 	}
 	return ""
 }
@@ -269,7 +269,7 @@ func salesOrderLineBalance(ctx context.Context, tx pgx.Tx, tenantID, salesOrderL
 func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenantID int64, lines []computedLine) map[string]string {
 	policy, err := processpolicy.Load(ctx, pool, tenantID)
 	if err != nil {
-		return map[string]string{"body": "Failed to load process policies."}
+		return map[string]string{"body": "Couldn't load process rules. Refresh and try again."}
 	}
 	useDelivery := salesUsesDeliveryBalance(policy)
 	errs := map[string]string{}
@@ -304,7 +304,7 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 			where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null`,
 			balanceExpr(useDelivery)), *ln.SourceSalesOrderLineID, tenantID).Scan(&balance, &progress)
 		if err != nil {
-			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = "Sales order line not found."
+			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = "That sales order line wasn't found. Reload Load Slip and pick the line again."
 			continue
 		}
 		if progress != "completed" {
@@ -430,7 +430,7 @@ func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 		return nil
 	}
 	if trackSerial {
-		return errors.New("serial-tracked items require Sales Order → Pick List release before invoicing")
+		return errors.New("Serial items need Pick List release on the sales order before invoicing. Open the order → Pick List → release and scan, then use Load Slip.")
 	}
 
 	var releaseLineID int64
@@ -442,7 +442,7 @@ func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 		salesOrderLineID, locationID, shortfall, userID,
 	).Scan(&releaseLineID)
 	if err != nil {
-		return errors.New("failed to auto-release sales order quantity")
+		return errors.New("Couldn't finish Pick List release automatically. Open the sales order Pick List and release manually, then try again.")
 	}
 
 	if trackInventory && itemID != nil {
@@ -455,7 +455,7 @@ func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 			values ($1, $2, $3, $4, 'so_release', 'so_release_line', $5, $6)`,
 			tenantID, *itemID, locationID, -shortfall, releaseLineID, userID)
 		if err != nil {
-			return errors.New("failed to record stock movement for auto-release")
+			return errors.New("Couldn't record stock for Pick List release automatically. Open the sales order Pick List and release manually, then try again.")
 		}
 	}
 	return nil

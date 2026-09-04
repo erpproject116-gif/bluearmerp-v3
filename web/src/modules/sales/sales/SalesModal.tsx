@@ -9,7 +9,7 @@ import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { SALES_ENTITY } from "../../../shared/entityTypes";
-import { handleSaveResult, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { showBlockerResult, handleSaveResult, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
 import { mergeFormErrors } from "../../../shared/formValidation";
@@ -441,10 +441,10 @@ export function SalesModal(props: Props) {
     });
     setReturningLines(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to return lines.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't return those lines. Check the sale and try again." });
       return;
     }
-    toast.success(res.message ?? "Lines returned.");
+    toast.success(res.message ?? "Lines returned to stock.");
     setReturnLinesOpen(false);
     hydrateFromDetail(res.data);
     invalidateRecordHistory(queryClient, "sa_sales", saleId);
@@ -464,7 +464,7 @@ export function SalesModal(props: Props) {
 
   const createShippingFromLine = async (line: SalesLineRow) => {
     if (!line.source_sales_order_line_id) {
-      toast.warning("Line must be linked to a sales order.");
+      toast.warning("This line needs a sales order link first.");
       return;
     }
     if (!partnerId() || !locationId()) {
@@ -486,7 +486,7 @@ export function SalesModal(props: Props) {
       }),
     });
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to create shipping order.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't create the shipping order. Check the line and try again." });
       return;
     }
     toast.success(`Shipping order ${res.data.shipping_no} created.`);
@@ -908,7 +908,7 @@ export function SalesModal(props: Props) {
     );
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
-      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Fix the highlighted fields, then try again.");
       return;
     }
     const attachmentErr = validateAttachmentBeforeConfirm(
@@ -984,10 +984,10 @@ export function SalesModal(props: Props) {
       : apiFetch<SalesDetail>("/api/v1/sales", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, ed ? "Sales updated." : "Sales created.", { onFieldErrors: setFieldErrors });
+      handleSaveResult(res, toast, ed ? "Sale updated." : "Sale created.", { onFieldErrors: setFieldErrors });
       return;
     }
-    toast.success(ed ? "Sales updated." : "Sales created.");
+    toast.success(ed ? "Sale updated." : "Sale created.");
     if (ed?.id) {
       invalidateRecordHistory(queryClient, "sa_sales", ed.id);
     }
@@ -1331,7 +1331,7 @@ export function SalesModal(props: Props) {
                         class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
                         onClick={() =>
                           void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
-                            if (!ok) toast.warning("Download failed.");
+                            if (!ok) toast.warning("Couldn't download the file. Try again.");
                           })
                         }
                       >
@@ -1409,10 +1409,21 @@ export function SalesModal(props: Props) {
             }}
           />
           <p class="text-xs text-text-secondary">
-            Load Slip fills this form from another document. Click <strong>Save</strong> to create the sales
-            invoice — the <strong>Invoice</strong> tab then opens for the accounting voucher. Same-side sources
-            apply residual qty; cross-side sources map item/qty only.
+            <strong>Load Slip</strong> copies open lines from a Sales Order (or quote). Prefer this for serial items
+            after Pick List. Click <strong>Save</strong> to create the invoice, then use the Invoice tab for
+            accounting.
           </p>
+          <ol class="mt-2 list-decimal space-y-0.5 pl-4 text-xs text-text-secondary">
+            <li>
+              Confirm a{" "}
+              <A href="/app/sales-order/sales-orders" class="font-medium text-brand-700 hover:underline">
+                Sales Order
+              </A>{" "}
+              (set progress to Completed when required).
+            </li>
+            <li>On that order, open <strong>Pick List</strong> — release qty and scan serials.</li>
+            <li>Return here → <strong>Load Slip → Sales Order</strong> → Save.</li>
+          </ol>
           <Show when={!props.editing}>
             <button
               type="button"

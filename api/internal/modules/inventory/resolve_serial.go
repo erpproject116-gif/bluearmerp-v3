@@ -44,9 +44,9 @@ const (
 )
 
 const (
-	msgSerialNotFound      = "Serial not found."
-	msgSerialNotReceivedPO = "Serial is on a purchase order but not in stock. Complete Purchase Receive, then scan again."
-	msgSerialNotReceivedGR = "Serial was scanned on a draft receive but is not in stock yet. Confirm Purchase Receive, then scan again."
+	msgSerialNotFound      = "This serial isn’t registered yet. Add it on the item, or receive it under Purchase Receive first."
+	msgSerialNotReceivedPO = "This serial is on a purchase order but not in stock yet. Finish Purchase Receive, then scan again."
+	msgSerialNotReceivedGR = "This serial was scanned on a draft receive but is not in stock yet. Confirm Purchase Receive, then scan again."
 )
 
 // isStockConsumingResolveContext is true for flows that require ledger units in stock.
@@ -274,7 +274,7 @@ func resolveOneSerial(
 				unitAny, err2 := lookupResolvedSerial(ctx, pool, tenantID, sn, nil)
 				if err2 == nil && unitAny != nil {
 					res.Status = resolveScanWrongLocation
-					res.Message = "Serial is not at the selected location."
+					res.Message = "This serial isn’t at the selected location. Switch location or move the serial first."
 					return res
 				}
 			}
@@ -290,7 +290,7 @@ func resolveOneSerial(
 	if context == "lookup" || context == "purchase" {
 		if filterItemID != nil && *filterItemID > 0 && unit.ItemID != *filterItemID {
 			res.Status = resolveScanWrongItem
-			res.Message = "Serial belongs to " + unit.ItemCode + ", not this line."
+			res.Message = "This serial belongs to " + unit.ItemCode + ", not this line. Scan a matching serial or change the line item."
 			return res
 		}
 		res.Status = resolveScanAccepted
@@ -301,12 +301,12 @@ func resolveOneSerial(
 	allowed := allowedSerialStatusForContext(context)
 	if !allowed[unit.Status] {
 		res.Status = resolveScanUnavailable
-		res.Message = "Serial is not available for sale."
+		res.Message = "This serial isn’t available to sell (it may already be sold, reserved, or void). Pick another serial."
 		return res
 	}
 	if filterItemID != nil && *filterItemID > 0 && unit.ItemID != *filterItemID {
 		res.Status = resolveScanWrongItem
-		res.Message = "Serial belongs to " + unit.ItemCode + ", not this line."
+		res.Message = "This serial belongs to " + unit.ItemCode + ", not this line. Scan a matching serial or change the line item."
 		return res
 	}
 

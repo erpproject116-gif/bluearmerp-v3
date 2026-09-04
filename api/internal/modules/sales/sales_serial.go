@@ -198,7 +198,7 @@ func applySaleSerialUnits(ctx context.Context, tx pgx.Tx, tenantID, salesID, par
 				return fmt.Errorf("line %d: invalid serial unit %d", dbLn.lineNo, unitID)
 			}
 			if status != "in_stock" && status != "reserved" {
-				return fmt.Errorf("line %d: serial %s is not available", dbLn.lineNo, serialNo)
+				return fmt.Errorf("line %d: serial %s is not available. Receive it under Purchase Receive, or pick a serial still in stock", dbLn.lineNo, serialNo)
 			}
 			if err := validateSerialUnitLocationForSale(dbLn.lineNo, serialNo, saleLocationID, locID); err != nil {
 				return err

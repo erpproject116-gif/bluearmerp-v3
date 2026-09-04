@@ -938,7 +938,7 @@ func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenan
 				}
 			}
 			if ln.Qty > balance+0.0001 {
-				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds GR balance (%.4f).", balance)
+				errs[key+".qty"] = fmt.Sprintf("Quantity is higher than what was received (%.4f). Lower the qty or receive more first.", balance)
 			}
 			continue
 		}
@@ -957,7 +957,7 @@ func validateSupplierInvoiceLinesExcluding(ctx context.Context, tx pgx.Tx, tenan
 				errs[key+".purchase_order_line_id"] = "Vendor does not match purchase order."
 			}
 			if ln.Qty > balance+0.0001 {
-				errs[key+".qty"] = fmt.Sprintf("Quantity exceeds PO balance (%.4f).", balance)
+				errs[key+".qty"] = fmt.Sprintf("Quantity is higher than the open PO balance (%.4f). Lower the qty or receive more first.", balance)
 			}
 			if msg := checkPOApproval(poID); msg != "" {
 				errs[key+".purchase_order_line_id"] = msg
@@ -1028,7 +1028,7 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		// New Purchase Receive always starts unconfirmed; confirm via list progress-status.
 		progress := "unconfirmed"
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, progress, 0); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmart(w, v)
 			return
 		}
 
@@ -1398,7 +1398,7 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		// Progress status is list-only (PATCH .../progress-status); keep existing on edit save.
 		progress := before.ProgressStatus
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, progress, id); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmart(w, v)
 			return
 		}
 
@@ -1574,7 +1574,7 @@ func patchSupplierInvoiceProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSupplierInvoice, status, id); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmart(w, v)
 			return
 		}
 

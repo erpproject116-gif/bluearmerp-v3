@@ -1100,6 +1100,22 @@ export function SupplierInvoiceModal(props: Props) {
                 Process policy requires Purchase Receive before Bill — use Load Slip → Purchase Receive, or turn the gate off under Process policies (Bill-first is the default).
               </Show>
             </p>
+            <ol class="mt-2 list-decimal space-y-0.5 pl-4 text-xs text-text-secondary">
+              <li>
+                Confirm a{" "}
+                <A href="/app/purchase-order/purchase-orders" class="font-medium text-brand-700 hover:underline">
+                  Purchase Order
+                </A>
+                .
+              </li>
+              <li>
+                <A href="/app/purchases/purchase-receive" class="font-medium text-brand-700 hover:underline">
+                  Purchase Receive
+                </A>{" "}
+                — receive qty and scan serials/lots if needed.
+              </li>
+              <li>Return here → <strong>Load Slip → Bill</strong> → Save.</li>
+            </ol>
           </div>
           <PurchaseRequestLineGrid
             lines={lines}

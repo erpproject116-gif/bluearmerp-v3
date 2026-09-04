@@ -61,7 +61,7 @@ export function DocumentSerialScanBar(props: Props) {
     // On PO / draft receive but not yet in stock — guide to Purchase Receive (do not invent stock).
     if (status === "not_received") {
       setLastUnresolved({ serialNo: sn, reason: "not_received" });
-      toast.warning(errors[0] ?? `${sn}: Complete Purchase Receive, then scan again.`);
+      toast.warning(errors[0] ?? `${sn}: Finish Purchase Receive so this serial is in stock, then scan again.`);
       inputEl?.select();
       return;
     }
@@ -88,7 +88,7 @@ export function DocumentSerialScanBar(props: Props) {
 
     // Other reasons (wrong location, unavailable, wrong item) — show the specific message.
     setLastUnresolved(null);
-    toast.warning(errors[0] ?? "Serial could not be added.");
+    toast.warning(errors[0] ?? "Couldn't add this serial. Check location and whether it's in stock.");
     inputEl?.select();
   };
 
@@ -191,10 +191,10 @@ export function DocumentSerialScanBar(props: Props) {
 
       <Show when={!lastUnresolved()}>
         <p class="mt-1 text-[11px] text-text-secondary">
-          Scan a registered serial to auto-fill the item line.{" "}
+          Scan a serial that is already in stock to fill the item line.{" "}
           {isPurchase()
-            ? "New serials are created when you enter them per line and save."
-            : "Serials must be in stock (posted via Buy → Purchase Receive). Being listed on a PO alone is not enough."}
+            ? "New serials are created when you enter them on a line and save."
+            : "For sales, receive the unit first under Buy → Purchase Receive. Being on a PO alone is not enough."}
         </p>
       </Show>
     </div>

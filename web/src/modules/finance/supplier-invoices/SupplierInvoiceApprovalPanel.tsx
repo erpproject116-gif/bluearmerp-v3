@@ -22,7 +22,7 @@ export function SupplierInvoiceApprovalPanel(props: Props) {
   const submit = async () => {
     const res = await submitSupplierInvoiceForApproval(props.supplierInvoiceId);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to submit for approval.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't submit for approval. Try again." });
       return;
     }
     toast.success("Submitted for approval.");
@@ -32,7 +32,7 @@ export function SupplierInvoiceApprovalPanel(props: Props) {
   const approve = async () => {
     const res = await approveSupplierInvoice(props.supplierInvoiceId);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to approve.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't approve. Refresh and try again." });
       return;
     }
     toast.success("Purchase approved.");
@@ -48,7 +48,7 @@ export function SupplierInvoiceApprovalPanel(props: Props) {
     }
     const res = await rejectSupplierInvoice(props.supplierInvoiceId, remarks);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to reject.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't reject. Refresh and try again." });
       return;
     }
     toast.success("Purchase rejected.");

@@ -18,7 +18,7 @@ export function SalesApprovalPanel(props: Props) {
   const submit = async () => {
     const res = await submitSaleForApproval(props.salesId);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to submit for approval.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't submit for approval. Try again." });
       return;
     }
     toast.success("Submitted for approval.");
@@ -28,7 +28,7 @@ export function SalesApprovalPanel(props: Props) {
   const approve = async () => {
     const res = await approveSale(props.salesId);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to approve.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't approve. Refresh and try again." });
       return;
     }
     toast.success("Sale approved.");
@@ -44,7 +44,7 @@ export function SalesApprovalPanel(props: Props) {
     }
     const res = await rejectSale(props.salesId, remarks);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to reject.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't reject. Refresh and try again." });
       return;
     }
     toast.success("Sale rejected.");

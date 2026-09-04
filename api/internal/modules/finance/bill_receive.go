@@ -121,19 +121,19 @@ func receiveForSupplierInvoiceLineTx(
 	// Serial/lot items: do not qty-receive until serials/lots are complete.
 	if trackSerial && len(serials) == 0 {
 		if confirming {
-			return nil, errors.New("serial numbers required before confirming this bill")
+			return nil, errors.New("Serial numbers required before confirming this bill. Receive/scan them under Purchase Receive, or add them on this bill, then confirm.")
 		}
 		return nil, nil
 	}
 	if trackLot && len(ln.LotLines) == 0 {
 		if confirming {
-			return nil, errors.New("lot numbers required before confirming this bill")
+			return nil, errors.New("Lot numbers required before confirming this bill. Receive/enter lots under Purchase Receive, or add them on this bill, then confirm.")
 		}
 		return nil, nil
 	}
 	if trackSerial && len(serials) != int(math.Floor(ln.Qty+1e-9)) {
 		if confirming {
-			return nil, fmt.Errorf("serial count (%d) must equal qty (%d)", len(serials), int(math.Floor(ln.Qty+1e-9)))
+			return nil, fmt.Errorf("Serial count (%d) must equal qty (%d). Add the missing serials under Purchase Receive or on this bill", len(serials), int(math.Floor(ln.Qty+1e-9)))
 		}
 		return nil, nil
 	}
@@ -189,7 +189,7 @@ func receiveFromPOLine(
 		return nil, nil
 	}
 	if invoiceQty > openReceive+0.0001 {
-		return nil, fmt.Errorf("exceeds unreceived PO quantity (%.4f available)", openReceive)
+		return nil, fmt.Errorf("Bill qty is higher than unreceived PO quantity (%.4f available). Receive goods first, or lower the bill qty", openReceive)
 	}
 
 	grLineID, grID, receiptDate, err := insertPostedGR(ctx, tx, tenantID, userID, locationID, &poID, &purchaseOrderLineID, invoiceQty, unitCost)

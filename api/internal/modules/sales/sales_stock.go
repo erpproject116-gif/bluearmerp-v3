@@ -88,10 +88,10 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 			from public.inv_item_location_balances
 			where tenant_id = $1 and item_id = $2 and location_id = $3
 			for update`, tenantID, itemID, locationID).Scan(&qtyOnHand); err != nil {
-			return fmt.Errorf("line item %d: insufficient stock at location", lineID)
+			return fmt.Errorf("line item %d: not enough stock at this location. Check Inv Per Branch or receive stock first", lineID)
 		}
 		if qtyOnHand+0.0001 < qty {
-			return fmt.Errorf("line item %d: insufficient stock (%.4f on hand)", lineID, qtyOnHand)
+			return fmt.Errorf("line item %d: not enough stock (%.4f on hand). Check Inv Per Branch or receive stock first", lineID, qtyOnHand)
 		}
 
 		tag, err := tx.Exec(ctx, `
@@ -302,7 +302,7 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 			return err
 		}
 		if lotQty+0.0001 < qty {
-			return fmt.Errorf("line %d: insufficient lot qty (%.4f on hand)", lineNo, lotQty)
+			return fmt.Errorf("line %d: not enough stock in this lot (%.4f on hand). Check Inv Per Branch or pick another lot", lineNo, lotQty)
 		}
 		tag, err := tx.Exec(ctx, `
 			update public.inv_lot_batches

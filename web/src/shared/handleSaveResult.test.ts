@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ApiResult } from "./api";
-import { handleSaveResult } from "./handleSaveResult";
+import { handleSaveResult, showBlockerResult } from "./handleSaveResult";
+import { recoveryHintFromError, hasSpecificRecoveryHint } from "./notificationMessageStandard";
+import { resolvePolicyActionHint } from "./policyActionHints";
 
 function failRes(partial: Partial<ApiResult<unknown>>): ApiResult<unknown> {
   return {
@@ -46,15 +48,18 @@ describe("handleSaveResult", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it("falls back to field error toast when no assist", () => {
+  it("adds how-to-fix when field error has a specific recovery hint", () => {
     const toast = {
       success: vi.fn(),
       error: vi.fn(),
       warning: vi.fn(),
       action: vi.fn(),
     };
-    handleSaveResult(failRes({ errors: { name: "Required." } }), toast);
-    expect(toast.error).toHaveBeenCalledWith("Required.");
+    handleSaveResult(failRes({ errors: { name: "Name is required." } }), toast);
+    expect(toast.warning).toHaveBeenCalledWith(
+      expect.stringMatching(/name is required.*fill in the highlighted fields/i),
+    );
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("uses warning when assist present but toast.action missing", () => {
@@ -76,5 +81,79 @@ describe("handleSaveResult", () => {
     expect(toast.warning).toHaveBeenCalledWith(
       "Fiscal period is closed — Reopen July 2026 under Fiscal years.",
     );
+  });
+
+  it("uses plain how-to-fix recovery when field errors have a policy hint", () => {
+    const action = vi.fn();
+    const toast = {
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+      action,
+    };
+    handleSaveResult(
+      failRes({
+        errors: {
+          lines:
+            "This item isn’t ready to invoice yet. For serial items, open the sales order → Pick List → release qty and scan the serial, then use Load Slip on this sale.",
+        },
+      }),
+      toast,
+    );
+    expect(action).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionLabel: "Pick items on Sales Order",
+        href: "/app/sales-order/sales-orders",
+      }),
+    );
+    const msg = action.mock.calls[0][0].message as string;
+    expect(msg.toLowerCase()).not.toContain("use the button to continue");
+    expect(msg.toLowerCase()).toMatch(/pick list|load slip|follow the button/);
+  });
+});
+
+describe("showBlockerResult", () => {
+  it("surfaces assist for side-action failures", () => {
+    const action = vi.fn();
+    const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), action };
+    showBlockerResult(
+      failRes({
+        assist: {
+          code: "SA_INSUFFICIENT_STOCK",
+          title: "Not enough stock on hand",
+          detail: "Check Inv Per Branch.",
+          actions: [{ label: "Open Inv Per Branch", href: "/app/inventory/find-stock" }],
+        },
+      }),
+      toast,
+    );
+    expect(action).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Not enough stock on hand",
+        actionLabel: "Open Inv Per Branch",
+      }),
+    );
+  });
+
+  it("uses fallbackTitle when message is empty", () => {
+    const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), action: vi.fn() };
+    showBlockerResult(failRes({ message: "", code: "ERR_INTERNAL", errors: undefined }), toast, {
+      fallbackTitle: "Couldn't finish that step. Try again.",
+    });
+    expect(toast.error).toHaveBeenCalledWith("Couldn't finish that step. Try again.");
+  });
+});
+
+describe("notification helpers", () => {
+  it("recoveryHintFromError recognizes pick list and stock", () => {
+    expect(recoveryHintFromError("Pick List release required").toLowerCase()).toMatch(/pick list|load slip/);
+    expect(hasSpecificRecoveryHint("Name is required.")).toBe(true);
+  });
+
+  it("resolvePolicyActionHint maps serial receive messages", () => {
+    const hint = resolvePolicyActionHint({
+      lines: "Serial numbers required before confirming this bill. Receive under Purchase Receive.",
+    });
+    expect(hint?.href).toContain("goods-receipt");
   });
 });

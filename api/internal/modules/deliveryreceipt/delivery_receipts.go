@@ -356,7 +356,7 @@ func createDeliveryReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			if ln.Qty > balance+0.0001 {
-				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): fmt.Sprintf("Exceeds undelivered balance (%.4f).", balance)})
+				response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): fmt.Sprintf("Delivery qty is higher than what’s left to deliver (%.4f). Lower the qty or release more on Pick List.", balance)})
 				return
 			}
 			var itemID *int64
@@ -443,7 +443,7 @@ func postDeliveryReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			if ln.Qty > balance+0.0001 {
-				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): "Exceeds undelivered balance."})
+				response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): "Delivery qty is higher than what’s left to deliver. Lower the qty or release more on Pick List."})
 				return
 			}
 
@@ -471,7 +471,7 @@ func postDeliveryReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 
 			if splitMode && trackInventory && ln.ItemID != nil {
 				if err := inventory.IssueReservedStock(r.Context(), tx, tenantID, *ln.ItemID, locationID, ln.Qty); err != nil {
-					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): err.Error()})
+					response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): err.Error()})
 					return
 				}
 				_, err = tx.Exec(r.Context(), `

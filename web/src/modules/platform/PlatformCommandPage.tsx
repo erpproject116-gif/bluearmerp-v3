@@ -1,6 +1,102 @@
-import { For, Show } from "solid-js";
+import { For, Show, createSignal, onMount } from "solid-js";
 import { A } from "@solidjs/router";
+import { apiFetch } from "../../shared/api";
+import { useToast } from "../../shared/toast";
 import { usePlatformCommandOverview } from "../../shared/usePlatform";
+
+type CoaReq = {
+  id: number;
+  tenant_id: number;
+  company_code: string;
+  company_name: string;
+  note: string;
+  created_at: string;
+  requested_by: string;
+};
+
+function CoaReplaceEscalations() {
+  const toast = useToast();
+  const [items, setItems] = createSignal<CoaReq[]>([]);
+  const [loading, setLoading] = createSignal(true);
+  const [busyId, setBusyId] = createSignal<number | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    const res = await apiFetch<{ requests: CoaReq[] }>("/api/v1/platform/console/coa-replace-requests", undefined, {
+      silent: true,
+    });
+    setLoading(false);
+    if (res.success && res.data?.requests) setItems(res.data.requests);
+    else setItems([]);
+  };
+
+  onMount(() => {
+    void load();
+  });
+
+  const decide = async (id: number, approve: boolean) => {
+    setBusyId(id);
+    const res = await apiFetch(`/api/v1/platform/console/coa-replace-requests/${id}/${approve ? "approve" : "reject"}`, {
+      method: "POST",
+      body: JSON.stringify({ decision_note: approve ? "Approved by platform" : "Rejected by platform" }),
+    });
+    setBusyId(null);
+    if (!res.success) {
+      toast.warning(res.message ?? "Couldn't save that decision. Refresh and try again.");
+      return;
+    }
+    toast.success(res.message ?? (approve ? "Request approved." : "Request rejected."));
+    void load();
+  };
+
+  return (
+    <Show when={!loading() && items().length > 0}>
+      <section class="rounded-xl border border-amber-200 bg-amber-50/40">
+        <div class="border-b border-amber-100 px-4 py-3">
+          <h3 class="text-sm font-semibold text-amber-950">Chart of accounts replace (needs product owner)</h3>
+          <p class="mt-0.5 text-xs text-amber-900/80">
+            Single-owner companies requested a chart wipe/replace. Approve only after reading their note.
+          </p>
+        </div>
+        <ul class="divide-y divide-amber-100">
+          <For each={items()}>
+            {(row) => (
+              <li class="flex flex-wrap items-start justify-between gap-3 px-4 py-3 text-sm">
+                <div class="min-w-0">
+                  <p class="font-medium text-slate-800">
+                    {row.company_code} · {row.company_name || "Company"}
+                  </p>
+                  <p class="mt-1 text-slate-600">{row.note}</p>
+                  <p class="mt-1 text-xs text-slate-500">
+                    Requested by {row.requested_by} · {new Date(row.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <div class="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    class="rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+                    disabled={busyId() === row.id}
+                    onClick={() => void decide(row.id, true)}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    disabled={busyId() === row.id}
+                    onClick={() => void decide(row.id, false)}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
+    </Show>
+  );
+}
 
 export default function PlatformCommandPage() {
   const overview = usePlatformCommandOverview();
@@ -38,6 +134,8 @@ export default function PlatformCommandPage() {
         <Stat label="Product gaps" value={counts()?.product_gap_tickets} href="/app/platform-command/tickets" />
         <Stat label="Pending invites" value={counts()?.pending_invites} href="/app/platform-command/access" />
       </div>
+
+      <CoaReplaceEscalations />
 
       <section class="rounded-xl border border-slate-200 bg-white">
         <div class="border-b border-slate-100 px-4 py-3">

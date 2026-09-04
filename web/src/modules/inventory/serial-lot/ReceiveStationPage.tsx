@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
+import { showBlockerResult } from "../../../shared/handleSaveResult";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
@@ -313,7 +314,7 @@ export default function ReceiveStationPage() {
     );
     setCreating(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to create goods receipt.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't create the goods receipt. Try again." });
       return;
     }
     appliedSerialScanIds.clear();
@@ -397,7 +398,7 @@ export default function ReceiveStationPage() {
     );
     setPosting(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to post goods receipt.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't post the goods receipt. Try again." });
       return;
     }
     toast.success(isPartialReceive() ? "Partial receive posted." : "Goods receipt posted.");

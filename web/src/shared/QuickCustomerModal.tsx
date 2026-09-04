@@ -114,7 +114,7 @@ export function QuickCustomerModal(props: Props) {
         props.onClose();
       }
     } catch {
-      toast.error("Could not reach the API. Check your connection and try again.");
+      toast.error("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setSaving(false);
     }

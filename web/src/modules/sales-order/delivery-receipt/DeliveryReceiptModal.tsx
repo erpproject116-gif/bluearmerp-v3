@@ -144,7 +144,7 @@ export function DeliveryReceiptModal(props: Props) {
     for (const l of lines()) {
       const qty = Number(l.qty);
       if (qty > l.balance_qty + 0.0001) {
-        errors.lines = `Quantity exceeds balance for ${l.label}.`;
+        errors.lines = `Quantity is higher than what's left for ${l.label}. Lower the qty or pick more first.`;
         break;
       }
     }

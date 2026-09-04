@@ -1,6 +1,7 @@
 /**
  * Maps process-policy / gate validation field keys to a next-step CTA.
  * Used by handleSaveResult so non-tech users get a button, not only an error code.
+ * Labels use action verbs (What to do next).
  */
 
 export type PolicyActionHint = {
@@ -12,35 +13,43 @@ const FIELD_HINTS: Record<string, PolicyActionHint> = {
   // Do not map bare "lines" — many docs use that key for line-item errors that are not SO-related.
   source_quotation_id: { href: "/app/quotation/quotations", label: "Open Quotations" },
   purchase_request_id: { href: "/app/purchase-request/purchase-requests", label: "Open Purchase Requests" },
-  goods_receipt_line_id: { href: "/app/purchase-order/goods-receipt", label: "Open Receive history" },
+  goods_receipt_line_id: { href: "/app/purchase-order/goods-receipt", label: "Open Purchase Receive" },
   sales_order_id: { href: "/app/dashboard/approvals", label: "Open Approvals" },
   purchase_order_id: { href: "/app/dashboard/approvals", label: "Open Approvals" },
   attachments: { href: "/app/sales-order/setup", label: "Adjust attachment settings" },
   purchase_order_line_id: { href: "/app/purchase-order/purchase-orders", label: "Confirm Purchase Order" },
-  source_sales_order_id: { href: "/app/sales-order/sales-orders", label: "Open Sales Orders" },
+  source_sales_order_id: { href: "/app/sales-order/sales-orders", label: "Pick items on Sales Order" },
+  source_sales_order_line_id: { href: "/app/sales-order/sales-orders", label: "Pick items on Sales Order" },
+  progress_status: { href: "/app/sales-order/sales-orders", label: "Complete the Sales Order" },
 };
 
 const MESSAGE_HINTS: Array<{ match: RegExp; hint: PolicyActionHint }> = [
   {
-    match: /attachment is required/i,
-    hint: { href: "/app/user-management/process-policies", label: "Turn off attachment requirement" },
+    match: /attachment is required|file attachment is required/i,
+    hint: { href: "/app/user-management/process-policies", label: "Review attachment settings" },
   },
   {
-    match: /not found or not confirmed/i,
-    hint: { href: "/app/purchase-order/purchase-orders", label: "Confirm Purchase Order first" },
+    match: /not found or not confirmed|confirm the purchase order|must be confirmed first/i,
+    hint: { href: "/app/purchase-order/purchase-orders", label: "Confirm Purchase Order" },
   },
   {
-    match: /confirm the purchase order/i,
-    hint: { href: "/app/purchase-order/purchase-orders", label: "Open Purchase Orders" },
+    match: /higher than what was received|quantity exceeds gr balance|goods receipt|purchase receive/i,
+    hint: { href: "/app/purchase-order/goods-receipt", label: "Open Purchase Receive" },
   },
-  { match: /goods receipt|purchase receive/i, hint: { href: "/app/purchase-order/goods-receipt", label: "Open Purchase Receive" } },
   {
-    match: /progress must be completed/i,
-    hint: { href: "/app/sales-order/sales-orders", label: "Set SO Progress to Completed" },
+    match: /not ready to invoice|progress.*completed|set its progress to completed/i,
+    hint: { href: "/app/sales-order/sales-orders", label: "Complete the Sales Order" },
+  },
+  {
+    match: /pick list|ready to invoice|nothing left to invoice|what's left to invoice|left to invoice/i,
+    hint: { href: "/app/sales-order/sales-orders", label: "Pick items on Sales Order" },
   },
   { match: /sales order/i, hint: { href: "/app/sales-order/sales-orders", label: "Open Sales Orders" } },
   { match: /quotation/i, hint: { href: "/app/quotation/quotations", label: "Open Quotations" } },
   { match: /purchase request/i, hint: { href: "/app/purchase-request/purchase-requests", label: "Open Purchase Requests" } },
+  { match: /rfq/i, hint: { href: "/app/rfq/rfqs", label: "Open RFQs" } },
+  { match: /insufficient.*stock|not enough stock/i, hint: { href: "/app/inventory/find-stock", label: "Open Inv Per Branch" } },
+  { match: /serial/i, hint: { href: "/app/inventory/serial-lot/serials", label: "Open Serials" } },
   { match: /approv/i, hint: { href: "/app/dashboard/approvals", label: "Open Approvals" } },
   { match: /process polic/i, hint: { href: "/app/user-management/process-policies", label: "Review process policies" } },
 ];

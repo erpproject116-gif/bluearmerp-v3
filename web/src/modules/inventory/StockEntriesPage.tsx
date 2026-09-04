@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { showBlockerResult } from "../../shared/handleSaveResult";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useToast } from "../../shared/toast";
 import { uiLabel } from "../../shared/branding/uiLabel";
@@ -42,7 +43,7 @@ export default function StockEntriesPage() {
     const res = await apiFetch(`/api/v1/inventory/stock-entries/${row.id}/post`, { method: "POST" });
     setPostingId(null);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to post.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't post this stock entry. Try again." });
       return;
     }
     toast.success("Stock entry posted.");

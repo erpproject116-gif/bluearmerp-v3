@@ -45,7 +45,7 @@ export async function resolveSerialBulk(
   );
 
   if (!res.success || !res.data?.results) {
-    return { units: [], errors: [res.message ?? "Failed to resolve serials."], statuses: ["error"] };
+    return { units: [], errors: [res.message ?? "Couldn't look up those serials. Check your connection and try again."], statuses: ["error"] };
   }
 
   const bySerial = new Map<string, ResolveScanBatchResult>();

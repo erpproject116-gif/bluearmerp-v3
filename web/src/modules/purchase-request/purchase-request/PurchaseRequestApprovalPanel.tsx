@@ -24,7 +24,7 @@ export function PurchaseRequestApprovalPanel(props: Props) {
   const submit = async () => {
     const res = await submitPurchaseRequestForApproval(props.purchaseRequestId);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to submit for approval.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't submit for approval. Try again." });
       return;
     }
     toast.success("Submitted for approval.");
@@ -34,7 +34,7 @@ export function PurchaseRequestApprovalPanel(props: Props) {
   const approve = async () => {
     const res = await approvePurchaseRequest(props.purchaseRequestId);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to approve.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't approve. Refresh and try again." });
       return;
     }
     toast.success("Purchase request approved.");
@@ -50,7 +50,7 @@ export function PurchaseRequestApprovalPanel(props: Props) {
     }
     const res = await rejectPurchaseRequest(props.purchaseRequestId, remarks);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to reject.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't reject. Refresh and try again." });
       return;
     }
     toast.success("Purchase request rejected.");

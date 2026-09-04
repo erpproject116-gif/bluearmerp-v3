@@ -192,7 +192,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			if item.ReleaseQty <= 0 {
-				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): "Quantity must be greater than zero."})
+				response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): "Quantity must be greater than zero."})
 				return
 			}
 
@@ -249,7 +249,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 
 			balance := lineQty - released
 			if item.ReleaseQty > balance+0.0001 {
-				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): fmt.Sprintf("Exceeds balance (%.4f available).", balance)})
+				response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): fmt.Sprintf("Release qty is higher than what’s left to release (%.4f available). Lower the qty.", balance)})
 				return
 			}
 
@@ -267,7 +267,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 					policy, legacyCombined, lineQtyReserved, released, item.ReleaseQty, qtyOnHandForCheck, qtyReservedAtLoc,
 				); v != nil {
 					for k, msg := range v {
-						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].%s", i, k): msg})
+						response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].%s", i, k): msg})
 						return
 					}
 				}
@@ -275,11 +275,11 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 
 			if trackSerial {
 				if len(item.SerialUnitIDs) == 0 {
-					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): "Serial selection required for tracked items."})
+					response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): "Serial selection required for tracked items."})
 					return
 				}
 				if float64(len(item.SerialUnitIDs)) != item.ReleaseQty {
-					response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): "Serial count must match release quantity."})
+					response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): "Serial count must match release quantity."})
 					return
 				}
 			}
@@ -299,7 +299,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 			if trackInventory && itemID != nil {
 				if legacyCombined {
 					if err := inventory.DeductOnHandStock(r.Context(), tx, tenantID, *itemID, locationID, item.ReleaseQty); err != nil {
-						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): err.Error()})
+						response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].release_qty", i): err.Error()})
 						return
 					}
 					_, err = tx.Exec(r.Context(), `
@@ -337,7 +337,7 @@ func postReleases(pool *pgxpool.Pool) http.HandlerFunc {
 						  and status in ('in_stock', 'reserved')
 						for update`, unitID, tenantID, *itemID, locationID).Scan(&serialNo)
 					if err != nil {
-						response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): fmt.Sprintf("Serial %d not available at location.", unitID)})
+						response.ValidationSmart(w, map[string]string{fmt.Sprintf("lines[%d].serial_unit_ids", i): fmt.Sprintf("Serial %d is not available at this location. Pick a serial that is in stock here.", unitID)})
 						return
 					}
 					_, err = tx.Exec(r.Context(), `

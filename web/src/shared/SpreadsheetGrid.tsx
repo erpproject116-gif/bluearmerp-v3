@@ -259,7 +259,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
     try {
       const result = await importItemsCsv(file);
       if (!result.ok || !result.data) {
-        toast.error(result.message ?? "Import failed.");
+        toast.error(result.message ?? "Couldn't import those rows. Check the file and try again.");
         return;
       }
       const { created, failed, row_errors: rowErrors } = result.data;
@@ -269,17 +269,17 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             ?.slice(0, 8)
             .map((e) => `Row ${e.row}: ${e.message}`)
             .join(" · ") ?? "";
-        toast.warning(`Imported ${created} row(s); ${failed} failed.${detail ? ` ${detail}` : ""}`);
+        toast.warning(`Imported ${created} row(s); ${failed} could not be imported.${detail ? ` ${detail}` : ""}`);
       } else if (created > 0) {
         toast.success(`Imported ${created} item(s).`);
       } else {
-        toast.warning("No rows were imported.");
+        toast.warning("No rows were imported. Check the file and try again.");
       }
       if (created > 0) {
         props.onImportComplete?.();
       }
     } catch {
-      toast.error("Import failed.");
+      toast.error("Couldn't import those rows. Check the file and try again.");
     } finally {
       setImporting(false);
       if (fileInputEl) fileInputEl.value = "";

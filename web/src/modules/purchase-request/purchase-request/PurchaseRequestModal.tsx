@@ -518,7 +518,7 @@ export function PurchaseRequestModal(props: Props) {
     );
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
-      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
+      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Fix the highlighted fields, then try again.");
       return;
     }
 

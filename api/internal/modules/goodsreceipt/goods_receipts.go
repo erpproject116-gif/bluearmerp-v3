@@ -504,7 +504,7 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if poStatus != "draft" && poStatus != "confirmed" && poStatus != "partially_received" {
-			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order must be open for receiving (Unconfirmed/draft, confirmed, or partially received)."})
+			response.ValidationSmart(w, map[string]string{"purchase_order_id": "Purchase order must be open for receiving (Unconfirmed/draft, confirmed, or partially received)."})
 			return
 		}
 		if v := validatePOApprovalForReceipt(r.Context(), tx, tu.TenantID, body.PurchaseOrderID); v != nil {
@@ -891,7 +891,7 @@ func addGoodsReceiptLot(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if receivedQty+body.Qty > expectedQty+0.0001 {
-			response.Validation(w, map[string]string{"qty": "Lot quantity exceeds open line quantity."})
+			response.ValidationSmart(w, map[string]string{"qty": "Lot qty is higher than what’s left on this receive line. Lower the lot qty."})
 			return
 		}
 
@@ -1133,7 +1133,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if inspectionStatus != "released" {
-			response.Validation(w, map[string]string{"inspection_status": "Goods receipt must be inspection-released before posting."})
+			response.ValidationSmart(w, map[string]string{"inspection_status": "Goods receipt must be inspection-released before posting. Release QC on this receipt, then post again."})
 			return
 		}
 
@@ -1147,7 +1147,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if poStatus != "draft" && poStatus != "confirmed" && poStatus != "partially_received" {
-			response.Validation(w, map[string]string{"purchase_order_id": "Purchase order is not open for receiving."})
+			response.ValidationSmart(w, map[string]string{"purchase_order_id": "Purchase order is not open for receiving."})
 			return
 		}
 		if v := validatePOApprovalForReceipt(r.Context(), tx, tu.TenantID, purchaseOrderID); v != nil {
@@ -1216,7 +1216,7 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			openQty := ln.POQty - ln.POReceivedQty
 			if ln.ReceivedQty > openQty+0.0001 {
 				response.ValidationSmart(w, map[string]string{
-					"received_qty": fmt.Sprintf("Line %d exceeds open PO quantity (%.4f available).", ln.ID, openQty),
+					"received_qty": fmt.Sprintf("Line %d qty is higher than the open purchase order (%.4f available). Lower the qty or open the PO to check balance.", ln.ID, openQty),
 				})
 				return
 			}

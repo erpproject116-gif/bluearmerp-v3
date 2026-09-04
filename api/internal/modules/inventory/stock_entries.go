@@ -241,7 +241,7 @@ func createStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if err := replaceStockEntryLines(r.Context(), tx, tu.TenantID, entryID, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
 
@@ -313,7 +313,7 @@ func updateStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 
 		_, _ = tx.Exec(r.Context(), `delete from public.inv_stock_entry_lines where stock_entry_id = $1`, id)
 		if err := replaceStockEntryLines(r.Context(), tx, tu.TenantID, id, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
 
@@ -372,7 +372,7 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			switch entry.EntryType {
 			case "receipt":
 				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.ToLocationID, ln.Qty, tu.AppUserID, "stock_entry", id, "receipt", reason); err != nil {
-					response.Validation(w, map[string]string{"lines": err.Error()})
+					response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 					return
 				}
 			case "issue":
@@ -381,16 +381,16 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 					moveType = reason
 				}
 				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.FromLocationID, -ln.Qty, tu.AppUserID, "stock_entry", id, moveType, reason); err != nil {
-					response.Validation(w, map[string]string{"lines": err.Error()})
+					response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 					return
 				}
 			case "transfer":
 				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.FromLocationID, -ln.Qty, tu.AppUserID, "stock_entry", id, "transfer_out", reason); err != nil {
-					response.Validation(w, map[string]string{"lines": err.Error()})
+					response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 					return
 				}
 				if err := ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ItemID, *entry.ToLocationID, ln.Qty, tu.AppUserID, "stock_entry", id, "transfer_in", reason); err != nil {
-					response.Validation(w, map[string]string{"lines": err.Error()})
+					response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 					return
 				}
 			}
@@ -456,7 +456,7 @@ func ApplyStockDelta(ctx context.Context, tx pgx.Tx, tenantID, itemID, locationI
 		qtyOnHand = 0
 	}
 	if qtyOnHand+delta < -0.0001 {
-		return fmt.Errorf("insufficient stock for item %d", itemID)
+		return fmt.Errorf("not enough stock for this item (need more on hand)")
 	}
 	_, err = tx.Exec(ctx, `
 		update public.inv_item_location_balances

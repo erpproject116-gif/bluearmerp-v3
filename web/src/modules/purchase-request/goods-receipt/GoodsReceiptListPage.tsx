@@ -14,6 +14,7 @@ import { PurchaseRequestLayout } from "../PurchaseRequestLayout";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { GoodsReceiptScanPanel } from "../../../shared/GoodsReceiptScanPanel";
 import { apiFetch } from "../../../shared/api";
+import { showBlockerResult } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { uiLabel } from "../../../shared/branding/uiLabel";
@@ -63,7 +64,7 @@ export default function GoodsReceiptListPage() {
     const res = await apiFetch(`/api/v1/goods-receipt/goods-receipts/${row.id}/reverse`, { method: "POST" });
     setReversingId(null);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to reverse goods receipt.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't reverse this goods receipt. Try again." });
       return;
     }
     toast.success(res.message ?? "Goods receipt reversed.");
@@ -78,7 +79,7 @@ export default function GoodsReceiptListPage() {
     });
     setQcCreatingId(null);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to create QC request.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't create the QC request. Try again." });
       return;
     }
     toast.success("QC request created.");
@@ -93,7 +94,7 @@ export default function GoodsReceiptListPage() {
     });
     setInspectingId(null);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to update inspection.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't update inspection. Try again." });
       return;
     }
     toast.success(status === "released" ? "Inspection released." : "Receipt placed on hold.");

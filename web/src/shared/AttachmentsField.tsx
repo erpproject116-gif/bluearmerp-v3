@@ -81,7 +81,7 @@ export function AttachmentsField(props: Props) {
       if (res.success) continue;
       allOk = false;
       remaining.push(entry);
-      toast.warning(res.message ?? `Failed to upload ${entry.file.name}.`);
+      toast.warning(res.message ?? `Couldn't upload ${entry.file.name}. Check the file and try again.`);
     }
     setPending(remaining);
     setUploading(false);
@@ -135,7 +135,7 @@ export function AttachmentsField(props: Props) {
       for (const file of files) {
         const res = await uploadAttachment(props.scope, id, file);
         if (!res.success) {
-          toast.warning(res.message ?? `Failed to upload ${file.name}.`);
+          toast.warning(res.message ?? `Couldn't upload ${file.name}. Check the file and try again.`);
           continue;
         }
         okCount += 1;
@@ -159,7 +159,7 @@ export function AttachmentsField(props: Props) {
     setBusyId(a.id);
     void downloadAttachment(props.scope, id, a).then((ok) => {
       setBusyId(null);
-      if (!ok) toast.warning("Download failed.");
+      if (!ok) toast.warning("Couldn't download the file. Try again.");
     });
   };
 

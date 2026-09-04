@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { showBlockerResult } from "../../shared/handleSaveResult";
 import { useToast } from "../../shared/toast";
 import { DashboardLayout } from "./DashboardLayout";
 import { uiLabel } from "../../shared/branding/uiLabel";
@@ -24,6 +25,7 @@ const ENTITY_LABELS: Record<string, string> = {
   fin_supplier_invoice: "Purchase",
   inv_serial_adjustment_request: "Serial qty fix",
   inv_stock_adjustment_request: "Stock adjustment",
+  fin_coa_replace_request: "Replace chart of accounts",
 };
 
 function entityLabel(type: string): string {
@@ -51,7 +53,7 @@ export default function ApprovalsQueuePage() {
     if (res.success && res.data) {
       setItems(res.data);
     } else {
-      toast.error(res.message ?? "Failed to load approvals queue.");
+      toast.error(res.message ?? "Couldn't load the approvals list. Refresh and try again.");
     }
   };
 
@@ -68,7 +70,8 @@ export default function ApprovalsQueuePage() {
       row.entity_type === "sa_sales" ||
       row.entity_type === "fin_supplier_invoice" ||
       row.entity_type === "inv_serial_adjustment_request" ||
-      row.entity_type === "inv_stock_adjustment_request"
+      row.entity_type === "inv_stock_adjustment_request" ||
+      row.entity_type === "fin_coa_replace_request"
     ) {
       const base =
         row.entity_type === "sa_sales"
@@ -77,6 +80,8 @@ export default function ApprovalsQueuePage() {
             ? `/api/v1/finance/supplier-invoices/${row.entity_id}`
             : row.entity_type === "inv_serial_adjustment_request"
               ? `/api/v1/inventory/serial-units/adjustment-requests/${row.entity_id}`
+              : row.entity_type === "fin_coa_replace_request"
+                ? `/api/v1/finance/accounts/coa-replace-requests/${row.entity_id}`
               : `/api/v1/inventory/stock-adjustment-requests/${row.entity_id}`;
       if (approve) {
         let approveBody: Record<string, string> = {};
@@ -88,10 +93,19 @@ export default function ApprovalsQueuePage() {
           }
           if (!remarks.trim()) {
             setBusyKey(null);
-            toast.warning("Confirmation remarks are required to approve.");
+            toast.warning("Add a short note explaining why you approve.");
             return;
           }
           approveBody = { remarks: remarks.trim() };
+        }
+        if (row.entity_type === "fin_coa_replace_request") {
+          const ok = window.confirm(
+            "Approve replacing the chart of accounts? Current accounts will be soft-deleted and the PH SME template loaded.",
+          );
+          if (!ok) {
+            setBusyKey(null);
+            return;
+          }
         }
         res = await apiFetch(`${base}/approve`, {
           method: "POST",
@@ -105,12 +119,16 @@ export default function ApprovalsQueuePage() {
         }
         if (!remarks.trim()) {
           setBusyKey(null);
-          toast.warning("Rejection remarks are required.");
+          toast.warning("Add a short note explaining why you reject.");
           return;
         }
+        const rejectBody =
+          row.entity_type === "fin_coa_replace_request"
+            ? { decision_note: remarks.trim() }
+            : { remarks: remarks.trim() };
         res = await apiFetch(`${base}/reject`, {
           method: "POST",
-          body: JSON.stringify({ remarks: remarks.trim() }),
+          body: JSON.stringify(rejectBody),
         });
       }
     } else {
@@ -121,10 +139,10 @@ export default function ApprovalsQueuePage() {
     }
     setBusyKey(null);
     if (!res.success) {
-      toast.error(res.message ?? `Failed to ${action}.`);
+      showBlockerResult(res, toast, { fallbackTitle: approve ? "Couldn't approve this request. Refresh and try again." : "Couldn't reject this request. Refresh and try again." });
       return;
     }
-    toast.success(res.message ?? (approve ? "Approved." : "Rejected."));
+    toast.success(res.message ?? (approve ? "Request approved." : "Request rejected."));
     void load();
   };
 

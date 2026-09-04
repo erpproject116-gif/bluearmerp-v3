@@ -1,6 +1,7 @@
 import { createMemo, createSignal, onMount } from "solid-js";
 import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
+import { showBlockerResult } from "../../../shared/handleSaveResult";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { SALES_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { useListState } from "../../../shared/useListState";
@@ -97,7 +98,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
   const onProgressChange = async (row: SalesRow, status: string) => {
     const res = await patchSalesProgress(row.id, status);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to update progress.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't update progress. Try again." });
       return;
     }
     invalidate();
@@ -106,7 +107,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
   const onInvoicingToggle = async (row: SalesRow) => {
     const res = await patchSalesInvoicing(row.id, !row.invoicing_status);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to update invoicing status.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't update invoicing status. Try again." });
       return;
     }
     invalidate();
@@ -131,7 +132,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
     const res = await createCollectiveInvoice(ids);
     setCreatingInvoice(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to create collective invoice.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't create the collective invoice. Check the selected sales and try again." });
       return;
     }
     toast.success("Collective invoice created.");
@@ -150,7 +151,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
           setEditing(res.data);
           setModalOpen(true);
         } else {
-          toast.warning(res.message ?? "Could not open that sale.");
+          toast.warning(res.message ?? "Couldn't open that sale. Refresh and try again.");
         }
         setSearchParams({ openId: undefined }, { replace: true });
       })();

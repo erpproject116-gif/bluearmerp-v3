@@ -1,6 +1,7 @@
 import { createMemo, createSignal, onMount, Show } from "solid-js";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
+import { showBlockerResult } from "../../../shared/handleSaveResult";
 import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { SALES_ORDER_SETTINGS_HREF } from "../../../shared/entityTypes";
@@ -31,6 +32,7 @@ type PageOptions = {
 export function SalesOrderListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const auth = useAuth();
   const invalidate = useInvalidateSalesOrders();
@@ -65,8 +67,7 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
     );
     setWoBusy(false);
     if (!res.success) {
-      const detail = res.errors ? Object.values(res.errors).join(" ") : "";
-      toast.warning(detail || res.message || "Failed to create work order.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't create the work order. Try again." });
       return;
     }
     const woNo = res.data?.work_order_no ? ` ${res.data.work_order_no}` : "";
@@ -123,7 +124,7 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
   const onProgressChange = async (row: SalesOrderRow, status: string) => {
     const res = await patchSalesOrderProgress(row.id, status);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to update progress.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't update progress. Try again." });
       return;
     }
     invalidate();
@@ -131,6 +132,20 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
 
   onMount(() => {
     if (props.openNewOnMount || loc.pathname.endsWith("/new")) openNew();
+    const openId = Number(searchParams.openId ?? "");
+    if (openId > 0) {
+      void (async () => {
+        const res = await apiFetch<SalesOrderDetail>(lifecycle.detailUrl(openId));
+        if (res.success && res.data) {
+          setEditing(res.data);
+          setViewingDeleted(false);
+          setModalOpen(true);
+        } else {
+          toast.warning(res.message ?? "Couldn't open that sales order. Refresh and try again.");
+        }
+        setSearchParams({ openId: undefined }, { replace: true });
+      })();
+    }
   });
 
   return (

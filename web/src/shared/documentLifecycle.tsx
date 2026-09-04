@@ -128,7 +128,7 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
     const res = await fetchLifecycleImpact(opts.apiBase, id);
     setLoadingImpact(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? `Failed to inspect this ${opts.documentLabel}.`);
+      toast.warning(res.message ?? `Couldn't check whether this ${opts.documentLabel} can be deleted. Try again.`);
       setDialogOpen(false);
       return;
     }
@@ -153,7 +153,7 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
     if (!t || !impact()) return;
     const trimmed = reason().trim();
     if (!trimmed) {
-      toast.warning("A reason is required.");
+      toast.warning("Enter a short reason before continuing.");
       return;
     }
     const act = action();
@@ -166,7 +166,7 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
     if (!res.success) {
       // 409 ERR_DEPENDENCY_BLOCKED returns a fresh impact payload — surface it in place.
       if (res.data?.blockers?.length) setImpact(res.data);
-      toast.warning(res.message ?? `Failed to ${act} this ${opts.documentLabel}.`);
+      toast.warning(res.message ?? `Couldn't ${act} this ${opts.documentLabel}. Check the blockers and try again.`);
       return;
     }
     toast.success(act === "delete"
@@ -217,13 +217,17 @@ export function useDocumentLifecycle(opts: UseDocumentLifecycleOptions) {
       : await bulkRestoreDocuments(opts.apiBase, ids, trimmed);
     setBulkSubmitting(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? `Bulk ${act} failed.`);
+      toast.warning(res.message ?? `Couldn't finish the bulk ${act}. Try again.`);
       return;
     }
     setBulkOutcome(res.data);
     const ok = res.data.deleted ?? res.data.restored ?? 0;
     if (ok > 0) {
-      toast.success(`Bulk ${act}: ${ok} succeeded, ${res.data.skipped} skipped.`);
+      toast.success(
+        act === "delete"
+          ? `Deleted ${ok}; ${res.data.skipped} skipped.`
+          : `Restored ${ok}; ${res.data.skipped} skipped.`,
+      );
       setSelectedIds(new Set<number>());
       opts.onChanged();
     } else {

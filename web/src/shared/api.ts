@@ -121,14 +121,14 @@ function defaultSuccessMessage(method?: string, serverMessage?: string, override
   const m = (method ?? "GET").toUpperCase();
   switch (m) {
     case "POST":
-      return "Created successfully.";
+      return "Created.";
     case "PUT":
     case "PATCH":
-      return "Updated successfully.";
+      return "Updated.";
     case "DELETE":
-      return "Deleted successfully.";
+      return "Deleted.";
     default:
-      return "Saved successfully.";
+      return "Saved.";
   }
 }
 

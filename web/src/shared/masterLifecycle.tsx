@@ -90,13 +90,17 @@ export function useMasterLifecycle(opts: Options) {
       : await bulkRestoreMasters(opts.apiBase, ids, trimmed);
     setBulkSubmitting(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? `Bulk ${act} failed.`);
+      toast.warning(res.message ?? `Couldn't finish the bulk ${act}. Try again.`);
       return;
     }
     setBulkOutcome(res.data);
     const ok = res.data.deleted ?? res.data.restored ?? 0;
     if (ok > 0) {
-      toast.success(`Bulk ${act}: ${ok} succeeded, ${res.data.skipped} skipped.`);
+      toast.success(
+        act === "delete"
+          ? `Deleted ${ok}; ${res.data.skipped} skipped.`
+          : `Restored ${ok}; ${res.data.skipped} skipped.`,
+      );
       setSelectedIds(new Set<number>());
       opts.onChanged();
     } else {

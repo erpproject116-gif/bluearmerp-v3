@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { showBlockerResult } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import {
   patchSalesProgressFromReport,
@@ -54,7 +55,7 @@ export default function SalesStatusPage() {
   const openSales = async (salesId: number) => {
     const res = await apiFetch<SalesDetail>(`/api/v1/sales/${salesId}`);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to load sales.");
+      toast.warning(res.message ?? "Couldn't load that sale. Refresh and try again.");
       return;
     }
     setEditing(res.data);
@@ -64,7 +65,7 @@ export default function SalesStatusPage() {
   const onProgressChange = async (salesId: number, status: string) => {
     const res = await patchSalesProgressFromReport(salesId, status);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to update progress.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't update progress. Try again." });
       return;
     }
     invalidate();

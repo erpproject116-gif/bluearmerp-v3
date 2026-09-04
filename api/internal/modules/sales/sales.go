@@ -522,7 +522,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if errs := validateSaleBody(body, true); errs != nil {
-			response.ValidationSmart(w, errs)
+			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if body.SalesCategory != nil && *body.SalesCategory != "" && !salesCategoryActive(r.Context(), pool, tu.TenantID, *body.SalesCategory) {
@@ -551,7 +551,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		body.Lines = applyPartnerRatesToSaleLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeSaleLines(tt, templateCode, body.Lines)
 		if errs != nil {
-			response.ValidationSmart(w, errs)
+			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		resolveComputedLineUnits(r.Context(), pool, tu.TenantID, computed)
@@ -573,20 +573,20 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if vErrs := processpolicy.ValidateDirectSale(policy, hasSOLinkedLine); vErrs != nil {
-			response.Validation(w, vErrs)
+			response.ValidationSmartContext(w, vErrs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if v := validateSourceSOApproval(r.Context(), pool, tu.TenantID, policy, body.SourceSalesOrderID, body.Lines); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmartContext(w, v, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), 0); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmartContext(w, v, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
 		if convErrs := validateSalesOrderConversion(r.Context(), pool, tu.TenantID, computed); convErrs != nil {
-			response.Validation(w, convErrs)
+			response.ValidationSmartContext(w, convErrs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
@@ -655,25 +655,25 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if err := validateSaleSerialRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if err := validateSaleLotRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
 		if err := applySaleSerialUnits(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
 		if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
@@ -683,7 +683,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if err := writeSalesOrderSlipsForSales(r.Context(), tx, tu.TenantID, id, tu.AppUserID, salesNo, dateNoDisplay, computed, salesUsesDeliveryBalance(policy)); err != nil {
-			response.Validation(w, map[string]string{"conversion": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"conversion": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
@@ -703,7 +703,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, body.CustomValues); errs != nil {
-			response.ValidationSmart(w, errs)
+			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
@@ -740,7 +740,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if errs := validateSaleBody(body, false); errs != nil {
-			response.ValidationSmart(w, errs)
+			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if body.SalesCategory != nil && *body.SalesCategory != "" && !salesCategoryActive(r.Context(), pool, tu.TenantID, *body.SalesCategory) {
@@ -769,14 +769,14 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		body.Lines = applyPartnerRatesToSaleLines(r.Context(), pool, tu.TenantID, body.PartnerID, body.Lines)
 		computed, errs := computeSaleLines(tt, templateCode, body.Lines)
 		if errs != nil {
-			response.ValidationSmart(w, errs)
+			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		resolveComputedLineUnits(r.Context(), pool, tu.TenantID, computed)
 		subtotal, taxTotal, grandTotal := sumSaleTotals(computed)
 
 		if convErrs := validateSalesOrderConversion(r.Context(), pool, tu.TenantID, computed); convErrs != nil {
-			response.Validation(w, convErrs)
+			response.ValidationSmartContext(w, convErrs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
@@ -800,15 +800,15 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		// Re-validate source requirements on update so edits cannot strip the SO link.
 		if vErrs := processpolicy.ValidateDirectSale(policy, hasSOLinkedLine); vErrs != nil {
-			response.Validation(w, vErrs)
+			response.ValidationSmartContext(w, vErrs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if v := validateSourceSOApproval(r.Context(), pool, tu.TenantID, policy, body.SourceSalesOrderID, body.Lines); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmartContext(w, v, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), id); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmartContext(w, v, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
@@ -867,24 +867,24 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if err := validateSaleSerialRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if err := validateSaleLotRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
 		if err := applySaleSerialUnits(r.Context(), tx, tu.TenantID, id, body.PartnerID, body.Lines); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
-			response.Validation(w, map[string]string{"lines": err.Error()})
+			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 		if _, err := crm.SyncWarrantyAssetsFromSale(r.Context(), tx, tu.TenantID, id); err != nil {
@@ -919,7 +919,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, body.CustomValues); errs != nil {
-			response.ValidationSmart(w, errs)
+			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
 
@@ -1129,3 +1129,13 @@ func validTemplateCode(s string) bool {
 func hasDiscountTemplate(templateCode string) bool {
 	return templateCode == "non_vat" || templateCode == "vat_included"
 }
+
+
+func saleAssistLinks(sourceSalesOrderID *int64) response.AssistLinkContext {
+	var links response.AssistLinkContext
+	if sourceSalesOrderID != nil && *sourceSalesOrderID > 0 {
+		links.SalesOrderID = *sourceSalesOrderID
+	}
+	return links
+}
+

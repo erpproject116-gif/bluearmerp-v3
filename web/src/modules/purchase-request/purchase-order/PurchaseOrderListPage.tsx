@@ -1,4 +1,4 @@
-import { A, useNavigate } from "@solidjs/router";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { hasDocSeed } from "../../../shared/docSeed";
 import { apiFetch } from "../../../shared/api";
@@ -24,7 +24,7 @@ import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../share
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
 import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
-import { handleSaveResult } from "../../../shared/handleSaveResult";
+import { showBlockerResult, handleSaveResult } from "../../../shared/handleSaveResult";
 import { toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 import { InlineTip } from "../../../shared/inlineGuides";
 
@@ -113,7 +113,7 @@ function CreateFromPrModal(props: {
     const res = await createPurchaseOrderFromRequest(id);
     setCreating(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to create purchase order.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't create the purchase order. Try again." });
       return;
     }
     toast.success(`Purchase order ${res.data?.purchase_order_no ?? "created"}.`);
@@ -206,7 +206,7 @@ function CreateFromSupplierQuotationModal(props: {
     const res = await createPurchaseOrderFromSupplierQuotation(id);
     setCreating(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to create purchase order.");
+      showBlockerResult(res, toast, { fallbackTitle: "Couldn't create the purchase order. Try again." });
       return;
     }
     toast.success(`Purchase order ${res.data?.purchase_order_no ?? "created"}.`);
@@ -277,6 +277,7 @@ function CreateFromSupplierQuotationModal(props: {
 export default function PurchaseOrderListPage() {
   const toast = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const auth = useAuth();
   const invalidate = useInvalidatePurchaseOrders();
 
@@ -300,6 +301,13 @@ export default function PurchaseOrderListPage() {
       setEditingPoId(null);
       setViewingDeleted(false);
       setPoModalOpen(true);
+    }
+    const openId = Number(searchParams.openId ?? "");
+    if (openId > 0) {
+      setEditingPoId(openId);
+      setViewingDeleted(false);
+      setPoModalOpen(true);
+      setSearchParams({ openId: undefined }, { replace: true });
     }
   });
 

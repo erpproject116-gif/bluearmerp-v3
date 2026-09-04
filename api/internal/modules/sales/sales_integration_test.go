@@ -47,13 +47,13 @@ func TestBalanceExpr_deliveryMode(t *testing.T) {
 }
 
 func TestZeroBalanceMessage(t *testing.T) {
-	if !strings.Contains(zeroBalanceMessage(false), "open sales order quantity") {
+	if !strings.Contains(strings.ToLower(zeroBalanceMessage(false)), "ready to invoice") {
 		t.Fatal("legacy message mismatch")
 	}
 	if !strings.Contains(zeroBalanceMessage(false), "Pick List") {
 		t.Fatal("legacy message should mention Pick List")
 	}
-	if !strings.Contains(zeroBalanceMessage(true), "delivered balance") {
+	if !strings.Contains(strings.ToLower(zeroBalanceMessage(true)), "delivery") {
 		t.Fatal("delivery message mismatch")
 	}
 }

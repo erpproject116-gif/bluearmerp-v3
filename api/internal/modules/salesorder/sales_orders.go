@@ -515,7 +515,7 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSalesOrder, defaultProgress(body.ProgressStatus), 0); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmart(w, v)
 			return
 		}
 
@@ -738,7 +738,7 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 
 		newProgress := defaultProgress(body.ProgressStatus)
 		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSalesOrder, newProgress, id); v != nil {
-			response.Validation(w, v)
+			response.ValidationSmart(w, v)
 			return
 		}
 		if newProgress == "in_progress" && before.ProgressStatus != "in_progress" {

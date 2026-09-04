@@ -116,7 +116,7 @@ func ValidateSalesInvoiceQtyAgainstDelivery(p Policy, qty, deliveredQty float64)
 		return nil
 	}
 	return map[string]string{
-		"qty": "Quantity exceeds delivered quantity for this sales order line.",
+		"qty": "Quantity is higher than what was delivered for this sales order line. Post a Delivery note or lower the qty.",
 	}
 }
 
@@ -129,7 +129,7 @@ func ValidateSupplierInvoiceQtyAgainstReceived(p Policy, qty, receivedQty float6
 		return nil
 	}
 	return map[string]string{
-		"qty": "Quantity exceeds received quantity on the purchase receipt line.",
+		"qty": "Quantity is higher than what was received on this purchase receipt line. Receive more or lower the qty.",
 	}
 }
 
@@ -152,7 +152,7 @@ func ValidateSalesReleaseRequiresReservation(
 		available := qtyOnHand - qtyReservedAtLocation
 		if available+0.0001 < releaseQty {
 			return map[string]string{
-				"release_qty": "Insufficient available stock. Reservation is required before release.",
+				"release_qty": "Not enough available stock for Pick List release. Check Inv Per Branch, or free reserved qty, then try again.",
 			}
 		}
 		return nil
@@ -160,7 +160,7 @@ func ValidateSalesReleaseRequiresReservation(
 	remainingReserved := lineQtyReserved - alreadyReleased
 	if remainingReserved+0.0001 < releaseQty {
 		return map[string]string{
-			"release_qty": "Line must be reserved before release. Confirm the sales order to reserve stock.",
+			"release_qty": "This line must be reserved before Pick List release. Confirm the sales order to reserve stock, then try again.",
 		}
 	}
 	return nil
@@ -188,7 +188,7 @@ func ValidateDeliveryRequiresRelease(p Policy, releasedQty, deliveredQty, drQty 
 		return nil
 	}
 	return map[string]string{
-		"qty": "Delivery quantity exceeds released quantity. Release stock before posting delivery.",
+		"qty": "Delivery qty is higher than what was picked. Release more on Pick List, or lower the delivery qty.",
 	}
 }
 
@@ -201,6 +201,6 @@ func ValidateReleaseQty(orderQty, alreadyReleased, releaseQty float64) map[strin
 		return nil
 	}
 	return map[string]string{
-		"release_qty": "Release quantity exceeds remaining order quantity.",
+		"release_qty": "Release qty is higher than what’s left on the order. Lower the release qty.",
 	}
 }
