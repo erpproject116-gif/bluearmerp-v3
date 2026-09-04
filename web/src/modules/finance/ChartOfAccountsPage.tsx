@@ -671,14 +671,45 @@ export default function ChartOfAccountsPage() {
   };
 
   const importTemplate = async (replace = false) => {
-    const msg = replace
-      ? "Soft-delete all current accounts and replace with the Philippine SME chart (~35 accounts)? Journal history stays linked to soft-deleted codes."
-      : "Import the Philippine SME starter chart (~35 accounts, codes 1000–5999)?";
+    if (replace) {
+      const note = window.prompt(
+        "Request replace chart of accounts\n\nExplain why (required). Another owner must approve — or Platform if you are the only owner. Old accounts stay soft-deleted and linked to journals.",
+      );
+      if (note === null) return;
+      if (!note.trim()) {
+        toast.warning("A reason note is required.");
+        return;
+      }
+      const code =
+        window.prompt('Type your company code or the word REPLACE to confirm:')?.trim() ?? "";
+      if (!code) {
+        toast.warning("Confirmation cancelled.");
+        return;
+      }
+      setImporting(true);
+      const res = await apiFetch("/api/v1/finance/accounts/coa-replace-requests", {
+        method: "POST",
+        body: JSON.stringify({
+          note: note.trim(),
+          confirm_company_code: code,
+          acknowledge_irreversible: true,
+          template: "ph_sme",
+        }),
+      }, { silent: true });
+      setImporting(false);
+      if (!res.success) {
+        toast.warning(res.message || "Could not submit replace request.");
+        return;
+      }
+      toast.success(res.message || "Replace request submitted for approval.");
+      return;
+    }
+    const msg = "Import the Philippine SME starter chart (~35 accounts, codes 1000–5999)?";
     if (!window.confirm(msg)) return;
     setImporting(true);
     const res = await apiFetch<{ imported: number }>("/api/v1/finance/accounts/import-template", {
       method: "POST",
-      body: JSON.stringify({ template: "ph_sme", replace }),
+      body: JSON.stringify({ template: "ph_sme", replace: false }),
     }, { silent: true });
     setImporting(false);
     if (!res.success) {
@@ -686,7 +717,7 @@ export default function ChartOfAccountsPage() {
       toast.warning(detail || res.message || "Failed to import template.");
       return;
     }
-    toast.success(replace ? `Replaced with PH template (${res.data?.imported ?? 0} accounts).` : `Imported ${res.data?.imported ?? 0} accounts.`);
+    toast.success(`Imported ${res.data?.imported ?? 0} accounts.`);
     invalidate();
   };
 
@@ -977,7 +1008,7 @@ export default function ChartOfAccountsPage() {
                 disabled={importing()}
                 onClick={() => void importTemplate(true)}
               >
-                {importing() ? "Replacing…" : "Replace with PH template"}
+                {importing() ? "Submitting…" : "Request replace with PH template"}
               </button>
             </Show>
             <Show when={isEmpty()}>
@@ -1069,7 +1100,7 @@ export default function ChartOfAccountsPage() {
             onClick={() => void importTemplate(true)}
             title="Soft-delete current accounts and load the Philippine SME market template"
           >
-            {importing() ? "Replacing…" : "Replace with PH template"}
+            {importing() ? "Submitting…" : "Request replace with PH template"}
           </button>
         </Show>
       </div>

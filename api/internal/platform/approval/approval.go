@@ -173,6 +173,16 @@ func ListPending(ctx context.Context, pool *pgxpool.Pool, tenantID int64, limit 
 			} else {
 				r.EntityLabel = fmt.Sprintf("Stock adj %s %+g", itemCode, qty)
 			}
+		case "fin_coa_replace_request":
+			var note string
+			_ = pool.QueryRow(ctx, `
+				select left(note, 80) from public.fin_coa_replace_requests
+				where id = $1 and tenant_id = $2`, r.EntityID, tenantID).Scan(&note)
+			if note != "" {
+				r.EntityLabel = "Replace chart of accounts — " + note
+			} else {
+				r.EntityLabel = fmt.Sprintf("Replace chart of accounts #%d", r.EntityID)
+			}
 		default:
 			r.EntityLabel = fmt.Sprintf("%s #%d", r.EntityType, r.EntityID)
 		}

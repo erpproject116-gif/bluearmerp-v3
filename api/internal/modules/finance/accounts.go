@@ -57,6 +57,7 @@ func registerAccountRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/accounts/ensure-purchase-cogs", ensurePurchaseCogsAccount(pool))
 	r.Get("/accounts/defaults", getFinanceDefaults(pool))
 	r.Patch("/accounts/defaults", saveFinanceDefaults(pool))
+	registerCoaReplaceRoutes(r, pool)
 	r.Get("/accounts/{id}", getAccount(pool))
 	r.Patch("/accounts/{id}", updateAccount(pool))
 	r.Delete("/accounts/{id}", deleteAccount(pool))
@@ -392,19 +393,16 @@ func importAccountTemplate(pool *pgxpool.Pool) http.HandlerFunc {
 			where tenant_id = $1 and deleted_at is null`, tu.TenantID).Scan(&existing)
 		if existing > 0 && !body.Replace {
 			response.Validation(w, map[string]string{
-				"template": "Chart already has accounts. Import PH template only works on an empty chart, or use Replace to soft-delete current accounts and load the PH SME template.",
+				"template": "Chart already has accounts. Import PH template only works on an empty chart, or request Replace (needs approval with a note).",
 			})
 			return
 		}
 
 		if body.Replace && existing > 0 {
-			if _, err := pool.Exec(r.Context(), `
-				update public.fin_accounts
-				set deleted_at = now(), is_active = false
-				where tenant_id = $1 and deleted_at is null`, tu.TenantID); err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to clear existing accounts.", "ERR_INTERNAL")
-				return
-			}
+			response.Err(w, http.StatusForbidden,
+				"Replacing the chart needs approval. Use Request replace chart, add a note, and wait for another owner (or Platform) to approve.",
+				"ERR_COA_REPLACE_NEEDS_APPROVAL")
+			return
 		}
 
 		if _, err := pool.Exec(r.Context(), `select public.seed_ph_sme_chart_of_accounts($1)`, tu.TenantID); err != nil {

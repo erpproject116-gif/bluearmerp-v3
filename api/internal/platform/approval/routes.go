@@ -131,7 +131,7 @@ func decideApproval(pool *pgxpool.Pool, approve bool) http.HandlerFunc {
 
 func requiresDedicatedApprovalRoute(entityType string) bool {
 	switch strings.TrimSpace(entityType) {
-	case "sa_sales", "fin_supplier_invoice":
+	case "sa_sales", "fin_supplier_invoice", "fin_coa_replace_request":
 		return true
 	default:
 		return false
