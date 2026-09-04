@@ -40,7 +40,7 @@ export default function PlatformPlanEditPage() {
   const [isPublic, setIsPublic] = createSignal(true);
   const [isTrial, setIsTrial] = createSignal(false);
   const [isDemo, setIsDemo] = createSignal(false);
-  const [trialDays, setTrialDays] = createSignal(30);
+  const [trialDays, setTrialDays] = createSignal(14);
   const [sortOrder, setSortOrder] = createSignal(50);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -64,7 +64,7 @@ export default function PlatformPlanEditPage() {
     setIsPublic(Boolean(p.is_public));
     setIsTrial(Boolean(p.is_trial));
     setIsDemo(Boolean(p.is_demo));
-    setTrialDays(Number(p.trial_days ?? 0) || 30);
+    setTrialDays(Number(p.trial_days ?? 0) || 14);
     setSortOrder(Number(p.sort_order ?? 0));
   });
 
@@ -184,10 +184,10 @@ export default function PlatformPlanEditPage() {
               mode="integer"
               class="mt-1 w-full max-w-xs rounded-lg border border-stroke px-3 py-2 text-sm"
               value={String(trialDays())}
-              onValue={(v) => setTrialDays(Math.max(1, parseNum(v) || 30))}
+              onValue={(v) => setTrialDays(Math.max(1, parseNum(v) || 14))}
             />
             <p class="mt-1 text-xs text-text-secondary">
-              Used when provisioning new trial workspaces. Default is 30.
+              Used when provisioning new trial workspaces. Default is 14.
             </p>
           </label>
         </Show>

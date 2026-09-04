@@ -39,7 +39,7 @@ const emptyForm = (): ProvisionForm => ({
 });
 
 function planOptionLabel(p: PlatformPlan) {
-  if (p.plan_code === "trial_90d") return p.trial_days ? `${p.trial_days}-day trial (free)` : "30-day trial (free)";
+  if (p.plan_code === "trial_90d") return p.trial_days ? `${p.trial_days}-day trial (free)` : "14-day trial (free)";
   return p.display_name;
 }
 
@@ -270,7 +270,7 @@ export default function PlatformCustomersPage() {
                   value={selectedPlanValue()}
                   onChange={(e) => onPlanChange(e.currentTarget.value)}
                 >
-                  <option value="trial_90d">30-day trial (free)</option>
+                  <option value="trial_90d">14-day trial (free)</option>
                   <For each={planOptions().filter((p) => p.plan_code !== "trial_90d")}>
                     {(p) => <option value={String(p.id)}>{planOptionLabel(p)}</option>}
                   </For>

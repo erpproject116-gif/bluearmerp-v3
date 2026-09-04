@@ -33,7 +33,7 @@ const (
 	Amount6MoTotal    = 12000.00
 	Amount12MoTotal   = 21600.00
 	// TrialDays is the fallback when a trial plan has no trial_days configured.
-	TrialDays = 30
+	TrialDays = 14
 )
 
 // ResolveTrialDays returns the trial length for a plan, falling back to TrialDays.

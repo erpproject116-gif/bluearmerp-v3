@@ -66,7 +66,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
                     <li>
                       Or{" "}
                       <a href="/welcome" class="font-medium text-brand-600 hover:underline">
-                        start a 30-day free trial
+                        start a 14-day free trial
                       </a>{" "}
                       /{" "}
                       <a href="/demo" class="font-medium text-brand-600 hover:underline">

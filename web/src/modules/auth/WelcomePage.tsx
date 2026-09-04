@@ -241,7 +241,7 @@ export default function WelcomePage() {
               class="w-full rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-60"
               onClick={() => void startTrial()}
             >
-              {loading() ? "Setting up your workspace…" : "Start 30-day free trial"}
+              {loading() ? "Setting up your workspace…" : "Start 14-day free trial"}
             </button>
             <p class="text-xs text-text-secondary">
               Empty workspace for real data. No credit card required. Do not use an email that already belongs to
