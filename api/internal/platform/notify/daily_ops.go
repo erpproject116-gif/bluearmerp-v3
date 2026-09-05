@@ -29,7 +29,8 @@ type dailyOpsMetrics struct {
 	ReconGaps           int64
 }
 
-// opsAdminEmails returns CHANGE_ALERT_DIGEST_TO override, else owner + active store_admins.
+// opsAdminEmails returns CHANGE_ALERT_DIGEST_TO override, else business owners only
+// (tenant owner_user_id and active owner / store_owner roles — not store_admin or below).
 func opsAdminEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]string, error) {
 	if override := parseDigestToEnv(); len(override) > 0 {
 		return override, nil
@@ -42,8 +43,8 @@ func opsAdminEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]
 		  and u.status = 'active'
 		  and coalesce(trim(u.email), '') <> ''
 		  and (
-		    u.tenant_role = 'store_admin'
-		    or u.id = t.owner_user_id
+		    u.id = t.owner_user_id
+		    or u.tenant_role in ('owner', 'store_owner')
 		  )`, tenantID)
 	if err != nil {
 		return nil, err
@@ -309,7 +310,7 @@ func formatDailyOps(company string, m dailyOpsMetrics, baseURL string) (subject,
 	}
 
 	b.WriteString(`<tr><td style="padding:12px 28px 24px;font-size:12px;color:#94a3b8;line-height:1.55;">`)
-	b.WriteString(`Sent to the tenant owner and store admins. Instant per-sale emails are not sent on the free plan — use this digest and the in-app notification bell.`)
+	b.WriteString(`Sent to business owners only. Instant per-sale emails are not sent on the free plan — use this digest and the in-app notification bell.`)
 	b.WriteString(`</td></tr></table></td></tr></table></body></html>`)
 
 	textParts := []string{subject, "", fmt.Sprintf("Company: %s", company), fmt.Sprintf("UTC day: %s", day), ""}
@@ -331,7 +332,7 @@ func formatDailyOps(company string, m dailyOpsMetrics, baseURL string) (subject,
 		textParts = append(textParts, "")
 	}
 	textParts = append(textParts,
-		"Sent to the tenant owner and store admins.",
+		"Sent to business owners only.",
 		"Instant per-sale emails are not sent on the free plan — use this digest and the in-app notification bell.",
 		"",
 		"— BluearmERP",

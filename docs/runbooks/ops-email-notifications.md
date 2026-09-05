@@ -10,7 +10,7 @@ Fact-locked runbook for Platform Command invites, hourly change-alert digests, a
 | Platform staff invite | Platform Command → staff invite (+ resend) | Invitee | Resend direct async (`platform.staff.invite`) |
 | Platform tenant / owner invite | Provision workspace; **Resend invites** playbook | Pending invitees | Outbox `user.invite` + async drain |
 | Hourly change-alert digest | Cron `POST .../change-alert-digest` | Tenant owner (or `CHANGE_ALERT_DIGEST_TO`) | Resend → SMTP → Gmail |
-| Daily ops digest | Cron `POST .../daily-ops-digest` | Owner + active `store_admin` (or override) | Resend → SMTP |
+| Daily ops digest | Cron `POST .../daily-ops-digest` | Business owners only (`owner_user_id` / `owner` / `store_owner`; not `store_admin`) or override | Resend → SMTP |
 | Weekly BI digest | Cron `POST .../weekly-bi-digest` | Owner + `store_admin` | Resend → SMTP |
 | Monthly BI digest | Cron `POST .../monthly-bi-digest` | Owner + `store_admin` | Resend → SMTP |
 
@@ -73,7 +73,7 @@ In-app: **Dashboard → Period summary** (`/app/dashboard/period-summary`).
 | 2 | Platform resend tenant invites | Pending users get mail; not only `invited_at` bump |
 | 3 | User Management invite | Still works (regression) |
 | 4 | `POST .../change-alert-digest` with secret | Digest via Resend when SMTP blocked |
-| 5 | `POST .../daily-ops-digest` | One mail per enabled tenant; owner + store_admin |
+| 5 | `POST .../daily-ops-digest` | One mail per enabled tenant; business owners only |
 | 6 | `POST .../weekly-bi-digest` | Weekly BI mail; `/app/dashboard/period-summary?period=weekly` matches |
 | 7 | `POST .../monthly-bi-digest` | Monthly BI mail; period summary monthly tab |
 | 8 | Auth reset / OTP | Unchanged (Supabase Auth SMTP) |

@@ -22,6 +22,12 @@ func TestFormatDailyOpsQuietDay(t *testing.T) {
 	if !strings.Contains(htmlBody, "#3c50e0") {
 		t.Fatal("html missing brand color")
 	}
+	if !strings.Contains(htmlBody, "Sent to business owners only") {
+		t.Fatal("html should state business-owner recipients")
+	}
+	if strings.Contains(htmlBody, "store admins") {
+		t.Fatal("html must not mention store admins as recipients")
+	}
 }
 
 func TestFormatDailyOpsRiskSubjectAndLinks(t *testing.T) {
