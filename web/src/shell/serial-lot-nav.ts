@@ -90,6 +90,12 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "overflow",
   },
   {
+    label: "Lot Inv. Book",
+    href: "/app/inventory/serial-lot/reports/lot-book",
+    permissionCode: "inventory.serial_movements",
+    headerPriority: "overflow",
+  },
+  {
     label: "Inv. Balance",
     href: "/app/inventory/serial-lot/reports/balance",
     permissionCode: "inventory.serial_registry",

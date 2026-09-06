@@ -128,6 +128,21 @@ func mappedOpeningLotsHandler(pool *pgxpool.Pool, forcePreview bool) http.Handle
 			}
 
 			notes := "Opening/cutover lot"
+			if err := inventory.InsertLotEvent(r.Context(), tx, inventory.LotEventInput{
+				TenantID:        tu.TenantID,
+				LotBatchID:      lotID,
+				EventType:       "received",
+				ToLocationID:    &locID,
+				Qty:             qty,
+				RefType:         "opening_import",
+				RefID:           &lotID,
+				Notes:           notes,
+				CreatedByUserID: &tu.AppUserID,
+			}); err != nil {
+				_ = tx.Rollback(r.Context())
+				failRow(&result, rowNum, err.Error())
+				continue
+			}
 			if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, item.ID, locID, qty, tu.AppUserID, "opening_lot", lotID, "receipt", notes); err != nil {
 				_ = tx.Rollback(r.Context())
 				failRow(&result, rowNum, err.Error())

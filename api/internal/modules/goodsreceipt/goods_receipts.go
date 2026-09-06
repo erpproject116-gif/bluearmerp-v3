@@ -1398,7 +1398,8 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 						response.Validation(w, map[string]string{"lots": fmt.Sprintf("Line %d: %v", ln.ID, err)})
 						return
 					}
-					_, err = tx.Exec(r.Context(), `
+					var lotBatchID int64
+					err = tx.QueryRow(r.Context(), `
 						insert into public.inv_lot_batches (
 						  tenant_id, item_id, lot_no, location_id, qty_on_hand, expiry_date,
 						  purchase_order_line_id, goods_receipt_line_id
@@ -1408,11 +1409,26 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 						  qty_on_hand = inv_lot_batches.qty_on_hand + excluded.qty_on_hand,
 						  expiry_date = coalesce(excluded.expiry_date, inv_lot_batches.expiry_date),
 						  goods_receipt_line_id = coalesce(excluded.goods_receipt_line_id, inv_lot_batches.goods_receipt_line_id),
-						  updated_at = now()`,
+						  updated_at = now()
+						returning id`,
 						tu.TenantID, *ln.ItemID, lotNo, locationID, lotQty, expiry,
-						ln.PurchaseOrderLineID, ln.ID)
+						ln.PurchaseOrderLineID, ln.ID).Scan(&lotBatchID)
 					if err != nil {
 						response.Err(w, http.StatusInternalServerError, "Failed to upsert lot batch.", "ERR_INTERNAL")
+						return
+					}
+					lotLocID := locationID
+					if err := inventory.InsertLotEvent(r.Context(), tx, inventory.LotEventInput{
+						TenantID:        tu.TenantID,
+						LotBatchID:      lotBatchID,
+						EventType:       "received",
+						ToLocationID:    &lotLocID,
+						Qty:             lotQty,
+						RefType:         "goods_receipt",
+						RefID:           &grID,
+						CreatedByUserID: &userID,
+					}); err != nil {
+						response.Err(w, http.StatusInternalServerError, "Failed to record lot event.", "ERR_INTERNAL")
 						return
 					}
 				}
@@ -1709,16 +1725,32 @@ func reverseGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 				lotRows.Close()
 				for _, lot := range lots {
-					tag, err := tx.Exec(r.Context(), `
+					var lotBatchID int64
+					err := tx.QueryRow(r.Context(), `
 						update public.inv_lot_batches
 						set qty_on_hand = qty_on_hand - $1, updated_at = now()
 						where tenant_id = $2 and item_id = $3 and lot_no = $4 and location_id = $5
-						  and qty_on_hand >= $1 - 0.0001`,
-						lot.Qty, tu.TenantID, *ln.ItemID, lot.LotNo, locationID)
-					if err != nil || tag.RowsAffected() == 0 {
+						  and qty_on_hand >= $1 - 0.0001
+						returning id`,
+						lot.Qty, tu.TenantID, *ln.ItemID, lot.LotNo, locationID).Scan(&lotBatchID)
+					if err != nil {
 						response.Validation(w, map[string]string{
 							"lots": fmt.Sprintf("Insufficient quantity in lot %s to reverse line %d.", lot.LotNo, ln.ID),
 						})
+						return
+					}
+					lotLocID := locationID
+					if err := inventory.InsertLotEvent(r.Context(), tx, inventory.LotEventInput{
+						TenantID:        tu.TenantID,
+						LotBatchID:      lotBatchID,
+						EventType:       "voided",
+						FromLocationID:  &lotLocID,
+						Qty:             lot.Qty,
+						RefType:         "goods_receipt",
+						RefID:           &grID,
+						CreatedByUserID: &userID,
+					}); err != nil {
+						response.Err(w, http.StatusInternalServerError, "Failed to record lot event.", "ERR_INTERNAL")
 						return
 					}
 				}

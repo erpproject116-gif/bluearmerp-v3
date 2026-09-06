@@ -30,6 +30,7 @@ const reportLinks = [
   { label: "Stock Ledger", href: "/app/inventory/reports/stock-ledger" },
   { label: "Serial/Lot Status", href: "/app/inventory/serial-lot/reports/status" },
   { label: "Serial Inv. Book", href: "/app/inventory/serial-lot/reports/book" },
+  { label: "Lot Inv. Book", href: "/app/inventory/serial-lot/reports/lot-book" },
   { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing" },
   { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation" },
 ];

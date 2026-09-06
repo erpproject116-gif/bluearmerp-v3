@@ -191,6 +191,27 @@ func applyLotAdjustments(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 
+			lotBatchID := line.LotBatchID
+			event := LotEventInput{
+				TenantID:        tu.TenantID,
+				LotBatchID:      lotBatchID,
+				EventType:       LotEventTypeForQtyDelta(line.QtyDelta, "adjusted"),
+				Qty:             line.QtyDelta,
+				RefType:         "lot_adjustment",
+				RefID:           &lotBatchID,
+				Notes:           reason,
+				CreatedByUserID: &userID,
+			}
+			if line.QtyDelta > 0 {
+				event.ToLocationID = &locationID
+			} else {
+				event.FromLocationID = &locationID
+			}
+			if err := InsertLotEvent(r.Context(), tx, event); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to record lot event.", "ERR_INTERNAL")
+				return
+			}
+
 			if trackQty {
 				if line.QtyDelta < 0 {
 					tag, err = tx.Exec(r.Context(), `
@@ -311,6 +332,21 @@ func registerLotBatch(pool *pgxpool.Pool) http.HandlerFunc {
 			tu.TenantID, body.ItemID, lotNo, body.LocationID, body.Qty, body.ExpiryDate).Scan(&lotID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to register lot.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := InsertLotEvent(r.Context(), tx, LotEventInput{
+			TenantID:        tu.TenantID,
+			LotBatchID:      lotID,
+			EventType:       "received",
+			ToLocationID:    &body.LocationID,
+			Qty:             body.Qty,
+			RefType:         "lot_register",
+			RefID:           &lotID,
+			Notes:           "Manual lot registration",
+			CreatedByUserID: &tu.AppUserID,
+		}); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to record lot event.", "ERR_INTERNAL")
 			return
 		}
 

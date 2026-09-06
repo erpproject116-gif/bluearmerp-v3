@@ -1,0 +1,5 @@
+{
+  "Status": "Success",
+  "ExitCode": 0,
+  "Output": "4c10818 feat: inv. book and serial lot\nbluearm-api\nbluearm-api\n69aab9fd4bd05f6c4f7aeb3af049d2f587ba49c925b62c5bd4a0a6fc50d6da41\nHEALTH_CODE=200\n{\"success\":true,\"message\":\"OK\",\"data\":{\"healthy\":true,\"latest_migration\":\"281_coa_replace_requests.sql\",\"migrations_directory\":\"/migrations\",\"missing_tables\":null,\"pending_count\":0,\"pending_migrations\":null}}\n\n{\"success\":true,\"message\":\"OK\",\"data\":{\"healthy\":true,\"latest_migration\":\"281_coa_replace_requests.sql\",\"migrations_directory\":\"/migrations\",\"missing_tables\":null,\"pending_count\":0,\"pending_migrations\":null}}\n\n69aab9fd4bd0 bluearm-api:latest Up 4 seconds\nCONTAINER_RESTART_DONE\n"
+}

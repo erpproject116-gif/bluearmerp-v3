@@ -43,6 +43,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/inventory/serial-lot/movements": "inventory.serial_movements",
   "/app/inventory/serial-lot/reports/status": "inventory.serial_registry",
   "/app/inventory/serial-lot/reports/book": "inventory.serial_movements",
+  "/app/inventory/serial-lot/reports/lot-book": "inventory.serial_movements",
   "/app/inventory/serial-lot/reports/balance": "inventory.serial_registry",
   "/app/inventory/serial-lot/reports/reconciliation": "inventory.serial_registry",
   "/app/inventory/serial-lot/trace": "inventory.serial_trace",

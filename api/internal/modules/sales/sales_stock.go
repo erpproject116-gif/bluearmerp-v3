@@ -312,6 +312,18 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 		if err != nil || tag.RowsAffected() == 0 {
 			return fmt.Errorf("line %d: failed to deduct lot qty", lineNo)
 		}
+		fromLocationID := lotLocationID
+		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+			TenantID:       tenantID,
+			LotBatchID:     lotBatchID,
+			EventType:      "sold",
+			FromLocationID: &fromLocationID,
+			Qty:            qty,
+			RefType:        "sa_sales",
+			RefID:          &salesID,
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -329,7 +341,7 @@ func reverseSaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) err
 	if err != nil {
 		return err
 	}
-	return applyLotRestores(ctx, tx, tenantID, restores)
+	return applyLotRestores(ctx, tx, tenantID, &salesID, restores)
 }
 
 type lotRestore struct {
@@ -355,7 +367,7 @@ func collectLotRestores(rows pgx.Rows) ([]lotRestore, error) {
 	return out, rows.Err()
 }
 
-func applyLotRestores(ctx context.Context, tx pgx.Tx, tenantID int64, restores []lotRestore) error {
+func applyLotRestores(ctx context.Context, tx pgx.Tx, tenantID int64, salesID *int64, restores []lotRestore) error {
 	for _, r := range restores {
 		qty := r.lineQty
 		if r.itemID != nil {
@@ -365,11 +377,24 @@ func applyLotRestores(ctx context.Context, tx pgx.Tx, tenantID int64, restores [
 			}
 			qty = converted
 		}
-		if _, err := tx.Exec(ctx, `
+		var locationID int64
+		if err := tx.QueryRow(ctx, `
 			update public.inv_lot_batches
 			set qty_on_hand = qty_on_hand + $1, updated_at = now()
-			where id = $2 and tenant_id = $3`,
-			qty, r.lotBatchID, tenantID); err != nil {
+			where id = $2 and tenant_id = $3
+			returning location_id`,
+			qty, r.lotBatchID, tenantID).Scan(&locationID); err != nil {
+			return err
+		}
+		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+			TenantID:     tenantID,
+			LotBatchID:   r.lotBatchID,
+			EventType:    "returned",
+			ToLocationID: &locationID,
+			Qty:          qty,
+			RefType:      "sa_sales",
+			RefID:        salesID,
+		}); err != nil {
 			return err
 		}
 	}
@@ -522,7 +547,7 @@ func reverseSaleLotForLines(ctx context.Context, tx pgx.Tx, tenantID int64, line
 	if err != nil {
 		return err
 	}
-	return applyLotRestores(ctx, tx, tenantID, restores)
+	return applyLotRestores(ctx, tx, tenantID, nil, restores)
 }
 
 // reverseSaleSerialsForLines moves sold serials back to in_stock for selected lines.
@@ -638,6 +663,20 @@ func applySalesReturnStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, lo
 			set qty_on_hand = qty_on_hand + $1, updated_at = now()
 			where id = $2 and tenant_id = $3`, lotRestore, *lotBatchID, tenantID)
 		if err != nil {
+			return err
+		}
+		locID := locationID
+		uid := userID
+		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+			TenantID:        tenantID,
+			LotBatchID:      *lotBatchID,
+			EventType:       "returned",
+			ToLocationID:    &locID,
+			Qty:             lotRestore,
+			RefType:         "sa_sales",
+			RefID:           &salesID,
+			CreatedByUserID: &uid,
+		}); err != nil {
 			return err
 		}
 	}

@@ -406,26 +406,43 @@ func applyStockAndTracking(
 			if lotNo == "" || lot.Qty <= 0 {
 				continue
 			}
-			_, err := tx.Exec(ctx, `
+			var lotBatchID int64
+			err := tx.QueryRow(ctx, `
 				insert into public.inv_lot_batches (
 				  tenant_id, item_id, lot_no, location_id, qty_on_hand,
 				  purchase_order_line_id, goods_receipt_line_id
 				) values ($1, $2, $3, $4, $5, $6, $7)
 				on conflict (tenant_id, item_id, lot_no, location_id)
 				do update set qty_on_hand = inv_lot_batches.qty_on_hand + excluded.qty_on_hand,
-				  goods_receipt_line_id = coalesce(inv_lot_batches.goods_receipt_line_id, excluded.goods_receipt_line_id)`,
-				tenantID, *itemID, lotNo, locationID, lot.Qty, poLineID, grLineID)
+				  goods_receipt_line_id = coalesce(inv_lot_batches.goods_receipt_line_id, excluded.goods_receipt_line_id)
+				returning id`,
+				tenantID, *itemID, lotNo, locationID, lot.Qty, poLineID, grLineID).Scan(&lotBatchID)
 			if err != nil {
 				// Fallback without on-conflict if unique differs
-				_, err = tx.Exec(ctx, `
+				err = tx.QueryRow(ctx, `
 					insert into public.inv_lot_batches (
 					  tenant_id, item_id, lot_no, location_id, qty_on_hand,
 					  purchase_order_line_id, goods_receipt_line_id
-					) values ($1, $2, $3, $4, $5, $6, $7)`,
-					tenantID, *itemID, lotNo, locationID, lot.Qty, poLineID, grLineID)
+					) values ($1, $2, $3, $4, $5, $6, $7)
+					returning id`,
+					tenantID, *itemID, lotNo, locationID, lot.Qty, poLineID, grLineID).Scan(&lotBatchID)
 				if err != nil {
 					return fmt.Errorf("failed to post lot %q: %w", lotNo, err)
 				}
+			}
+			lotLocID := locationID
+			lotUserID := userID
+			if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+				TenantID:        tenantID,
+				LotBatchID:      lotBatchID,
+				EventType:       "received",
+				ToLocationID:    &lotLocID,
+				Qty:             lot.Qty,
+				RefType:         "goods_receipt",
+				RefID:           &grID,
+				CreatedByUserID: &lotUserID,
+			}); err != nil {
+				return err
 			}
 		}
 	}

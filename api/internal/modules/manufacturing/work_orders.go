@@ -507,6 +507,19 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Validation(w, map[string]string{"input_lot_batch_id": "Failed to consume input lot batch."})
 					return
 				}
+				if err := inventory.InsertLotEvent(r.Context(), tx, inventory.LotEventInput{
+					TenantID:        tu.TenantID,
+					LotBatchID:      *completeBody.InputLotBatchID,
+					EventType:       "consumed",
+					FromLocationID:  &lotLocationID,
+					Qty:             actualInputQty,
+					RefType:         "mfg_work_order",
+					RefID:           &id,
+					CreatedByUserID: &tu.AppUserID,
+				}); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to record lot event.", "ERR_INTERNAL")
+					return
+				}
 			} else if !fgSettings.TrackSerial && !fgSettings.TrackLot {
 				if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, -actualInputQty, tu.AppUserID, "mfg_work_order", id, "wo_disassembly_issue"); err != nil {
 					response.Validation(w, map[string]string{"stock": err.Error()})
@@ -910,7 +923,8 @@ func receiveDisassemblyCutLot(
 	} else {
 		expiry = nil
 	}
-	_, err := tx.Exec(ctx, `
+	var lotBatchID int64
+	err := tx.QueryRow(ctx, `
 		insert into public.inv_lot_batches (
 		  tenant_id, item_id, lot_no, location_id, qty_on_hand, expiry_date
 		) values ($1, $2, $3, $4, $5, $6)
@@ -918,9 +932,22 @@ func receiveDisassemblyCutLot(
 		do update set
 		  qty_on_hand = inv_lot_batches.qty_on_hand + excluded.qty_on_hand,
 		  expiry_date = coalesce(excluded.expiry_date, inv_lot_batches.expiry_date),
-		  updated_at = now()`,
-		tenantID, itemID, lotNo, locationID, qty, expiry)
+		  updated_at = now()
+		returning id`,
+		tenantID, itemID, lotNo, locationID, qty, expiry).Scan(&lotBatchID)
 	if err != nil {
+		return err
+	}
+	if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+		TenantID:        tenantID,
+		LotBatchID:      lotBatchID,
+		EventType:       "produced",
+		ToLocationID:    &locationID,
+		Qty:             qty,
+		RefType:         "mfg_work_order",
+		RefID:           &woID,
+		CreatedByUserID: &userID,
+	}); err != nil {
 		return err
 	}
 	return inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, qty, userID, "mfg_work_order", woID, "wo_disassembly_receipt")

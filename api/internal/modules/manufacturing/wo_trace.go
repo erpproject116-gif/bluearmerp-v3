@@ -871,6 +871,18 @@ func consumeWoIssueTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locatio
 		if err != nil || tag.RowsAffected() == 0 {
 			return fmt.Errorf("failed to consume lot batch %d", lotID)
 		}
+		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+			TenantID:        tenantID,
+			LotBatchID:      lotID,
+			EventType:       "consumed",
+			FromLocationID:  &locationID,
+			Qty:             qty,
+			RefType:         "mfg_work_order",
+			RefID:           &woID,
+			CreatedByUserID: &userID,
+		}); err != nil {
+			return err
+		}
 		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, -qty, userID, "mfg_work_order", woID, "wo_trace_issue"); err != nil {
 			return err
 		}
@@ -978,7 +990,8 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 		if err := rows.Scan(&rowID, &lotNo, &qty, &expiry); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `
+		var lotBatchID int64
+		err = tx.QueryRow(ctx, `
 			insert into public.inv_lot_batches (
 			  tenant_id, item_id, lot_no, location_id, qty_on_hand, expiry_date
 			) values ($1, $2, $3, $4, $5, $6)
@@ -986,9 +999,22 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 			do update set
 			  qty_on_hand = inv_lot_batches.qty_on_hand + excluded.qty_on_hand,
 			  expiry_date = coalesce(excluded.expiry_date, inv_lot_batches.expiry_date),
-			  updated_at = now()`,
-			tenantID, itemID, lotNo, locationID, qty, expiry)
+			  updated_at = now()
+			returning id`,
+			tenantID, itemID, lotNo, locationID, qty, expiry).Scan(&lotBatchID)
 		if err != nil {
+			return err
+		}
+		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+			TenantID:        tenantID,
+			LotBatchID:      lotBatchID,
+			EventType:       "produced",
+			ToLocationID:    &locationID,
+			Qty:             qty,
+			RefType:         "mfg_work_order",
+			RefID:           &woID,
+			CreatedByUserID: &userID,
+		}); err != nil {
 			return err
 		}
 		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, qty, userID, "mfg_work_order", woID, "wo_trace_receipt"); err != nil {
