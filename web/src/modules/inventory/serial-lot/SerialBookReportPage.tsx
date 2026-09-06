@@ -15,6 +15,7 @@ import {
 } from "../../../shared/useSerialReports";
 import { SerialLotLayout } from "./SerialLotLayout";
 import { openSerialTrace } from "./openSerialTrace";
+import { InvBookFamilyNav } from "../InvBookFamilyNav";
 
 function defaultFilters(): SerialBookFilters {
   const range = defaultSerialBookDateRange();
@@ -96,6 +97,7 @@ export default function SerialBookReportPage() {
 
   return (
     <SerialLotLayout>
+      <InvBookFamilyNav active="serial" />
       <CollapsibleFilterPanel
         title="Serial Inv. Book"
         description="Slip ledger with increase / release / running inventory qty — Search (F8)."

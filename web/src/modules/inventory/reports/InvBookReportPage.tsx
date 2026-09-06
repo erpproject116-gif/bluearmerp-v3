@@ -5,6 +5,7 @@ import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { invBookExportUrl, useInvBookReport, type InvBookFilters } from "../../../shared/reports/useModuleReports";
 import { formatPeso } from "../../../shared/money";
+import { InvBookFamilyNav } from "../InvBookFamilyNav";
 
 function stockLedgerHref(row: { item_id: number; location_id: number }, filters: InvBookFilters): string {
   const qs = new URLSearchParams();
@@ -53,8 +54,10 @@ export default function InvBookReportPage() {
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
 
   return (
-    <ReportPageLayout
-      title="Inv. Book"
+    <>
+      <InvBookFamilyNav active="item" />
+      <ReportPageLayout
+      title="Item Inv. Book"
       description="Opening, receipt, issue, and closing qty by item and location — click Closing to open Stock Ledger."
       dateFrom={() => filters().date_from ?? ""}
       dateTo={() => filters().date_to ?? ""}
@@ -151,5 +154,6 @@ export default function InvBookReportPage() {
         </p>
       </Show>
     </ReportPageLayout>
+    </>
   );
 }

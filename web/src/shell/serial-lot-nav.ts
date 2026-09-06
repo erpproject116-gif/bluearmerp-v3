@@ -29,16 +29,28 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
+    label: "Serial Inv. Book",
+    href: "/app/inventory/serial-lot/reports/book",
+    permissionCode: "inventory.serial_movements",
+    headerPriority: "primary",
+  },
+  {
+    label: "Lot Inv. Book",
+    href: "/app/inventory/serial-lot/reports/lot-book",
+    permissionCode: "inventory.serial_movements",
+    headerPriority: "primary",
+  },
+  {
     label: "Settings",
     href: "/app/inventory/serial-lot/settings",
     permissionCode: "inventory.serial_settings",
-    headerPriority: "primary",
+    headerPriority: "overflow",
   },
   {
     label: "Receive station",
     href: "/app/inventory/serial-lot/receive-station",
     permissionCode: "inventory.receive_station",
-    headerPriority: "primary",
+    headerPriority: "overflow",
   },
   {
     /** Deep-link / typed lookup; open a row from Serials for day-to-day work. */
@@ -81,18 +93,6 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     label: "Status",
     href: "/app/inventory/serial-lot/reports/status",
     permissionCode: "inventory.serial_registry",
-    headerPriority: "overflow",
-  },
-  {
-    label: "Inv. Book",
-    href: "/app/inventory/serial-lot/reports/book",
-    permissionCode: "inventory.serial_movements",
-    headerPriority: "overflow",
-  },
-  {
-    label: "Lot Inv. Book",
-    href: "/app/inventory/serial-lot/reports/lot-book",
-    permissionCode: "inventory.serial_movements",
     headerPriority: "overflow",
   },
   {

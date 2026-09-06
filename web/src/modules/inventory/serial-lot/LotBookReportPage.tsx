@@ -14,6 +14,7 @@ import {
   type LotBookSummaryRow,
 } from "../../../shared/useLotReports";
 import { SerialLotLayout } from "./SerialLotLayout";
+import { InvBookFamilyNav } from "../InvBookFamilyNav";
 
 function defaultFilters(): LotBookFilters {
   const range = defaultLotBookDateRange();
@@ -95,6 +96,7 @@ export default function LotBookReportPage() {
 
   return (
     <SerialLotLayout>
+      <InvBookFamilyNav active="lot" />
       <CollapsibleFilterPanel
         title="Lot Inv. Book"
         description="Lot slip ledger with increase / release / running inventory qty — Search (F8)."

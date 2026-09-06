@@ -21,16 +21,19 @@ const tiles: KpiTile[] = [
   { label: "Open stock entries", value: (s) => s.open_stock_entries, href: "/app/inventory/stock-entries" },
 ];
 
+const invBookLinks = [
+  { label: "Item Inv. Book", href: "/app/inventory/reports/inv-book", hint: "By item & location" },
+  { label: "Serial Inv. Book", href: "/app/inventory/serial-lot/reports/book", hint: "Serial slip ledger" },
+  { label: "Lot Inv. Book", href: "/app/inventory/serial-lot/reports/lot-book", hint: "Lot slip ledger" },
+  { label: "Stock Ledger", href: "/app/inventory/reports/stock-ledger", hint: "Movement detail" },
+];
+
 const reportLinks = [
   { label: "Inv Per Branch", href: "/app/inventory/find-stock" },
   { label: "Inventory Balance (on hand)", href: "/app/inventory/reports/on-hand" },
   { label: "Inventory Status", href: "/app/inventory/reports/inventory-status" },
-  { label: "Inv. Book", href: "/app/inventory/reports/inv-book" },
   { label: "Stock Balance", href: "/app/inventory/reports/stock-balance" },
-  { label: "Stock Ledger", href: "/app/inventory/reports/stock-ledger" },
   { label: "Serial/Lot Status", href: "/app/inventory/serial-lot/reports/status" },
-  { label: "Serial Inv. Book", href: "/app/inventory/serial-lot/reports/book" },
-  { label: "Lot Inv. Book", href: "/app/inventory/serial-lot/reports/lot-book" },
   { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing" },
   { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation" },
 ];
@@ -100,7 +103,27 @@ export default function StockWorkspacePage() {
       </Show>
 
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h3 class="mb-4 text-sm font-semibold text-text-primary">Reports</h3>
+        <h3 class="mb-1 text-sm font-semibold text-text-primary">Inventory books</h3>
+        <p class="mb-4 text-sm text-text-secondary">Period ledgers for items, serials, and lots.</p>
+        <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <For each={invBookLinks}>
+            {(link) => (
+              <li>
+                <A
+                  href={link.href}
+                  class="block rounded-lg border border-stroke px-3 py-3 transition hover:border-brand-300 hover:bg-brand-50/40"
+                >
+                  <span class="block text-sm font-medium text-brand-700">{link.label}</span>
+                  <span class="mt-0.5 block text-xs text-text-secondary">{link.hint}</span>
+                </A>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
+
+      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+        <h3 class="mb-4 text-sm font-semibold text-text-primary">More reports</h3>
         <Show when={!workspace.isLoading} fallback={<p class="text-sm text-text-secondary">Loading...</p>}>
           <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <For each={reportLinks}>
