@@ -33,6 +33,12 @@ export type SerialBookFilters = {
   item_id?: number;
   location_id?: number;
   event_type?: string;
+  inventory_qty?: string;
+  include_void?: boolean;
+  include_transfers?: boolean;
+  exclude_no_tx?: boolean;
+  validity_from?: string;
+  validity_to?: string;
 };
 
 export type SerialBalanceFilters = {
@@ -107,9 +113,17 @@ export type SerialBookDetailRow = {
   item_code: string;
   item_name: string;
   location_name: string;
+  terms_of_validity?: string | null;
+  slip_type: string;
+  partner_name: string;
   event_type: string;
+  opening_qty: number;
+  increase_qty: number;
+  release_qty: number;
+  inventory_qty: number;
   qty_delta: number;
   ref_type?: string | null;
+  ref_id?: number | null;
   notes?: string | null;
 };
 
@@ -117,6 +131,7 @@ export type SerialBookSummaryRow = {
   serial_no: string;
   item_code: string;
   item_name: string;
+  location_name: string;
   opening_qty: number;
   received_qty: number;
   issued_qty: number;

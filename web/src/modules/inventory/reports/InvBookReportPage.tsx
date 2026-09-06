@@ -1,9 +1,19 @@
 import { createSignal, For, onMount, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { ReportPageLayout, defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { invBookExportUrl, useInvBookReport, type InvBookFilters } from "../../../shared/reports/useModuleReports";
 import { formatPeso } from "../../../shared/money";
+
+function stockLedgerHref(row: { item_id: number; location_id: number }, filters: InvBookFilters): string {
+  const qs = new URLSearchParams();
+  qs.set("item_id", String(row.item_id));
+  qs.set("location_id", String(row.location_id));
+  if (filters.date_from) qs.set("date_from", filters.date_from);
+  if (filters.date_to) qs.set("date_to", filters.date_to);
+  return `/app/inventory/reports/stock-ledger?${qs.toString()}`;
+}
 
 export default function InvBookReportPage() {
   const defaults = defaultReportDateRange();
@@ -45,7 +55,7 @@ export default function InvBookReportPage() {
   return (
     <ReportPageLayout
       title="Inv. Book"
-      description="Opening, receipt, issue, and closing qty by item and location — Search (F8)."
+      description="Opening, receipt, issue, and closing qty by item and location — click Closing to open Stock Ledger."
       dateFrom={() => filters().date_from ?? ""}
       dateTo={() => filters().date_to ?? ""}
       onDateFromChange={(v) => patch({ date_from: v })}
@@ -109,7 +119,15 @@ export default function InvBookReportPage() {
                 <td class="px-3 py-2 text-right">{row.opening_qty}</td>
                 <td class="px-3 py-2 text-right">{row.receipt_qty}</td>
                 <td class="px-3 py-2 text-right">{row.issue_qty}</td>
-                <td class="px-3 py-2 text-right">{row.closing_qty}</td>
+                <td class="px-3 py-2 text-right">
+                  <A
+                    class="font-medium text-brand-600 hover:underline"
+                    href={stockLedgerHref(row, filters())}
+                    aria-label={`Open stock ledger for ${row.item_code} at ${row.location_name}`}
+                  >
+                    {row.closing_qty}
+                  </A>
+                </td>
                 <td class="px-3 py-2 text-right">{formatPeso(row.purchase_price)}</td>
                 <td class="px-3 py-2 text-right">{formatPeso(row.sales_price)}</td>
                 <td class="px-3 py-2 text-right">{formatPeso(row.vip_price)}</td>

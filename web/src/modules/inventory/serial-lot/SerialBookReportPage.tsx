@@ -1,9 +1,10 @@
 import { createSignal, onMount, Show } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { DateInput } from "../../../shared/DateInput";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
+import { inventoryRefLink } from "../../../shared/inventoryRefLink";
 import {
   defaultSerialBookDateRange,
   serialBookExportUrl,
@@ -17,7 +18,17 @@ import { openSerialTrace } from "./openSerialTrace";
 
 function defaultFilters(): SerialBookFilters {
   const range = defaultSerialBookDateRange();
-  return { view: "general", ...range, q: "", serial_no: "", event_type: "" };
+  return {
+    view: "general",
+    ...range,
+    q: "",
+    serial_no: "",
+    event_type: "",
+    inventory_qty: "",
+    include_void: false,
+    include_transfers: false,
+    exclude_no_tx: true,
+  };
 }
 
 function withRowIds<T extends object>(rows: T[], page: number, pageSize: number): (T & { id: number })[] {
@@ -87,7 +98,7 @@ export default function SerialBookReportPage() {
     <SerialLotLayout>
       <CollapsibleFilterPanel
         title="Serial Inv. Book"
-        description="Opening, issue, and closing per serial in a date range — Search (F8)."
+        description="Slip ledger with increase / release / running inventory qty — Search (F8)."
         actions={
           <>
             <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
@@ -119,10 +130,10 @@ export default function SerialBookReportPage() {
             class={`rounded-lg px-3 py-1.5 text-sm ${draft().view === "summary" ? "bg-brand-600 text-white" : "border border-stroke text-text-secondary"}`}
             onClick={() => patch({ view: "summary" })}
           >
-            Summary by serial
+            Summary by Serial/Lot No.
           </button>
         </div>
-        <div class="grid gap-4 md:grid-cols-2">
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Field label="Date from">
             <DateInput value={draft().date_from} onInput={(e) => patch({ date_from: e.currentTarget.value })} />
           </Field>
@@ -135,6 +146,62 @@ export default function SerialBookReportPage() {
           <Field label="Serial no.">
             <input class={inputClass} value={draft().serial_no ?? ""} onInput={(e) => patch({ serial_no: e.currentTarget.value })} />
           </Field>
+          <Field label="Item ID">
+            <input
+              type="number"
+              class={inputClass}
+              value={draft().item_id ?? ""}
+              onInput={(e) => patch({ item_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
+            />
+          </Field>
+          <Field label="Location ID">
+            <input
+              type="number"
+              class={inputClass}
+              value={draft().location_id ?? ""}
+              onInput={(e) => patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
+            />
+          </Field>
+          <Field label="Inventory qty (summary)">
+            <select
+              class={inputClass}
+              value={draft().inventory_qty ?? ""}
+              onChange={(e) => patch({ inventory_qty: e.currentTarget.value || undefined })}
+            >
+              <option value="">All</option>
+              <option value="1">1 (in stock)</option>
+              <option value="0">0 (zero)</option>
+              <option value="others">Others</option>
+            </select>
+          </Field>
+          <Field label="Validity from">
+            <DateInput value={draft().validity_from ?? ""} onInput={(e) => patch({ validity_from: e.currentTarget.value || undefined })} />
+          </Field>
+          <Field label="Validity to">
+            <DateInput value={draft().validity_to ?? ""} onInput={(e) => patch({ validity_to: e.currentTarget.value || undefined })} />
+          </Field>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-4 text-sm text-text-secondary">
+          <label class="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={Boolean(draft().include_transfers)}
+              onChange={(e) => patch({ include_transfers: e.currentTarget.checked })}
+            />
+            Include location transfers / reserves
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input type="checkbox" checked={Boolean(draft().include_void)} onChange={(e) => patch({ include_void: e.currentTarget.checked })} />
+            Include deactivated (void) serials
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={draft().exclude_no_tx !== false}
+              onChange={(e) => patch({ exclude_no_tx: e.currentTarget.checked })}
+            />
+            Exclude items without transactions
+          </label>
         </div>
       </CollapsibleFilterPanel>
 
@@ -149,16 +216,37 @@ export default function SerialBookReportPage() {
                 { key: "item_code", header: "Item code" },
                 { key: "item_name", header: "Item name" },
                 { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
-                { key: "event_type", header: "Event" },
-                { key: "qty_delta", header: "Qty Δ", render: (r) => String(r.qty_delta) },
-                { key: "ref_type", header: "Ref", render: (r) => r.ref_type ?? "—" },
+                {
+                  key: "terms_of_validity",
+                  header: "Terms of validity",
+                  render: (r) => r.terms_of_validity || "—",
+                },
+                { key: "slip_type", header: "Slip type" },
+                { key: "partner_name", header: "Customer/Vendor", render: (r) => r.partner_name || "—" },
+                { key: "increase_qty", header: "Increase", render: (r) => String(r.increase_qty) },
+                { key: "release_qty", header: "Release qty", render: (r) => String(r.release_qty) },
+                { key: "inventory_qty", header: "Inventory qty", render: (r) => String(r.inventory_qty) },
+                {
+                  key: "ref_type",
+                  header: "Linked slip",
+                  render: (r) => {
+                    const link = inventoryRefLink(r.ref_type, r.ref_id);
+                    return link.href ? (
+                      <A class="text-brand-600 hover:underline" href={link.href}>
+                        {link.label}
+                      </A>
+                    ) : (
+                      link.label
+                    );
+                  },
+                },
               ]}
               rows={(report.data?.rows ?? []) as SerialBookDetailRow[]}
               loading={report.isFetching}
               selectedId={selectedId()}
               onSelect={setSelectedId}
               codeKey="serial_no"
-              nameKey="event_type"
+              nameKey="slip_type"
               sortKey={sort()}
               sortOrder={order()}
               onSort={toggleSort}
@@ -178,6 +266,7 @@ export default function SerialBookReportPage() {
               { key: "serial_no", header: "Serial no.", clickable: true },
               { key: "item_code", header: "Item code" },
               { key: "item_name", header: "Item name" },
+              { key: "location_name", header: "Location", render: (r) => r.location_name || "—" },
               { key: "opening_qty", header: "Opening", render: (r) => String(r.opening_qty) },
               { key: "received_qty", header: "Received", render: (r) => String(r.received_qty) },
               { key: "issued_qty", header: "Issued", render: (r) => String(r.issued_qty) },

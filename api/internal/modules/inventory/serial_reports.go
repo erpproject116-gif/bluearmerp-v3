@@ -24,6 +24,43 @@ const serialEventQtyDelta = `case e.event_type
   else 0
 end`
 
+// Non-qty warehouse events (ECOUNT "Goods Issued / Location Tran.").
+const serialTransferEventTypes = `'transferred', 'reserved', 'released'`
+
+const serialBookPartnerNameSQL = `coalesce(nullif(trim(
+  case
+    when p.ref_type in ('sales', 'sa_sales') and p.ref_id is not null then (
+      select coalesce(pr.company_name, '')
+      from public.sa_sales s
+      join public.inv_partners pr on pr.id = s.partner_id
+      where s.id = p.ref_id and s.tenant_id = p.tenant_id
+      limit 1
+    )
+    when p.ref_type = 'sa_sales_line' and p.ref_id is not null then (
+      select coalesce(pr.company_name, '')
+      from public.sa_sales_lines ln
+      join public.sa_sales s on s.id = ln.sales_id
+      join public.inv_partners pr on pr.id = s.partner_id
+      where ln.id = p.ref_id and s.tenant_id = p.tenant_id
+      limit 1
+    )
+    when p.ref_type = 'goods_receipt' and p.ref_id is not null then (
+      select coalesce(pr.company_name, '')
+      from public.gr_goods_receipts gr
+      join public.po_purchase_orders po on po.id = gr.purchase_order_id
+      join public.inv_partners pr on pr.id = po.partner_id
+      where gr.id = p.ref_id and gr.tenant_id = p.tenant_id
+      limit 1
+    )
+    else coalesce((
+      select coalesce(pr.company_name, '')
+      from public.inv_partners pr
+      where pr.id = su.partner_id
+      limit 1
+    ), '')
+  end
+), ''), '')`
+
 type serialStatusDetailRow struct {
 	ID            int64   `json:"id"`
 	SerialNo      string  `json:"serial_no"`
@@ -49,22 +86,31 @@ type serialStatusSummaryRow struct {
 }
 
 type serialBookDetailRow struct {
-	ID           int64   `json:"id"`
-	CreatedAt    string  `json:"created_at"`
-	SerialNo     string  `json:"serial_no"`
-	ItemCode     string  `json:"item_code"`
-	ItemName     string  `json:"item_name"`
-	LocationName string  `json:"location_name"`
-	EventType    string  `json:"event_type"`
-	QtyDelta     float64 `json:"qty_delta"`
-	RefType      *string `json:"ref_type,omitempty"`
-	Notes        *string `json:"notes,omitempty"`
+	ID              int64   `json:"id"`
+	CreatedAt       string  `json:"created_at"`
+	SerialNo        string  `json:"serial_no"`
+	ItemCode        string  `json:"item_code"`
+	ItemName        string  `json:"item_name"`
+	LocationName    string  `json:"location_name"`
+	TermsOfValidity *string `json:"terms_of_validity,omitempty"`
+	SlipType        string  `json:"slip_type"`
+	PartnerName     string  `json:"partner_name"`
+	EventType       string  `json:"event_type"`
+	OpeningQty      float64 `json:"opening_qty"`
+	IncreaseQty     float64 `json:"increase_qty"`
+	ReleaseQty      float64 `json:"release_qty"`
+	InventoryQty    float64 `json:"inventory_qty"`
+	QtyDelta        float64 `json:"qty_delta"`
+	RefType         *string `json:"ref_type,omitempty"`
+	RefID           *int64  `json:"ref_id,omitempty"`
+	Notes           *string `json:"notes,omitempty"`
 }
 
 type serialBookSummaryRow struct {
 	SerialNo     string  `json:"serial_no"`
 	ItemCode     string  `json:"item_code"`
 	ItemName     string  `json:"item_name"`
+	LocationName string  `json:"location_name"`
 	OpeningQty   float64 `json:"opening_qty"`
 	ReceivedQty  float64 `json:"received_qty"`
 	IssuedQty    float64 `json:"issued_qty"`
@@ -95,17 +141,19 @@ type serialReconciliationRow struct {
 }
 
 type serialReportFilters struct {
-	Q              string
-	SerialNo       string
-	Status         string
-	EventType      string
-	RefType        string
-	ItemID         *int64
-	LocationID     *int64
-	ValidityFrom   *time.Time
-	ValidityTo     *time.Time
-	IncludeVoid    bool
-	InventoryQty   string
+	Q                string
+	SerialNo         string
+	Status           string
+	EventType        string
+	RefType          string
+	ItemID           *int64
+	LocationID       *int64
+	ValidityFrom     *time.Time
+	ValidityTo       *time.Time
+	IncludeVoid      bool
+	IncludeTransfers bool
+	ExcludeNoTx      bool
+	InventoryQty     string
 }
 
 func registerSerialReportRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -123,14 +171,18 @@ func registerSerialReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 func parseSerialReportFilters(r *http.Request) serialReportFilters {
 	p := httputil.ParseListParams(r, "", nil)
+	includeTransfersRaw := strings.TrimSpace(r.URL.Query().Get("include_transfers"))
+	includeTransfers := strings.EqualFold(includeTransfersRaw, "1") || strings.EqualFold(includeTransfersRaw, "true")
 	f := serialReportFilters{
-		Q:            p.Q,
-		SerialNo:     strings.TrimSpace(r.URL.Query().Get("serial_no")),
-		Status:       strings.TrimSpace(r.URL.Query().Get("status")),
-		EventType:    strings.TrimSpace(r.URL.Query().Get("event_type")),
-		RefType:      strings.TrimSpace(r.URL.Query().Get("ref_type")),
-		InventoryQty: strings.TrimSpace(r.URL.Query().Get("inventory_qty")),
-		IncludeVoid:  strings.TrimSpace(r.URL.Query().Get("include_void")) == "1" || strings.EqualFold(r.URL.Query().Get("include_void"), "true"),
+		Q:                p.Q,
+		SerialNo:         strings.TrimSpace(r.URL.Query().Get("serial_no")),
+		Status:           strings.TrimSpace(r.URL.Query().Get("status")),
+		EventType:        strings.TrimSpace(r.URL.Query().Get("event_type")),
+		RefType:          strings.TrimSpace(r.URL.Query().Get("ref_type")),
+		InventoryQty:     strings.TrimSpace(r.URL.Query().Get("inventory_qty")),
+		IncludeVoid:      strings.TrimSpace(r.URL.Query().Get("include_void")) == "1" || strings.EqualFold(r.URL.Query().Get("include_void"), "true"),
+		IncludeTransfers: includeTransfers,
+		ExcludeNoTx:      strings.TrimSpace(r.URL.Query().Get("exclude_no_tx")) == "1" || strings.EqualFold(r.URL.Query().Get("exclude_no_tx"), "true"),
 	}
 	if id, ok := optionalInt64Query(r, "item_id"); ok {
 		f.ItemID = id
@@ -149,6 +201,32 @@ func parseSerialReportFilters(r *http.Request) serialReportFilters {
 		}
 	}
 	return f
+}
+
+func serialSlipTypeLabel(eventType string) string {
+	switch eventType {
+	case "received":
+		return "Received"
+	case "returned":
+		return "Returned"
+	case "sold":
+		return "Sold"
+	case "voided":
+		return "Voided"
+	case "transferred":
+		return "Location transfer"
+	case "reserved":
+		return "Reserved"
+	case "released":
+		return "Released"
+	case "adjusted":
+		return "Adjusted"
+	default:
+		if eventType == "" {
+			return "—"
+		}
+		return strings.ReplaceAll(eventType, "_", " ")
+	}
 }
 
 func appendSerialUnitFilters(where string, args []any, argN int, f serialReportFilters, prefix string) (string, []any, int) {
@@ -548,9 +626,8 @@ func formatDateString(t *time.Time) string {
 }
 
 func listSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
-	// Sort columns refer to the wrapped subquery's output names, not inner table aliases.
 	allowedDetail := map[string]string{
-		"created_at": "created_at", "serial_no": "serial_no", "item_code": "item_code",
+		"created_at": "created_at", "serial_no": "serial_no", "item_code": "item_code", "inventory_qty": "inventory_qty",
 	}
 	allowedSummary := map[string]string{
 		"serial_no": "serial_no", "item_code": "item_code", "closing_qty": "closing_qty",
@@ -592,7 +669,7 @@ func listSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 			var out []serialBookSummaryRow
 			for rows.Next() {
 				var row serialBookSummaryRow
-				if err := rows.Scan(&row.SerialNo, &row.ItemCode, &row.ItemName, &row.OpeningQty, &row.ReceivedQty, &row.IssuedQty, &row.ClosingQty); err != nil {
+				if err := rows.Scan(&row.SerialNo, &row.ItemCode, &row.ItemName, &row.LocationName, &row.OpeningQty, &row.ReceivedQty, &row.IssuedQty, &row.ClosingQty); err != nil {
 					response.Err(w, http.StatusInternalServerError, "Failed to read report.", "ERR_INTERNAL")
 					return
 				}
@@ -631,14 +708,11 @@ func listSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		defer rows.Close()
 		var out []serialBookDetailRow
 		for rows.Next() {
-			var row serialBookDetailRow
-			var at time.Time
-			if err := rows.Scan(&row.ID, &at, &row.SerialNo, &row.ItemCode, &row.ItemName, &row.LocationName,
-				&row.EventType, &row.QtyDelta, &row.RefType, &row.Notes); err != nil {
+			row, err := scanSerialBookDetail(rows)
+			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read report.", "ERR_INTERNAL")
 				return
 			}
-			row.CreatedAt = at.Format(time.RFC3339)
 			out = append(out, row)
 		}
 		if out == nil {
@@ -648,11 +722,38 @@ func listSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+type serialBookDetailScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanSerialBookDetail(rows serialBookDetailScanner) (serialBookDetailRow, error) {
+	var row serialBookDetailRow
+	var at time.Time
+	var warrantyEnd *time.Time
+	var partner string
+	err := rows.Scan(
+		&row.ID, &at, &row.SerialNo, &row.ItemCode, &row.ItemName, &row.LocationName,
+		&warrantyEnd, &row.EventType, &row.OpeningQty, &row.IncreaseQty, &row.ReleaseQty,
+		&row.InventoryQty, &row.QtyDelta, &row.RefType, &row.RefID, &row.Notes, &partner,
+	)
+	if err != nil {
+		return row, err
+	}
+	row.CreatedAt = at.Format(time.RFC3339)
+	row.PartnerName = strings.TrimSpace(partner)
+	row.SlipType = serialSlipTypeLabel(row.EventType)
+	if warrantyEnd != nil {
+		s := warrantyEnd.Format("2006-01-02")
+		row.TermsOfValidity = &s
+	}
+	return row, nil
+}
+
 func serialBookDetailSQL(tenantID int64, dateFrom, dateTo time.Time, f serialReportFilters) (string, []any) {
 	where := "e.tenant_id = $1 and i.track_serial = true"
 	args := []any{tenantID, dateFrom.Format("2006-01-02") + " 00:00:00+00", dateTo.Format("2006-01-02")}
 	argN := 4
-	where += fmt.Sprintf(" and e.created_at >= $2::timestamptz and e.created_at < ($3::date + interval '1 day')")
+	where += " and e.created_at >= $2::timestamptz and e.created_at < ($3::date + interval '1 day')"
 	where, args, argN = appendSerialUnitFilters(where, args, argN, f, "su")
 	if f.EventType != "" {
 		where += fmt.Sprintf(" and e.event_type = $%d", argN)
@@ -664,18 +765,49 @@ func serialBookDetailSQL(tenantID int64, dateFrom, dateTo time.Time, f serialRep
 		args = append(args, f.RefType)
 		argN++
 	}
+	if !f.IncludeTransfers {
+		where += fmt.Sprintf(" and e.event_type not in (%s)", serialTransferEventTypes)
+	}
+	_ = argN
 	q := fmt.Sprintf(`
-		select e.id, e.created_at, su.serial_no, i.item_code, i.item_name,
+		with opening as (
+		  select e.serial_unit_id, coalesce(sum(%s), 0)::float8 as open_qty
+		  from public.inv_serial_events e
+		  join public.inv_serial_units su on su.id = e.serial_unit_id
+		  join public.inv_items i on i.id = su.item_id
+		  where e.tenant_id = $1 and i.track_serial = true and e.created_at < $2::timestamptz
+		  group by e.serial_unit_id
+		),
+		period as (
+		  select e.id, e.created_at, e.serial_unit_id, e.event_type, e.ref_type, e.ref_id, e.notes,
+		    e.from_location_id, e.to_location_id, e.tenant_id,
+		    (%s)::float8 as qty_delta
+		  from public.inv_serial_events e
+		  join public.inv_serial_units su on su.id = e.serial_unit_id
+		  join public.inv_items i on i.id = su.item_id
+		  where %s
+		)
+		select p.id, p.created_at, su.serial_no, i.item_code, i.item_name,
 		  coalesce(tl.location_name, fl.location_name, ''),
-		  e.event_type,
-		  (%s)::float8,
-		  e.ref_type, e.notes
-		from public.inv_serial_events e
-		join public.inv_serial_units su on su.id = e.serial_unit_id
+		  su.warranty_end,
+		  p.event_type,
+		  coalesce(o.open_qty, 0)::float8 as opening_qty,
+		  (case when p.qty_delta > 0 then p.qty_delta else 0 end)::float8 as increase_qty,
+		  (case when p.qty_delta < 0 then -p.qty_delta else 0 end)::float8 as release_qty,
+		  (coalesce(o.open_qty, 0) + sum(p.qty_delta) over (
+		    partition by p.serial_unit_id order by p.created_at, p.id
+		    rows between unbounded preceding and current row
+		  ))::float8 as inventory_qty,
+		  p.qty_delta,
+		  p.ref_type, p.ref_id, p.notes,
+		  (%s) as partner_name
+		from period p
+		join public.inv_serial_units su on su.id = p.serial_unit_id
 		join public.inv_items i on i.id = su.item_id
-		left join public.inv_locations fl on fl.id = e.from_location_id
-		left join public.inv_locations tl on tl.id = e.to_location_id
-		where %s`, serialEventQtyDelta, where)
+		left join opening o on o.serial_unit_id = p.serial_unit_id
+		left join public.inv_locations fl on fl.id = p.from_location_id
+		left join public.inv_locations tl on tl.id = p.to_location_id
+	`, serialEventQtyDelta, serialEventQtyDelta, where, serialBookPartnerNameSQL)
 	return q, args
 }
 
@@ -684,14 +816,26 @@ func serialBookSummarySQL(tenantID int64, dateFrom, dateTo time.Time, f serialRe
 	args := []any{tenantID, dateFrom.Format("2006-01-02") + " 00:00:00+00", dateTo.Format("2006-01-02")}
 	argN := 4
 	where, args, argN = appendSerialUnitFilters(where, args, argN, f, "su")
+	_ = argN
+	closingExpr := "(coalesce(opening.open_qty, 0) + coalesce(period.recv_qty, 0) - coalesce(period.issued_qty, 0))"
+	having := ""
+	if f.ExcludeNoTx {
+		having = `
+		  and (coalesce(opening.open_qty, 0) <> 0
+		    or coalesce(period.recv_qty, 0) <> 0
+		    or coalesce(period.issued_qty, 0) <> 0)`
+	}
+	having = appendInventoryQtyFilter(having, closingExpr, f.InventoryQty)
 	q := fmt.Sprintf(`
 		select su.serial_no, i.item_code, i.item_name,
+		  coalesce(l.location_name, ''),
 		  coalesce(opening.open_qty, 0)::float8,
 		  coalesce(period.recv_qty, 0)::float8,
 		  coalesce(period.issued_qty, 0)::float8,
-		  (coalesce(opening.open_qty, 0) + coalesce(period.recv_qty, 0) - coalesce(period.issued_qty, 0))::float8
+		  %s::float8 as closing_qty
 		from public.inv_serial_units su
 		join public.inv_items i on i.id = su.item_id
+		left join public.inv_locations l on l.id = su.location_id
 		left join lateral (
 		  select sum(%s)::float8 as open_qty
 		  from public.inv_serial_events e
@@ -707,9 +851,7 @@ func serialBookSummarySQL(tenantID int64, dateFrom, dateTo time.Time, f serialRe
 		    and e.created_at < ($3::date + interval '1 day')
 		) period on true
 		where %s
-		  and (coalesce(opening.open_qty, 0) <> 0
-		    or coalesce(period.recv_qty, 0) <> 0
-		    or coalesce(period.issued_qty, 0) <> 0)`, serialEventQtyDelta, where)
+		%s`, closingExpr, serialEventQtyDelta, where, having)
 	return q, args
 }
 
@@ -736,14 +878,14 @@ func exportSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			defer rows.Close()
-			_ = cw.Write([]string{"Serial No.", "Item Code", "Item Name", "Opening", "Received", "Issued", "Closing"})
+			_ = cw.Write([]string{"Serial No.", "Item Code", "Item Name", "Location", "Opening", "Received", "Issued", "Closing"})
 			for rows.Next() {
 				var row serialBookSummaryRow
-				if err := rows.Scan(&row.SerialNo, &row.ItemCode, &row.ItemName, &row.OpeningQty, &row.ReceivedQty, &row.IssuedQty, &row.ClosingQty); err != nil {
+				if err := rows.Scan(&row.SerialNo, &row.ItemCode, &row.ItemName, &row.LocationName, &row.OpeningQty, &row.ReceivedQty, &row.IssuedQty, &row.ClosingQty); err != nil {
 					return
 				}
 				_ = cw.Write([]string{
-					row.SerialNo, row.ItemCode, row.ItemName,
+					row.SerialNo, row.ItemCode, row.ItemName, row.LocationName,
 					fmt.Sprintf("%.4f", row.OpeningQty), fmt.Sprintf("%.4f", row.ReceivedQty),
 					fmt.Sprintf("%.4f", row.IssuedQty), fmt.Sprintf("%.4f", row.ClosingQty),
 				})
@@ -756,25 +898,33 @@ func exportSerialBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			defer rows.Close()
-			_ = cw.Write([]string{"Date", "Serial No.", "Item Code", "Item Name", "Location", "Event", "Qty Delta", "Ref", "Notes"})
+			_ = cw.Write([]string{"Date", "Serial No.", "Item Code", "Item Name", "Location", "Terms of Validity", "Slip Type", "Customer/Vendor", "Increase", "Release Qty", "Inventory Qty", "Ref Type", "Ref ID", "Notes"})
 			for rows.Next() {
-				var row serialBookDetailRow
-				var at time.Time
-				if err := rows.Scan(&row.ID, &at, &row.SerialNo, &row.ItemCode, &row.ItemName, &row.LocationName,
-					&row.EventType, &row.QtyDelta, &row.RefType, &row.Notes); err != nil {
+				row, err := scanSerialBookDetail(rows)
+				if err != nil {
 					return
+				}
+				terms := ""
+				if row.TermsOfValidity != nil {
+					terms = *row.TermsOfValidity
 				}
 				ref := ""
 				if row.RefType != nil {
 					ref = *row.RefType
+				}
+				refID := ""
+				if row.RefID != nil {
+					refID = fmt.Sprintf("%d", *row.RefID)
 				}
 				notes := ""
 				if row.Notes != nil {
 					notes = *row.Notes
 				}
 				_ = cw.Write([]string{
-					at.Format(time.RFC3339), row.SerialNo, row.ItemCode, row.ItemName, row.LocationName,
-					row.EventType, fmt.Sprintf("%.4f", row.QtyDelta), ref, notes,
+					row.CreatedAt, row.SerialNo, row.ItemCode, row.ItemName, row.LocationName, terms,
+					row.SlipType, row.PartnerName,
+					fmt.Sprintf("%.4f", row.IncreaseQty), fmt.Sprintf("%.4f", row.ReleaseQty), fmt.Sprintf("%.4f", row.InventoryQty),
+					ref, refID, notes,
 				})
 			}
 		}

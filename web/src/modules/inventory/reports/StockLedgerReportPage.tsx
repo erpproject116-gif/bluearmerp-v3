@@ -42,10 +42,14 @@ export default function StockLedgerReportPage() {
     const itemId = Number(one("item_id"));
     const locationId = Number(one("location_id"));
     const q = one("q");
+    const dateFrom = one("date_from");
+    const dateTo = one("date_to");
     const fromUrl: Partial<StockLedgerFilters> = {};
     if (Number.isFinite(itemId) && itemId > 0) fromUrl.item_id = itemId;
     if (Number.isFinite(locationId) && locationId > 0) fromUrl.location_id = locationId;
     if (q) fromUrl.q = q;
+    if (dateFrom) fromUrl.date_from = dateFrom;
+    if (dateTo) fromUrl.date_to = dateTo;
     if (Object.keys(fromUrl).length > 0) {
       setFilters((prev) => ({ ...prev, ...fromUrl }));
       setSubmitted(true);
