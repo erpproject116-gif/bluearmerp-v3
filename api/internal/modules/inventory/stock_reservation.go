@@ -101,7 +101,7 @@ func DeductOnHandStock(ctx context.Context, tx pgx.Tx, tenantID, itemID, locatio
 		return fmt.Errorf("no balance record")
 	}
 	if onHand+0.0001 < qty {
-		return fmt.Errorf("insufficient stock (%.4f on hand)", onHand)
+		return fmt.Errorf("not enough stock (%.4f on hand)", onHand)
 	}
 	tag, err := tx.Exec(ctx, `
 		update public.inv_item_location_balances

@@ -1,0 +1,60 @@
+{
+  "initial": {
+    "processID": "proc_d751a89caaa248e0be9e5dc3930071b5",
+    "status": "Succeeded",
+    "approvalStatus": "NotRequired",
+    "approvalReqId": null,
+    "approvalUrl": null,
+    "riskSummary": null,
+    "actionPlan": null,
+    "nextAction": "None",
+    "costPreview": null,
+    "result": {
+      "ok": true,
+      "health_code": "200",
+      "git_log": "1e123f9 fix: resolve Vercel TS errors in serial-lot receive and pack pages",
+      "errors": [
+        "git fetch failed (auth); API already deployed via direct file upload"
+      ],
+      "skipped_direct_upload": true,
+      "message": "API already deployed via direct file upload (git fetch auth failed)",
+      "last": {
+        "status": "Success",
+        "exit": 0,
+        "output": "fatal: could not read Username for 'https://github.com': No such device or address\nGIT_FETCH_AUTH_FAILED\nHEALTH_CODE_START\n200\n1e123f9 fix: resolve Vercel TS errors in serial-lot receive and pack pages\nSKIPPED_DIRECT_UPLOAD_ALREADY_DEPLOYED\n"
+      }
+    },
+    "waitTimedOut": false,
+    "message": null,
+    "error": null
+  },
+  "final": {
+    "processID": "proc_d751a89caaa248e0be9e5dc3930071b5",
+    "status": "Succeeded",
+    "approvalStatus": "NotRequired",
+    "approvalReqId": null,
+    "approvalUrl": null,
+    "riskSummary": null,
+    "actionPlan": null,
+    "nextAction": "None",
+    "costPreview": null,
+    "result": {
+      "ok": true,
+      "health_code": "200",
+      "git_log": "1e123f9 fix: resolve Vercel TS errors in serial-lot receive and pack pages",
+      "errors": [
+        "git fetch failed (auth); API already deployed via direct file upload"
+      ],
+      "skipped_direct_upload": true,
+      "message": "API already deployed via direct file upload (git fetch auth failed)",
+      "last": {
+        "status": "Success",
+        "exit": 0,
+        "output": "fatal: could not read Username for 'https://github.com': No such device or address\nGIT_FETCH_AUTH_FAILED\nHEALTH_CODE_START\n200\n1e123f9 fix: resolve Vercel TS errors in serial-lot receive and pack pages\nSKIPPED_DIRECT_UPLOAD_ALREADY_DEPLOYED\n"
+      }
+    },
+    "waitTimedOut": false,
+    "message": null,
+    "error": null
+  }
+}

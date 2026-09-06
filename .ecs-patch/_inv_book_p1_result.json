@@ -1,0 +1,18 @@
+{
+  "processID": "proc_9c167d938dc342e3ab09bfecbc88f711",
+  "status": "Expired",
+  "approvalStatus": "NotRequired",
+  "approvalReqId": null,
+  "approvalUrl": null,
+  "riskSummary": null,
+  "actionPlan": null,
+  "nextAction": "Stop",
+  "costPreview": null,
+  "result": null,
+  "waitTimedOut": false,
+  "message": null,
+  "error": {
+    "code": "QueuePayloadDecryptFailed",
+    "message": "run_script redis queue payload cannot be decrypted"
+  }
+}

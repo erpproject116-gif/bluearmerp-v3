@@ -1,0 +1,10 @@
+{
+  "boms_ok": true,
+  "reports_ok": true,
+  "work_orders_ok": true,
+  "rebuild_ok": false,
+  "health_code": "200",
+  "errors": [
+    "rebuild: {\"processID\": \"proc_b565bc86386943ae94b4dfac35b80ee1\", \"status\": \"Failed\", \"approvalStatus\": \"NotRequired\", \"approvalReqId\": null, \"approvalUrl\": null, \"riskSummary\": null, \"actionPlan\": null, \"nextAction\": \"InspectError\", \"costPreview\": null, \"result\": null, \"waitTimedOut\": false, \"message\": null, \"error\": {\"message\": \"OpenApiExplorerCommandGenerationFailed: Error: request execution failed: request execution failed: Post \\\"https://openapi-mcp.cn-hangzhou.aliyuncs.com/api/cli/makeCode\\\": read tcp 172.16.41.159:47084->101.37.132.1:443: read: connection reset by peer\", \"code\": \"OpenApiExplorerCommandGenerationFailed\", \"failedCall\": {\"product\": \"Ecs\", \"version\": \"2014-05-26\", \"action\": \"DescribeInvocationResults\", \"statusCode\": 400, \"requestId\": null}}}"
+  ]
+}

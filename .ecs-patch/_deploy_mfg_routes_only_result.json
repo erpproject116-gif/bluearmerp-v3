@@ -1,0 +1,52 @@
+{
+  "initial": {
+    "processID": "proc_6d9ff7665fa047c1b33c9dd6d8e32bc5",
+    "status": "Failed",
+    "approvalStatus": "NotRequired",
+    "approvalReqId": null,
+    "approvalUrl": null,
+    "riskSummary": null,
+    "actionPlan": null,
+    "nextAction": "InspectError",
+    "costPreview": null,
+    "result": null,
+    "waitTimedOut": false,
+    "message": null,
+    "error": {
+      "message": "Error: request execution failed: request execution failed: SDKError:\n   StatusCode: 403\n   Code: CmdContent.ExceedLimit\n   Message: code: 403, The length of the command content exceeds the upper limit. request id: 01A05F6C-593C-39AC-BC2F-A86D11C6BB85\n   Detail: <nil>\n   Data: {\"Code\":\"CmdContent.ExceedLimit\",\"HostId\":\"ecs.ap-southeast-1.aliyuncs.com\",\"Message\":\"The length of the command content exceeds the upper limit.\",\"Recommend\":\"https://api.aliyun.com/troubleshoot?q=CmdContent.ExceedLimit&product=Ecs&requestId=01A05F6C-593C-39AC-BC2F-A86D11C6BB85\",\"RequestId\":\"01A05F6C-593C-39AC-BC2F-A86D11C6BB85\"}",
+      "code": "CliCommandFailed",
+      "failedCall": {
+        "product": "Ecs",
+        "version": "2014-05-26",
+        "action": "RunCommand",
+        "statusCode": 500,
+        "requestId": "01A05F6C-593C-39AC-BC2F-A86D11C6BB85"
+      }
+    }
+  },
+  "final": {
+    "processID": "proc_6d9ff7665fa047c1b33c9dd6d8e32bc5",
+    "status": "Failed",
+    "approvalStatus": "NotRequired",
+    "approvalReqId": null,
+    "approvalUrl": null,
+    "riskSummary": null,
+    "actionPlan": null,
+    "nextAction": "InspectError",
+    "costPreview": null,
+    "result": null,
+    "waitTimedOut": false,
+    "message": null,
+    "error": {
+      "message": "Error: request execution failed: request execution failed: SDKError:\n   StatusCode: 403\n   Code: CmdContent.ExceedLimit\n   Message: code: 403, The length of the command content exceeds the upper limit. request id: 01A05F6C-593C-39AC-BC2F-A86D11C6BB85\n   Detail: <nil>\n   Data: {\"Code\":\"CmdContent.ExceedLimit\",\"HostId\":\"ecs.ap-southeast-1.aliyuncs.com\",\"Message\":\"The length of the command content exceeds the upper limit.\",\"Recommend\":\"https://api.aliyun.com/troubleshoot?q=CmdContent.ExceedLimit&product=Ecs&requestId=01A05F6C-593C-39AC-BC2F-A86D11C6BB85\",\"RequestId\":\"01A05F6C-593C-39AC-BC2F-A86D11C6BB85\"}",
+      "code": "CliCommandFailed",
+      "failedCall": {
+        "product": "Ecs",
+        "version": "2014-05-26",
+        "action": "RunCommand",
+        "statusCode": 500,
+        "requestId": "01A05F6C-593C-39AC-BC2F-A86D11C6BB85"
+      }
+    }
+  }
+}

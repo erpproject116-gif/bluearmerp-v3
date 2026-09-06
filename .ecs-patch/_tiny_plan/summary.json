@@ -1,0 +1,576 @@
+{
+  "steps": 95,
+  "max_cmd_len": 1184,
+  "commands": [
+    {
+      "idx": 0,
+      "name": "reset_b64",
+      "timeout": 120,
+      "cmd_len": 240
+    },
+    {
+      "idx": 1,
+      "name": "mfgpart0_b64_clear",
+      "timeout": 120,
+      "cmd_len": 232
+    },
+    {
+      "idx": 2,
+      "name": "mfgpart0_b64_c0",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 3,
+      "name": "mfgpart0_b64_c700",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 4,
+      "name": "mfgpart0_b64_c1400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 5,
+      "name": "mfgpart0_b64_c2100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 6,
+      "name": "mfgpart0_b64_c2800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 7,
+      "name": "mfgpart0_b64_c3500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 8,
+      "name": "mfgpart0_b64_c4200",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 9,
+      "name": "mfgpart0_b64_c4900",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 10,
+      "name": "mfgpart0_b64_c5600",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 11,
+      "name": "mfgpart0_b64_c6300",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 12,
+      "name": "mfgpart0_b64_c7000",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 13,
+      "name": "mfgpart0_b64_c7700",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 14,
+      "name": "mfgpart0_b64_c8400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 15,
+      "name": "mfgpart0_b64_c9100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 16,
+      "name": "mfgpart0_b64_c9800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 17,
+      "name": "mfgpart0_b64_c10500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 18,
+      "name": "mfgpart0_b64_c11200",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 19,
+      "name": "mfgpart0_b64_c11900",
+      "timeout": 120,
+      "cmd_len": 556
+    },
+    {
+      "idx": 20,
+      "name": "mfgpart0_b64_exec",
+      "timeout": 120,
+      "cmd_len": 248
+    },
+    {
+      "idx": 21,
+      "name": "mfgpart1_b64_clear",
+      "timeout": 120,
+      "cmd_len": 232
+    },
+    {
+      "idx": 22,
+      "name": "mfgpart1_b64_c0",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 23,
+      "name": "mfgpart1_b64_c700",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 24,
+      "name": "mfgpart1_b64_c1400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 25,
+      "name": "mfgpart1_b64_c2100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 26,
+      "name": "mfgpart1_b64_c2800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 27,
+      "name": "mfgpart1_b64_c3500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 28,
+      "name": "mfgpart1_b64_c4200",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 29,
+      "name": "mfgpart1_b64_c4900",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 30,
+      "name": "mfgpart1_b64_c5600",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 31,
+      "name": "mfgpart1_b64_c6300",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 32,
+      "name": "mfgpart1_b64_c7000",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 33,
+      "name": "mfgpart1_b64_c7700",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 34,
+      "name": "mfgpart1_b64_c8400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 35,
+      "name": "mfgpart1_b64_c9100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 36,
+      "name": "mfgpart1_b64_c9800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 37,
+      "name": "mfgpart1_b64_c10500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 38,
+      "name": "mfgpart1_b64_c11200",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 39,
+      "name": "mfgpart1_b64_c11900",
+      "timeout": 120,
+      "cmd_len": 480
+    },
+    {
+      "idx": 40,
+      "name": "mfgpart1_b64_exec",
+      "timeout": 120,
+      "cmd_len": 248
+    },
+    {
+      "idx": 41,
+      "name": "mfgpart2_b64_clear",
+      "timeout": 120,
+      "cmd_len": 232
+    },
+    {
+      "idx": 42,
+      "name": "mfgpart2_b64_c0",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 43,
+      "name": "mfgpart2_b64_c700",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 44,
+      "name": "mfgpart2_b64_c1400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 45,
+      "name": "mfgpart2_b64_c2100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 46,
+      "name": "mfgpart2_b64_c2800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 47,
+      "name": "mfgpart2_b64_c3500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 48,
+      "name": "mfgpart2_b64_c4200",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 49,
+      "name": "mfgpart2_b64_c4900",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 50,
+      "name": "mfgpart2_b64_c5600",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 51,
+      "name": "mfgpart2_b64_c6300",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 52,
+      "name": "mfgpart2_b64_c7000",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 53,
+      "name": "mfgpart2_b64_c7700",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 54,
+      "name": "mfgpart2_b64_c8400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 55,
+      "name": "mfgpart2_b64_c9100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 56,
+      "name": "mfgpart2_b64_c9800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 57,
+      "name": "mfgpart2_b64_c10500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 58,
+      "name": "mfgpart2_b64_c11200",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 59,
+      "name": "mfgpart2_b64_c11900",
+      "timeout": 120,
+      "cmd_len": 480
+    },
+    {
+      "idx": 60,
+      "name": "mfgpart2_b64_exec",
+      "timeout": 120,
+      "cmd_len": 248
+    },
+    {
+      "idx": 61,
+      "name": "mfgpart3_b64_clear",
+      "timeout": 120,
+      "cmd_len": 232
+    },
+    {
+      "idx": 62,
+      "name": "mfgpart3_b64_c0",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 63,
+      "name": "mfgpart3_b64_c700",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 64,
+      "name": "mfgpart3_b64_c1400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 65,
+      "name": "mfgpart3_b64_c2100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 66,
+      "name": "mfgpart3_b64_c2800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 67,
+      "name": "mfgpart3_b64_c3500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 68,
+      "name": "mfgpart3_b64_c4200",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 69,
+      "name": "mfgpart3_b64_c4900",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 70,
+      "name": "mfgpart3_b64_c5600",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 71,
+      "name": "mfgpart3_b64_c6300",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 72,
+      "name": "mfgpart3_b64_c7000",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 73,
+      "name": "mfgpart3_b64_c7700",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 74,
+      "name": "mfgpart3_b64_c8400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 75,
+      "name": "mfgpart3_b64_c9100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 76,
+      "name": "mfgpart3_b64_c9800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 77,
+      "name": "mfgpart3_b64_c10500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 78,
+      "name": "mfgpart3_b64_c11200",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 79,
+      "name": "mfgpart3_b64_c11900",
+      "timeout": 120,
+      "cmd_len": 480
+    },
+    {
+      "idx": 80,
+      "name": "mfgpart3_b64_exec",
+      "timeout": 120,
+      "cmd_len": 248
+    },
+    {
+      "idx": 81,
+      "name": "mfgpart4_b64_clear",
+      "timeout": 120,
+      "cmd_len": 232
+    },
+    {
+      "idx": 82,
+      "name": "mfgpart4_b64_c0",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 83,
+      "name": "mfgpart4_b64_c700",
+      "timeout": 120,
+      "cmd_len": 1180
+    },
+    {
+      "idx": 84,
+      "name": "mfgpart4_b64_c1400",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 85,
+      "name": "mfgpart4_b64_c2100",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 86,
+      "name": "mfgpart4_b64_c2800",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 87,
+      "name": "mfgpart4_b64_c3500",
+      "timeout": 120,
+      "cmd_len": 1184
+    },
+    {
+      "idx": 88,
+      "name": "mfgpart4_b64_c4200",
+      "timeout": 120,
+      "cmd_len": 416
+    },
+    {
+      "idx": 89,
+      "name": "mfgpart4_b64_exec",
+      "timeout": 120,
+      "cmd_len": 248
+    },
+    {
+      "idx": 90,
+      "name": "build_clear",
+      "timeout": 120,
+      "cmd_len": 224
+    },
+    {
+      "idx": 91,
+      "name": "build_c0",
+      "timeout": 120,
+      "cmd_len": 1168
+    },
+    {
+      "idx": 92,
+      "name": "build_c700",
+      "timeout": 120,
+      "cmd_len": 1172
+    },
+    {
+      "idx": 93,
+      "name": "build_c1400",
+      "timeout": 120,
+      "cmd_len": 988
+    },
+    {
+      "idx": 94,
+      "name": "build_exec",
+      "timeout": 900,
+      "cmd_len": 236
+    }
+  ]
+}

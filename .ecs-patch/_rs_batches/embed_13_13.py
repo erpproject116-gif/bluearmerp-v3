@@ -1,0 +1,23 @@
+INSTANCE='i-t4n5tdhzaktd0x6tc34w'
+REGION='ap-southeast-1'
+STEPS=[
+ (13, 'cHJpbnRmICclcycgJ2VjMDBiOTNjZTFhM2FlZjk5MmUxMDk0ZDZkMmU1ZGY2ZjU3NjIyMzhkMjU5ZmZhYzIwNDM4ZDA2NzA4ZTI3ZmU1OThlZGQ2OTY3N2VmMTUzNzllNzVmMTAzZDVmMGMyZTE3ODAzNWUzYzljMDA5YjhlMWExOGQ4NmU5MzJlODQyMTEwNWE2NTUwNDYxYzZlOTdlNDY5ZTk4N2MxOGI4NmNmMjNkMTI2ZTJhYzI3ZDMxNzUzZGM3NjY5MjBlMDViYTJiZjIyN2E1NjAyOGUxNzZlZGI4M2NjNDZlMTk5ODRkOGZlYTcyMDRjMTk2ODI0Y2Q1ODVjMmE4YzU2MmM0YmRkMzQzOTIxNDI5MzgyOTgwNjA4Y2YxNDZhYWQzMzM0M2M2MWU5ZDAxMWYzMGVmMTA4YWJiOTBkYzJjYjc5MjliODM3YjA3ZjAwNWE3ODFiMzY0ZjA1NzM4ZWQ0ZTY2NzFmNDgyYzEzNDZkMzc0OWQxN2U2OWJkZjU4ODMwNWNkY2RlZjNkNDEyNWZkY2U2YzMyM2VkZTJhNWIwMjhlZTdlN2VkMmMyMjdlOGNhNThmZTNiNzY5ODVkYjQ5ODE1MjI1MjA2ZGQ5YTI1YWM0NjNhMTMyNTM0Y2I1MzFhYmQzYjk3NTgyMmJiMzNjZTU0OGE5NGFiNjJmMjI0YTQxMGM1NjBjNDgyYWRhZTU5NWU2YjdkZDVjMDBjY2I3MmY5NDdjODZhNzhiNWVhMGUxMTU0M2YxZjhjZTdlNTUxMmRjN2YxZWY3ZDgwMzhhODgxNDlhYTE0NGU2MDVjNzQ3NTk0MjQ2OWE1MDUyNTgzMjkzZWJkZmUyY2U3Y2E5NWVhZWFkY2FhYWI2OTgxMjE2NWM0NTk3ODcxOGEyYmVmYzBiNTc3YWE2YjZiMmQwZTc4MzY1ZWU5NmNiNDdiOTQ4ZDBmNWVlNDA3ZDk5M2Y0YWNmY2I1MTQ1ZTk3MmU0YTM1MDBhYjBkNTlhYmU1OGMyZjA0NDQxZWVhNzlmYWU4ODAwZTVjZGQ1Y2I2ZDM0NDJjNmFmN2EwYWY1MDZlMGIwNTllYmE3NTkzY2EwOWVlYzBjMGEzNzRkNDE5NDZhODJiM2U1NzIxNDM2YThhN2VlMjRiZmJmODQyMjgyMjE3MzRhN2QwNDYxYmZlZWQ5YzJmMmJkNjI5M2MyZWQ4NTgwYTU2ZTUwMGMwNWZkOTM3NmFlOTE4N2RjZWNmZjhhZDk1MjQ1MThmNzc1ZTNlN2JmMWZjZjE5YmQ4YmQ4YWQ5NDBiMGYyNzAwZTYyODA3YTdlMTE1YzY3OThmZGY5YWVhYmYxY2YyNTc5MmI5ODY4ZmE3NTM2MjJkZWE1ZmY2NWZiMmQ5ODg1YWM3NTdhZjdkMzlmNWM1OThkYjRiNzFhMzkyZDdlOGIwZWYwY2I3ODQ3N2YwOWQ3YjgzYWIzYWQ4NWI0YTI3YjE2MDQ3NGNiYzQ1MjE0YTYwZjU0ODAxZjVkNWJiYzgwNzUzNDUzZDE1MDM0Y2YyZDdlY2VkYjAxNTRiNDllODE3NTljMzgxYTA4MmFhODM0MTA1NjM5NGIzNzIxY2E5OTM4OWNiYzY0NzBhOGE0NTRiMWRiNGI0MjQxMzc3ZmY5ZDRkNzQwNmNhMTlmMjEzZTYxNzFkZDRjMDA2Zjk2ZDNjZTljZDMzYzVmODQxNjZkYzdlNjUwZWMyMTExYmI5NjVmM2JlZTJkZTI2Y2FjZTM5OGIxM2I4ZTdlYjJkZTUzNTc4ZDg5N2JjOTQ4OTc5NGZhODI1MmNhNmZmMjJhNDZmMDE5Y2NkZDQ3MzAxYmYyNWU3MzViMzIxYWVjNzY3M2ZiYzY1ZDc1OTViMjk4YThhZDJlMjBjNWY0MDU4MDU0ZWM1ZDVjZWRmNWMxYmE1YTBkMjEyZjdlMjMyMWE1NmVjNmU0YzJlODNhZGJiMmRjYWEyY2M3YzBhYzUwMDk4ODg4OTRjMGQ1Y2U1MjVkZjAxMjk2MDA2ZWJkYzA5YTdjNWZiMjJlODAzODQ4MjRlNjIxNjZjNGEzYmUxNzQ1NWEzNmVlNDA2ODJiMDQzNWE3YTQyMDA3ODlhNzQ1NzBjYjYxZTQyNGI3MWM4YmE2MjQyMjQ0YjNiZDBiZTUzNGE5ZTA0MWExNDUxMTA2MDU1OTQ0ODU4MWRlNjIwZGE4NjdhYTA4MGJmZWJjMjUyMmQyZTJjNjY2MmY3OTI3N2FiYjhiZjczYWE4YjNlYTQwMmNhYWFhMmQxNzVkZjdhZWIwNDBiY2ZmNjRhMmZhMzhhYzBhNDVlODA5YzY1YmIxOGZkMDYxZjUzMTkxMzk0MWQ0Y2UwYmU1ZGVlY2NiYWQyMjRlNTU2MTUwZDA0YmJhYmExZGEyNWQ4NTRjYjgxOTBhMTQxNicgPj4gL3RtcC9tZmctbWFpbi5oZXgKZWNobyBDMjE2MDA=', 120),
+]
+
+outs=[]
+for i, cc, timeout in STEPS:
+    r=await call_cli(product='Ecs', action='RunCommand', version='2014-05-26', region=REGION, params={'RegionId': REGION, 'Type': 'RunShellScript', 'ContentEncoding': 'Base64', 'CommandContent': cc, 'Timeout': int(timeout), 'InstanceId': [INSTANCE]})
+    inv=r['InvokeId']
+    item=None
+    for _ in range(300):
+        await asyncio.sleep(2 if timeout<=120 else 5)
+        d=await call_cli(product='Ecs', action='DescribeInvocationResults', version='2014-05-26', region=REGION, params={'RegionId': REGION, 'InvokeId': inv, 'ContentEncoding': 'PlainText'})
+        items=d.get('Invocation',{}).get('InvocationResults',{}).get('InvocationResult',[])
+        if not items: continue
+        st=items[0].get('InvocationStatus')
+        if st in ('Success','Failed','PartialFailed','Stopped'):
+            item=items[0]; break
+    outs.append({'i':i,'invoke_id':inv,'status':None if item is None else item.get('InvocationStatus'),'exit':None if item is None else item.get('ExitCode'),'output':None if item is None else (item.get('Output') or '')[-1500:]})
+    if item is None or item.get('InvocationStatus')!='Success' or item.get('ExitCode') not in (0,'0'):
+        break
+result={'outs':outs,'ok':len(outs)==len(STEPS) and all(o.get('status')=='Success' and o.get('exit') in (0,'0') for o in outs)}

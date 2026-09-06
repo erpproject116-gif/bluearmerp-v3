@@ -1,0 +1,40 @@
+INSTANCE = 'i-t4n5tdhzaktd0x6tc34w'
+REGION = 'ap-southeast-1'
+
+async def run_shell(script, timeout=120):
+    r = await call_cli(product='Ecs', action='RunCommand', version='2014-05-26', region=REGION, params={'RegionId': REGION, 'Type': 'RunShellScript', 'ContentEncoding': 'PlainText', 'CommandContent': script, 'Timeout': int(timeout), 'InstanceId': [INSTANCE]})
+    invoke_id = r['InvokeId']
+    for _ in range(260):
+        await asyncio.sleep(3)
+        d = await call_cli(product='Ecs', action='DescribeInvocationResults', version='2014-05-26', region=REGION, params={'RegionId': REGION, 'InvokeId': invoke_id, 'ContentEncoding': 'PlainText'})
+        items = d.get('Invocation', {}).get('InvocationResults', {}).get('InvocationResult', [])
+        if not items:
+            continue
+        item = items[0]
+        st = item.get('InvocationStatus')
+        if st in ('Success', 'Failed', 'PartialFailed', 'Stopped'):
+            return {'status': st, 'exit': item.get('ExitCode'), 'output': (item.get('Output') or '')[-4000:]}
+    return {'status': 'Timeout', 'invoke_id': invoke_id}
+
+finish = """set -e
+mkdir -p /root/bluearmerp-v3/api/internal/modules/inventory
+xxd -r -p /tmp/partners.hex > /root/bluearmerp-v3/api/internal/modules/inventory/partners.go
+xxd -r -p /tmp/helpers.hex > /root/bluearmerp-v3/api/internal/modules/inventory/helpers.go
+grep -n createWithCode /root/bluearmerp-v3/api/internal/modules/inventory/partners.go
+grep -n syncCodeSequence /root/bluearmerp-v3/api/internal/modules/inventory/helpers.go
+date >> /root/bluearmerp-v3/api/internal/modules/inventory/.partner-fix-bust
+docker inspect bluearm-api --format '{{range .Config.Env}}{{println .}}{{end}}' > /tmp/bluearm-api.env
+cd /root/bluearmerp-v3/api
+docker build --no-cache -t bluearm-api:latest .
+docker stop bluearm-api || true
+docker rm bluearm-api || true
+docker run -d --name bluearm-api --restart unless-stopped --env-file /tmp/bluearm-api.env -p 8080:8080 bluearm-api:latest
+sleep 8
+docker exec bluearm-api grep -ao inventory.partner.create /server | head -1
+echo HEALTH_CODE_START
+curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health || true
+echo
+echo DEPLOY_PARTNER_FIX_DONE"""
+
+last = await run_shell(finish, timeout=900)
+result = {'ok': last.get('status')=='Success' and 'DEPLOY_PARTNER_FIX_DONE' in (last.get('output') or ''), 'last': last}

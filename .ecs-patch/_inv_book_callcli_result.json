@@ -1,0 +1,13 @@
+{
+  "run": {
+    "CommandId": "c-sgp6w7o9cnn1fk0",
+    "InvokeId": "t-sgp6w7o9co20tmo",
+    "RequestId": "01A074D4-026B-36AE-A5C2-55998A17BDC4"
+  },
+  "final": {
+    "Status": "Failed",
+    "ExitCode": 128,
+    "ErrorInfo": "The command execution exit code is not zero.",
+    "Output": "34064 /tmp/cb5407d.patch\n## staging...origin/staging [ahead 156]\n?? .deployed-sha\n?? api/.rebuild-bust\n?? api/internal/modules/inventory/.partner-fix-bust\n?? api/internal/modules/manufacturing/.rebuild-bust\n?? api/internal/modules/quality/.rebuild-bust\n?? api/~bluearm.env\n[staging 83d7cbd] Upgrade Serial Inv. Book to slip-ledger parity and deep-link Inv. Book to Stock Ledger.\n 6 files changed, 393 insertions(+), 71 deletions(-)\nremote: Write access to repository not granted.\nfatal: unable to access 'https://github.com/erpproject116-gif/bluearmerp-v3.git/': The requested URL returned error: 403\n"
+  }
+}

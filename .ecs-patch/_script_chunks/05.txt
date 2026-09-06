@@ -1,0 +1,69 @@
+20617574682e4163636573735265616429292e47657428222f776f726b2d6f7264657273222c206c697374576f726b4f726465727328706f6f6c29290d0a09096d722e5769746828617574682e526571756972655065726d697373696f6e28226d616e75666163747572696e672e776f726b5f6f7264657273222c20617574682e4163636573735265616429292e47657428222f776f726b2d6f72646572732f7b69647d222c20676574576f726b4f7264657228706f6f6c29290d0a09096d722e5769746828617574682e526571756972655065726d697373696f6e28226d616e75666163747572696e672e776f726b5f6f7264657273222c20617574682e4163636573735265616429292e47657428222f776f726b2d6f72646572732f7b69647d2f6d6174657269616c2d6e65656473222c20676574576f726b4f726465724d6174657269616c4e6565647328706f6f6c29290d0a09096d722e5769746828617574682e526571756972655065726d697373696f6e28226d616e75666163747572696e672e776f726b5f6f7264657273222c20617574682e416363657373577269746529292e506f737428222f776f726b2d6f7264657273222c20637265617465576f726b4f7264657228706f6f6c29290d0a09096d722e5769746828617574682e526571756972655065726d697373696f6e28226d616e75666163747572696e672e776f726b5f6f7264657273222c20617574682e416363657373577269746529292e506174636828222f776f726b2d6f72646572732f7b69647d222c20757064617465576f726b4f7264657228706f6f6c29290d0a09096d722e5769746828617574682e526571756972655375626d697428226d616e75666163747572696e672e776f726b5f6f72646572735f72656c656173652229292e506f737428222f776f726b2d6f72646572732f7b69647d2f72656c65617365222c2072656c65617365576f726b4f7264657228706f6f6c29290d0a09096d722e5769746828617574682e526571756972655375626d697428226d616e75666163747572696e672e776f726b5f6f72646572735f636f6d706c6574652229292e506f737428222f776f726b2d6f72646572732f7b69647d2f636f6d706c657465222c20636f6d706c657465576f726b4f7264657228706f6f6c29290d0a097d290d0a7d0d0a'''
+FINISH = """set -e
+xxd -r -p /tmp/slip.go.hex > /root/bluearmerp-v3/api/internal/modules/manufacturing/wo_so_link_slip.go
+xxd -r -p /tmp/routes.go.hex > /root/bluearmerp-v3/api/internal/modules/manufacturing/routes.go
+rm -f /root/bluearmerp-v3/api/internal/modules/manufacturing/wo_so_link.go
+grep -n optionalInt64Query /root/bluearmerp-v3/api/internal/modules/manufacturing/wo_so_link_slip.go
+grep -n 'No active BOM' /root/bluearmerp-v3/api/internal/modules/manufacturing/wo_so_link_slip.go
+docker inspect bluearm-api --format '{{range .Config.Env}}{{println .}}{{end}}' > /tmp/bluearm-api.env
+cd /root/bluearmerp-v3/api
+docker build -t bluearm-api:latest .
+docker stop bluearm-api || true
+docker rm bluearm-api || true
+docker run -d --name bluearm-api --restart unless-stopped --env-file /tmp/bluearm-api.env -p 8080:8080 bluearm-api:latest
+sleep 5
+docker ps --filter name=bluearm-api --format '{{.Names}} {{.Status}}'
+code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8080/api/v1/manufacturing/work-orders/from-sales-order/1 || true)
+echo POST=$code
+echo DEPLOY_BOM_MSG_DONE"""
+
+async def run_shell(script, timeout=120):
+    r = await call_cli(
+        product='Ecs',
+        action='RunCommand',
+        version='2014-05-26',
+        region=REGION,
+        params={
+            'RegionId': REGION,
+            'Type': 'RunShellScript',
+            'ContentEncoding': 'PlainText',
+            'CommandContent': script,
+            'Timeout': int(timeout),
+            'InstanceId': [INSTANCE],
+        },
+    )
+    invoke_id = r['InvokeId']
+    for _ in range(150):
+        await asyncio.sleep(3)
+        d = await call_cli(
+            product='Ecs',
+            action='DescribeInvocationResults',
+            version='2014-05-26',
+            region=REGION,
+            params={'RegionId': REGION, 'InvokeId': invoke_id, 'ContentEncoding': 'PlainText'},
+        )
+        items = d.get('Invocation', {}).get('InvocationResults', {}).get('InvocationResult', [])
+        if not items:
+            continue
+        item = items[0]
+        st = item.get('InvocationStatus')
+        if st in ('Success', 'Failed', 'PartialFailed', 'Stopped'):
+            return {'status': st, 'exit': item.get('ExitCode'), 'output': (item.get('Output') or '')[-5000:]}
+    return {'status': 'Timeout', 'invoke_id': invoke_id}
+
+outs = []
+outs.append(await run_shell('rm -f /tmp/slip.go.hex /tmp/routes.go.hex\necho RESET'))
+chunk = 1800
+for i in range(0, len(ROUTES_HEX), chunk):
+    part = ROUTES_HEX[i:i+chunk]
+    outs.append(await run_shell("printf '%s' '" + part + "' >> /tmp/routes.go.hex\necho R" + str(i)))
+for i in range(0, len(SLIP_HEX), chunk):
+    part = SLIP_HEX[i:i+chunk]
+    outs.append(await run_shell("printf '%s' '" + part + "' >> /tmp/slip.go.hex\necho S" + str(i)))
+outs.append(await run_shell(FINISH, timeout=900))
+failed = [s for s in outs if s.get('status') != 'Success']
+result = {
+    'ok': len(failed) == 0 and 'DEPLOY_BOM_MSG_DONE' in ((outs[-1] or {}).get('output') or ''),
+    'failed_count': len(failed),
+    'last': outs[-1] if outs else None,
+}

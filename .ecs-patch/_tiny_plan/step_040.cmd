@@ -1,0 +1,1 @@
+aliyun ecs RunCommand --RegionId ap-southeast-1 --Type RunShellScript --InstanceId.1 i-t4n5tdhzaktd0x6tc34w --ContentEncoding Base64 --Timeout 120 --CommandContent YmFzZTY0IC1kIC90bXAvbWZncGFydDFfYjY0LmI2NCB8IGJhc2gKZWNobyBFWEVDX21mZ3BhcnQxX2I2NA==

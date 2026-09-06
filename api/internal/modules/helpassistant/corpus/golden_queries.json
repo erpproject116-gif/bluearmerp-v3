@@ -46,7 +46,7 @@
   },
   {
     "query": "onboarding playbook",
-    "path": "/app/onboarding",
+    "path": "/app/dashboard/onboarding",
     "expectArticleId": "onboarding-playbook"
   },
   {
@@ -68,6 +68,16 @@
     "query": "serial count does not match quantity",
     "path": "/app/purchases/purchase-receive/new",
     "expectArticleId": "serial-count-mismatch"
+  },
+  {
+    "query": "BA082126000181: Serial not found.",
+    "path": "/app/sales",
+    "expectArticleId": "serial-not-found-sale"
+  },
+  {
+    "query": "serial on PO but not found on sales",
+    "path": "/app/sales",
+    "expectArticleId": "serial-not-found-sale"
   },
   {
     "query": "official receipt after sales invoice",

@@ -1,0 +1,19 @@
+INSTANCE = 'i-t4n5tdhzaktd0x6tc34w'
+REGION = 'ap-southeast-1'
+CONTENT = "c2V0IC1lCnh4ZCAtciAtcCAvdG1wL3JvdXRlcy5nby5oZXggPiAvcm9vdC9ibHVlYXJtZXJwLXYzL2FwaS9pbnRlcm5hbC9tb2R1bGVzL21hbnVmYWN0dXJpbmcvcm91dGVzLmdvCmVjaG8gSEVYX0xFTj0kKHdjIC1jIDwvdG1wL3JvdXRlcy5nby5oZXgpCmVjaG8gUk9VVEVTX0xFTj0kKHdjIC1jIDwvcm9vdC9ibHVlYXJtZXJwLXYzL2FwaS9pbnRlcm5hbC9tb2R1bGVzL21hbnVmYWN0dXJpbmcvcm91dGVzLmdvKQplY2hvIFNMSVBfTEVOPSQod2MgLWMgPC9yb290L2JsdWVhcm1lcnAtdjMvYXBpL2ludGVybmFsL21vZHVsZXMvbWFudWZhY3R1cmluZy93b19zb19saW5rX3NsaXAuZ28pCmdyZXAgLW4gZnJvbS1zYWxlcy1vcmRlciAvcm9vdC9ibHVlYXJtZXJwLXYzL2FwaS9pbnRlcm5hbC9tb2R1bGVzL21hbnVmYWN0dXJpbmcvcm91dGVzLmdvCmdyZXAgLW4gY3JlYXRlV29ya09yZGVyRnJvbVNhbGVzT3JkZXIgL3Jvb3QvYmx1ZWFybWVycC12My9hcGkvaW50ZXJuYWwvbW9kdWxlcy9tYW51ZmFjdHVyaW5nL3dvX3NvX2xpbmtfc2xpcC5nbwpkb2NrZXIgaW5zcGVjdCBibHVlYXJtLWFwaSAtLWZvcm1hdCAne3tyYW5nZSAuQ29uZmlnLkVudn19e3twcmludGxuIC59fXt7ZW5kfX0nID4gL3RtcC9ibHVlYXJtLWFwaS5lbnYKY2QgL3Jvb3QvYmx1ZWFybWVycC12My9hcGkKZG9ja2VyIGJ1aWxkIC10IGJsdWVhcm0tYXBpOmxhdGVzdCAuCmRvY2tlciBzdG9wIGJsdWVhcm0tYXBpIHx8IHRydWUKZG9ja2VyIHJtIGJsdWVhcm0tYXBpIHx8IHRydWUKZG9ja2VyIHJ1biAtZCAtLW5hbWUgYmx1ZWFybS1hcGkgLS1yZXN0YXJ0IHVubGVzcy1zdG9wcGVkIC0tZW52LWZpbGUgL3RtcC9ibHVlYXJtLWFwaS5lbnYgLXAgODA4MDo4MDgwIGJsdWVhcm0tYXBpOmxhdGVzdApzbGVlcCA1CmRvY2tlciBwcyAtLWZpbHRlciBuYW1lPWJsdWVhcm0tYXBpIC0tZm9ybWF0ICd7ey5OYW1lc319IHt7LlN0YXR1c319Jwpkb2NrZXIgZXhlYyBibHVlYXJtLWFwaSBzaCAtYyAnZ3JlcCAtYSAtbyBmcm9tLXNhbGVzLW9yZGVyIC9wcm9jLzEvZXhlIHwgaGVhZCAtMScKY29kZT0kKGN1cmwgLXNTIC1vIC9kZXYvbnVsbCAtdyAnJXtodHRwX2NvZGV9JyAtWCBQT1NUIGh0dHA6Ly8xMjcuMC4wLjE6ODA4MC9hcGkvdjEvbWFudWZhY3R1cmluZy93b3JrLW9yZGVycy9mcm9tLXNhbGVzLW9yZGVyLzEgfHwgdHJ1ZSkKZWNobyBQT1NUX2Zyb21fc289JGNvZGUKY3VybCAtc1MgLW8gL2Rldi9udWxsIC13ICdoZWFsdGg9JXtodHRwX2NvZGV9JyBodHRwOi8vMTI3LjAuMC4xOjgwODAvaGVhbHRoIHx8IHRydWUKZWNobwplY2hvIFNVUkcyX0RPTkUK"
+TIMEOUT = 900
+r = await call_cli(product='Ecs', action='RunCommand', version='2014-05-26', region=REGION, params={'RegionId': REGION, 'Type': 'RunShellScript', 'ContentEncoding': 'Base64', 'CommandContent': CONTENT, 'Timeout': TIMEOUT, 'InstanceId': [INSTANCE]})
+invoke_id = r['InvokeId']
+out = None
+for _ in range(320):
+    await asyncio.sleep(3)
+    d = await call_cli(product='Ecs', action='DescribeInvocationResults', version='2014-05-26', region=REGION, params={'RegionId': REGION, 'InvokeId': invoke_id, 'ContentEncoding': 'PlainText'})
+    items = d.get('Invocation', {}).get('InvocationResults', {}).get('InvocationResult', [])
+    if not items:
+        continue
+    item = items[0]
+    st = item.get('InvocationStatus')
+    if st in ('Success', 'Failed', 'PartialFailed', 'Stopped'):
+        out = {'status': st, 'exit': item.get('ExitCode'), 'output': (item.get('Output') or '')[-5000:], 'invoke_id': invoke_id}
+        break
+result = out or {'status': 'Timeout', 'invoke_id': invoke_id}

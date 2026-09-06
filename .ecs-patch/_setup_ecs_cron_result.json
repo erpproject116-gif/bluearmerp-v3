@@ -1,0 +1,12 @@
+{
+  "run_command": {
+    "CommandId": "c-sgp6vt0rjg7ghkw",
+    "InvokeId": "t-sgp6vt0rjghg2yo",
+    "RequestId": "01A05FAE-4154-3216-96CA-06C817273251"
+  },
+  "invoke_id": "t-sgp6vt0rjghg2yo",
+  "status": "Failed",
+  "exit": 1,
+  "output": "POST /api/v1/crm/jobs/evaluate-alerts -> HTTP 401\n",
+  "ok": false
+}

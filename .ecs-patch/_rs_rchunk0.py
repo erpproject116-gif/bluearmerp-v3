@@ -1,0 +1,19 @@
+INSTANCE = 'i-t4n5tdhzaktd0x6tc34w'
+REGION = 'ap-southeast-1'
+CONTENT = "cm0gLWYgL3RtcC9yb3V0ZXMuZ28uaGV4CnByaW50ZiAnJXMnICc3MDYxNjM2YjYxNjc2NTIwNmQ2MTZlNzU2NjYxNjM3NDc1NzI2OTZlNjcwZDBhMGQwYTY5NmQ3MDZmNzI3NDIwMjgwZDBhMDkyMjY3Njk3NDY4NzU2MjJlNjM2ZjZkMmY2NzZmMmQ2MzY4NjkyZjYzNjg2OTJmNzYzNTIyMGQwYTA5MjI2NzY5NzQ2ODc1NjIyZTYzNmY2ZDJmNmE2MTYzNmI2MzJmNzA2Nzc4MmY3NjM1MmY3MDY3Nzg3MDZmNmY2YzIyMGQwYTBkMGEwOTIyNjc2OTc0Njg3NTYyMmU2MzZmNmQyZjYyNmM3NTY1NjE3MjZkMmY2MjZjNzU2NTYxNzI2ZDJkNjU3MjcwMmQ3NjMzMmY2MTcwNjkyZjY5NmU3NDY1NzI2ZTYxNmMyZjcwNmM2MTc0NjY2ZjcyNmQyZjYxNzU3NDY4MjIwZDBhMjkwZDBhMGQwYTY2NzU2ZTYzMjA1MjY1Njc2OTczNzQ2NTcyNTI2Zjc1NzQ2NTczMjg3MjIwNjM2ODY5MmU1MjZmNzU3NDY1NzIyYzIwNzA2ZjZmNmMyMDJhNzA2Nzc4NzA2ZjZmNmMyZTUwNmY2ZjZjMjkyMDdiMGQwYTA5NzIyZTUyNmY3NTc0NjUyODIyMmY2ZDYxNmU3NTY2NjE2Mzc0NzU3MjY5NmU2NzIyMmMyMDY2NzU2ZTYzMjg2ZDcyMjA2MzY4NjkyZTUyNmY3NTc0NjU3MjI5MjA3YjBkMGEwOTA5NmQ3MjJlNTc2OTc0NjgyODYxNzU3NDY4MmU1MjY1NzE3NTY5NzI2NTUwNjU3MjZkNjk3MzczNjk2ZjZlMjgyMjZkNjE2ZTc1NjY2MTYzNzQ3NTcyNjk2ZTY3MmU2MjZmNmQ3MzIyMmMyMDYxNzU3NDY4MmU0MTYzNjM2NTczNzM1MjY1NjE2NDI5MjkyZTQ3NjU3NDI4MjIyZjYyNmY2ZDczMjIyYzIwNmM2OTczNzQ0MjZmNmQ3MzI4NzA2ZjZmNmMyOTI5MGQwYTA5MDk2ZDcyMmU1NzY5NzQ2ODI4NjE3NTc0NjgyZTUyNjU3MTc1Njk3MjY1NTA2NTcyNmQ2OTczNzM2OTZmNmUyODIyNmQ2MTZlNzU2NjYxNjM3NDc1NzI2OTZlNjcyZTYyNmY2ZDczMjIyYzIwNjE3NTc0NjgyZTQxNjM2MzY1NzM3MzUyNjU2MTY0MjkyOTJlNDc2NTc0MjgyMjJmNjI2ZjZkNzMyZjdiNjk2NDdkMjIyYzIwNjc2NTc0NDI2ZjZkMjg3MDZmNmY2YzI5MjkwZDBhMDkwOTZkNzIyZTU3Njk3NDY4Mjg2MTc1NzQ2ODJlNTI2NTcxNzU2OTcyNjU1MDY1NzI2ZDY5NzM3MzY5NmY2ZTI4MjI2ZDYxNmU3NTY2NjE2Mzc0NzU3MjY5NmU2NzJlNjI2ZjZkNzMyMjJjMjA2MTc1NzQ2ODJlNDE2MzYzNjU3MzczNTc3MjY5NzQ2NTI5MjkyZTUwNmY3Mzc0MjgyMjJmNjI2ZjZkNzMyMjJjMjA2MzcyNjU2MTc0NjU0MjZmNmQyODcwNmY2ZjZjMjkyOTBkMGEwOTA5NmQ3MjJlNTc2OTc0NjgyODYxNzU3NDY4MmU1MjY1NzE3NTY5NzI2NTUwNjU3MjZkNjk3MzczNjk2ZjZlMjgyMjZkNjE2ZTc1NjY2MTYzNzQ3NTcyNjk2ZTY3MmU2MjZmNmQ3MzIyMmMyMDYxNzU3NDY4MmU0MTYzNjM2NTczNzM1NzcyNjk3NDY1MjkyOTJlNTA2MTc0NjM2ODI4MjIyZjYyNmY2ZDczMmY3YjY5NjQ3ZDIyMmMyMDc1NzA2NDYxNzQ2NTQyNmY2ZDI4NzA2ZjZmNmMyOTI5MGQwYTA5MDk2ZDcyMmU1NzY5NzQ2ODI4NjE3NTc0NjgyZTUyNjU3MTc1Njk3MjY1NTA2NTcyNmQ2OTczNzM2OTZmNmUyODIyNmQ2MTZlNzU2NjYxNjM3NDc1NzInID4+IC90bXAvcm91dGVzLmdvLmhleAplY2hvIE9LX1IwCg=="
+TIMEOUT = 120
+r = await call_cli(product='Ecs', action='RunCommand', version='2014-05-26', region=REGION, params={'RegionId': REGION, 'Type': 'RunShellScript', 'ContentEncoding': 'Base64', 'CommandContent': CONTENT, 'Timeout': TIMEOUT, 'InstanceId': [INSTANCE]})
+invoke_id = r['InvokeId']
+out = None
+for _ in range(60):
+    await asyncio.sleep(3)
+    d = await call_cli(product='Ecs', action='DescribeInvocationResults', version='2014-05-26', region=REGION, params={'RegionId': REGION, 'InvokeId': invoke_id, 'ContentEncoding': 'PlainText'})
+    items = d.get('Invocation', {}).get('InvocationResults', {}).get('InvocationResult', [])
+    if not items:
+        continue
+    item = items[0]
+    st = item.get('InvocationStatus')
+    if st in ('Success', 'Failed', 'PartialFailed', 'Stopped'):
+        out = {'status': st, 'exit': item.get('ExitCode'), 'output': (item.get('Output') or '')[-5000:], 'invoke_id': invoke_id}
+        break
+result = out or {'status': 'Timeout', 'invoke_id': invoke_id}
