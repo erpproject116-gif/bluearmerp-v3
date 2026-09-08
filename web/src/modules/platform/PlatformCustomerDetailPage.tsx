@@ -81,6 +81,28 @@ export default function PlatformCustomerDetailPage() {
       company_code?: string;
     }>(`/api/v1/platform/console/customers/${id()}/wipe-preflight`, undefined, { silent: true });
     setBusy(false);
+    // #region agent log
+    fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dbd614" },
+      body: JSON.stringify({
+        sessionId: "dbd614",
+        runId: "pre-fix",
+        hypothesisId: "C",
+        location: "PlatformCustomerDetailPage.tsx:openWipe",
+        message: "wipe preflight result",
+        data: {
+          customerId: id(),
+          ok: res.ok,
+          can_wipe: res.data?.can_wipe ?? null,
+          blockerCount: (res.data?.blockers ?? []).length,
+          blockers: (res.data?.blockers ?? []).slice(0, 30),
+          message: res.message ?? null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (!res.ok) {
       window.alert(res.message ?? "Wipe preflight failed.");
       return;
@@ -114,6 +136,30 @@ export default function PlatformCustomerDetailPage() {
       { silent: true },
     );
     setBusy(false);
+    // #region agent log
+    fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dbd614" },
+      body: JSON.stringify({
+        sessionId: "dbd614",
+        runId: "pre-fix",
+        hypothesisId: "A,B,E",
+        location: "PlatformCustomerDetailPage.tsx:runWipe",
+        message: "wipe API response",
+        data: {
+          customerId: id(),
+          companyCode: code,
+          ok: res.ok,
+          message: res.message ?? null,
+          errorCode: (res as { code?: string }).code ?? null,
+          mentionsReleaseLines: String(res.message ?? "").includes("so_sales_order_release_lines"),
+          mentionsSalesOrderLineFkey: String(res.message ?? "").includes("sales_order_line_id_fkey"),
+          mentionsInsertOrUpdate: String(res.message ?? "").toLowerCase().includes("insert or update"),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (!res.ok) {
       window.alert(res.message ?? "Wipe failed.");
       return;

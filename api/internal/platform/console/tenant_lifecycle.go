@@ -252,7 +252,35 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 	}
 	tag, err := tx.Exec(r.Context(), `delete from public.tenants where id = $1`, tenantID)
 	if err != nil {
-		response.Err(w, http.StatusInternalServerError, "Failed to delete workspace (cascade): "+err.Error(), "ERR_INTERNAL")
+		// #region agent log
+		diag := ""
+		if rows, qerr := s.pool.Query(r.Context(), `
+			select c.conname || ' → ' || ref.relname || ' [' ||
+			  case c.confdeltype when 'a' then 'NO ACTION' when 'r' then 'RESTRICT'
+			    when 'c' then 'CASCADE' when 'n' then 'SET NULL' when 'd' then 'SET DEFAULT'
+			    else c.confdeltype::text end || '] ' || pg_get_constraintdef(c.oid)
+			from pg_catalog.pg_constraint c
+			join pg_catalog.pg_class cl on cl.oid = c.conrelid
+			join pg_catalog.pg_class ref on ref.oid = c.confrelid
+			where c.contype = 'f' and cl.relname = 'so_sales_order_release_lines'
+			order by c.conname`); qerr == nil {
+			defer rows.Close()
+			var parts []string
+			for rows.Next() {
+				var line string
+				if rows.Scan(&line) == nil {
+					parts = append(parts, line)
+				}
+			}
+			diag = strings.Join(parts, " || ")
+			log.Printf("console: wipe cascade FK diag tenant %d: %s; err=%v", tenantID, diag, err)
+		}
+		// #endregion
+		msg := "Failed to delete workspace (cascade): " + err.Error()
+		if diag != "" {
+			msg += " | release_lines_fks: " + diag
+		}
+		response.Err(w, http.StatusInternalServerError, msg, "ERR_INTERNAL")
 		return
 	}
 	if tag.RowsAffected() == 0 {
