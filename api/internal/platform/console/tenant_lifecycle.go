@@ -73,7 +73,7 @@ func (s *service) suspendCustomer(w http.ResponseWriter, r *http.Request) {
 		TargetType: "tenants", TargetID: &tid,
 		Summary: "Suspended workspace " + code + " (data retained)",
 	})
-	response.OK(w, map[string]any{"tenant_id": tenantID, "company_code": code, "status": "suspended"}, "Workspace suspended. Business data retained.")
+	response.OK(w, map[string]any{"tenant_id": tenantID, "company_code": code, "status": "suspended"}, "Company "+code+" suspended. Users cannot sign in to ERP; all business data is still there. This did not delete anyone.")
 }
 
 func (s *service) reactivateCustomer(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +121,7 @@ func (s *service) reactivateCustomer(w http.ResponseWriter, r *http.Request) {
 		TargetType: "tenants", TargetID: &tid,
 		Summary: "Reactivated workspace " + code,
 	})
-	response.OK(w, map[string]any{"tenant_id": tenantID, "company_code": code, "status": "active"}, "Workspace reactivated.")
+	response.OK(w, map[string]any{"tenant_id": tenantID, "company_code": code, "status": "active"}, "Company "+code+" reactivated. Users can sign in again; existing data was not changed.")
 }
 
 func (s *service) wipePreflightCustomer(w http.ResponseWriter, r *http.Request) {
@@ -140,33 +140,37 @@ func (s *service) wipePreflightCustomer(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if tenantID == 0 {
-		response.Err(w, http.StatusBadRequest, "Customer has no workspace to wipe.", "ERR_BAD_REQUEST")
+		response.Err(w, http.StatusBadRequest, "This contact has no company workspace to wipe. Nothing to delete.", "ERR_BAD_REQUEST")
 		return
 	}
+	snap := s.loadWipeSnapshot(r.Context(), tenantID, code, status)
 	blockers, err := s.tenantWipeBlockers(r.Context())
 	if err != nil {
 		log.Printf("console: wipe preflight customer %d: %v", id, err)
 		// Still open the dialog — surface catalog failure as a soft blocker instead of HTTP 500.
-		response.OK(w, map[string]any{
-			"tenant_id":     tenantID,
-			"company_code":  code,
-			"tenant_status": status,
-			"can_wipe":      false,
-			"blockers":      []string{"Wipe preflight catalog check failed: " + err.Error()},
-			"irreversible":  true,
-			"customer_kept": true,
-		}, "OK")
+		snap["can_wipe"] = false
+		blockers := []string{"Could not check whether wipe is safe: " + err.Error()}
+		if auth.IsOperatorCompanyCode(code) {
+			blockers = append([]string{"BLUEARM is the operator company and cannot be wiped from a customer contact."}, blockers...)
+			snap["operator_protected"] = true
+		}
+		snap["blockers"] = blockers
+		response.OK(w, snap, "Wipe is not ready — preflight check failed.")
 		return
 	}
-	response.OK(w, map[string]any{
-		"tenant_id":     tenantID,
-		"company_code":  code,
-		"tenant_status": status,
-		"can_wipe":      len(blockers) == 0,
-		"blockers":      blockers,
-		"irreversible":  true,
-		"customer_kept": true,
-	}, "OK")
+	if auth.IsOperatorCompanyCode(code) {
+		blockers = append([]string{
+			"BLUEARM is the operator company. Close & wipe on a contact must not delete it. Unlink this contact from BLUEARM first.",
+		}, blockers...)
+		snap["operator_protected"] = true
+	}
+	snap["can_wipe"] = len(blockers) == 0
+	snap["blockers"] = blockers
+	msg := "Wipe will permanently delete company " + code + " and every user in it, including the owner."
+	if len(blockers) > 0 {
+		msg = "Wipe is blocked. Company " + code + " was not deleted."
+	}
+	response.OK(w, snap, msg)
 }
 
 func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
@@ -198,15 +202,21 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if tenantID == 0 {
-		response.Err(w, http.StatusBadRequest, "Customer has no workspace to wipe.", "ERR_BAD_REQUEST")
+		response.Err(w, http.StatusBadRequest, "This contact has no company workspace to wipe. Nothing to delete.", "ERR_BAD_REQUEST")
 		return
 	}
 	if status != "active" && status != "suspended" {
-		response.Err(w, http.StatusBadRequest, "Only active or suspended workspaces can be wiped (status="+status+").", "ERR_BAD_REQUEST")
+		response.Err(w, http.StatusBadRequest, "Only active or suspended companies can be wiped (current status: "+status+").", "ERR_BAD_REQUEST")
 		return
 	}
 	if strings.TrimSpace(body.ConfirmCompanyCode) != code {
-		response.Validation(w, map[string]string{"confirm_company_code": "Type the exact company code to confirm wipe."})
+		response.Validation(w, map[string]string{"confirm_company_code": "Type the exact company code (" + code + ") to confirm you are wiping that company, not removing a person."})
+		return
+	}
+	if auth.IsOperatorCompanyCode(code) {
+		response.Err(w, http.StatusConflict,
+			"Cannot wipe BLUEARM (operator company). This contact was linked to Bluearm's own workspace. Unlink them first; wipe only deletes a customer's own company.",
+			"ERR_WIPE_BLOCKED")
 		return
 	}
 
@@ -276,7 +286,7 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 			log.Printf("console: wipe cascade FK diag tenant %d: %s; err=%v", tenantID, diag, err)
 		}
 		// #endregion
-		msg := "Failed to delete workspace (cascade): " + err.Error()
+		msg := "Could not wipe company " + code + ": " + err.Error()
 		if diag != "" {
 			msg += " | release_lines_fks: " + diag
 		}
@@ -304,8 +314,38 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 		Summary: "Wiped workspace " + code + " (business data deleted)",
 	})
 	response.OK(w, map[string]any{
-		"wiped": true, "previous_tenant_id": tenantID, "previous_company_code": code,
-	}, "Workspace wiped. Provision again to create a new empty company.")
+		"wiped":                   true,
+		"previous_tenant_id":      tenantID,
+		"previous_company_code":   code,
+		"customer_contact_kept":   true,
+		"owner_handoff_required":  false,
+	}, "Company "+code+" wiped. All users (including the owner), inventory, sales, and books for that workspace are gone. This contact is still in Platform Command — provision again only if you want a new empty company.")
+}
+
+func (s *service) loadWipeSnapshot(ctx context.Context, tenantID int64, code, status string) map[string]any {
+	var companyName string
+	var userCount int64
+	var ownerName, ownerEmail string
+	_ = s.pool.QueryRow(ctx, `
+		select coalesce(t.company_name, ''),
+		       (select count(*) from public.users u where u.tenant_id = t.id),
+		       coalesce(o.full_name, ''),
+		       coalesce(o.email, '')
+		from public.tenants t
+		left join public.users o on o.id = t.owner_user_id
+		where t.id = $1`, tenantID).Scan(&companyName, &userCount, &ownerName, &ownerEmail)
+	return map[string]any{
+		"tenant_id":     tenantID,
+		"company_code":  code,
+		"company_name":  companyName,
+		"tenant_status": status,
+		"user_count":    userCount,
+		"owner_name":    ownerName,
+		"owner_email":   ownerEmail,
+		"irreversible":  true,
+		"customer_kept": true,
+		"wipes_owner":   true,
+	}
 }
 
 func (s *service) loadCustomerTenant(ctx context.Context, customerID int64) (tenantID int64, companyCode, status string, err error) {

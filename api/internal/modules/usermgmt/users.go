@@ -54,6 +54,7 @@ func registerUserRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Patch("/users/{id}", patchUser(pool))
 	r.Post("/users/{id}/reset-for-reinvite", resetUserForReinvite(pool))
 	r.Post("/users/{id}/reinvite", reinviteExistingUser(pool))
+	r.Post("/users/{id}/transfer-ownership", transferOwnership(pool))
 	r.Get("/users/{id}/groups", getUserGroups(pool))
 	r.Put("/users/{id}/groups", putUserGroups(pool))
 	r.Post("/invites/{id}/revoke", revokeInvite(pool))
@@ -431,11 +432,11 @@ func patchUser(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if ownerUserID != nil && *ownerUserID == id {
 			if body.TenantRole != nil && *body.TenantRole != currentRole {
-				response.Err(w, http.StatusBadRequest, "Cannot change the tenant owner role.", "ERR_BAD_REQUEST")
+				response.Err(w, http.StatusBadRequest, "Cannot change the company owner's role. Reassign ownership first.", "ERR_BAD_REQUEST")
 				return
 			}
 			if body.Status != nil && *body.Status == "disabled" {
-				response.Err(w, http.StatusBadRequest, "Cannot disable the tenant owner.", "ERR_BAD_REQUEST")
+				response.Err(w, http.StatusBadRequest, "Cannot delete the company owner. Reassign ownership to another user first, or use Platform Command Close & wipe to delete the whole company.", "ERR_BAD_REQUEST")
 				return
 			}
 		}

@@ -31,6 +31,12 @@ func TestIsBootstrapSuperadminEmail(t *testing.T) {
 	if isBootstrapSuperadminEmail("other@example.com") {
 		t.Fatal("unexpected bootstrap email")
 	}
+	if !IsOperatorCompanyCode("BLUEARM") || IsOperatorCompanyCode("ACME") {
+		t.Fatal("operator company code check failed")
+	}
+	if !IsOperatorStoreOwnerEmail("BluearmPH@gmail.com") || IsOperatorStoreOwnerEmail("glen.bluearm@gmail.com") {
+		t.Fatal("operator store owner email check failed")
+	}
 	if IsPlatformConsoleEmail("demo@customer.com") {
 		t.Fatal("customer email must not access platform console")
 	}

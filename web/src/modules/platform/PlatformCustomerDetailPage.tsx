@@ -2,6 +2,7 @@ import { A, useParams } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { useAuth } from "../../shared/auth-context";
 import {
   usePlatformCustomer,
   usePlatformCustomerEngagement,
@@ -11,6 +12,76 @@ import {
   type PlatformPlan,
 } from "../../shared/usePlatform";
 import { LoadingText } from "../../shared/LoadingText";
+import { useToast } from "../../shared/toast";
+
+type WipePreflight = {
+  can_wipe?: boolean;
+  blockers?: string[];
+  company_code?: string;
+  company_name?: string;
+  tenant_id?: number;
+  user_count?: number;
+  owner_name?: string;
+  owner_email?: string;
+};
+
+const actionCopy = (path: string): { ok: string; fail: string } => {
+  if (path.endsWith("/approve")) {
+    return {
+      ok: "Signup approved. That company can now use the ERP.",
+      fail: "Could not approve this signup.",
+    };
+  }
+  if (path.endsWith("/reject")) {
+    return {
+      ok: "Signup rejected. No company workspace was created.",
+      fail: "Could not reject this signup.",
+    };
+  }
+  if (path.endsWith("/suspend")) {
+    return {
+      ok: "Company suspended. Users cannot sign in; all data is kept.",
+      fail: "Could not suspend this company.",
+    };
+  }
+  if (path.endsWith("/reactivate")) {
+    return {
+      ok: "Company reactivated. Users can sign in again; data was not changed.",
+      fail: "Could not reactivate this company.",
+    };
+  }
+  if (path.endsWith("/subscriptions")) {
+    return {
+      ok: "Paid plan activated for this company.",
+      fail: "Could not activate that plan.",
+    };
+  }
+  if (path.endsWith("/extend-trial")) {
+    return {
+      ok: "Trial extended by 30 days.",
+      fail: "Could not extend the trial.",
+    };
+  }
+  if (path.endsWith("/convert-demo")) {
+    return {
+      ok: "Demo converted to a trial workspace.",
+      fail: "Could not convert this demo.",
+    };
+  }
+  if (path.includes("/invoices/") && path.endsWith("/mark-paid")) {
+    return {
+      ok: "Invoice marked paid.",
+      fail: "Could not mark that invoice paid.",
+    };
+  }
+  if (path.endsWith("/invoices")) {
+    return {
+      ok: "Invoice created.",
+      fail: "Could not create that invoice.",
+    };
+  }
+  return { ok: "Saved.", fail: "That action did not complete." };
+};
 
 function planLabel(p: PlatformPlan) {
   const price = p.promo_active ? p.effective_monthly_amount : p.regular_monthly_amount;
@@ -40,6 +111,8 @@ function fmtDuration(sec?: number | null): string {
 export default function PlatformCustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const id = () => Number(params.id);
+  const toast = useToast();
+  const auth = useAuth();
   const q = usePlatformCustomer(id);
   const overview = usePlatformCustomerOverview(id);
   const engagement = usePlatformCustomerEngagement(id);
@@ -51,20 +124,22 @@ export default function PlatformCustomerDetailPage() {
   const [wipeAck, setWipeAck] = createSignal(false);
   const [wipeBlockers, setWipeBlockers] = createSignal<string[]>([]);
   const [wipeCan, setWipeCan] = createSignal(true);
+  const [wipeSnap, setWipeSnap] = createSignal<WipePreflight | null>(null);
   const sessionDetail = usePlatformCustomerSession(id, openSessionId);
 
   const paidPlans = () =>
     (plansQ.data ?? []).filter((p) => p.is_active && !p.plan_code.includes("trial") && !p.plan_code.includes("demo"));
 
   const act = async (path: string, body?: object) => {
+    const copy = actionCopy(path);
     setBusy(true);
     const res = await apiFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }, { silent: true });
     setBusy(false);
     if (!res.ok) {
-      window.alert(res.message ?? "Action failed.");
+      toast.error(res.message ?? copy.fail);
       return res;
     }
-    window.alert(res.message ?? "Done.");
+    toast.success(res.message ?? copy.ok);
     await q.refetch();
     return res;
   };
@@ -74,55 +149,55 @@ export default function PlatformCustomerDetailPage() {
     setWipeAck(false);
     setWipeBlockers([]);
     setWipeCan(true);
+    setWipeSnap(null);
     setBusy(true);
-    const res = await apiFetch<{
-      can_wipe?: boolean;
-      blockers?: string[];
-      company_code?: string;
-    }>(`/api/v1/platform/console/customers/${id()}/wipe-preflight`, undefined, { silent: true });
+    const res = await apiFetch<WipePreflight>(
+      `/api/v1/platform/console/customers/${id()}/wipe-preflight`,
+      undefined,
+      { silent: true },
+    );
     setBusy(false);
-    // #region agent log
-    fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dbd614" },
-      body: JSON.stringify({
-        sessionId: "dbd614",
-        runId: "pre-fix",
-        hypothesisId: "C",
-        location: "PlatformCustomerDetailPage.tsx:openWipe",
-        message: "wipe preflight result",
-        data: {
-          customerId: id(),
-          ok: res.ok,
-          can_wipe: res.data?.can_wipe ?? null,
-          blockerCount: (res.data?.blockers ?? []).length,
-          blockers: (res.data?.blockers ?? []).slice(0, 30),
-          message: res.message ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!res.ok) {
-      window.alert(res.message ?? "Wipe preflight failed.");
+      toast.error(res.message ?? "Could not check whether this company is safe to wipe.");
       return;
     }
     setWipeCan(Boolean(res.data?.can_wipe));
     setWipeBlockers(res.data?.blockers ?? []);
+    setWipeSnap(res.data ?? null);
     setWipeOpen(true);
   };
 
   const runWipe = async () => {
-    const code = String((q.data?.customer as Record<string, unknown> | undefined)?.company_code ?? "");
+    const code = String(
+      (q.data?.customer as Record<string, unknown> | undefined)?.company_code ?? wipeSnap()?.company_code ?? "",
+    );
+    const name = String(
+      wipeSnap()?.company_name ||
+        (q.data?.customer as Record<string, unknown> | undefined)?.company_name ||
+        code,
+    );
+    const tenantId = Number(
+      wipeSnap()?.tenant_id || (q.data?.customer as Record<string, unknown> | undefined)?.tenant_id || 0,
+    );
     if (!wipeAck() || wipeCode().trim() !== code) {
-      window.alert("Type the exact company code and acknowledge irreversible wipe.");
+      toast.warning(`Type company code ${code} and tick the checkbox. This wipes the whole company, not one person.`);
       return;
     }
     if (!wipeCan()) {
-      window.alert("Wipe is blocked by schema preflight.");
+      toast.warning("Wipe is blocked until the listed schema issues are fixed. The company was not deleted.");
       return;
     }
-    if (!confirm(`Permanently delete all business data for ${code}? This cannot be undone.`)) return;
+    const signedInHere = Number(auth.me?.tenant?.id || auth.me?.active_tenant_id || 0) === tenantId && tenantId > 0;
+    const extra = signedInHere
+      ? `\n\nYou are currently signed into this same company (${code}). After wipe, ERP data for this workspace will be gone and you will only have Platform Command.`
+      : "";
+    if (
+      !confirm(
+        `Wipe company ${name} (${code})?\n\nThis permanently deletes ALL users (including the owner), inventory, sales, and books.\nIt does NOT only remove the contact on this page.${extra}\n\nThis cannot be undone.`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     const res = await apiFetch(
       `/api/v1/platform/console/customers/${id()}/wipe`,
@@ -136,34 +211,11 @@ export default function PlatformCustomerDetailPage() {
       { silent: true },
     );
     setBusy(false);
-    // #region agent log
-    fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dbd614" },
-      body: JSON.stringify({
-        sessionId: "dbd614",
-        runId: "pre-fix",
-        hypothesisId: "A,B,E",
-        location: "PlatformCustomerDetailPage.tsx:runWipe",
-        message: "wipe API response",
-        data: {
-          customerId: id(),
-          companyCode: code,
-          ok: res.ok,
-          message: res.message ?? null,
-          errorCode: (res as { code?: string }).code ?? null,
-          mentionsReleaseLines: String(res.message ?? "").includes("so_sales_order_release_lines"),
-          mentionsSalesOrderLineFkey: String(res.message ?? "").includes("sales_order_line_id_fkey"),
-          mentionsInsertOrUpdate: String(res.message ?? "").toLowerCase().includes("insert or update"),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!res.ok) {
-      window.alert(res.message ?? "Wipe failed.");
+      toast.error(res.message ?? `Could not wipe company ${code}. Nothing was deleted.`);
       return;
     }
+    toast.success(res.message ?? `Company ${code} wiped. Contact kept; all workspace data is gone.`);
     setWipeOpen(false);
     await q.refetch();
   };
@@ -234,10 +286,12 @@ export default function PlatformCustomerDetailPage() {
 
                 <Show when={String(c().tenant_status ?? "") === "active" || String(c().tenant_status ?? "") === "suspended"}>
                   <div class="space-y-3 rounded-xl border border-stroke bg-white p-4">
-                    <h2 class="text-sm font-semibold text-text-primary">Workspace lifecycle</h2>
+                    <h2 class="text-sm font-semibold text-text-primary">Company lifecycle</h2>
                     <p class="text-xs text-text-secondary">
-                      Suspend keeps all business data and locks ERP access. Close &amp; wipe permanently deletes the
-                      tenant and data; you can provision a new empty workspace for this customer afterward.
+                      This page is the <strong>contact</strong>, not one ERP user. To remove a staff member, use User
+                      Management inside that company. To remove the owner as a person, transfer ownership first — wipe
+                      is not that. <strong>Suspend</strong> locks sign-in and keeps data. <strong>Close &amp; wipe</strong>{" "}
+                      deletes the whole company (every user, including the owner) and all books.
                     </p>
                     <div class="flex flex-wrap gap-2">
                       <Show when={String(c().tenant_status) === "active"}>
@@ -246,7 +300,13 @@ export default function PlatformCustomerDetailPage() {
                           class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-950 disabled:opacity-50"
                           disabled={busy()}
                           onClick={() => {
-                            if (!confirm("Suspend this workspace? Users lose ERP access; data is kept.")) return;
+                            if (
+                              !confirm(
+                                `Suspend company ${String(c().company_code || c().company_name || "")}? Users cannot sign in. Data is kept. This does not delete the owner.`,
+                              )
+                            ) {
+                              return;
+                            }
                             void act(`/api/v1/platform/console/customers/${id()}/suspend`);
                           }}
                         >
@@ -284,27 +344,38 @@ export default function PlatformCustomerDetailPage() {
 
                 <Show when={wipeOpen()}>
                   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div class="w-full max-w-md space-y-3 rounded-xl border border-stroke bg-white p-6 shadow-lg">
-                      <h2 class="text-lg font-semibold text-red-800">Close &amp; wipe workspace</h2>
+                    <div class="w-full max-w-lg space-y-3 rounded-xl border border-stroke bg-white p-6 shadow-lg">
+                      <h2 class="text-lg font-semibold text-red-800">Close &amp; wipe company</h2>
                       <p class="text-sm text-text-secondary">
-                        Deletes tenant <strong>{String(c().company_code)}</strong> and all cascaded business data.
-                        Customer lead is kept for re-provision.
+                        This deletes company{" "}
+                        <strong>
+                          {wipeSnap()?.company_name || String(c().company_name || "")} ({String(c().company_code)})
+                        </strong>
+                        , tenant #{wipeSnap()?.tenant_id ?? String(c().tenant_id ?? "—")},{" "}
+                        {wipeSnap()?.user_count ?? "all"} users (including owner{" "}
+                        {wipeSnap()?.owner_email || wipeSnap()?.owner_name || "of this workspace"}), inventory, sales,
+                        and books. The contact on this page stays so you can provision a new empty company later.
+                      </p>
+                      <p class="text-sm font-medium text-red-800">
+                        Do not use this to remove one person. Ownership handoff is not required for wipe because
+                        everyone in this company is deleted.
                       </p>
                       <Show when={wipeBlockers().length > 0}>
                         <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
-                          <p class="font-medium">Wipe blocked by FK preflight:</p>
+                          <p class="font-medium">Wipe is blocked — the company was not deleted:</p>
                           <ul class="mt-1 list-disc pl-4">
                             <For each={wipeBlockers()}>{(b) => <li>{b}</li>}</For>
                           </ul>
                         </div>
                       </Show>
                       <label class="block text-sm">
-                        Type company code to confirm
+                        Type company code {String(c().company_code)} to confirm
                         <input
                           class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
                           value={wipeCode()}
                           onInput={(e) => setWipeCode(e.currentTarget.value)}
                           placeholder={String(c().company_code ?? "")}
+                          aria-label="Type company code to confirm wipe"
                         />
                       </label>
                       <label class="flex items-start gap-2 text-sm">
@@ -314,7 +385,10 @@ export default function PlatformCustomerDetailPage() {
                           checked={wipeAck()}
                           onChange={(e) => setWipeAck(e.currentTarget.checked)}
                         />
-                        <span>I understand this is irreversible and business data will be destroyed.</span>
+                        <span>
+                          I understand this destroys the whole company, including the owner, and cannot be undone from
+                          the app.
+                        </span>
                       </label>
                       <div class="flex justify-end gap-2">
                         <button

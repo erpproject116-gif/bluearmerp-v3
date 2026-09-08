@@ -6,7 +6,7 @@ import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared
 import { submitEntity } from "../../../shared/handleSaveResult";
 import { useListState } from "../../../shared/useListState";
 import { useToast } from "../../../shared/toast";
-import { useAuth } from "../../../shared/auth-context";
+import { useAuth, PLATFORM_CONSOLE_EMAILS } from "../../../shared/auth-context";
 import { PermissionMatrix, type AccessLevel, type MatrixValue } from "../../../shared/PermissionMatrix";
 import {
   useInvalidateUserManagement,
@@ -262,7 +262,9 @@ export default function UsersPage() {
 
   const softDelete = async (row: TenantUserRow) => {
     if (row.is_owner) {
-      toast.warning("Cannot delete the tenant owner.");
+      toast.warning(
+        "Cannot delete the company owner from User Management. Transfer ownership to another active user first (More → Make company owner), then delete them. Close & wipe in Platform Command deletes the whole company — including this owner and all data.",
+      );
       return;
     }
     if (row.id === auth.me?.user?.id) {
@@ -384,6 +386,45 @@ export default function UsersPage() {
     navigate(`/app/user-management/user-permissions?userId=${row.id}`);
   };
 
+  const canTransferOwnership = () => {
+    const u = auth.me?.user;
+    if (!u) return false;
+    const email = (u.email ?? "").trim().toLowerCase();
+    return Boolean(u.is_platform_superadmin || u.is_tenant_owner || PLATFORM_CONSOLE_EMAILS.has(email));
+  };
+
+  const transferOwnership = async (row: TenantUserRow) => {
+    if (row.is_owner) {
+      toast.warning("This person is already the company owner.");
+      return;
+    }
+    if (row.status !== "active") {
+      toast.warning("Ownership can only move to an active user. Restore them first.");
+      return;
+    }
+    const company = auth.me?.tenant?.company_code || "this company";
+    if (
+      !confirm(
+        `Make ${row.full_name || row.email} the owner of ${company}?\n\nThe current owner stays as a user (store admin) and can be deleted after this. This does not wipe company data.`,
+      )
+    ) {
+      return;
+    }
+    setMenuOpenId(null);
+    const res = await apiFetch(
+      `/api/v1/user-management/users/${row.id}/transfer-ownership`,
+      { method: "POST", body: JSON.stringify({ acknowledge: true }) },
+      { silent: true },
+    );
+    if (!res.ok) {
+      toast.error(res.message ?? "Could not transfer ownership.");
+      return;
+    }
+    toast.success(res.message ?? `${row.full_name || row.email} is now the company owner.`);
+    invalidate.all();
+    await auth.refresh({ background: true });
+  };
+
   const rows = () => list.data?.rows ?? [];
 
   const hasMoreItems = (row: TenantUserRow) => {
@@ -404,7 +445,9 @@ export default function UsersPage() {
   return (
     <div class="space-y-3">
       <p class="text-sm text-text-secondary">
-        Invite people, assign a role (and optional groups), soft-delete/restore. The list defaults to{" "}
+        Invite people, assign a role (and optional groups), soft-delete/restore. The company owner cannot be deleted
+        until a platform superadmin or the current owner uses <strong>Make company owner</strong> on another active
+        user. The list defaults to{" "}
         <strong>Active + pending</strong> so outstanding invites stay visible until the person signs in with Google
         and joins — then their status becomes <strong>Active</strong>. Open <strong>Overrides</strong> only for
         exceptions. Limit customers/locations on{" "}
@@ -590,6 +633,20 @@ export default function UsersPage() {
               >
                 Data scopes
               </button>
+              <Show when={canTransferOwnership()}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="block w-full px-3 py-1.5 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
+                  onClick={() => {
+                    const row = menuRow()!;
+                    closeRowMenu();
+                    void transferOwnership(row);
+                  }}
+                >
+                  Make company owner
+                </button>
+              </Show>
             </Show>
             <Show when={menuRow()!.is_owner}>
               <button

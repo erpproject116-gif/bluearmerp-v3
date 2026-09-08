@@ -38,6 +38,16 @@ func isBootstrapSuperadminEmail(email string) bool {
 	return ok
 }
 
+// IsOperatorCompanyCode reports whether this is the Bluearm operator tenant (BLUEARM).
+func IsOperatorCompanyCode(code string) bool {
+	return strings.EqualFold(strings.TrimSpace(code), bluearmOperatorTenantCode)
+}
+
+// IsOperatorStoreOwnerEmail reports whether email is the required BLUEARM store owner.
+func IsOperatorStoreOwnerEmail(email string) bool {
+	return normalizeEmail(email) == bluearmStoreOwnerEmail
+}
+
 // IsPlatformConsoleEmail reports whether email may use the Platform console.
 func IsPlatformConsoleEmail(email string) bool {
 	return isBootstrapSuperadminEmail(email)
