@@ -134,7 +134,9 @@ func invBookSlipsSQL(tenantID, itemID int64, dateFrom, dateTo time.Time, locatio
 		  coalesce((%s), '') as serial_lot_nos,
 		  coalesce(l.location_name, '') as location_name,
 		  p.location_id,
-		  coalesce(p.movement_type, ''), coalesce(p.ref_type, ''), p.ref_id,
+		  coalesce(p.movement_type, '') as movement_type,
+		  coalesce(p.ref_type, '') as ref_type,
+		  p.ref_id,
 		  i.item_code, i.item_name
 		from period p
 		join public.inv_items i on i.id = p.item_id

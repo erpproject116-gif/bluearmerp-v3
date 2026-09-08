@@ -33,11 +33,17 @@ fi
 git log -1 --oneline
 
 docker inspect "$CONTAINER_NAME" --format '{{range .Config.Env}}{{println .}}{{end}}' > "$ENV_FILE"
+# Keep a durable copy so a failed stop/rm/run cycle cannot wipe secrets.
+if [ -s "$ENV_FILE" ] && grep -q '^DATABASE_URL=' "$ENV_FILE" && grep -q '^SUPABASE_URL=' "$ENV_FILE"; then
+  cp -f "$ENV_FILE" /tmp/bluearm-api.env.bak
+elif [ -f /tmp/bluearm-api.env.bak ] && grep -q '^DATABASE_URL=' /tmp/bluearm-api.env.bak; then
+  cp -f /tmp/bluearm-api.env.bak "$ENV_FILE"
+fi
 
 cd api
 docker build -t bluearm-api:latest .
 docker stop "$CONTAINER_NAME" 2>/dev/null || true
-docker rm "$CONTAINER_NAME" 2>/dev/null || true
+docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \

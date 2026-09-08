@@ -239,10 +239,15 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 		response.Err(w, http.StatusInternalServerError, "Failed to cancel subscriptions: "+err.Error(), "ERR_INTERNAL")
 		return
 	}
-	_, err = tx.Exec(r.Context(), `
-		update public.platform_customers set tenant_id = null, updated_at = now() where id = $1`, id)
-	if err != nil {
+	if _, err := tx.Exec(r.Context(), `
+		update public.platform_customers set tenant_id = null, updated_at = now() where id = $1`, id); err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to unlink customer.", "ERR_INTERNAL")
+		return
+	}
+	// Break users ↔ tenant_roles composite FK race before tenants CASCADE deletes both.
+	if _, err := tx.Exec(r.Context(), `delete from public.users where tenant_id = $1`, tenantID); err != nil {
+		log.Printf("console: wipe delete users tenant %d: %v", tenantID, err)
+		response.Err(w, http.StatusInternalServerError, "Failed to delete workspace users: "+err.Error(), "ERR_INTERNAL")
 		return
 	}
 	tag, err := tx.Exec(r.Context(), `delete from public.tenants where id = $1`, tenantID)
@@ -294,10 +299,11 @@ func (s *service) loadCustomerTenant(ctx context.Context, customerID int64) (ten
 // tenantWipeBlockers lists FK constraints that would block DELETE tenants:
 // 1) tenant_id → tenants without CASCADE/SET NULL
 // 2) any column → users without CASCADE/SET NULL (users cascade from tenants)
-// 3) any column → other tenant-scoped masters (partners/items/…) without CASCADE/SET NULL
+// 3) any FK → other tenant-scoped masters without CASCADE/SET NULL
+// Composite FKs are reported once (constraint name), not once per column.
 func (s *service) tenantWipeBlockers(ctx context.Context) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `
-		select format('%I.%I.%I → %s (ON DELETE %s)', n.nspname, cl.relname, a.attname, ref.relname,
+		select format('%I.%I.%I → %s (ON DELETE %s)', n.nspname, cl.relname, c.conname, ref.relname,
 		  case c.confdeltype
 		    when 'a' then 'NO ACTION'
 		    when 'r' then 'RESTRICT'
@@ -308,15 +314,23 @@ func (s *service) tenantWipeBlockers(ctx context.Context) ([]string, error) {
 		join pg_catalog.pg_namespace n on n.oid = cl.relnamespace
 		join pg_catalog.pg_class ref on ref.oid = c.confrelid
 		join pg_catalog.pg_namespace rn on rn.oid = ref.relnamespace
-		join lateral unnest(c.conkey) as u(attnum) on true
-		join pg_catalog.pg_attribute a
-		  on a.attrelid = c.conrelid and a.attnum = u.attnum and not a.attisdropped
 		where c.contype = 'f'
 		  and rn.nspname = 'public'
 		  and n.nspname = 'public'
 		  and c.confdeltype in ('a', 'r')
+		  -- Wipe deletes users before the tenant; users→tenant_roles is handled there.
+		  and not (cl.relname = 'users' and ref.relname = 'tenant_roles')
 		  and (
-		    (ref.relname = 'tenants' and a.attname = 'tenant_id')
+		    (
+		      ref.relname = 'tenants'
+		      and exists (
+		        select 1
+		        from unnest(c.conkey) as u(attnum)
+		        join pg_catalog.pg_attribute a
+		          on a.attrelid = c.conrelid and a.attnum = u.attnum and not a.attisdropped
+		        where a.attname = 'tenant_id'
+		      )
+		    )
 		    or ref.relname = 'users'
 		    or (
 		      ref.relname not in ('tenants', 'users')
