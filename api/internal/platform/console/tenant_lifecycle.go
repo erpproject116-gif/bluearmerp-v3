@@ -293,7 +293,8 @@ func (s *service) loadCustomerTenant(ctx context.Context, customerID int64) (ten
 
 // tenantWipeBlockers lists FK constraints that would block DELETE tenants:
 // 1) tenant_id → tenants without CASCADE/SET NULL
-// 2) any column → users without CASCADE/SET NULL (users themselves cascade from tenants)
+// 2) any column → users without CASCADE/SET NULL (users cascade from tenants)
+// 3) any column → other tenant-scoped masters (partners/items/…) without CASCADE/SET NULL
 func (s *service) tenantWipeBlockers(ctx context.Context) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `
 		select format('%I.%I.%I → %s (ON DELETE %s)', n.nspname, cl.relname, a.attname, ref.relname,
@@ -317,6 +318,20 @@ func (s *service) tenantWipeBlockers(ctx context.Context) ([]string, error) {
 		  and (
 		    (ref.relname = 'tenants' and a.attname = 'tenant_id')
 		    or ref.relname = 'users'
+		    or (
+		      ref.relname not in ('tenants', 'users')
+		      and exists (
+		        select 1
+		        from pg_catalog.pg_constraint tc
+		        join pg_catalog.pg_attribute ta
+		          on ta.attrelid = tc.conrelid and ta.attnum = any (tc.conkey) and not ta.attisdropped
+		        where tc.contype = 'f'
+		          and tc.conrelid = ref.oid
+		          and ta.attname = 'tenant_id'
+		          and tc.confrelid = 'public.tenants'::regclass
+		          and tc.confdeltype = 'c'
+		      )
+		    )
 		  )
 		order by 1`)
 	if err != nil {

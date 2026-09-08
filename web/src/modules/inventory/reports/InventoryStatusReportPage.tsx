@@ -16,6 +16,7 @@ import { DataTableScroll, ResizableTd, ResizableTh } from "../../../shared/Resiz
 import { useResizableColumns, type ColumnWidthDef } from "../../../shared/useResizableColumns";
 import { StocksHowItFits } from "../StocksHowItFits";
 import { FindStockUnitsModal, type FindStockUnitsTarget } from "./FindStockUnitsModal";
+import { InvBookLedgerModal, type InvBookLedgerTarget } from "./InvBookLedgerModal";
 
 type CategoryOpt = { id: number; name: string };
 type LocationOpt = { id: number; location_name: string; is_rma?: boolean; status?: string };
@@ -56,10 +57,6 @@ type MatrixItem = {
 
 function defaultFilters(): InventoryStatusFilters {
   return { view: "matrix" };
-}
-
-function itemHref(code: string) {
-  return `/app/inventory/items?q=${encodeURIComponent(code)}`;
 }
 
 function ledgerHref(itemId: number, locationId: number) {
@@ -201,6 +198,7 @@ export default function InventoryStatusReportPage() {
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [unitsTargetRow, setUnitsTargetRow] = createSignal<FindStockUnitsTarget | null>(null);
+  const [ledgerRow, setLedgerRow] = createSignal<InvBookLedgerTarget | null>(null);
   const pageSize = 50;
   let qDebounce: ReturnType<typeof setTimeout> | undefined;
 
@@ -308,10 +306,18 @@ export default function InventoryStatusReportPage() {
     });
   };
 
+  const openInvBook = (item: MatrixItem) => {
+    setLedgerRow({
+      item_id: item.item_id,
+      item_code: item.item_code,
+      item_name: item.item_name,
+    });
+  };
+
   return (
     <ReportPageLayout
-      title="Inv Per Branch"
-      description="One row per item with on-hand qty across branches (Ecount-style). Branch filter limits which items appear; columns still show every branch so you can compare. Drag column edges to resize. Filters apply live; F8 refreshes."
+      title="Inv. Balance by Location"
+      description="Item code, name, spec, prices, total on-hand, and qty per branch — click item code or name for Inv. Book. Print / CSV / PDF from the report toolbar. F8 refreshes."
       showDateFilters={false}
       submitted={true}
       loading={report.isFetching}
@@ -320,6 +326,7 @@ export default function InventoryStatusReportPage() {
       totalPages={totalPages()}
       onPageChange={setPage}
       onSearch={search}
+      exportFilename="inv-balance-by-location"
       onReset={() => {
         if (qDebounce) clearTimeout(qDebounce);
         setDraft(defaultFilters());
@@ -327,7 +334,7 @@ export default function InventoryStatusReportPage() {
         setSubmitted(defaultFilters());
         setGeneratedAt(new Date());
       }}
-      onExportCsv={() => void downloadReportCsv(inventoryStatusExportUrl(filters()), "find-stock.csv")}
+      onExportCsv={() => void downloadReportCsv(inventoryStatusExportUrl(filters()), "inv-balance-by-location.csv")}
       filterExtra={
         <div class="mt-4 space-y-3">
           <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -388,6 +395,11 @@ export default function InventoryStatusReportPage() {
     >
       <StocksHowItFits class="mb-4" />
       <FindStockUnitsModal target={unitsTargetRow()} onClose={() => setUnitsTargetRow(null)} />
+      <InvBookLedgerModal
+        open={ledgerRow() != null}
+        row={ledgerRow()}
+        onClose={() => setLedgerRow(null)}
+      />
       <Show when={matrixItems().length === 0 && !report.isFetching}>
         <ReportEmptyMessage
           message={
@@ -493,15 +505,27 @@ export default function InventoryStatusReportPage() {
                         width={widthFor("item_code")}
                         class="sticky left-0 z-[1] bg-inherit px-3 py-2 font-medium tabular-nums"
                       >
-                        {item.item_code}
+                        <button
+                          type="button"
+                          class="text-brand-700 hover:underline"
+                          aria-label={`Open inv. book for ${item.item_code}`}
+                          onClick={() => openInvBook(item)}
+                        >
+                          {item.item_code}
+                        </button>
                       </ResizableTd>
                       <ResizableTd
                         width={widthFor("item_name")}
                         class="sticky left-[7.5rem] z-[1] bg-inherit px-3 py-2"
                       >
-                        <A href={itemHref(item.item_code)} class="text-brand-700 hover:underline">
+                        <button
+                          type="button"
+                          class="text-left text-brand-700 hover:underline"
+                          aria-label={`Open inv. book for ${item.item_name}`}
+                          onClick={() => openInvBook(item)}
+                        >
                           {item.item_name}
-                        </A>
+                        </button>
                         <Show when={item.unit_code}>
                           <div class="text-[11px] text-text-secondary">{item.unit_code}</div>
                         </Show>

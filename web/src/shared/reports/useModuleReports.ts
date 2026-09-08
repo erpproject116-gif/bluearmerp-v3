@@ -519,6 +519,52 @@ export function useInvBookReport(params: () => ReportParams<InvBookFilters>) {
   });
 }
 
+export type InvBookSlipFilters = DateRangeFilters & {
+  item_id: number;
+  location_id?: number;
+};
+
+export type InvBookSlipRow = {
+  id: number;
+  is_beginning?: boolean;
+  created_at: string;
+  partner_name: string;
+  remark: string;
+  increase_qty: number;
+  release_qty: number;
+  inventory_qty: number;
+  serial_lot_nos: string;
+  location_name: string;
+  location_id?: number | null;
+  movement_type?: string;
+  ref_type?: string;
+  ref_id?: number | null;
+  item_code?: string;
+  item_name?: string;
+};
+
+export function useInvBookSlips(params: () => ReportParams<InvBookSlipFilters>) {
+  return createQuery(() => {
+    const p = params();
+    const qs = reportQs(p.filters as Record<string, string | number | null | undefined>, {
+      page: p.page,
+      pageSize: p.pageSize,
+      sort: p.sort,
+      order: p.order,
+    });
+    return {
+      queryKey: ["report-inv-book-slips", p.filters, p.page, p.pageSize, p.sort, p.order, p.runId ?? 0],
+      enabled: p.enabled && p.filters.item_id > 0,
+      queryFn: async () => {
+        const res = await apiFetch<InvBookSlipRow[]>(`/api/v1/inventory/reports/inv-book/slips?${qs}`);
+        if (!res.success) throw new Error(res.message ?? "Failed to load inv. book");
+        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+      },
+      staleTime: 0,
+    };
+  });
+}
+
 // --- AR/AP Status ---
 
 export type ArApStatusFilters = {

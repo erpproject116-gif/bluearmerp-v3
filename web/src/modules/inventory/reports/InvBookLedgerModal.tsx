@@ -1,32 +1,40 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
-import { A } from "@solidjs/router";
 import { Portal } from "solid-js/web";
-import { inventoryRefLink } from "../../../shared/inventoryRefLink";
 import { PageJumpControl } from "../../../shared/PageJumpControl";
+import { defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
 import { ReportLoadingOverlay } from "../../../shared/reports/ReportLoadingOverlay";
+import { GridExportButtons } from "../../../shared/gridExport";
 import {
-  useStockLedgerReport,
-  type InvBookFilters,
-  type InvBookRow,
-  type StockLedgerFilters,
+  useInvBookSlips,
+  type InvBookSlipFilters,
 } from "../../../shared/reports/useModuleReports";
 
-export type InvBookLedgerTarget = Pick<
-  InvBookRow,
-  "item_id" | "location_id" | "item_code" | "item_name" | "location_name"
->;
+export type InvBookLedgerTarget = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  location_id?: number;
+  location_name?: string;
+};
 
 type Props = {
   open: boolean;
   row: InvBookLedgerTarget | null;
-  period: InvBookFilters;
+  /** Period for slips; defaults to last ~30 days when omitted. */
+  period?: { date_from?: string; date_to?: string };
   onClose: () => void;
 };
+
+function fmtQty(n: number | undefined) {
+  if (n == null || !Number.isFinite(n) || Math.abs(n) < 0.0000001) return "";
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
 
 export function InvBookLedgerModal(props: Props) {
   const [page, setPage] = createSignal(1);
   const [runId, setRunId] = createSignal(0);
   const pageSize = 100;
+  let tableRoot: HTMLDivElement | undefined;
 
   createEffect(() => {
     if (!props.open || !props.row) return;
@@ -46,22 +54,31 @@ export function InvBookLedgerModal(props: Props) {
     onCleanup(() => window.removeEventListener("keydown", onKey));
   });
 
-  const filters = (): StockLedgerFilters => {
-    const row = props.row;
+  const period = (): { date_from: string; date_to: string } => {
+    const d = defaultReportDateRange();
     return {
-      date_from: props.period.date_from,
-      date_to: props.period.date_to,
-      item_id: row?.item_id,
+      date_from: props.period?.date_from || d.date_from,
+      date_to: props.period?.date_to || d.date_to,
+    };
+  };
+
+  const filters = (): InvBookSlipFilters => {
+    const row = props.row;
+    const p = period();
+    return {
+      date_from: p.date_from,
+      date_to: p.date_to,
+      item_id: row?.item_id ?? 0,
       location_id: row?.location_id,
     };
   };
 
-  const report = useStockLedgerReport(() => ({
+  const report = useInvBookSlips(() => ({
     filters: filters(),
     page: page(),
     pageSize,
     sort: "created_at",
-    order: "desc",
+    order: "asc",
     enabled: props.open && props.row != null,
     runId: runId(),
   }));
@@ -69,8 +86,8 @@ export function InvBookLedgerModal(props: Props) {
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
   const title = () => {
     const row = props.row;
-    if (!row) return "Stock Ledger";
-    return `${row.item_code} — ${row.item_name}`;
+    if (!row) return "Inv. Book";
+    return `${row.item_name} (${row.item_code})`;
   };
 
   return (
@@ -93,78 +110,81 @@ export function InvBookLedgerModal(props: Props) {
             <div class="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-stroke px-5 py-4">
               <div class="min-w-0">
                 <h2 id="inv-book-ledger-modal-title" class="truncate text-lg font-semibold text-text-primary">
-                  {title()}
+                  Inv. Book
                 </h2>
                 <p class="mt-0.5 text-sm text-text-secondary">
-                  Stock Ledger · {props.row!.location_name}
-                  <Show when={props.period.date_from || props.period.date_to}>
-                    {" "}
-                    · {props.period.date_from ?? "…"} → {props.period.date_to ?? "…"}
-                  </Show>
+                  {title()}
+                  <Show when={props.row?.location_name}> · {props.row!.location_name}</Show>
+                  {" · "}
+                  {period().date_from} → {period().date_to}
                 </p>
               </div>
-              <button
-                type="button"
-                class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:bg-slate-50"
-                aria-label="Close stock ledger"
-                onClick={() => props.onClose()}
-              >
-                Close
-              </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <GridExportButtons
+                  title={`Inv. Book — ${title()}`}
+                  filename={`inv-book-${props.row!.item_code}`}
+                  columns={[]}
+                  rows={() => []}
+                  scrapeRoot={() => tableRoot ?? null}
+                />
+                <button
+                  type="button"
+                  class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:bg-slate-50"
+                  aria-label="Close inv. book"
+                  onClick={() => props.onClose()}
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
-            <div class="min-h-0 flex-1 overflow-auto px-5 py-3">
+            <div class="min-h-0 flex-1 overflow-auto px-5 py-3" ref={(el) => (tableRoot = el)}>
               <ReportLoadingOverlay loading={report.isFetching}>
                 <table class="erp-grid min-w-full text-left text-sm">
                   <thead class="sticky top-0 z-[1] bg-brand-50 text-xs font-semibold uppercase text-brand-700">
                     <tr>
                       <th class="px-3 py-2">Date</th>
-                      <th class="px-3 py-2 text-right">Qty Delta</th>
-                      <th class="px-3 py-2 text-right">Balance</th>
-                      <th class="px-3 py-2">Type</th>
-                      <th class="px-3 py-2">Reference</th>
-                      <th class="px-3 py-2">Reason</th>
+                      <th class="px-3 py-2">Customer/Vendor Name</th>
+                      <th class="px-3 py-2">Remark</th>
+                      <th class="px-3 py-2 text-right">Increase</th>
+                      <th class="px-3 py-2 text-right">Release Qty</th>
+                      <th class="px-3 py-2 text-right">Inventory Qty</th>
+                      <th class="px-3 py-2">Serial/Lot No.</th>
+                      <th class="px-3 py-2">Location Name</th>
                     </tr>
                   </thead>
                   <tbody>
                     <For each={report.data?.rows ?? []}>
-                      {(row) => {
-                        const ref = () => inventoryRefLink(row.ref_type, row.ref_id);
-                        return (
-                          <tr class="border-t border-stroke/60">
-                            <td class="px-3 py-2 whitespace-nowrap">{row.created_at}</td>
-                            <td class="px-3 py-2 text-right">{row.qty_delta}</td>
-                            <td class="px-3 py-2 text-right">{row.running_balance}</td>
-                            <td class="px-3 py-2">{row.movement_type}</td>
-                            <td class="px-3 py-2">
-                              <Show when={ref().href} fallback={ref().label}>
-                                <A href={ref().href!} class="text-brand-600 hover:underline" onClick={() => props.onClose()}>
-                                  {ref().label}
-                                </A>
-                              </Show>
-                            </td>
-                            <td class="px-3 py-2">{row.reason ?? ""}</td>
-                          </tr>
-                        );
-                      }}
+                      {(row) => (
+                        <tr
+                          class={`border-t border-stroke/60 ${row.is_beginning ? "bg-amber-50/60 font-medium text-red-700" : ""}`}
+                        >
+                          <td class="px-3 py-2 whitespace-nowrap">{row.created_at?.slice?.(0, 10) ?? row.created_at}</td>
+                          <td class="px-3 py-2">{row.partner_name}</td>
+                          <td class="px-3 py-2 text-text-secondary">{row.remark}</td>
+                          <td class="px-3 py-2 text-right tabular-nums">{fmtQty(row.increase_qty)}</td>
+                          <td class="px-3 py-2 text-right tabular-nums">{fmtQty(row.release_qty)}</td>
+                          <td class="px-3 py-2 text-right tabular-nums font-medium">{fmtQty(row.inventory_qty)}</td>
+                          <td class="max-w-[14rem] px-3 py-2 text-xs break-words">{row.serial_lot_nos}</td>
+                          <td class="px-3 py-2 whitespace-nowrap">{row.location_name}</td>
+                        </tr>
+                      )}
                     </For>
                   </tbody>
                 </table>
                 <Show when={(report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
-                  <p class="px-2 py-8 text-center text-sm text-text-secondary">No movements in this date range.</p>
+                  <p class="px-2 py-8 text-center text-sm text-text-secondary">No inv. book movements in this date range.</p>
                 </Show>
                 <Show when={report.isError}>
                   <p class="px-2 py-4 text-center text-sm text-red-600">
-                    {(report.error as Error)?.message ?? "Failed to load stock ledger."}
+                    {(report.error as Error)?.message ?? "Failed to load inv. book."}
                   </p>
                 </Show>
               </ReportLoadingOverlay>
             </div>
 
             <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
-              <span class="text-text-secondary">
-                {report.data?.total ?? 0} movement{(report.data?.total ?? 0) === 1 ? "" : "s"}
-              </span>
+              <span class="text-text-secondary">{report.data?.total ?? 0} movement(s)</span>
               <div class="flex flex-wrap items-center gap-2">
                 <button
                   type="button"

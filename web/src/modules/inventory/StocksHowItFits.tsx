@@ -22,7 +22,7 @@ export function StocksHowItFits(props?: { class?: string }) {
         </li>
         <li>
           <A href="/app/inventory/find-stock" class="font-medium text-brand-700 hover:underline">
-            Inv Per Branch
+            Inv. Balance by Location
           </A>{" "}
           — on-hand qty by branch; serial pill when units are tracked (full list under Serials).
         </li>
