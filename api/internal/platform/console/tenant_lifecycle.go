@@ -291,11 +291,12 @@ func (s *service) loadCustomerTenant(ctx context.Context, customerID int64) (ten
 	return tenantID, companyCode, status, nil
 }
 
-// tenantWipeBlockers lists FK constraints from tables with tenant_id → tenants(id)
-// that are NOT ON DELETE CASCADE / SET NULL (would block DELETE tenants).
+// tenantWipeBlockers lists FK constraints that would block DELETE tenants:
+// 1) tenant_id → tenants without CASCADE/SET NULL
+// 2) any column → users without CASCADE/SET NULL (users themselves cascade from tenants)
 func (s *service) tenantWipeBlockers(ctx context.Context) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `
-		select format('%I.%I.tenant_id (ON DELETE %s)', n.nspname, cl.relname,
+		select format('%I.%I.%I → %s (ON DELETE %s)', n.nspname, cl.relname, a.attname, ref.relname,
 		  case c.confdeltype
 		    when 'a' then 'NO ACTION'
 		    when 'r' then 'RESTRICT'
@@ -304,19 +305,19 @@ func (s *service) tenantWipeBlockers(ctx context.Context) ([]string, error) {
 		from pg_catalog.pg_constraint c
 		join pg_catalog.pg_class cl on cl.oid = c.conrelid
 		join pg_catalog.pg_namespace n on n.oid = cl.relnamespace
+		join pg_catalog.pg_class ref on ref.oid = c.confrelid
+		join pg_catalog.pg_namespace rn on rn.oid = ref.relnamespace
 		join lateral unnest(c.conkey) as u(attnum) on true
 		join pg_catalog.pg_attribute a
 		  on a.attrelid = c.conrelid and a.attnum = u.attnum and not a.attisdropped
 		where c.contype = 'f'
-		  and c.confrelid = (
-		    select c2.oid
-		    from pg_catalog.pg_class c2
-		    join pg_catalog.pg_namespace n2 on n2.oid = c2.relnamespace
-		    where n2.nspname = 'public' and c2.relname = 'tenants'
-		    limit 1
-		  )
-		  and a.attname = 'tenant_id'
+		  and rn.nspname = 'public'
+		  and n.nspname = 'public'
 		  and c.confdeltype in ('a', 'r')
+		  and (
+		    (ref.relname = 'tenants' and a.attname = 'tenant_id')
+		    or ref.relname = 'users'
+		  )
 		order by 1`)
 	if err != nil {
 		return nil, err

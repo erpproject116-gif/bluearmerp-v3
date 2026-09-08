@@ -8,9 +8,11 @@ import { GridExportButtons } from "../gridExport";
 import { PageJumpControl } from "../PageJumpControl";
 import {
   inferReportDatePreset,
+  localISODate,
   ReportDatePresets,
   type ReportDatePresetId,
 } from "./ReportDatePresets";
+import { ReportLoadingOverlay } from "./ReportLoadingOverlay";
 
 export type ReportPageLayoutProps = {
   title: string;
@@ -34,7 +36,7 @@ export type ReportPageLayoutProps = {
   children: JSX.Element;
   /** Filename stem for client-side exports from the on-screen table. */
   exportFilename?: string;
-  /** When true, filter panel starts expanded. Default false (closed). */
+  /** When false, filter panel starts collapsed. Default true (open). */
   filtersOpenByDefault?: boolean;
 };
 
@@ -59,15 +61,16 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
       <CollapsibleFilterPanel
         title={props.title}
         description={props.description}
-        defaultOpen={props.filtersOpenByDefault === true}
+        defaultOpen={props.filtersOpenByDefault !== false}
         actions={
           <>
             <button
               type="button"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              disabled={props.loading === true}
               onClick={() => props.onSearch()}
             >
-              {uiLabel("reports.search_button", "Run Report")}
+              {props.loading ? "Running…" : uiLabel("reports.search_button", "Run Report")}
             </button>
             <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => props.onReset()}>
               {uiLabel("reports.reset_button")}
@@ -90,34 +93,32 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                 }
               }}
             />
-            <Show when={datePreset() === "custom"}>
-              <div class="flex flex-wrap items-end gap-3">
-                <label class="text-sm">
-                  <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
-                  <input
-                    type="date"
-                    class="rounded-lg border border-stroke px-3 py-2"
-                    value={props.dateFrom!()}
-                    onInput={(e) => {
-                      props.onDateFromChange!(e.currentTarget.value);
-                      setDatePreset("custom");
-                    }}
-                  />
-                </label>
-                <label class="text-sm">
-                  <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_to")}</span>
-                  <input
-                    type="date"
-                    class="rounded-lg border border-stroke px-3 py-2"
-                    value={props.dateTo!()}
-                    onInput={(e) => {
-                      props.onDateToChange!(e.currentTarget.value);
-                      setDatePreset("custom");
-                    }}
-                  />
-                </label>
-              </div>
-            </Show>
+            <div class="flex flex-wrap items-end gap-3">
+              <label class="text-sm">
+                <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
+                <input
+                  type="date"
+                  class="rounded-lg border border-stroke px-3 py-2"
+                  value={props.dateFrom!()}
+                  onInput={(e) => {
+                    props.onDateFromChange!(e.currentTarget.value);
+                    setDatePreset("custom");
+                  }}
+                />
+              </label>
+              <label class="text-sm">
+                <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_to")}</span>
+                <input
+                  type="date"
+                  class="rounded-lg border border-stroke px-3 py-2"
+                  value={props.dateTo!()}
+                  onInput={(e) => {
+                    props.onDateToChange!(e.currentTarget.value);
+                    setDatePreset("custom");
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </Show>
         <Show when={props.filterExtra}>{props.filterExtra}</Show>
@@ -141,7 +142,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
             />
           </div>
           <div class="overflow-x-auto px-5" ref={(el) => (reportBodyEl = el)}>
-            {props.children}
+            <ReportLoadingOverlay loading={props.loading === true}>{props.children}</ReportLoadingOverlay>
           </div>
           <div class="border-t border-stroke px-5 py-3">
             <PrintBrandingFooter
@@ -149,7 +150,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
             />
             <div class="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm">
               <Show when={props.loading}>
-                <span class="text-text-secondary">{uiLabel("common.loading")}</span>
+                <span class="font-medium text-brand-700">{uiLabel("common.loading", "Loading…")}</span>
               </Show>
               <div class="ml-auto flex flex-wrap items-center gap-2">
                 <Show when={props.onExportCsv}>
@@ -161,7 +162,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                   <button
                     type="button"
                     class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
-                    disabled={(props.page ?? 1) <= 1}
+                    disabled={(props.page ?? 1) <= 1 || props.loading === true}
                     onClick={() => props.onPageChange!(props.page! - 1)}
                   >
                     {uiLabel("reports.prev_page")}
@@ -175,7 +176,7 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                   <button
                     type="button"
                     class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
-                    disabled={(props.page ?? 1) >= (props.totalPages ?? 1)}
+                    disabled={(props.page ?? 1) >= (props.totalPages ?? 1) || props.loading === true}
                     onClick={() => props.onPageChange!(props.page! + 1)}
                   >
                     {uiLabel("reports.next_page")}
@@ -195,7 +196,7 @@ export function defaultReportDateRange(): { date_from: string; date_to: string }
   const from = new Date();
   from.setDate(from.getDate() - 30);
   return {
-    date_from: from.toISOString().slice(0, 10),
-    date_to: to.toISOString().slice(0, 10),
+    date_from: localISODate(from),
+    date_to: localISODate(to),
   };
 }

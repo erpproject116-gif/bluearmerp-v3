@@ -13,6 +13,7 @@ function defaultFilters(): OnHandFilters {
 export default function OnHandReportPage() {
   const [draft, setDraft] = createSignal<OnHandFilters>(defaultFilters());
   const [submitted, setSubmitted] = createSignal<OnHandFilters | null>(null);
+  const [runId, setRunId] = createSignal(0);
   const [page, setPage] = createSignal(1);
   const pageSize = 50;
 
@@ -23,6 +24,7 @@ export default function OnHandReportPage() {
     sort: "item_code",
     order: "asc",
     enabled: submitted() !== null,
+    runId: runId(),
   }));
 
   onMount(() => {
@@ -40,6 +42,7 @@ export default function OnHandReportPage() {
   const search = () => {
     setSubmitted({ ...draft() });
     setPage(1);
+    setRunId((n) => n + 1);
   };
 
   const patch = (p: Partial<OnHandFilters>) => setDraft((prev) => ({ ...prev, ...p }));

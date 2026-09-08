@@ -621,12 +621,29 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
         </div>
       </div>
       <Show when={isInitialLoading()}>
-        <p class="p-8 text-center text-sm text-text-secondary">{uiLabel("common.loading")}</p>
+        <div class="flex flex-col items-center justify-center gap-3 p-12" role="status" aria-live="polite" aria-busy="true">
+          <span
+            class="h-8 w-8 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600"
+            aria-hidden="true"
+          />
+          <p class="text-sm font-medium text-text-secondary">{uiLabel("common.loading")}</p>
+        </div>
       </Show>
       <Show when={!isInitialLoading()}>
         <div class="relative">
           <Show when={isRefreshing()}>
-            <div class="pointer-events-none absolute inset-0 z-[2] bg-white/40" aria-hidden="true" />
+            <div
+              class="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-2 bg-white/70 backdrop-blur-[1px]"
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <span
+                class="h-8 w-8 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600"
+                aria-hidden="true"
+              />
+              <p class="text-sm font-medium text-text-secondary">{uiLabel("common.loading")}</p>
+            </div>
           </Show>
           <DataTableScroll maxHeight="calc(100vh - 16rem)">
           <table

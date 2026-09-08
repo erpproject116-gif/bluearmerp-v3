@@ -7,6 +7,7 @@ export type SerialReportListParams = {
   sort: string;
   order: "asc" | "desc";
   enabled?: boolean;
+  runId?: number;
 };
 
 export type SerialStatusFilters = {
@@ -195,7 +196,7 @@ export function useSerialBookReport(params: () => SerialReportListParams & { fil
     const p = params();
     const qs = reportQs(p.filters as Record<string, string | number | boolean | undefined>, p);
     return {
-      queryKey: ["serial-report-book", p],
+      queryKey: ["serial-report-book", p.filters, p.page, p.pageSize, p.sort, p.order, p.runId ?? 0],
       enabled: p.enabled !== false,
       queryFn: async () => {
         const res = await apiFetch<SerialBookDetailRow[] | SerialBookSummaryRow[]>(
@@ -204,7 +205,7 @@ export function useSerialBookReport(params: () => SerialReportListParams & { fil
         if (!res.success) throw new Error(res.message ?? "Failed to load report");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0, view: p.filters.view ?? "general" };
       },
-      staleTime: 15_000,
+      staleTime: 0,
     };
   });
 }
@@ -257,12 +258,19 @@ export function useSerialReconciliationReport(
   });
 }
 
+function localISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function defaultSerialBookDateRange(): { date_from: string; date_to: string } {
   const to = new Date();
   const from = new Date();
   from.setDate(1);
   return {
-    date_from: from.toISOString().slice(0, 10),
-    date_to: to.toISOString().slice(0, 10),
+    date_from: localISODate(from),
+    date_to: localISODate(to),
   };
 }

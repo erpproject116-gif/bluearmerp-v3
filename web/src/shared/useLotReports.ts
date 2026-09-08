@@ -81,7 +81,7 @@ export function useLotBookReport(params: () => SerialReportListParams & { filter
     const p = params();
     const qs = reportQs(p.filters as Record<string, string | number | boolean | undefined>, p);
     return {
-      queryKey: ["lot-report-book", p],
+      queryKey: ["lot-report-book", p.filters, p.page, p.pageSize, p.sort, p.order, p.runId ?? 0],
       enabled: p.enabled !== false,
       queryFn: async () => {
         const res = await apiFetch<LotBookDetailRow[] | LotBookSummaryRow[]>(
@@ -90,9 +90,16 @@ export function useLotBookReport(params: () => SerialReportListParams & { filter
         if (!res.success) throw new Error(res.message ?? "Failed to load report");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0, view: p.filters.view ?? "general" };
       },
-      staleTime: 15_000,
+      staleTime: 0,
     };
   });
+}
+
+function localISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function defaultLotBookDateRange(): { date_from: string; date_to: string } {
@@ -100,7 +107,7 @@ export function defaultLotBookDateRange(): { date_from: string; date_to: string 
   const from = new Date();
   from.setDate(1);
   return {
-    date_from: from.toISOString().slice(0, 10),
-    date_to: to.toISOString().slice(0, 10),
+    date_from: localISODate(from),
+    date_to: localISODate(to),
   };
 }

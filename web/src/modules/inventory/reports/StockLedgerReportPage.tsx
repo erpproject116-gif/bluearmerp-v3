@@ -10,27 +10,35 @@ import {
   type StockLedgerFilters,
 } from "../../../shared/reports/useModuleReports";
 
+function defaultFilters(): StockLedgerFilters {
+  return { ...defaultReportDateRange(), q: "" };
+}
+
 export default function StockLedgerReportPage() {
   const [searchParams] = useSearchParams();
-  const defaults = defaultReportDateRange();
+  const [draft, setDraft] = createSignal<StockLedgerFilters>(defaultFilters());
+  const [applied, setApplied] = createSignal<StockLedgerFilters>(defaultFilters());
   const [submitted, setSubmitted] = createSignal(true);
+  const [runId, setRunId] = createSignal(0);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const [filters, setFilters] = createSignal<StockLedgerFilters>(defaults);
   const pageSize = 50;
 
   const report = useStockLedgerReport(() => ({
-    filters: filters(),
+    filters: applied(),
     page: page(),
     pageSize,
     sort: "created_at",
     order: "desc",
     enabled: submitted(),
+    runId: runId(),
   }));
 
   const search = () => {
+    setApplied({ ...draft() });
     setSubmitted(true);
     setPage(1);
+    setRunId((n) => n + 1);
     setGeneratedAt(new Date());
   };
 
@@ -51,8 +59,10 @@ export default function StockLedgerReportPage() {
     if (dateFrom) fromUrl.date_from = dateFrom;
     if (dateTo) fromUrl.date_to = dateTo;
     if (Object.keys(fromUrl).length > 0) {
-      setFilters((prev) => ({ ...prev, ...fromUrl }));
+      setDraft((prev) => ({ ...prev, ...fromUrl }));
+      setApplied((prev) => ({ ...prev, ...fromUrl }));
       setSubmitted(true);
+      setRunId((n) => n + 1);
       setGeneratedAt(new Date());
     }
     const onKey = (e: KeyboardEvent) => {
@@ -65,7 +75,7 @@ export default function StockLedgerReportPage() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const patch = (p: Partial<StockLedgerFilters>) => setFilters((prev) => ({ ...prev, ...p }));
+  const patch = (p: Partial<StockLedgerFilters>) => setDraft((prev) => ({ ...prev, ...p }));
 
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
 
@@ -73,8 +83,8 @@ export default function StockLedgerReportPage() {
     <ReportPageLayout
       title="Stock Ledger"
       description="Movement detail with running balance by item and location — Search (F8)."
-      dateFrom={() => filters().date_from ?? ""}
-      dateTo={() => filters().date_to ?? ""}
+      dateFrom={() => draft().date_from ?? ""}
+      dateTo={() => draft().date_to ?? ""}
       onDateFromChange={(v) => patch({ date_from: v })}
       onDateToChange={(v) => patch({ date_to: v })}
       submitted={submitted()}
@@ -85,21 +95,25 @@ export default function StockLedgerReportPage() {
       onPageChange={setPage}
       onSearch={search}
       onReset={() => {
-        setFilters(defaults);
+        const next = defaultFilters();
+        setDraft(next);
+        setApplied(next);
         setSubmitted(true);
         setPage(1);
+        setRunId((n) => n + 1);
+        setGeneratedAt(new Date());
       }}
-      onExportCsv={() => void downloadReportCsv(stockLedgerExportUrl(filters()), "stock-ledger.csv")}
+      onExportCsv={() => void downloadReportCsv(stockLedgerExportUrl(applied()), "stock-ledger.csv")}
       filterExtra={
         <div class="mt-4 grid gap-4 md:grid-cols-3">
           <Field label="Item keyword">
-            <input class={inputClass} value={filters().q ?? ""} onInput={(e) => patch({ q: e.currentTarget.value })} />
+            <input class={inputClass} value={draft().q ?? ""} onInput={(e) => patch({ q: e.currentTarget.value })} />
           </Field>
           <Field label="Item ID">
             <input
               type="number"
               class={inputClass}
-              value={filters().item_id ?? ""}
+              value={draft().item_id ?? ""}
               onInput={(e) => patch({ item_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
             />
           </Field>
@@ -107,8 +121,10 @@ export default function StockLedgerReportPage() {
             <input
               type="number"
               class={inputClass}
-              value={filters().location_id ?? ""}
-              onInput={(e) => patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
+              value={draft().location_id ?? ""}
+              onInput={(e) =>
+                patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
+              }
             />
           </Field>
         </div>

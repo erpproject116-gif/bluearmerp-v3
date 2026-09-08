@@ -38,6 +38,7 @@ export default function LotBookReportPage() {
   const navigate = useNavigate();
   const [draft, setDraft] = createSignal<LotBookFilters>(defaultFilters());
   const [submitted, setSubmitted] = createSignal<LotBookFilters>(defaultFilters());
+  const [runId, setRunId] = createSignal(0);
   const [page, setPage] = createSignal(1);
   const [sort, setSort] = createSignal("created_at");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
@@ -56,6 +57,7 @@ export default function LotBookReportPage() {
       order: order(),
       filters: f,
       enabled: true,
+      runId: runId(),
     };
   });
 
@@ -64,6 +66,7 @@ export default function LotBookReportPage() {
   const search = () => {
     setSubmitted({ ...draft() });
     setPage(1);
+    setRunId((n) => n + 1);
   };
 
   const reset = () => {
@@ -71,6 +74,7 @@ export default function LotBookReportPage() {
     setDraft(defaults);
     setSubmitted(defaults);
     setPage(1);
+    setRunId((n) => n + 1);
   };
 
   const toggleSort = (key: string) => {
@@ -102,8 +106,13 @@ export default function LotBookReportPage() {
         description="Lot slip ledger with increase / release / running inventory qty — Search (F8)."
         actions={
           <>
-            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
-              Search (F8)
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+              disabled={report.isFetching}
+              onClick={search}
+            >
+              {report.isFetching ? "Running…" : "Search (F8)"}
             </button>
             <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
               Reset

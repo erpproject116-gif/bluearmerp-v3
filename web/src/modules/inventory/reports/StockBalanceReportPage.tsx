@@ -5,6 +5,7 @@ import { stockBalanceExportUrl, useStockBalanceReport } from "../../../shared/re
 
 export default function StockBalanceReportPage() {
   const [submitted, setSubmitted] = createSignal(true);
+  const [runId, setRunId] = createSignal(0);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;
@@ -16,6 +17,7 @@ export default function StockBalanceReportPage() {
     sort: "item_code",
     order: "asc",
     enabled: submitted(),
+    runId: runId(),
   }));
 
   onMount(() => {
@@ -34,6 +36,7 @@ export default function StockBalanceReportPage() {
   const search = () => {
     setSubmitted(true);
     setPage(1);
+    setRunId((n) => n + 1);
     setGeneratedAt(new Date());
   };
 
@@ -54,6 +57,8 @@ export default function StockBalanceReportPage() {
       onReset={() => {
         setSubmitted(true);
         setPage(1);
+        setRunId((n) => n + 1);
+        setGeneratedAt(new Date());
       }}
       onExportCsv={() => void downloadReportCsv(stockBalanceExportUrl(), "stock-balance.csv")}
     >

@@ -13,6 +13,8 @@ export type ReportParams<F> = {
   sort: string;
   order: "asc" | "desc";
   enabled: boolean;
+  /** Increment on each Run Report so identical filters still refetch. */
+  runId?: number;
 };
 
 function reportQs(
@@ -230,7 +232,7 @@ export function stockBalanceExportUrl(): string {
   return "/api/v1/inventory/reports/stock-balance/export";
 }
 
-export function useStockBalanceReport(params: () => Omit<ReportParams<Record<string, never>>, "filters">) {
+export function useStockBalanceReport(params: () => Omit<ReportParams<Record<string, never>>, "filters"> & { filters?: Record<string, never> }) {
   return createQuery(() => {
     const p = params();
     const qs = reportQs({}, {
@@ -240,14 +242,14 @@ export function useStockBalanceReport(params: () => Omit<ReportParams<Record<str
       order: p.order,
     });
     return {
-      queryKey: ["report-stock-balance", p],
+      queryKey: ["report-stock-balance", p.page, p.pageSize, p.sort, p.order, p.runId ?? 0],
       enabled: p.enabled,
       queryFn: async () => {
         const res = await apiFetch<StockBalanceRow[]>(`/api/v1/inventory/reports/stock-balance?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load report");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 15_000,
+      staleTime: 0,
     };
   });
 }
@@ -287,21 +289,21 @@ export function stockLedgerExportUrl(filters: StockLedgerFilters): string {
 export function useStockLedgerReport(params: () => ReportParams<StockLedgerFilters>) {
   return createQuery(() => {
     const p = params();
-    const qs = reportQs(p.filters as Record<string, string>, {
+    const qs = reportQs(p.filters as Record<string, string | number | null | undefined>, {
       page: p.page,
       pageSize: p.pageSize,
       sort: p.sort,
       order: p.order,
     });
     return {
-      queryKey: ["report-stock-ledger", p],
+      queryKey: ["report-stock-ledger", p.filters, p.page, p.pageSize, p.sort, p.order, p.runId ?? 0],
       enabled: p.enabled,
       queryFn: async () => {
         const res = await apiFetch<StockLedgerRow[]>(`/api/v1/inventory/reports/stock-ledger?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load report");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 15_000,
+      staleTime: 0,
     };
   });
 }
@@ -391,14 +393,14 @@ export function useOnHandReport(params: () => ReportParams<OnHandFilters>) {
       order: p.order,
     });
     return {
-      queryKey: ["report-on-hand", p],
+      queryKey: ["report-on-hand", p.filters, p.page, p.pageSize, p.sort, p.order, p.runId ?? 0],
       enabled: p.enabled,
       queryFn: async () => {
         const res = await apiFetch<OnHandRow[]>(`/api/v1/inventory/reports/on-hand?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load report");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 15_000,
+      staleTime: 0,
     };
   });
 }
@@ -498,21 +500,21 @@ export function invBookExportUrl(filters: InvBookFilters): string {
 export function useInvBookReport(params: () => ReportParams<InvBookFilters>) {
   return createQuery(() => {
     const p = params();
-    const qs = reportQs(p.filters as Record<string, string>, {
+    const qs = reportQs(p.filters as Record<string, string | number | null | undefined>, {
       page: p.page,
       pageSize: p.pageSize,
       sort: p.sort,
       order: p.order,
     });
     return {
-      queryKey: ["report-inv-book", p],
+      queryKey: ["report-inv-book", p.filters, p.page, p.pageSize, p.sort, p.order, p.runId ?? 0],
       enabled: p.enabled,
       queryFn: async () => {
         const res = await apiFetch<InvBookRow[]>(`/api/v1/inventory/reports/inv-book?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load report");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 15_000,
+      staleTime: 0,
     };
   });
 }
