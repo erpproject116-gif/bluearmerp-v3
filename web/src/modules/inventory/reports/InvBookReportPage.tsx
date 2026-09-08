@@ -5,21 +5,7 @@ import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { invBookExportUrl, useInvBookReport, type InvBookFilters } from "../../../shared/reports/useModuleReports";
 import { formatPeso } from "../../../shared/money";
 import { InvBookFamilyNav } from "../InvBookFamilyNav";
-
-function stockLedgerHref(row: { item_id: number; location_id: number }, filters: InvBookFilters): string {
-  const qs = new URLSearchParams();
-  qs.set("item_id", String(row.item_id));
-  qs.set("location_id", String(row.location_id));
-  if (filters.date_from) qs.set("date_from", filters.date_from);
-  if (filters.date_to) qs.set("date_to", filters.date_to);
-  return `/app/inventory/reports/stock-ledger?${qs.toString()}`;
-}
-
-function openItemLedgerWindow(row: { item_id: number; location_id: number; item_code: string }, filters: InvBookFilters) {
-  const href = stockLedgerHref(row, filters);
-  const name = `inv-book-ledger-${row.item_id}-${row.location_id}`;
-  window.open(href, name, "noopener,noreferrer,width=1280,height=840");
-}
+import { InvBookLedgerModal, type InvBookLedgerTarget } from "./InvBookLedgerModal";
 
 function defaultFilters(): InvBookFilters {
   return { ...defaultReportDateRange(), q: "" };
@@ -32,6 +18,7 @@ export default function InvBookReportPage() {
   const [runId, setRunId] = createSignal(0);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
+  const [ledgerRow, setLedgerRow] = createSignal<InvBookLedgerTarget | null>(null);
   const pageSize = 50;
 
   const report = useInvBookReport(() => ({
@@ -66,6 +53,8 @@ export default function InvBookReportPage() {
 
   const patch = (p: Partial<InvBookFilters>) => setDraft((prev) => ({ ...prev, ...p }));
 
+  const openLedger = (row: InvBookLedgerTarget) => setLedgerRow(row);
+
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
 
   return (
@@ -73,7 +62,7 @@ export default function InvBookReportPage() {
       <InvBookFamilyNav active="item" />
       <ReportPageLayout
         title="Item Inv. Book"
-        description="Opening, receipt, issue, and closing qty by item and location — click a row to open that item’s Stock Ledger window."
+        description="Opening, receipt, issue, and closing qty by item and location — click a row to view that item’s Stock Ledger."
         dateFrom={() => draft().date_from ?? ""}
         dateTo={() => draft().date_to ?? ""}
         onDateFromChange={(v) => patch({ date_from: v })}
@@ -142,11 +131,11 @@ export default function InvBookReportPage() {
                   class="cursor-pointer border-t border-stroke/60 hover:bg-brand-50/40"
                   tabindex={0}
                   aria-label={`Open stock ledger for ${row.item_code} at ${row.location_name}`}
-                  onClick={() => openItemLedgerWindow(row, applied())}
+                  onClick={() => openLedger(row)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      openItemLedgerWindow(row, applied());
+                      openLedger(row);
                     }
                   }}
                 >
@@ -181,6 +170,13 @@ export default function InvBookReportPage() {
           </p>
         </Show>
       </ReportPageLayout>
+
+      <InvBookLedgerModal
+        open={ledgerRow() != null}
+        row={ledgerRow()}
+        period={applied()}
+        onClose={() => setLedgerRow(null)}
+      />
     </>
   );
 }

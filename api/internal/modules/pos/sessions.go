@@ -172,7 +172,7 @@ func listSessions(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		q := fmt.Sprintf(`
 			select s.id, s.session_no, s.location_id, coalesce(l.location_name, ''),
-			  s.cashier_user_id, coalesce(u.full_name, ''),
+			  coalesce(s.cashier_user_id, 0), coalesce(u.full_name, ''),
 			  s.status, s.opening_cash::float8, s.closing_cash::float8, s.sales_total::float8,
 			  s.opened_at::text, s.closed_at::text, s.notes, count(*) over()
 			from public.pos_sessions s
@@ -886,7 +886,7 @@ func loadSession(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (S
 	var closed *string
 	var notes *string
 	err := pool.QueryRow(ctx, `
-		select s.id, s.session_no, s.location_id, coalesce(l.location_name,''), s.cashier_user_id, coalesce(u.full_name,''),
+		select s.id, s.session_no, s.location_id, coalesce(l.location_name,''), coalesce(s.cashier_user_id, 0), coalesce(u.full_name,''),
 		  s.status, s.opening_cash::float8, s.closing_cash::float8, s.sales_total::float8, s.opened_at::text, s.closed_at::text, s.notes
 		from public.pos_sessions s
 		left join public.inv_locations l on l.id=s.location_id
