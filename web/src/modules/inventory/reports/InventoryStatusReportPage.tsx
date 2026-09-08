@@ -45,6 +45,7 @@ type MatrixItem = {
   item_id: number;
   item_code: string;
   item_name: string;
+  spec_name: string;
   category_name: string;
   unit_code: string;
   purchase_price: number;
@@ -100,9 +101,8 @@ function fmtQty(n: number) {
   return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "";
 }
 
-/** Merge duplicate location names (case-insensitive) into one column; sum qty when reading cells. */
+/** One column per tenant branch (non-RMA). Prefer active locations; still merge duplicate names. */
 function buildBranchCols(locs: LocationOpt[], rows: InventoryStatusRow[]): BranchCol[] {
-  // Include inactive non-RMA so duplicate "HQ" rows still merge into one column (qty summed).
   const source = locs.filter((l) => !l.is_rma);
 
   const byName = new Map<string, BranchCol>();
@@ -119,9 +119,9 @@ function buildBranchCols(locs: LocationOpt[], rows: InventoryStatusRow[]): Branc
 
   if (source.length > 0) {
     for (const l of source) push(l.id, l.location_name);
-  } else {
-    for (const r of rows) push(r.location_id, r.branch_name || r.location_name);
   }
+  // Ensure any location present in stock rows still gets a column (e.g. locations API truncated).
+  for (const r of rows) push(r.location_id, r.branch_name || r.location_name);
 
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -167,6 +167,7 @@ function pivotRows(rows: InventoryStatusRow[]): MatrixItem[] {
         item_id: r.item_id,
         item_code: r.item_code,
         item_name: r.item_name,
+        spec_name: r.spec_name ?? "",
         category_name: r.category_name ?? "",
         unit_code: r.unit_code ?? "",
         purchase_price: r.purchase_price ?? 0,
@@ -279,10 +280,10 @@ export default function InventoryStatusReportPage() {
     const fixed: ColumnWidthDef[] = [
       { key: "item_code", width: 120, minWidth: 88 },
       { key: "item_name", width: 220, minWidth: 140 },
-      { key: "spec", width: 120, minWidth: 80 },
-      { key: "purchase", width: 100, minWidth: 72 },
-      { key: "vip", width: 100, minWidth: 72 },
-      { key: "sales", width: 100, minWidth: 72 },
+      { key: "spec", width: 160, minWidth: 100 },
+      { key: "purchase", width: 120, minWidth: 88 },
+      { key: "vip", width: 110, minWidth: 80 },
+      { key: "sales", width: 110, minWidth: 80 },
       { key: "total", width: 88, minWidth: 64 },
     ];
     return [
@@ -317,7 +318,7 @@ export default function InventoryStatusReportPage() {
   return (
     <ReportPageLayout
       title="Inv. Balance by Location"
-      description="Item code, name, spec, prices, total on-hand, and qty per branch — click item code or name for Inv. Book. Print / CSV / PDF from the report toolbar. F8 refreshes."
+      description="Item Code, Item Name, Item Specs, prices, Total on-hand, and qty for every branch — click item code or name for Inv. Book. Print / CSV / PDF from the report toolbar. F8 refreshes."
       showDateFilters={false}
       submitted={true}
       loading={report.isFetching}
@@ -436,7 +437,7 @@ export default function InventoryStatusReportPage() {
                   onResizeStart={onResizeStart}
                   class="sticky left-0 z-20 bg-brand-50 px-3 py-2"
                 >
-                  Item code
+                  Item Code
                 </ResizableTh>
                 <ResizableTh
                   columnKey="item_name"
@@ -444,10 +445,10 @@ export default function InventoryStatusReportPage() {
                   onResizeStart={onResizeStart}
                   class="sticky left-[7.5rem] z-20 bg-brand-50 px-3 py-2"
                 >
-                  Item name
+                  Item Name
                 </ResizableTh>
                 <ResizableTh columnKey="spec" width={widthFor("spec")} onResizeStart={onResizeStart} class="px-3 py-2">
-                  Spec.
+                  Item Specs
                 </ResizableTh>
                 <ResizableTh
                   columnKey="purchase"
@@ -455,7 +456,7 @@ export default function InventoryStatusReportPage() {
                   onResizeStart={onResizeStart}
                   class="px-3 py-2 text-right"
                 >
-                  Purchase
+                  Purchase Price
                 </ResizableTh>
                 <ResizableTh
                   columnKey="vip"
@@ -463,7 +464,7 @@ export default function InventoryStatusReportPage() {
                   onResizeStart={onResizeStart}
                   class="px-3 py-2 text-right"
                 >
-                  VIP
+                  VIP Price
                 </ResizableTh>
                 <ResizableTh
                   columnKey="sales"
@@ -471,7 +472,7 @@ export default function InventoryStatusReportPage() {
                   onResizeStart={onResizeStart}
                   class="px-3 py-2 text-right"
                 >
-                  Sales
+                  Sales Price
                 </ResizableTh>
                 <ResizableTh
                   columnKey="total"
@@ -531,7 +532,7 @@ export default function InventoryStatusReportPage() {
                         </Show>
                       </ResizableTd>
                       <ResizableTd width={widthFor("spec")} class="px-3 py-2 text-text-secondary">
-                        {item.category_name || "—"}
+                        {item.spec_name || "—"}
                       </ResizableTd>
                       <ResizableTd width={widthFor("purchase")} class="px-3 py-2 text-right tabular-nums">
                         {formatMoney(item.purchase_price)}

@@ -152,6 +152,13 @@ func listInvBookSlips(pool *pgxpool.Pool) http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if dateFrom == nil || dateTo == nil {
+			response.Validation(w, map[string]string{
+				"date_from": "Start date is required.",
+				"date_to":   "End date is required.",
+			})
+			return
+		}
 		itemID, errID := parseOptionalItemID(r)
 		if errID != nil || itemID == nil || *itemID <= 0 {
 			response.Validation(w, map[string]string{"item_id": "Item ID is required."})

@@ -426,6 +426,7 @@ export type InventoryStatusRow = {
   unit_code?: string;
   category_id?: number | null;
   category_name: string;
+  spec_name?: string;
   location_id: number;
   location_name: string;
   branch_name: string;

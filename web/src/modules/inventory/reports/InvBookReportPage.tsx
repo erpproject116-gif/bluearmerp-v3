@@ -1,14 +1,19 @@
-import { createSignal, For, onMount, Show } from "solid-js";
-import { ReportPageLayout, defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
+import { createResource, createSignal, For, onMount, Show } from "solid-js";
+import { ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
+import { resolveReportDatePreset } from "../../../shared/reports/ReportDatePresets";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { invBookExportUrl, useInvBookReport, type InvBookFilters } from "../../../shared/reports/useModuleReports";
 import { formatPeso } from "../../../shared/money";
+import { apiFetch } from "../../../shared/api";
 import { InvBookFamilyNav } from "../InvBookFamilyNav";
 import { InvBookLedgerModal, type InvBookLedgerTarget } from "./InvBookLedgerModal";
 
+type LocationOpt = { id: number; location_name: string; is_rma?: boolean; status?: string };
+
 function defaultFilters(): InvBookFilters {
-  return { ...defaultReportDateRange(), q: "" };
+  const range = resolveReportDatePreset("this_month")!;
+  return { date_from: range.date_from, date_to: range.date_to, q: "" };
 }
 
 export default function InvBookReportPage() {
@@ -19,7 +24,15 @@ export default function InvBookReportPage() {
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [ledgerRow, setLedgerRow] = createSignal<InvBookLedgerTarget | null>(null);
+  const [filterError, setFilterError] = createSignal("");
   const pageSize = 50;
+
+  const [locations] = createResource(async () => {
+    const res = await apiFetch<LocationOpt[]>(
+      "/api/v1/inventory/locations?page=1&pageSize=500&sort=location_name&order=asc",
+    );
+    return res.success ? (res.data ?? []) : [];
+  });
 
   const report = useInvBookReport(() => ({
     filters: applied(),
@@ -27,7 +40,7 @@ export default function InvBookReportPage() {
     pageSize,
     sort: "item_code",
     order: "asc",
-    enabled: submitted(),
+    enabled: submitted() && Boolean(applied().date_from && applied().date_to),
     runId: runId(),
   }));
 
@@ -44,7 +57,13 @@ export default function InvBookReportPage() {
   });
 
   const search = () => {
-    setApplied({ ...draft() });
+    const next = { ...draft() };
+    if (!next.date_from || !next.date_to) {
+      setFilterError("Choose a From and To date (or a period preset), then Run Report.");
+      return;
+    }
+    setFilterError("");
+    setApplied(next);
     setSubmitted(true);
     setPage(1);
     setRunId((n) => n + 1);
@@ -57,12 +76,15 @@ export default function InvBookReportPage() {
 
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
 
+  const branchOptions = () =>
+    (locations() ?? []).filter((l) => !l.is_rma && (l.status == null || l.status === "active"));
+
   return (
     <>
       <InvBookFamilyNav active="item" />
       <ReportPageLayout
         title="Item Inv. Book"
-        description="Opening, receipt, issue, and closing qty by item and location — click a row to view that item’s Stock Ledger."
+        description="Opening, receipt, issue, and closing qty by item and location — click a row to view that item’s Inv. Book slips."
         dateFrom={() => draft().date_from ?? ""}
         dateTo={() => draft().date_to ?? ""}
         onDateFromChange={(v) => patch({ date_from: v })}
@@ -78,6 +100,7 @@ export default function InvBookReportPage() {
           const next = defaultFilters();
           setDraft(next);
           setApplied(next);
+          setFilterError("");
           setSubmitted(true);
           setPage(1);
           setRunId((n) => n + 1);
@@ -87,7 +110,12 @@ export default function InvBookReportPage() {
         filterExtra={
           <div class="mt-4 grid gap-4 md:grid-cols-3">
             <Field label="Item keyword">
-              <input class={inputClass} value={draft().q ?? ""} onInput={(e) => patch({ q: e.currentTarget.value })} />
+              <input
+                class={inputClass}
+                placeholder="Code, name, or specs…"
+                value={draft().q ?? ""}
+                onInput={(e) => patch({ q: e.currentTarget.value })}
+              />
             </Field>
             <Field label="Item ID">
               <input
@@ -97,16 +125,21 @@ export default function InvBookReportPage() {
                 onInput={(e) => patch({ item_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
               />
             </Field>
-            <Field label="Location ID">
-              <input
-                type="number"
+            <Field label="Location">
+              <select
                 class={inputClass}
                 value={draft().location_id ?? ""}
-                onInput={(e) =>
+                onChange={(e) =>
                   patch({ location_id: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })
                 }
-              />
+              >
+                <option value="">All locations</option>
+                <For each={branchOptions()}>{(l) => <option value={l.id}>{l.location_name}</option>}</For>
+              </select>
             </Field>
+            <Show when={filterError()}>
+              <p class="md:col-span-3 text-sm text-red-600">{filterError()}</p>
+            </Show>
           </div>
         }
       >
@@ -130,7 +163,7 @@ export default function InvBookReportPage() {
                 <tr
                   class="cursor-pointer border-t border-stroke/60 hover:bg-brand-50/40"
                   tabindex={0}
-                  aria-label={`Open stock ledger for ${row.item_code} at ${row.location_name}`}
+                  aria-label={`Open inv. book slips for ${row.item_code} at ${row.location_name}`}
                   onClick={() => openLedger(row)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -155,7 +188,7 @@ export default function InvBookReportPage() {
             </For>
           </tbody>
         </table>
-        <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
+        <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching && !report.isError}>
           <p class="px-5 py-8 text-center text-sm text-text-secondary">
             No inventory book rows for this period. Try a wider date range, or post stock movements via{" "}
             <a class="text-brand-600 hover:underline" href="/app/inventory/stock-entries">

@@ -45,7 +45,7 @@ func invBookSQL(tenantID int64, dateFrom, dateTo time.Time, itemID, locationID *
 		n++
 	}
 	if strings.TrimSpace(q) != "" {
-		extra += fmt.Sprintf(" and (i.item_code ilike $%d or i.item_name ilike $%d)", n, n)
+		extra += fmt.Sprintf(" and (i.item_code ilike $%d or i.item_name ilike $%d or coalesce(i.spec_name,'') ilike $%d)", n, n, n)
 		args = append(args, "%"+strings.TrimSpace(q)+"%")
 	}
 	qry := `
@@ -65,15 +65,16 @@ func invBookSQL(tenantID int64, dateFrom, dateTo time.Time, itemID, locationID *
 		  where sm.tenant_id = $1
 		  group by sm.item_id, sm.location_id
 		)
-		select i.id, i.item_code, i.item_name, l.id, l.location_name,
+		select i.id as item_id, i.item_code, i.item_name, l.id as location_id, l.location_name,
 		  m.opening_qty, m.receipt_qty, m.issue_qty,
 		  (m.opening_qty + m.receipt_qty - m.issue_qty)::float8 as closing_qty,
-		  coalesce(i.purchase_price, 0)::float8, coalesce(i.sales_price, 0)::float8,
-		  coalesce(i.vip_price, 0)::float8
+		  coalesce(i.purchase_price, 0)::float8 as purchase_price,
+		  coalesce(i.sales_price, 0)::float8 as sales_price,
+		  coalesce(i.vip_price, 0)::float8 as vip_price
 		from movements m
-		join public.inv_items i on i.id = m.item_id
-		join public.inv_locations l on l.id = m.location_id
-		where m.opening_qty <> 0 or m.receipt_qty <> 0 or m.issue_qty <> 0` + extra
+		join public.inv_items i on i.id = m.item_id and i.tenant_id = $1 and i.deleted_at is null
+		join public.inv_locations l on l.id = m.location_id and l.tenant_id = $1 and l.deleted_at is null
+		where (m.opening_qty <> 0 or m.receipt_qty <> 0 or m.issue_qty <> 0)` + extra
 	return qry, args
 }
 
@@ -83,6 +84,13 @@ func listInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		dateFrom, dateTo, ok := reports.ValidationDateRange(w, r)
 		if !ok {
+			return
+		}
+		if dateFrom == nil || dateTo == nil {
+			response.Validation(w, map[string]string{
+				"date_from": "Start date is required.",
+				"date_to":   "End date is required.",
+			})
 			return
 		}
 		p := httputil.ParseListParams(r, "item_code", allowed)
@@ -127,6 +135,13 @@ func exportInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		dateFrom, dateTo, ok := reports.ValidationDateRange(w, r)
 		if !ok {
+			return
+		}
+		if dateFrom == nil || dateTo == nil {
+			response.Validation(w, map[string]string{
+				"date_from": "Start date is required.",
+				"date_to":   "End date is required.",
+			})
 			return
 		}
 		itemID, _ := parseOptionalItemID(r)

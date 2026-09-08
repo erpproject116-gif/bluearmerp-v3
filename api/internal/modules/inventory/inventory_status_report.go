@@ -33,6 +33,7 @@ type inventoryStatusRow struct {
 	UnitCode            string   `json:"unit_code"`
 	CategoryID          *int64   `json:"category_id,omitempty"`
 	CategoryName        string   `json:"category_name"`
+	SpecName            string   `json:"spec_name"`
 	LocationID          int64    `json:"location_id"`
 	LocationName        string   `json:"location_name"`
 	BranchName          string   `json:"branch_name"`
@@ -66,6 +67,7 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 		  coalesce(bu.code, coalesce(i.unit, '')) as unit_code,
 		  i.item_category_id as category_id,
 		  coalesce(c.name, coalesce(i.item_category, '')) as category_name,
+		  coalesce(i.spec_name, '') as spec_name,
 		  l.id as location_id, l.location_name,
 		  l.location_name as branch_name,
 		  bal.qty_on_hand::float8,
@@ -252,6 +254,7 @@ func inventoryStatusMatrixExpandSQL(tenantID int64, itemIDs []int64) (string, []
 		  coalesce(bu.code, coalesce(i.unit, '')) as unit_code,
 		  i.item_category_id as category_id,
 		  coalesce(c.name, coalesce(i.item_category, '')) as category_name,
+		  coalesce(i.spec_name, '') as spec_name,
 		  l.id as location_id,
 		  l.location_name,
 		  l.location_name as branch_name,
@@ -388,7 +391,7 @@ func scanInventoryStatusRow(rows interface {
 	var reorder *float64
 	err := rows.Scan(
 		&row.ItemID, &row.ItemCode, &row.ItemName, &row.ItemStatus, &row.UnitCode,
-		&row.CategoryID, &row.CategoryName,
+		&row.CategoryID, &row.CategoryName, &row.SpecName,
 		&row.LocationID, &row.LocationName, &row.BranchName,
 		&row.QtyOnHand, &row.QtyReserved, &row.AvailableQty,
 		&row.PurchasePrice, &row.VIPPrice, &row.SalesPrice, &row.CompanyAvailableQty,
@@ -535,7 +538,7 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Disposition", `attachment; filename="find-stock.csv"`)
 		cw := csv.NewWriter(w)
 		_ = cw.Write([]string{
-			"Item Code", "Item Name", "Unit", "Item Status", "Category", "Branch/Location",
+			"Item Code", "Item Name", "Item Specs", "Unit", "Item Status", "Category", "Branch/Location",
 			"Qty On Hand", "Qty Reserved", "Available", "Purchase Price", "VIP Price", "Sales Price", "Company Available",
 			"Reorder Level", "Stock Status", "Track Serial", "Track Lot", "Serials In Stock", "Lot Batches",
 			"Last Sold At", "Last Sold By", "Last Sold Ref", "Last Movement At", "Last Movement Type",
@@ -563,7 +566,7 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 				movedAt = *row.LastMovementAt
 			}
 			_ = cw.Write([]string{
-				row.ItemCode, row.ItemName, row.UnitCode, row.ItemStatus, row.CategoryName, row.BranchName,
+				row.ItemCode, row.ItemName, row.SpecName, row.UnitCode, row.ItemStatus, row.CategoryName, row.BranchName,
 				fmt.Sprintf("%.4f", row.QtyOnHand), fmt.Sprintf("%.4f", row.QtyReserved), fmt.Sprintf("%.4f", row.AvailableQty),
 				fmt.Sprintf("%.4f", row.PurchasePrice), fmt.Sprintf("%.4f", row.VIPPrice),
 				fmt.Sprintf("%.4f", row.SalesPrice), fmt.Sprintf("%.4f", row.CompanyAvailableQty),

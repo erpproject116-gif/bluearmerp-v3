@@ -43,13 +43,15 @@ export type ReportPageLayoutProps = {
 export function ReportPageLayout(props: ReportPageLayoutProps) {
   const auth = useAuth();
   const showDates = () => props.showDateFilters !== false && props.dateFrom && props.dateTo;
-  const initialPreset = (): ReportDatePresetId => {
+  /** When user clicks Custom, keep it highlighted even if dates still match a preset. */
+  const [customOverride, setCustomOverride] = createSignal(false);
+  const datePreset = (): ReportDatePresetId => {
+    if (customOverride()) return "custom";
     if (props.dateFrom && props.dateTo) {
       return inferReportDatePreset(props.dateFrom(), props.dateTo());
     }
     return "custom";
   };
-  const [datePreset, setDatePreset] = createSignal<ReportDatePresetId>(initialPreset());
   let reportBodyEl: HTMLDivElement | undefined;
 
   const exportName = () =>
@@ -86,8 +88,12 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
             <ReportDatePresets
               value={datePreset()}
               onChange={(preset, range) => {
-                setDatePreset(preset);
-                if (range && props.onDateFromChange && props.onDateToChange) {
+                if (preset === "custom" || !range) {
+                  setCustomOverride(true);
+                  return;
+                }
+                setCustomOverride(false);
+                if (props.onDateFromChange && props.onDateToChange) {
                   props.onDateFromChange(range.date_from);
                   props.onDateToChange(range.date_to);
                 }
@@ -98,11 +104,12 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                 <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
                 <input
                   type="date"
+                  required
                   class="rounded-lg border border-stroke px-3 py-2"
-                  value={props.dateFrom!()}
+                  value={props.dateFrom!() || ""}
                   onInput={(e) => {
+                    setCustomOverride(true);
                     props.onDateFromChange!(e.currentTarget.value);
-                    setDatePreset("custom");
                   }}
                 />
               </label>
@@ -110,11 +117,12 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                 <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_to")}</span>
                 <input
                   type="date"
+                  required
                   class="rounded-lg border border-stroke px-3 py-2"
-                  value={props.dateTo!()}
+                  value={props.dateTo!() || ""}
                   onInput={(e) => {
+                    setCustomOverride(true);
                     props.onDateToChange!(e.currentTarget.value);
-                    setDatePreset("custom");
                   }}
                 />
               </label>
