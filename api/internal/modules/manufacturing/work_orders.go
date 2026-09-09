@@ -62,6 +62,8 @@ type MaterialNeedLine struct {
 	StockUnitCode   string  `json:"stock_unit_code"`
 	QtyOnHand       float64 `json:"qty_on_hand"`
 	Shortage        float64 `json:"shortage"`
+	StagedQty       float64 `json:"staged_qty,omitempty"`
+	TrackLot        bool    `json:"track_lot,omitempty"`
 }
 
 type MaterialNeeds struct {
@@ -467,6 +469,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		if completeBody.ActualInputQty != nil && *completeBody.ActualInputQty > 0 {
 			actualInputQty = *completeBody.ActualInputQty
 		}
+		qtyProduced := wo.QtyToProduce
 
 		if bomType == "disassembly" {
 			fgSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, wo.FinishedItemID)
@@ -526,6 +529,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 			}
+			var cutPostedTotal float64
 			for _, ln := range bom.Lines {
 				plannedRecv, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, actualInputQty, bom.OutputQty, bom.YieldPct)
 				if err != nil {
@@ -571,6 +575,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 							response.Validation(w, map[string]string{"stock": fmt.Sprintf("failed to receive cut lot for %s: %v", label, err)})
 							return
 						}
+						cutPostedTotal += qty
 					}
 					_ = markStagedComponentLotsPosted(r.Context(), tx, id, ln.ComponentItemID)
 				} else {
@@ -597,7 +602,12 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 						response.Validation(w, map[string]string{"stock": msg})
 						return
 					}
+					cutPostedTotal += recvQty
+					_ = markStagedComponentLotsPosted(r.Context(), tx, id, ln.ComponentItemID)
 				}
+			}
+			if cutPostedTotal > 0 {
+				qtyProduced = cutPostedTotal
 			}
 		} else {
 			for _, ln := range bom.Lines {
@@ -652,9 +662,9 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 
 		tag, err := tx.Exec(r.Context(), `
 			update public.mfg_work_orders
-			set status = 'completed', qty_produced = qty_to_produce, completed_at = now(), updated_at = now(),
+			set status = 'completed', qty_produced = $5, completed_at = now(), updated_at = now(),
 			  actual_input_qty = $3, input_lot_batch_id = $4
-			where id = $1 and tenant_id = $2 and status = 'released'`, id, tu.TenantID, actualInputQty, completeBody.InputLotBatchID)
+			where id = $1 and tenant_id = $2 and status = 'released'`, id, tu.TenantID, actualInputQty, completeBody.InputLotBatchID, qtyProduced)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusConflict, "Work order already completed.", "ERR_CONFLICT")
 			return
@@ -766,6 +776,14 @@ func buildMaterialNeeds(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 				return MaterialNeeds{}, err
 			}
 			line := appendLine(ln, plannedRecv, recvUnit)
+			_ = pool.QueryRow(ctx, `
+				select coalesce(sum(coalesce(catch_weight, qty)), 0)::float8
+				from public.mfg_wo_output_lots
+				where tenant_id = $1 and work_order_id = $2 and component_item_id = $3 and status = 'staged'`,
+				tenantID, wo.ID, ln.ComponentItemID).Scan(&line.StagedQty)
+			if st, err := inventory.LoadItemTrackingSettings(ctx, pool, tenantID, ln.ComponentItemID); err == nil {
+				line.TrackLot = st.TrackLot
+			}
 			out.Lines = append(out.Lines, line)
 			out.ReceiveQty += plannedRecv
 		}

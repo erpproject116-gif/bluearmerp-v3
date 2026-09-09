@@ -389,7 +389,7 @@ export default function InventoryStatusReportPage() {
               checked={Boolean(draft().in_stock_only)}
               onChange={(e) => patchLive({ in_stock_only: e.currentTarget.checked ? 1 : undefined })}
             />
-            In stock only (available &gt; 0 at filtered / any branch)
+            In stock only (off by default — leave unchecked to list all active items, including zeros)
           </label>
         </div>
       }

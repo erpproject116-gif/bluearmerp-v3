@@ -78,6 +78,16 @@ begin
     update public.inv_items set track_inventory_qty = true
     where tenant_id = v_tenant and item_code in ('00001', '00002', '00003', '00004');
 
+    -- Ensure base UoM + lot tracking on demo cut / perishable SKUs for floor weigh
+    update public.inv_items i
+    set base_unit_id = coalesce(
+          i.base_unit_id,
+          (select u.id from public.inv_units u where u.tenant_id = i.tenant_id order by u.id limit 1)
+        ),
+        track_lot = case when i.item_code in ('00002', '00003', '00004') then true else i.track_lot end,
+        track_inventory_qty = true
+    where i.tenant_id = v_tenant and i.item_code in ('00001', '00002', '00003', '00004');
+
     -- Component stock at assembly plant (00002) for backflush demos
     insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
     values
@@ -85,6 +95,17 @@ begin
       (v_tenant, v_item_foam, v_loc_plant, 12),
       (v_tenant, v_item_fabric, v_loc_plant, 30),
       (v_tenant, v_item_sofa, v_loc_plant, 2)
+    on conflict (tenant_id, item_id, location_id)
+    do update set qty_on_hand = greatest(inv_item_location_balances.qty_on_hand, excluded.qty_on_hand),
+                  updated_at = now();
+
+    -- HQ balances so Inv. Balance by Location shows multi-branch columns
+    insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
+    values
+      (v_tenant, v_item_panel, v_loc_hq, 4),
+      (v_tenant, v_item_foam, v_loc_hq, 2),
+      (v_tenant, v_item_fabric, v_loc_hq, 8),
+      (v_tenant, v_item_sofa, v_loc_hq, 1)
     on conflict (tenant_id, item_id, location_id)
     do update set qty_on_hand = greatest(inv_item_location_balances.qty_on_hand, excluded.qty_on_hand),
                   updated_at = now();
@@ -273,6 +294,22 @@ begin
           (v_tenant, v_item_fabric, v_loc_plant, -9.2, 'wo_disassembly_issue', 'mfg_work_order', v_woid_s16, v_user_id),
           (v_tenant, v_item_foam, v_loc_plant, 1.656, 'wo_disassembly_receipt', 'mfg_work_order', v_woid_s16, v_user_id),
           (v_tenant, v_item_panel, v_loc_plant, 0.368, 'wo_disassembly_receipt', 'mfg_work_order', v_woid_s16, v_user_id);
+      end if;
+
+      -- Open released disassembly job for floor walkthrough (Issue whole → Weigh cuts → Complete)
+      if not exists (select 1 from public.mfg_work_orders where tenant_id = v_tenant and work_order_no = 'DEMO-S16-OPEN') then
+        insert into public.mfg_work_orders (
+          tenant_id, work_order_no, bom_id, finished_item_id, location_id,
+          qty_to_produce, qty_produced, status, order_date,
+          released_at, inspection_status, inspected_at,
+          created_by_user_id, notes
+        )
+        values (
+          v_tenant, 'DEMO-S16-OPEN', v_bom_s16, v_item_fabric, v_loc_plant,
+          5, 0, 'released', v_d,
+          now(), 'released', now(),
+          v_user_id, 'GOLDEN-S16 open walkthrough — use Weigh cuts then Complete.'
+        );
       end if;
     else
       raise notice 'seed-demo-golden-s14-s16: bom_type column missing — S16 disassembly skipped for %', v_code;

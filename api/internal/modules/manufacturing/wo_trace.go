@@ -370,14 +370,8 @@ func batchWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Validation(w, map[string]string{"component_item_id": "Each cut weigh row needs component_item_id."})
 					return
 				}
-				ln, ok := allowed[*sc.ComponentItemID]
-				if !ok {
+				if _, ok := allowed[*sc.ComponentItemID]; !ok {
 					response.Validation(w, map[string]string{"component_item_id": "Component is not on this recipe."})
-					return
-				}
-				st, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, *sc.ComponentItemID)
-				if err != nil || !st.TrackLot {
-					response.Validation(w, map[string]string{"item": fmt.Sprintf("%s must be lot-tracked.", ln.ComponentCode)})
 					return
 				}
 			}

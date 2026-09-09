@@ -510,7 +510,7 @@ export default function BomsPage() {
           fetchOptions={fetchLocations}
         />
         <Field label={`${copy.batchQtyLabel} *`}>
-          <input class={inputClass} type="number" min="0" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
+          <input class={inputClass} type="text" inputMode="decimal" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
         </Field>
         <UnitLookupCombo
           label="Batch UoM"
@@ -528,15 +528,18 @@ export default function BomsPage() {
           }}
         />
         <Field label={copy.yieldLabel} description={copy.yieldDescription}>
-          <input class={inputClass} type="number" min="0" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
+          <input class={inputClass} type="text" inputMode="decimal" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
         </Field>
         <Show when={mode === "disassembly"}>
           <Field label={copy.expectedYieldMinLabel} description={copy.expectedYieldMinDescription}>
-            <input class={inputClass} type="number" min="0" value={expectedYieldMin()} onInput={(e) => setExpectedYieldMin(e.currentTarget.value)} />
+            <input class={inputClass} type="text" inputMode="decimal" value={expectedYieldMin()} onInput={(e) => setExpectedYieldMin(e.currentTarget.value)} />
           </Field>
           <Field label={copy.expectedYieldMaxLabel} description={copy.expectedYieldMaxDescription}>
-            <input class={inputClass} type="number" min="0" value={expectedYieldMax()} onInput={(e) => setExpectedYieldMax(e.currentTarget.value)} />
+            <input class={inputClass} type="text" inputMode="decimal" value={expectedYieldMax()} onInput={(e) => setExpectedYieldMax(e.currentTarget.value)} />
           </Field>
+          <p class="col-span-full text-xs text-text-secondary">
+            Tip: enable lot tracking on cut output items for lot numbers on Weigh cuts. Non-lot cuts can still be weighed and post as plain qty on Complete.
+          </p>
         </Show>
         <div class="col-span-full sm:col-span-2 lg:col-span-3">
           <Field label="Notes">
@@ -595,13 +598,14 @@ export default function BomsPage() {
                   <label class="text-sm">
                     <span class="text-text-secondary">{copy.lineQtyLabel}</span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       class={`${inputClass} mt-1`}
-                      min="0"
-                      value={ln.qty}
+                      value={ln.qty === 0 ? "" : String(ln.qty)}
                       onInput={(e) => {
-                        const v = Number(e.currentTarget.value);
-                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, qty: v } : row)));
+                        const raw = e.currentTarget.value.trim();
+                        const v = raw === "" ? 0 : Number(raw);
+                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, qty: Number.isFinite(v) ? v : row.qty } : row)));
                       }}
                     />
                   </label>

@@ -628,8 +628,8 @@ export default function WorkOrdersPage() {
         <Field label={`${copy.jobQtyLabel} *${finishedUnit() ? ` (${finishedUnit()})` : ""}`}>
           <input
             class={inputClass}
-            type="number"
-            min="0"
+            type="text"
+            inputMode="decimal"
             value={qty()}
             disabled={!!editing() && editing()!.status !== "draft"}
             onInput={(e) => setQty(e.currentTarget.value)}

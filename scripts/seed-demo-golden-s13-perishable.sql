@@ -52,7 +52,11 @@ begin
     update public.inv_items
     set track_lot = true, track_serial = false, track_inventory_qty = true,
         catch_weight = true, lot_allocation_method = 'fefo',
-        default_shelf_life_days = 7, price_basis = 'per_kg'
+        default_shelf_life_days = 7, price_basis = 'per_kg',
+        base_unit_id = coalesce(
+          base_unit_id,
+          (select u.id from public.inv_units u where u.tenant_id = v_tenant order by u.id limit 1)
+        )
     where id = v_item_perish;
 
     if not exists (select 1 from public.pr_purchase_requests where tenant_id = v_tenant and purchase_request_no = 'DEMO-S13-PR') then

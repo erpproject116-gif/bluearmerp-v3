@@ -3,7 +3,12 @@
 -- or use User Management → Demo Data in the app (after migration 056).
 -- See docs/runbooks/sql-run-order.md Phase 2 for the file list.
 --
--- Prerequisites: migrations through 055 applied (especially 052 finance AP, 054 qty_reserved, 055 DR).
+-- Prerequisites: migrations through latest applied (MFG: 272–279+, inventory balances).
+--
+-- After seed, walkthrough:
+--   Assembly: Production → Assembly → Jobs (DEMO-S14/S15) or New job from DEMO-S14-BOM
+--   Disassembly: Jobs → DEMO-S16-OPEN (released) → Weigh cuts → Complete
+--   Stock board: Inventory → Inv. Balance by Location (leave "In stock only" unchecked)
 --
 --   psql "$DATABASE_URL" -f scripts/seed-demo-full-chain.sql
 --

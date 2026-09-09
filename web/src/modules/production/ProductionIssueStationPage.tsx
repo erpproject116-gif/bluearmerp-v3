@@ -376,8 +376,8 @@ export default function ProductionIssueStationPage() {
                         <Field label="Qty">
                           <input
                             class={inputClass}
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="decimal"
                             value={lotQty()}
                             onInput={(e) => setLotQty(e.currentTarget.value)}
                           />

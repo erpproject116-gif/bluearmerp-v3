@@ -151,8 +151,8 @@ export default function ProductionWeighPartsPage() {
           </A>
           <h2 class="mt-2 text-lg font-semibold text-text-primary">Weigh cuts</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            On a released cut-apart job, weigh each cut SKU into a lot. Cut items must be lot-tracked.
-            Enter actual whole weight when you Complete the job. Complete posts cut lots to stock.
+            On a released cut-apart job, weigh each cut SKU (catch-weight). Lot-tracked cuts post as lots on complete;
+            non-lot cuts still stage here and post as plain qty. Enter actual whole weight when you Complete the job.
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo
@@ -205,7 +205,14 @@ export default function ProductionWeighPartsPage() {
                 <input class={inputClass} value={lotNo()} onInput={(e) => setLotNo(e.currentTarget.value)} placeholder="Auto if blank" />
               </Field>
               <Field label="Catch-weight (kg)">
-                <input class={inputClass} type="number" step="0.001" min="0" value={weight()} onInput={(e) => setWeight(e.currentTarget.value)} />
+                <input
+                  class={inputClass}
+                  type="text"
+                  inputMode="decimal"
+                  value={weight()}
+                  onInput={(e) => setWeight(e.currentTarget.value)}
+                  placeholder="e.g. 12.5"
+                />
               </Field>
               <Field label="Expiry">
                 <DateInput value={expiry()} onInput={(e) => setExpiry(e.currentTarget.value)} />

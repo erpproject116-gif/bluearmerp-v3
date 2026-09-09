@@ -55,6 +55,17 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-50, #ecf3ff) 80%, transparent);
 }
 
+/* Qty / amount fields: type freely — hide browser spinner arrows */
+.erp-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.erp-input[type="number"]::-webkit-outer-spin-button,
+.erp-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* Subtle discovery pulse on header Guide button (unseen / early onboarding) */
 @keyframes erp-guide-pulse-ring {
   0%,
