@@ -10,7 +10,7 @@ import { resolveSerialBulk } from "../../shared/resolveSerialBulk";
 import { LotLineCell } from "../../shared/LotLineCell";
 import type { LotBatchRow } from "../../shared/useSerialLotList";
 import { ProductionLayout } from "./ProductionLayout";
-import { jobsHref } from "./mfgProductionMode";
+import { jobsHref, parseMfgMode } from "./mfgProductionMode";
 
 type WorkOrderOption = {
   id: number;
@@ -87,6 +87,10 @@ async function resolveLotBatchIds(
 export default function ProductionIssueStationPage() {
   const toast = useToast();
   const [searchParams] = useSearchParams();
+  const jobsBackHref = () => {
+    const mode = parseMfgMode(String(searchParams.mode ?? "")) ?? "assembly";
+    return `${jobsHref(mode)}?status=released`;
+  };
   const [woLabel, setWoLabel] = createSignal("");
   const [woId, setWoId] = createSignal<number | null>(null);
   const [context, setContext] = createSignal<ScanContext | null>(null);
@@ -248,12 +252,13 @@ export default function ProductionIssueStationPage() {
     <ProductionLayout>
       <div class="space-y-6">
         <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-          <A href={`${jobsHref("assembly")}?status=released`} class="text-xs font-medium text-brand-700 hover:underline">
+          <A href={jobsBackHref()} class="text-xs font-medium text-brand-700 hover:underline">
             ← Work orders
           </A>
           <h2 class="mt-2 text-lg font-semibold text-text-primary">Issue station</h2>
           <p class="mt-1 text-sm text-text-secondary">
             Select a released work order, then stage component serials or lots before completion.
+            For cut-apart jobs, stage the whole/input item here when it is lot or serial tracked.
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo

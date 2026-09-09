@@ -90,7 +90,7 @@ export const MFG_COPY: Record<MfgMode, MfgCopy> = {
     bomGuideId: "mfg_bom_disassembly",
     jobGuideId: "mfg_work_order_disassembly",
     sequenceHint:
-      "After the recipe: open Jobs → create a draft → Release → weigh whole & receive pieces → Pass QC → Complete.",
+      "After the recipe: open Jobs → create a draft → Release → Issue whole (if tracked) → Weigh cuts → Pass QC → Complete (enter actual whole weight).",
   },
 };
 

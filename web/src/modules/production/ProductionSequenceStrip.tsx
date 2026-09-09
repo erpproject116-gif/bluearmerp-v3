@@ -2,11 +2,11 @@ import { For } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import {
   jobsHref,
-  modeFromPath,
   recipesHref,
   type MfgMode,
   MFG_COPY,
 } from "./mfgProductionMode";
+import { inferMfgModeFromPath } from "./productionHubMode";
 
 const MODES: MfgMode[] = ["assembly", "disassembly"];
 
@@ -37,7 +37,7 @@ function modeStepHref(mode: MfgMode, pathname: string): string {
 
 export function ProductionSequenceStrip(props: { mode?: MfgMode }) {
   const loc = useLocation();
-  const mode = () => props.mode ?? modeFromPath(loc.pathname) ?? "assembly";
+  const mode = () => props.mode ?? inferMfgModeFromPath(loc.pathname, loc.search) ?? "assembly";
   const copy = () => MFG_COPY[mode()];
 
   return (

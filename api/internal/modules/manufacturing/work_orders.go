@@ -749,14 +749,9 @@ func buildMaterialNeeds(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 	}
 
 	if bomType == "disassembly" {
-		inputStock, unitCode, err := StockIssueForLine(ctx, pool, tenantID, BomLine{
-			ComponentItemID: wo.FinishedItemID,
-			ComponentCode:   wo.FinishedItemCode,
-			ComponentName:   wo.FinishedItemName,
-		}, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
-		if err != nil {
-			return MaterialNeeds{}, err
-		}
+		// Whole/input to consume = job qty in finished-item base UoM (not StockIssueForLine with Qty=0).
+		inputStock := wo.QtyToProduce
+		unitCode := wo.FinishedBaseUnit
 		inputLine := appendLine(BomLine{
 			ComponentItemID: wo.FinishedItemID,
 			ComponentCode:   wo.FinishedItemCode,

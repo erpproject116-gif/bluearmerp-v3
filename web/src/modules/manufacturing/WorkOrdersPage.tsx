@@ -475,18 +475,18 @@ export default function WorkOrdersPage() {
                   </Show>
                   <Show when={woType(r) === "disassembly"}>
                     <A
+                      href={`/app/production/issue-station${stationQuery(r.id)}`}
+                      class="text-xs font-medium text-brand-600 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Issue whole
+                    </A>
+                    <A
                       href={`/app/production/weigh-parts${stationQuery(r.id)}`}
                       class="text-xs font-medium text-brand-600 hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      Weigh whole
-                    </A>
-                    <A
-                      href={`/app/production/receive-station${stationQuery(r.id)}`}
-                      class="text-xs font-medium text-brand-600 hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Receive pieces
+                      Weigh cuts
                     </A>
                   </Show>
                 </Show>

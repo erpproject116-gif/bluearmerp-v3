@@ -176,8 +176,8 @@ export const MODAL_FORM_GUIDES: Record<string, ModalFormGuideDef> = {
     steps: [
       "Pick the Disassembly recipe, location, and quantity to process. Save as Draft.",
       "On the job row: Next: Release to floor when the cut should start.",
-      "Use Weigh whole and Receive pieces while status is In production.",
-      "Pass QC in Inspection if required, then Next: Complete to post output lots.",
+      "Use Issue whole (if tracked) and Weigh cuts while the job is released.",
+      "Pass QC in Inspection if required, then Next: Complete (enter actual whole weight) to post cut lots.",
     ],
   },
   mfg_bom: {

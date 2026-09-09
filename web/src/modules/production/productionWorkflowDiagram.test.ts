@@ -18,14 +18,20 @@ describe("productionWorkflowDiagram", () => {
     expect(flow.steps[idx]?.id).toBe("recipe");
   });
 
-  it("highlights disassembly receive when mode=disassembly", () => {
+  it("highlights disassembly weigh-parts", () => {
+    const flow = PRODUCTION_FLOWS.disassembly;
+    const idx = activeFlowStepIndex("/app/production/weigh-parts", "mode=disassembly", flow);
+    expect(flow.steps[idx]?.id).toBe("weigh");
+  });
+
+  it("highlights disassembly issue station when mode=disassembly", () => {
     const flow = PRODUCTION_FLOWS.disassembly;
     const idx = activeFlowStepIndex(
-      "/app/production/receive-station",
+      "/app/production/issue-station",
       "mode=disassembly",
       flow,
     );
-    expect(flow.steps[idx]?.id).toBe("receive");
+    expect(flow.steps[idx]?.id).toBe("issue");
   });
 
   it("highlights assembly issue station", () => {

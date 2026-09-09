@@ -149,9 +149,10 @@ export default function ProductionWeighPartsPage() {
           <A href={jobsBackHref()} class="text-xs font-medium text-brand-700 hover:underline">
             ← Jobs
           </A>
-          <h2 class="mt-2 text-lg font-semibold text-text-primary">Weigh parts</h2>
+          <h2 class="mt-2 text-lg font-semibold text-text-primary">Weigh cuts</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            On a released cut-apart job, weigh each cut SKU into a lot. Complete the job to post lots to stock (planned vs actual shows on Reports).
+            On a released cut-apart job, weigh each cut SKU into a lot. Cut items must be lot-tracked.
+            Enter actual whole weight when you Complete the job. Complete posts cut lots to stock.
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo

@@ -541,7 +541,7 @@ export const workflowGuides: WorkflowGuide[] = [
     id: "manufacturing_disassembly",
     title: "Disassembly",
     summary:
-      "Recipe → Jobs (draft, release, QC, complete) → weigh whole and receive pieces on the floor. Release and QC stay on the Jobs list.",
+      "Recipe → Jobs (draft, release, QC, complete) → Issue whole (if tracked) and Weigh cuts on the floor. Release and QC stay on the Jobs list.",
     docHref: "/app/documentation/kb/manufacturing-bom",
     steps: [
       {
@@ -559,7 +559,7 @@ export const workflowGuides: WorkflowGuide[] = [
         short: "Jobs",
         title: "Create, release, QC, and complete",
         what:
-          "On Disassembly → Jobs: New job → pick recipe and qty. Release to floor when ready. After weighing and receiving pieces, Pass QC in Inspection if required, then Next: Complete.",
+          "On Disassembly → Jobs: New job → pick recipe and qty. Release to floor when ready. After issuing the whole (if tracked) and weighing cuts, Pass QC in Inspection if required, then Next: Complete (enter actual whole weight).",
         href: "/app/production/disassembly/jobs",
         routePrefixes: ["/app/production/disassembly/jobs"],
         moduleCode: "manufacturing",
@@ -567,11 +567,11 @@ export const workflowGuides: WorkflowGuide[] = [
       {
         id: "floor",
         short: "Floor",
-        title: "Weigh whole and receive pieces",
+        title: "Issue whole and weigh cuts",
         what:
-          "On a released job, use Weigh whole and Receive pieces links on the row. Record actual weights and output lots before completing the job.",
+          "On a released job, use Issue whole (when the carcass is lot/serial tracked) and Weigh cuts. Cut SKUs must be lot-tracked. Actual whole weight is entered on Complete.",
         href: "/app/production/disassembly/jobs",
-        routePrefixes: ["/app/production/weigh-parts", "/app/production/receive-station"],
+        routePrefixes: ["/app/production/weigh-parts", "/app/production/issue-station"],
         moduleCode: "manufacturing",
       },
     ],

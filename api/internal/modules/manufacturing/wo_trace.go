@@ -130,11 +130,7 @@ func issueWorkOrderSerials(pool *pgxpool.Pool) http.HandlerFunc {
 
 		wo, bom, err := loadReleasedWorkOrderForTrace(r.Context(), tx, tu.TenantID, woID)
 		if err != nil {
-			if errors.Is(err, errWoNotReleased) {
-				response.Validation(w, map[string]string{"status": "Only released work orders accept issue scans."})
-				return
-			}
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			respondReleasedWOLoadError(w, err, "Only released work orders accept issue scans.")
 			return
 		}
 		componentIDs := bomComponentIDs(bom, wo.FinishedItemID, normalizeBomType(bom.BomType) == "disassembly")
@@ -205,11 +201,7 @@ func issueWorkOrderLots(pool *pgxpool.Pool) http.HandlerFunc {
 
 		wo, bom, err := loadReleasedWorkOrderForTrace(r.Context(), tx, tu.TenantID, woID)
 		if err != nil {
-			if errors.Is(err, errWoNotReleased) {
-				response.Validation(w, map[string]string{"status": "Only released work orders accept issue scans."})
-				return
-			}
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			respondReleasedWOLoadError(w, err, "Only released work orders accept issue scans.")
 			return
 		}
 		componentIDs := bomComponentIDs(bom, wo.FinishedItemID, normalizeBomType(bom.BomType) == "disassembly")
@@ -294,11 +286,7 @@ func batchWorkOrderOutputSerials(pool *pgxpool.Pool) http.HandlerFunc {
 
 		wo, _, err := loadReleasedWorkOrderForTrace(r.Context(), tx, tu.TenantID, woID)
 		if err != nil {
-			if errors.Is(err, errWoNotReleased) {
-				response.Validation(w, map[string]string{"status": "Only released work orders accept output scans."})
-				return
-			}
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			respondReleasedWOLoadError(w, err, "Only released work orders accept output scans.")
 			return
 		}
 		fgSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, wo.FinishedItemID)
@@ -352,11 +340,7 @@ func batchWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 
 		wo, _, err := loadReleasedWorkOrderForTrace(r.Context(), tx, tu.TenantID, woID)
 		if err != nil {
-			if errors.Is(err, errWoNotReleased) {
-				response.Validation(w, map[string]string{"status": "Only released work orders accept output scans."})
-				return
-			}
-			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			respondReleasedWOLoadError(w, err, "Only released work orders accept output scans.")
 			return
 		}
 		bom, err := loadBom(r.Context(), tx, tu.TenantID, wo.BomID)
@@ -454,6 +438,27 @@ func getWorkOrderScanContext(pool *pgxpool.Pool) http.HandlerFunc {
 
 var errWoNotReleased = errors.New("work order not released")
 
+func respondReleasedWOLoadError(w http.ResponseWriter, err error, notReleasedMsg string) {
+	if errors.Is(err, errWoNotReleased) {
+		response.Validation(w, map[string]string{"status": notReleasedMsg})
+		return
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+		return
+	}
+	response.Err(w, http.StatusInternalServerError, "Failed to load work order.", "ERR_INTERNAL")
+}
+
+func isUndefinedColumnErr(err error, column string) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	col := strings.ToLower(column)
+	return strings.Contains(msg, col) && (strings.Contains(msg, "does not exist") || strings.Contains(msg, "undefined_column"))
+}
+
 func loadReleasedWorkOrderForTrace(ctx context.Context, tx pgx.Tx, tenantID, woID int64) (WorkOrder, Bom, error) {
 	var wo WorkOrder
 	var status string
@@ -466,7 +471,7 @@ func loadReleasedWorkOrderForTrace(ctx context.Context, tx pgx.Tx, tenantID, woI
 		join public.inv_items fi on fi.id = wo.finished_item_id
 		left join public.inv_locations loc on loc.id = wo.location_id
 		where wo.id = $1 and wo.tenant_id = $2
-		for update`, woID, tenantID).Scan(
+		for update of wo`, woID, tenantID).Scan(
 		&wo.ID, &wo.WorkOrderNo, &wo.BomID, &wo.FinishedItemID, &wo.LocationID,
 		&wo.QtyToProduce, &status, &wo.FinishedItemCode, &wo.FinishedItemName, &wo.LocationName)
 	if err != nil {
@@ -677,7 +682,13 @@ func processWoOutputLotScans(ctx context.Context, tx pgx.Tx, tenantID, woID int6
 			values ($1, $2, $3, $4, $5, $6, $7, 'staged', $8)
 			returning id`, tenantID, woID, lotNo, qty, expiry, sc.CatchWeight, clientScanArg, componentArg).Scan(&rowID)
 		if err != nil {
-			// Fallback without component_item_id when migration 279 not applied.
+			// Fallback without component_item_id only when migration 279 is not applied.
+			if componentArg != nil && !isUndefinedColumnErr(err, "component_item_id") {
+				res.Status = "invalid"
+				res.Message = "Failed to record lot."
+				results = append(results, res)
+				continue
+			}
 			err2 := tx.QueryRow(ctx, `
 				insert into public.mfg_wo_output_lots (tenant_id, work_order_id, lot_no, qty, expiry_date, catch_weight, client_scan_id, status)
 				values ($1, $2, $3, $4, $5, $6, $7, 'staged')
@@ -728,10 +739,8 @@ func loadWorkOrderScanContext(ctx context.Context, pool *pgxpool.Pool, tenantID,
 	disassembly := normalizeBomType(bom.BomType) == "disassembly"
 	lines := bom.Lines
 	if disassembly {
-		stock, _, err := StockIssueForLine(ctx, pool, tenantID, BomLine{ComponentItemID: wo.FinishedItemID}, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
-		if err != nil {
-			return woScanContextPayload{}, err
-		}
+		// Whole/input qty to consume equals job qty (finished item is the carcass/whole).
+		stock := wo.QtyToProduce
 		settings, _ := inventory.LoadItemTrackingSettings(ctx, pool, tenantID, wo.FinishedItemID)
 		var issuedSerials int
 		var issuedLotQty float64

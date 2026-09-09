@@ -190,9 +190,9 @@ export default function ProductionReceiveStationPage() {
           </A>
           <h2 class="mt-2 text-lg font-semibold text-text-primary">Receive / weigh station</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            Stage finished-good serials or lots on a released job before completion posts them to stock.
+            Stage finished-good serials or lots on a released <span class="font-medium">assembly</span> job before completion posts them to stock.
             For catch-weight, paste <span class="font-medium">lot · qty · expiry · catch-weight kg</span> (4th column optional; when set it becomes stock qty).
-            Multi-cut disassembly lot posting on complete is available after weighing cut SKUs (see Weigh parts on the job).
+            For cut-apart jobs, use <span class="font-medium">Weigh cuts</span> on the job row instead — this station stages the whole/FG item, not cut SKUs.
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo

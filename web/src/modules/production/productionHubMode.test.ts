@@ -19,4 +19,11 @@ describe("productionHubMode", () => {
   it("infers assembly issue station by default", () => {
     expect(inferMfgModeFromPath("/app/production/issue-station")).toBe("assembly");
   });
+
+  it("infers disassembly from weigh-parts", () => {
+    expect(inferMfgModeFromPath("/app/production/weigh-parts")).toBe("disassembly");
+    expect(inferMfgModeFromPath("/app/production/weigh-parts", "woId=11&mode=disassembly")).toBe(
+      "disassembly",
+    );
+  });
 });
