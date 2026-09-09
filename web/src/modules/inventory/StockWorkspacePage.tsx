@@ -21,17 +21,21 @@ const tiles: KpiTile[] = [
   { label: "Open stock entries", value: (s) => s.open_stock_entries, href: "/app/inventory/stock-entries" },
 ];
 
+const balanceLink = {
+  label: "Inv. Balance by Location",
+  href: "/app/inventory/find-stock",
+  hint: "Items as rows · each branch as a column (zeros included)",
+};
+
 const invBookLinks = [
-  { label: "Item Inv. Book", href: "/app/inventory/reports/inv-book", hint: "By item & location" },
+  { label: "Item Inv. Book", href: "/app/inventory/reports/inv-book", hint: "Opening / receipt / issue / closing by item & location" },
   { label: "Serial Inv. Book", href: "/app/inventory/serial-lot/reports/book", hint: "Serial slip ledger" },
   { label: "Lot Inv. Book", href: "/app/inventory/serial-lot/reports/lot-book", hint: "Lot slip ledger" },
   { label: "Stock Ledger", href: "/app/inventory/reports/stock-ledger", hint: "Movement detail" },
 ];
 
 const reportLinks = [
-  { label: "Inv. Balance by Location", href: "/app/inventory/find-stock" },
   { label: "Inventory Balance (on hand)", href: "/app/inventory/reports/on-hand" },
-  { label: "Inventory Status", href: "/app/inventory/reports/inventory-status" },
   { label: "Stock Balance", href: "/app/inventory/reports/stock-balance" },
   { label: "Serial/Lot Status", href: "/app/inventory/serial-lot/reports/status" },
   { label: "Stock Ageing", href: "/app/inventory/reports/stock-ageing" },
@@ -49,8 +53,11 @@ export default function StockWorkspacePage() {
         <h1 class="text-lg font-semibold text-text-primary">Stocks</h1>
         <p class="mt-1 text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
         <p class="mt-1 text-sm text-text-secondary">
-          Set up places and products first. See what’s on the shelf in Inv. Balance by Location after you enter opening counts or
-          receive a delivery.
+          Set up places and products first. Day-to-day stock lives in{" "}
+          <A href="/app/inventory/find-stock" class="font-medium text-brand-700 hover:underline">
+            Inv. Balance by Location
+          </A>{" "}
+          (qty per branch). Inv. Books are movement history, not the shelf board.
         </p>
       </section>
 
@@ -59,6 +66,20 @@ export default function StockWorkspacePage() {
       <ReconciliationBanner />
 
       <StocksHowItFits />
+
+      <section class="rounded-xl border border-brand-200 bg-brand-50/40 p-5 shadow-sm">
+        <h3 class="mb-1 text-sm font-semibold text-text-primary">On the shelf</h3>
+        <p class="mb-3 text-sm text-text-secondary">
+          Primary stock board — every active item, with a column for each branch (0 when never received).
+        </p>
+        <A
+          href={balanceLink.href}
+          class="inline-flex items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+        >
+          {balanceLink.label}
+        </A>
+        <p class="mt-2 text-xs text-text-secondary">{balanceLink.hint}</p>
+      </section>
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <For each={tiles}>
@@ -103,8 +124,10 @@ export default function StockWorkspacePage() {
       </Show>
 
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-        <h3 class="mb-1 text-sm font-semibold text-text-primary">Inventory books</h3>
-        <p class="mb-4 text-sm text-text-secondary">Period ledgers for items, serials, and lots.</p>
+        <h3 class="mb-1 text-sm font-semibold text-text-primary">Movement history (Inv. Books)</h3>
+        <p class="mb-4 text-sm text-text-secondary">
+          Ledgers for what moved when — not the day-to-day shelf view. Prefer Inv. Balance by Location for qty by branch.
+        </p>
         <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <For each={invBookLinks}>
             {(link) => (

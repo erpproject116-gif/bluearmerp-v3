@@ -8,7 +8,7 @@ const links: { kind: InvBookFamilyKind; label: string; href: string; hint: strin
     kind: "item",
     label: "Item Inv. Book",
     href: "/app/inventory/reports/inv-book",
-    hint: "By item & location",
+    hint: "Item × location ledger",
   },
   {
     kind: "serial",
@@ -32,7 +32,17 @@ export const InvBookFamilyNav = (props: { active: InvBookFamilyKind }) => {
       class="mb-4 rounded-xl border border-stroke bg-white p-3 shadow-sm"
       aria-label="Inventory book reports"
     >
-      <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Inventory books</p>
+      <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Movement history (Inv. Books)
+        </p>
+        <A href="/app/inventory/find-stock" class="text-xs font-medium text-brand-700 hover:underline">
+          ← Inv. Balance by Location (shelf board)
+        </A>
+      </div>
+      <p class="mb-2 text-[11px] text-text-secondary">
+        These ledgers show what moved when. For qty per branch, use Inv. Balance by Location.
+      </p>
       <div class="flex flex-wrap gap-2">
         <For each={links}>
           {(link) => {

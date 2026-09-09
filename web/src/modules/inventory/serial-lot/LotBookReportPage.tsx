@@ -103,7 +103,7 @@ export default function LotBookReportPage() {
       <InvBookFamilyNav active="lot" />
       <CollapsibleFilterPanel
         title="Lot Inv. Book"
-        description="Lot slip ledger with increase / release / running inventory qty — Search (F8)."
+        description="Lot movement history (slip ledger) — increase / release / running qty. For on-hand by branch use Inv. Balance by Location. Search (F8)."
         actions={
           <>
             <button

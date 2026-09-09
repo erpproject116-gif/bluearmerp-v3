@@ -84,7 +84,7 @@ export default function InvBookReportPage() {
       <InvBookFamilyNav active="item" />
       <ReportPageLayout
         title="Item Inv. Book"
-        description="Opening, receipt, issue, and closing qty by item and location — click a row to view that item’s Inv. Book slips."
+        description="Movement history: opening, receipt, issue, and closing by item and location — not the day-to-day shelf board. Click a row for slips. For qty by branch use Inv. Balance by Location."
         dateFrom={() => draft().date_from ?? ""}
         dateTo={() => draft().date_to ?? ""}
         onDateFromChange={(v) => patch({ date_from: v })}

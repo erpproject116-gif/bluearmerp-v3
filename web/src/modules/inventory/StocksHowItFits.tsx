@@ -24,7 +24,13 @@ export function StocksHowItFits(props?: { class?: string }) {
           <A href="/app/inventory/find-stock" class="font-medium text-brand-700 hover:underline">
             Inv. Balance by Location
           </A>{" "}
-          — on-hand qty by branch; serial pill when units are tracked (full list under Serials).
+          — primary shelf board (item rows × branch columns; zeros included). Use for “what’s on hand where?”
+        </li>
+        <li>
+          <A href="/app/inventory/reports/inv-book" class="font-medium text-brand-700 hover:underline">
+            Item / Serial / Lot Inv. Books
+          </A>{" "}
+          — movement history (opening / receipts / issues), not the day-to-day qty board.
         </li>
         <li>
           <A href="/app/purchases/purchase-receive" class="font-medium text-brand-700 hover:underline">

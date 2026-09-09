@@ -318,7 +318,7 @@ export default function InventoryStatusReportPage() {
   return (
     <ReportPageLayout
       title="Inv. Balance by Location"
-      description="Item Code, Item Name, Item Specs, prices, Total on-hand, and qty for every branch — click item code or name for Inv. Book. Print / CSV / PDF from the report toolbar. F8 refreshes."
+      description="Day-to-day shelf board: each item is a row; each branch is a column (0 if never received). Click item code/name for Inv. Book history. Uncheck “In stock only” to see masters with zero everywhere. Print / CSV / PDF from the toolbar. F8 refreshes."
       showDateFilters={false}
       submitted={true}
       loading={report.isFetching}

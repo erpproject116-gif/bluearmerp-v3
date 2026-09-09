@@ -104,7 +104,7 @@ export default function SerialBookReportPage() {
       <InvBookFamilyNav active="serial" />
       <CollapsibleFilterPanel
         title="Serial Inv. Book"
-        description="Slip ledger with increase / release / running inventory qty — Search (F8)."
+        description="Serial movement history (slip ledger) — increase / release / running qty. For on-hand by branch use Inv. Balance by Location. Search (F8)."
         actions={
           <>
             <button
