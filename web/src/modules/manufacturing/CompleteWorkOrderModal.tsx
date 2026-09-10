@@ -48,6 +48,11 @@ type ScanComponent = {
 type ScanContext = {
   work_order_id: number;
   status: string;
+  qty_to_produce?: number;
+  track_serial?: boolean;
+  track_lot?: boolean;
+  output_serials?: number;
+  output_lot_qty?: number;
   components: ScanComponent[];
 };
 
@@ -122,21 +127,51 @@ export function CompleteWorkOrderModal(props: {
     return null;
   };
 
-  const continueHref = () => {
+  const recordFinishedGap = (): string | null => {
+    const wo = props.workOrder;
+    const s = scan();
+    if (!wo || !isAssembly()) return null;
+    const trackSerial = Boolean(s?.track_serial ?? wo.finished_track_serial);
+    const trackLot = Boolean(s?.track_lot ?? wo.finished_track_lot);
+    const planned = Number(actualQty()) > 0 ? Number(actualQty()) : wo.qty_to_produce;
+    if (trackSerial) {
+      const need = Math.round(planned);
+      const have = s?.output_serials ?? 0;
+      if (have < need) {
+        return `Finished product: need ${need} serial(s), recorded ${have}`;
+      }
+    } else if (trackLot) {
+      const have = s?.output_lot_qty ?? 0;
+      if (have + 0.0001 < planned) {
+        return `Finished product: need ${planned} lot qty, recorded ${have}`;
+      }
+    }
+    return null;
+  };
+
+  const continueHref = (kind: "issue" | "receive" | "auto" = "auto") => {
     const wo = props.workOrder;
     if (!wo) return jobsHref(props.mode);
-    const gapComp = (scan()?.components ?? []).find(
-      (c) =>
-        (c.track_serial && c.issued_serials < Math.round(c.stock_to_issue)) ||
-        (c.track_lot && c.issued_lot_qty + 0.0001 < c.stock_to_issue),
-    );
-    if (gapComp || wo.components_tracked) {
+    if (kind === "issue" || (kind === "auto" && takeMaterialsGap())) {
+      return `/app/production/issue-station?woId=${wo.id}&mode=${props.mode}`;
+    }
+    if (kind === "receive" || (kind === "auto" && recordFinishedGap())) {
+      return `/app/production/receive-station?woId=${wo.id}&mode=${props.mode}`;
+    }
+    if (wo.components_tracked) {
       return `/app/production/issue-station?woId=${wo.id}&mode=${props.mode}`;
     }
     if (wo.finished_track_serial || wo.finished_track_lot) {
       return `/app/production/receive-station?woId=${wo.id}&mode=${props.mode}`;
     }
     return jobsHref(props.mode);
+  };
+
+  const redirectAfterRelease = (message: string, kind: "issue" | "receive") => {
+    mfgWarn(null, message);
+    props.onCompleted();
+    props.onClose();
+    window.location.assign(continueHref(kind));
   };
 
   const tryRevertIfWeReleased = async (woId: number) => {
@@ -169,8 +204,8 @@ export function CompleteWorkOrderModal(props: {
     }
     setFieldErrors({});
 
-    const gap = isAssembly() ? takeMaterialsGap() : null;
-    if (gap) {
+    const materialsGap = isAssembly() ? takeMaterialsGap() : null;
+    if (materialsGap) {
       const status = (wo.status ?? "").toLowerCase();
       if (props.releaseFirst && status === "draft") {
         setSaving(true);
@@ -184,18 +219,32 @@ export function CompleteWorkOrderModal(props: {
           mfgWarn(rel.message, "Couldn’t start this job. Try Start job, then Continue.");
           return;
         }
-        mfgWarn(
-          null,
-          "Job started. Take materials on the next screen, then Finish build.",
-        );
-        props.onCompleted();
-        props.onClose();
-        window.location.assign(continueHref());
+        redirectAfterRelease("Job started. Take materials next, then Finish build.", "issue");
         return;
       }
-      setFieldErrors({
-        stock: `Take materials first: ${gap}`,
-      });
+      setFieldErrors({ stock: `Take materials first: ${materialsGap}` });
+      return;
+    }
+
+    const finishedGap = isAssembly() ? recordFinishedGap() : null;
+    if (finishedGap) {
+      const status = (wo.status ?? "").toLowerCase();
+      if (props.releaseFirst && status === "draft") {
+        setSaving(true);
+        const rel = await apiFetch(
+          `/api/v1/manufacturing/work-orders/${wo.id}/release`,
+          { method: "POST" },
+          { silent: true },
+        );
+        setSaving(false);
+        if (!rel.success) {
+          mfgWarn(rel.message, "Couldn’t start this job. Try Start job, then Continue.");
+          return;
+        }
+        redirectAfterRelease("Job started. Record finished serials/lots next, then Finish build.", "receive");
+        return;
+      }
+      setFieldErrors({ stock: `Record finished product first: ${finishedGap}` });
       return;
     }
 
@@ -237,7 +286,7 @@ export function CompleteWorkOrderModal(props: {
       mfgWarn(
         res.message,
         props.releaseFirst
-          ? "Could not finish this job. Take materials if needed, then try Finish build again."
+          ? "Could not finish this job. Take materials / record finished if needed, then try Finish build again."
           : "Could not finish this job. Check stock, then try again.",
       );
       return;
@@ -277,8 +326,19 @@ export function CompleteWorkOrderModal(props: {
                 <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   <p class="font-medium">Take materials before Finish build</p>
                   <p class="mt-1 text-xs">{gap()}</p>
-                  <A href={continueHref()} class="mt-2 inline-block text-xs font-semibold text-brand-700 hover:underline">
+                  <A href={continueHref("issue")} class="mt-2 inline-block text-xs font-semibold text-brand-700 hover:underline">
                     Open Take materials →
+                  </A>
+                </div>
+              )}
+            </Show>
+            <Show when={isAssembly() && !takeMaterialsGap() && recordFinishedGap()}>
+              {(gap) => (
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <p class="font-medium">Record finished serials/lots before Finish build</p>
+                  <p class="mt-1 text-xs">{gap()}</p>
+                  <A href={continueHref("receive")} class="mt-2 inline-block text-xs font-semibold text-brand-700 hover:underline">
+                    Open Record finished →
                   </A>
                 </div>
               )}

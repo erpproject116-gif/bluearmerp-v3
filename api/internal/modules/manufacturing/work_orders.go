@@ -751,7 +751,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			if fgSettings.TrackSerial || fgSettings.TrackLot {
 				if err := postWoOutputTrace(r.Context(), tx, tu.TenantID, id, wo.LocationID, wo.FinishedItemID, qtyProduced, tu.AppUserID, bom.FinishedItemCode, fgSettings.DefaultShelfLifeDays); err != nil {
-					response.Validation(w, map[string]string{"stock": err.Error()})
+					response.Validation(w, map[string]string{"stock": fmt.Sprintf("Record finished product first: %s", err.Error())})
 					return
 				}
 			} else if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, qtyProduced, tu.AppUserID, "mfg_work_order", id, "wo_backflush_receipt"); err != nil {

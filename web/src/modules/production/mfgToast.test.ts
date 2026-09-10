@@ -16,10 +16,10 @@ describe("friendlyMfgMessage", () => {
     expect(friendlyMfgMessage("Insufficient stock / shortage", "x")).toContain("Not enough stock");
   });
 
-  it("maps staged serial gap before stock shortage", () => {
+  it("maps staged output serial gap", () => {
     expect(
-      friendlyMfgMessage("Take materials first: staged issue for 00151: staged serial count 0 does not match required 1", "x"),
-    ).toContain("Take materials");
+      friendlyMfgMessage("Record finished product first: staged output serial count 0 does not match required 1", "x"),
+    ).toContain("Record finished");
   });
 
   it("maps insufficient staged issue wrapper", () => {

@@ -8,6 +8,7 @@ import { parseAndDedupeLotBulkInput } from "../../shared/lotBulkParse";
 import { ProductionLayout } from "./ProductionLayout";
 import { jobsHref, parseMfgMode } from "./mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "./mfgToast";
+import { DEFAULT_SERIAL_PREFIX } from "../../shared/printCode128Labels";
 
 type WorkOrderOption = {
   id: number;
@@ -80,6 +81,40 @@ export default function ProductionReceiveStationPage() {
   const [loading, setLoading] = createSignal(false);
   const [lastResults, setLastResults] = createSignal<(BatchSerialResult | BatchLotResult)[]>([]);
   const [prefilled, setPrefilled] = createSignal(false);
+  const [allocBusy, setAllocBusy] = createSignal(false);
+
+  const remainingOutputSerials = (ctx: ScanContext) =>
+    Math.max(0, Math.round(ctx.qty_to_produce) - (ctx.output_serials || 0));
+
+  const autoAllocateSerials = async (ctx: ScanContext, fillPaste: boolean) => {
+    if (!ctx.track_serial) return;
+    const need = remainingOutputSerials(ctx);
+    if (need <= 0) {
+      if (fillPaste) setSerialPaste("");
+      return;
+    }
+    setAllocBusy(true);
+    const res = await apiFetch<{ serials: string[]; count: number }>(
+      "/api/v1/inventory/serial-units/allocate-numbers",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          qty: need,
+          prefix: DEFAULT_SERIAL_PREFIX,
+          register_date: new Date().toISOString().slice(0, 10),
+        }),
+      },
+      { silent: true },
+    );
+    setAllocBusy(false);
+    if (!res.success || !(res.data?.serials?.length)) {
+      mfgWarn(res.message, "Could not auto-create serial numbers. Paste them manually.");
+      return;
+    }
+    if (fillPaste) {
+      setSerialPaste((res.data.serials ?? []).join("\n"));
+    }
+  };
 
   const loadWo = async (id: number) => {
     setLoading(true);
@@ -99,23 +134,28 @@ export default function ProductionReceiveStationPage() {
       return;
     }
     setWoId(id);
+    let nextCtx: ScanContext = res.data;
     if (woRes.success && woRes.data) {
       setWoLabel(
         `${woRes.data.work_order_no} — ${woRes.data.finished_item_name ?? woRes.data.bom_code ?? ""}`.trim(),
       );
-      setContext({
+      nextCtx = {
         ...res.data,
         bom_code: woRes.data.bom_code,
         bom_name: woRes.data.bom_name,
         source_sales_order_no: woRes.data.source_sales_order_no,
-      });
+      };
     } else {
       setWoLabel(res.data.work_order_no);
-      setContext(res.data);
     }
-    setSerialPaste("");
+    setContext(nextCtx);
     setLotPaste("");
     setLastResults([]);
+    if (nextCtx.track_serial && remainingOutputSerials(nextCtx) > 0) {
+      await autoAllocateSerials(nextCtx, true);
+    } else {
+      setSerialPaste("");
+    }
   };
 
   createEffect(() => {
@@ -256,12 +296,27 @@ export default function ProductionReceiveStationPage() {
               </p>
 
               <Show when={ctx().track_serial}>
-                <Field label="Paste finished-good serial numbers">
+                <p class="mt-3 text-xs text-text-secondary">
+                  Need {remainingOutputSerials(ctx())} more finished serial(s). Numbers are auto-allocated when available —
+                  review then Record.
+                </p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="rounded border border-stroke px-2 py-1 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                    disabled={allocBusy() || remainingOutputSerials(ctx()) <= 0}
+                    onClick={() => void autoAllocateSerials(ctx(), true)}
+                  >
+                    {allocBusy() ? "Allocating…" : "Generate serial numbers"}
+                  </button>
+                </div>
+                <Field label="Finished-good serial numbers">
                   <textarea
                     class={`${inputClass} mt-2`}
                     rows={5}
                     value={serialPaste()}
                     onInput={(e) => setSerialPaste(e.currentTarget.value)}
+                    aria-label="Finished-good serial numbers"
                   />
                 </Field>
                 <button

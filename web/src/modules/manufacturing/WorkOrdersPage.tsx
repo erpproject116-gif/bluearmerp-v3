@@ -607,6 +607,21 @@ export default function WorkOrdersPage() {
                 </A>
               )}
             </Show>
+            <Show
+              when={
+                r.status === "released" &&
+                needsRecordFinished(r) &&
+                needsTakeFromStock(r)
+              }
+            >
+              <A
+                href={`/app/production/receive-station${stationQuery(r.id)}`}
+                class="text-xs font-medium text-brand-600 hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Record finished
+              </A>
+            </Show>
             <Show when={r.status === "draft" && canRelease()}>
               <button
                 type="button"

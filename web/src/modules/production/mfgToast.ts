@@ -19,8 +19,13 @@ export function friendlyMfgMessage(raw: string | undefined | null, fallback: str
     lower.includes("staged serial") ||
     lower.includes("staged lot") ||
     lower.includes("staged issue") ||
-    (lower.includes("take materials") && lower.includes("finish"))
+    lower.includes("staged output") ||
+    (lower.includes("take materials") && lower.includes("finish")) ||
+    lower.includes("record finished")
   ) {
+    if (lower.includes("output") || lower.includes("record finished")) {
+      return "Record finished product first (Continue → Record finished serials/lots), then Finish build.";
+    }
     return "Take materials first (Continue → scan/take serials or lots), then Finish build.";
   }
   if (lower.includes("insufficient") || lower.includes("shortage") || lower.includes("not enough")) {
