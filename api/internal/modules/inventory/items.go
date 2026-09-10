@@ -255,10 +255,14 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, base_unit_id, item_category, item_type, production_process, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, oe_price, standard_costs, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, catch_weight, default_shelf_life_days, lot_allocation_method, price_basis, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
 				returning id, item_code, item_name, coalesce(spec_name,''), coalesce(unit,''), base_unit_id, coalesce(item_category,'merchandise'), coalesce(item_type,'item'), production_process, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, oe_price::float8, standard_costs, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, catch_weight, default_shelf_life_days, lot_allocation_method, price_basis, status, item_category_id`,
 				tu.TenantID, code, strings.TrimSpace(body.ItemName), specName, unit, baseUnitID, itemCategory, itemType, productionProcess, body.PurchasePrice, body.SalesPrice, body.VipPrice, priceJSON, safetyJSON, oePrice, standardJSON, body.WarrantyDurationMonths, body.ReorderLevel, trackSerial, trackLot, serialPolicy, lotPolicy, trackQty, catchWeight, body.DefaultShelfLifeDays, lotAlloc, priceBasis, defaultStatus(body.Status), body.ItemCategoryID).
-				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit, &row.BaseUnitID, &row.ItemCategory, &row.ItemType, &row.ProductionProcess, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.OePrice, &standardJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.Status, &row.ItemCategoryID)
+				Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.Unit, &row.BaseUnitID, &row.ItemCategory, &row.ItemType, &row.ProductionProcess, &row.PurchasePrice, &row.SalesPrice, &row.VipPrice, &priceJSON, &safetyJSON, &row.OePrice, &standardJSON, &row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty, &row.CatchWeight, &row.DefaultShelfLifeDays, &row.LotAllocationMethod, &row.PriceBasis, &row.Status, &row.ItemCategoryID)
 			row.PriceLevels = unmarshalJSONFloatMap(priceJSON)
 			row.SafetyStockByDoc = unmarshalJSONFloatMap(safetyJSON)
 			row.StandardCosts = unmarshalJSONFloatMap(standardJSON)
+			row.SerialPolicy = NormalizeTrackingPolicy(row.SerialPolicy)
+			row.LotPolicy = NormalizeTrackingPolicy(row.LotPolicy)
+			row.LotAllocationMethod = NormalizeLotAllocationMethod(row.LotAllocationMethod)
+			row.PriceBasis = NormalizePriceBasis(row.PriceBasis)
 			return row.ID, row, err
 		})
 		if err != nil {
