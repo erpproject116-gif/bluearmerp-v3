@@ -11,6 +11,8 @@ export type ProductionFlowStep = {
   optional?: boolean;
   /** Shown on the Jobs list as a row action, not a separate page */
   onJobsRow?: boolean;
+  /** Hidden in the default 3-step assembly strip unless "Show full process" */
+  advancedOnly?: boolean;
 };
 
 export type ProductionFlow = {
@@ -35,14 +37,15 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       href: "/app/sales-order/sales-orders",
       routePrefixes: ["/app/sales-order"],
       optional: true,
+      advancedOnly: true,
     },
     {
       id: "recipe",
       label: "Recipe",
       short: "What you build",
-      description: "Finished product and the parts you use.",
+      description: "Finished product and the parts you use. Recipe code is assigned automatically (Ammddyyyy-######).",
       detail:
-        "Assembly → Recipes: name the recipe, pick the finished product, list parts and how many of each. Leave Advanced alone unless you need yield tweaks.",
+        "Assembly → Recipes: name the recipe, pick the finished product and warehouse, list parts. Code is auto-generated on save. Costs are estimates only.",
       href: "/app/production/assembly/recipes",
       routePrefixes: ["/app/production/assembly/recipes"],
     },
@@ -50,8 +53,8 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       id: "job",
       label: "Job",
       short: "How many",
-      description: "Create a draft job from the recipe.",
-      detail: "Assembly → Jobs → New job: pick recipe, how many to make, and location. Then Start job.",
+      description: "Create a job from the recipe.",
+      detail: "Assembly → Jobs → New job: pick recipe, how many to make, and location.",
       href: "/app/production/assembly/jobs",
       routePrefixes: ["/app/production/assembly/jobs"],
     },
@@ -59,11 +62,13 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       id: "release",
       label: "Start job",
       short: "Begin",
-      description: "Start the job so you can take stock and finish.",
-      detail: "On the Jobs list, click Start job on the draft row.",
+      description: "Optional — only if you schedule without posting stock yet.",
+      detail: "Most floor users skip this and use Finish build, which starts and finishes in one step.",
       href: "/app/production/assembly/jobs",
       routePrefixes: ["/app/production/assembly/jobs"],
       onJobsRow: true,
+      optional: true,
+      advancedOnly: true,
     },
     {
       id: "issue",
@@ -71,38 +76,42 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       short: "If tracked",
       description: "Only needed when parts use serial or lot numbers.",
       detail:
-        "If your parts are not serial/lot tracked, skip this step and Finish. Otherwise open Take materials on the job row.",
+        "If your parts are not serial/lot tracked, skip this step and Finish build. Otherwise open Continue on the job row.",
       href: "/app/production/issue-station",
       routePrefixes: ["/app/production/issue-station"],
       optional: true,
+      advancedOnly: true,
     },
     {
       id: "receive",
       label: "Record finished",
       short: "If tracked",
       description: "Only needed when the finished product uses serial or lot numbers.",
-      detail: "Skip if the finished product is plain qty. Otherwise record serials/lots before Finish.",
+      detail: "Staging does not update stock until Finish build. Then Finish writes actual produced.",
       href: "/app/production/receive-station",
       routePrefixes: ["/app/production/receive-station"],
       optional: true,
+      advancedOnly: true,
     },
     {
       id: "qc",
       label: "Quality check",
       short: "If required",
-      description: "Pass quality check when your company requires it before Finish.",
-      detail: "Use Pass quality check on the Jobs list if the Finish button is blocked.",
+      description: "Only when your company turns on FG QC in Process policies.",
+      detail: "When QC is off (default), Jobs never show Pass/Hold. When on, Pass before Finish build if blocked.",
       href: "/app/production/assembly/jobs",
       routePrefixes: ["/app/production/assembly/jobs"],
       onJobsRow: true,
       optional: true,
+      advancedOnly: true,
     },
     {
       id: "complete",
-      label: "Finish",
+      label: "Finish build",
       short: "Update stock",
-      description: "Posts stock: parts out, finished product in.",
-      detail: "Click Finish on the job row. Stock updates when this succeeds.",
+      description: "Posts stock: parts out, finished product in. Writes actual produced.",
+      detail:
+        "Click Finish build on the job row (draft or released). Does not create a new item and does not post FG cost — stock qty only.",
       href: "/app/production/assembly/jobs",
       routePrefixes: ["/app/production/assembly/jobs"],
       onJobsRow: true,
@@ -116,6 +125,7 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       href: "/app/inventory/serial-lot/pack-station",
       routePrefixes: ["/app/inventory/serial-lot/pack-station"],
       optional: true,
+      advancedOnly: true,
     },
     {
       id: "sell",
@@ -126,15 +136,17 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       href: "/app/sales/sales",
       routePrefixes: ["/app/sales", "/app/shipping"],
       optional: true,
+      advancedOnly: true,
     },
     {
       id: "reports",
       label: "Reports",
       short: "Review",
-      description: "See job status and stock movements.",
-      detail: "Production → Reports for job status and movements.",
+      description: "See job status, recipe, SO, and actual produced.",
+      detail: "Production → Reports for job status, progress, and movements.",
       href: "/app/production/reports",
       routePrefixes: ["/app/production/reports"],
+      advancedOnly: true,
     },
   ],
 };
@@ -239,6 +251,12 @@ export const PRODUCTION_FLOWS: Record<MfgMode, ProductionFlow> = {
   assembly: ASSEMBLY_FLOW,
   disassembly: DISASSEMBLY_FLOW,
 };
+
+/** Default assembly strip: Recipe → Job → Finish build (hide advancedOnly). */
+export function visibleFlowSteps(flow: ProductionFlow, showFull: boolean): ProductionFlowStep[] {
+  if (flow.mode !== "assembly" || showFull) return flow.steps;
+  return flow.steps.filter((s) => !s.advancedOnly);
+}
 
 /** Pick the best-matching step for highlighting "You are here". */
 export function activeFlowStepIndex(pathname: string, search: string, flow: ProductionFlow): number {

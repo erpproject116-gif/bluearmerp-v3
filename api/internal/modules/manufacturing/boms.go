@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -33,17 +34,19 @@ type BomLine struct {
 	BaseUnitID      int64   `json:"base_unit_id,omitempty"`
 	BaseUnitCode    string  `json:"base_unit_code,omitempty"`
 	StockQtyPreview float64 `json:"stock_qty_preview,omitempty"`
+	UnitCost        float64 `json:"unit_cost,omitempty"`
+	LineTotal       float64 `json:"line_total,omitempty"`
 }
 
 type Bom struct {
-	ID                int64     `json:"id"`
-	BomCode           string    `json:"bom_code"`
-	BomName           string    `json:"bom_name"`
-	FinishedItemID    int64     `json:"finished_item_id"`
-	FinishedItemCode  string    `json:"finished_item_code,omitempty"`
-	FinishedItemName  string    `json:"finished_item_name,omitempty"`
-	DefaultLocationID *int64    `json:"default_location_id,omitempty"`
-	DefaultLocation   string    `json:"default_location_name,omitempty"`
+	ID                   int64     `json:"id"`
+	BomCode              string    `json:"bom_code"`
+	BomName              string    `json:"bom_name"`
+	FinishedItemID       int64     `json:"finished_item_id"`
+	FinishedItemCode     string    `json:"finished_item_code,omitempty"`
+	FinishedItemName     string    `json:"finished_item_name,omitempty"`
+	DefaultLocationID    *int64    `json:"default_location_id,omitempty"`
+	DefaultLocation      string    `json:"default_location_name,omitempty"`
 	OutputQty            float64   `json:"output_qty"`
 	OutputUnitID         *int64    `json:"output_unit_id,omitempty"`
 	OutputUnitCode       string    `json:"output_unit_code,omitempty"`
@@ -51,26 +54,35 @@ type Bom struct {
 	BomType              string    `json:"bom_type"`
 	ExpectedYieldPctMin  *float64  `json:"expected_yield_pct_min,omitempty"`
 	ExpectedYieldPctMax  *float64  `json:"expected_yield_pct_max,omitempty"`
+	AdditionalCostType   *string   `json:"additional_cost_type,omitempty"`
+	DirectLaborCost      float64   `json:"direct_labor_cost"`
+	InboundFreightCost   float64   `json:"inbound_freight_cost"`
+	MaterialsSubtotal    float64   `json:"materials_subtotal,omitempty"`
+	AdditionalCost       float64   `json:"additional_cost,omitempty"`
+	TotalCost            float64   `json:"total_cost,omitempty"`
 	IsActive             bool      `json:"is_active"`
-	Notes             *string   `json:"notes,omitempty"`
-	Components        string    `json:"components,omitempty"`
-	Lines             []BomLine `json:"lines,omitempty"`
+	Notes                *string   `json:"notes,omitempty"`
+	Components           string    `json:"components,omitempty"`
+	Lines                []BomLine `json:"lines,omitempty"`
 }
 
 type bomBody struct {
-	BomCode           string        `json:"bom_code"`
-	BomName           string        `json:"bom_name"`
-	FinishedItemID    int64         `json:"finished_item_id"`
-	DefaultLocationID *int64        `json:"default_location_id"`
-	OutputQty             *float64      `json:"output_qty"`
-	OutputUnitID          *int64        `json:"output_unit_id"`
-	YieldPct              *float64      `json:"yield_pct"`
-	BomType               string        `json:"bom_type"`
-	ExpectedYieldPctMin   *float64      `json:"expected_yield_pct_min"`
-	ExpectedYieldPctMax   *float64      `json:"expected_yield_pct_max"`
-	IsActive              *bool         `json:"is_active"`
-	Notes             *string       `json:"notes"`
-	Lines             []bomLineBody `json:"lines"`
+	BomCode             string        `json:"bom_code"`
+	BomName             string        `json:"bom_name"`
+	FinishedItemID      int64         `json:"finished_item_id"`
+	DefaultLocationID   *int64        `json:"default_location_id"`
+	OutputQty           *float64      `json:"output_qty"`
+	OutputUnitID        *int64        `json:"output_unit_id"`
+	YieldPct            *float64      `json:"yield_pct"`
+	BomType             string        `json:"bom_type"`
+	ExpectedYieldPctMin *float64      `json:"expected_yield_pct_min"`
+	ExpectedYieldPctMax *float64      `json:"expected_yield_pct_max"`
+	AdditionalCostType  *string       `json:"additional_cost_type"`
+	DirectLaborCost     *float64      `json:"direct_labor_cost"`
+	InboundFreightCost  *float64      `json:"inbound_freight_cost"`
+	IsActive            *bool         `json:"is_active"`
+	Notes               *string       `json:"notes"`
+	Lines               []bomLineBody `json:"lines"`
 }
 
 type bomLineBody struct {
@@ -121,6 +133,7 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(b.output_qty, 1)::float8, b.output_unit_id, coalesce(ou.code, ''),
 			  coalesce(b.yield_pct, 100)::float8, coalesce(b.bom_type, 'assembly'),
 			  b.expected_yield_pct_min::float8, b.expected_yield_pct_max::float8,
+			  b.additional_cost_type, coalesce(b.direct_labor_cost, 0)::float8, coalesce(b.inbound_freight_cost, 0)::float8,
 			  b.is_active, b.notes,
 			  string_agg(
 			    coalesce(ci.item_code, '') || ' × ' || l.qty::text || ' ' || coalesce(lu.code, coalesce(nullif(trim(ci.unit), ''), '')),
@@ -154,17 +167,21 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			var row Bom
 			var notes *string
 			var components *string
+			var addCostType *string
 			if err := rows.Scan(
 				&row.ID, &row.BomCode, &row.BomName, &row.FinishedItemID,
 				&row.FinishedItemCode, &row.FinishedItemName,
 				&row.DefaultLocationID, &row.DefaultLocation,
 				&row.OutputQty, &row.OutputUnitID, &row.OutputUnitCode,
 				&row.YieldPct, &row.BomType, &row.ExpectedYieldPctMin, &row.ExpectedYieldPctMax,
+				&addCostType, &row.DirectLaborCost, &row.InboundFreightCost,
 				&row.IsActive, &notes, &components, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read BOM.", "ERR_INTERNAL")
 				return
 			}
+			row.AdditionalCostType = addCostType
+			row.AdditionalCost = row.DirectLaborCost + row.InboundFreightCost
 			row.Notes = notes
 			if components != nil {
 				row.Components = *components
@@ -232,19 +249,34 @@ func createBom(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		bomType := normalizeBomType(body.BomType)
+		bomCode := strings.TrimSpace(body.BomCode)
+		if bomCode == "" && bomType == "assembly" {
+			err = tx.QueryRow(r.Context(), `
+				select public.allocate_mfg_assembly_bom_code($1, current_date)`, tu.TenantID).Scan(&bomCode)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to allocate recipe code.", "ERR_INTERNAL")
+				return
+			}
+		}
+		labor, freight := resolveBomCostDefaults(body)
+		addCostType := normalizeAdditionalCostType(body.AdditionalCostType)
+
 		var id int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.mfg_boms (
 			  tenant_id, bom_code, bom_name, finished_item_id, default_location_id,
 			  output_qty, output_unit_id, yield_pct, bom_type,
 			  expected_yield_pct_min, expected_yield_pct_max,
+			  additional_cost_type, direct_labor_cost, inbound_freight_cost,
 			  is_active, notes
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 			returning id`,
-			tu.TenantID, strings.TrimSpace(body.BomCode), strings.TrimSpace(body.BomName),
+			tu.TenantID, bomCode, strings.TrimSpace(body.BomName),
 			body.FinishedItemID, body.DefaultLocationID,
-			outputQty, outputUnitID, yieldPct, normalizeBomType(body.BomType),
+			outputQty, outputUnitID, yieldPct, bomType,
 			body.ExpectedYieldPctMin, body.ExpectedYieldPctMax,
+			addCostType, labor, freight,
 			body.IsActive == nil || *body.IsActive, body.Notes,
 		).Scan(&id)
 		if err != nil {
@@ -269,7 +301,7 @@ func createBom(pool *pgxpool.Pool) http.HandlerFunc {
 		row, err := loadBom(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			// Row is committed; return id so the client can still refresh the list.
-			response.OK(w, map[string]any{"id": id, "bom_code": strings.TrimSpace(body.BomCode)}, "BOM created.")
+			response.OK(w, map[string]any{"id": id, "bom_code": bomCode}, "BOM created.")
 			return
 		}
 		response.OK(w, row, "BOM created.")
@@ -318,16 +350,30 @@ func updateBom(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		labor, freight := resolveBomCostDefaults(body)
+		addCostType := normalizeAdditionalCostType(body.AdditionalCostType)
+		bomCode := strings.TrimSpace(body.BomCode)
+		if bomCode == "" {
+			_ = tx.QueryRow(r.Context(), `
+				select bom_code from public.mfg_boms where id=$1 and tenant_id=$2`, id, tu.TenantID).Scan(&bomCode)
+		}
+		if bomCode == "" {
+			response.Validation(w, map[string]string{"bom_code": "BOM code is required."})
+			return
+		}
+
 		tag, err := tx.Exec(r.Context(), `
 			update public.mfg_boms set
 			  bom_code=$1, bom_name=$2, finished_item_id=$3, default_location_id=$4,
 			  output_qty=$5, output_unit_id=$6, yield_pct=$7,
 			  bom_type=$8, expected_yield_pct_min=$9, expected_yield_pct_max=$10,
-			  is_active=$11, notes=$12, updated_at=now()
-			where id=$13 and tenant_id=$14`,
-			strings.TrimSpace(body.BomCode), strings.TrimSpace(body.BomName), body.FinishedItemID,
+			  additional_cost_type=$11, direct_labor_cost=$12, inbound_freight_cost=$13,
+			  is_active=$14, notes=$15, updated_at=now()
+			where id=$16 and tenant_id=$17`,
+			bomCode, strings.TrimSpace(body.BomName), body.FinishedItemID,
 			body.DefaultLocationID, outputQty, outputUnitID, yieldPct,
 			normalizeBomType(body.BomType), body.ExpectedYieldPctMin, body.ExpectedYieldPctMax,
+			addCostType, labor, freight,
 			body.IsActive == nil || *body.IsActive, body.Notes, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "BOM not found.", "ERR_NOT_FOUND")
@@ -382,6 +428,7 @@ type pgxpoolConn interface {
 
 func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error) {
 	var row Bom
+	var addCostType *string
 	err := q.QueryRow(ctx, `
 		select b.id, b.bom_code, b.bom_name, b.finished_item_id,
 		  coalesce(fi.item_code, ''), coalesce(fi.item_name, ''),
@@ -389,6 +436,7 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		  coalesce(b.output_qty, 1)::float8, b.output_unit_id, coalesce(ou.code, ''),
 		  coalesce(b.yield_pct, 100)::float8, coalesce(b.bom_type, 'assembly'),
 		  b.expected_yield_pct_min::float8, b.expected_yield_pct_max::float8,
+		  b.additional_cost_type, coalesce(b.direct_labor_cost, 0)::float8, coalesce(b.inbound_freight_cost, 0)::float8,
 		  b.is_active, b.notes
 		from public.mfg_boms b
 		left join public.inv_items fi on fi.id = b.finished_item_id and fi.tenant_id = b.tenant_id
@@ -400,14 +448,17 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 			&row.DefaultLocationID, &row.DefaultLocation,
 			&row.OutputQty, &row.OutputUnitID, &row.OutputUnitCode,
 			&row.YieldPct, &row.BomType, &row.ExpectedYieldPctMin, &row.ExpectedYieldPctMax,
+			&addCostType, &row.DirectLaborCost, &row.InboundFreightCost,
 			&row.IsActive, &row.Notes)
 	if err != nil {
 		return Bom{}, err
 	}
+	row.AdditionalCostType = addCostType
 	lines, err := q.Query(ctx, `
 		select l.id, l.line_no, l.component_item_id, coalesce(i.item_code, ''), coalesce(i.item_name, ''),
 		  l.qty::float8, l.unit_id, coalesce(u.code, ''), coalesce(l.scrap_qty, 0)::float8,
-		  coalesce(i.base_unit_id, 0), coalesce(bu.code, coalesce(nullif(trim(i.unit), ''), 'ea'))
+		  coalesce(i.base_unit_id, 0), coalesce(bu.code, coalesce(nullif(trim(i.unit), ''), 'ea')),
+		  coalesce(i.purchase_price, 0)::float8, coalesce(i.standard_costs, '{}'::jsonb)
 		from public.mfg_bom_lines l
 		left join public.inv_items i on i.id = l.component_item_id
 		left join public.inv_units u on u.id = l.unit_id
@@ -418,11 +469,15 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		return Bom{}, err
 	}
 	defer lines.Close()
+	var materials float64
 	for lines.Next() {
 		var ln BomLine
+		var purchase float64
+		var stdRaw []byte
 		if err := lines.Scan(
 			&ln.ID, &ln.LineNo, &ln.ComponentItemID, &ln.ComponentCode, &ln.ComponentName,
 			&ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.ScrapQty, &ln.BaseUnitID, &ln.BaseUnitCode,
+			&purchase, &stdRaw,
 		); err != nil {
 			return Bom{}, err
 		}
@@ -434,11 +489,17 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		} else if ln.BaseUnitID > 0 && (ln.UnitID == nil || *ln.UnitID == ln.BaseUnitID) {
 			ln.StockQtyPreview = need
 		}
+		ln.UnitCost = resolveItemUnitCost(purchase, stdRaw)
+		ln.LineTotal = ln.UnitCost * ln.Qty
+		materials += ln.LineTotal
 		row.Lines = append(row.Lines, ln)
 	}
 	if row.Lines == nil {
 		row.Lines = []BomLine{}
 	}
+	row.MaterialsSubtotal = materials
+	row.AdditionalCost = row.DirectLaborCost + row.InboundFreightCost
+	row.TotalCost = row.MaterialsSubtotal + row.AdditionalCost
 	return row, nil
 }
 
@@ -473,7 +534,8 @@ func resolveBomHeaderDefaults(ctx context.Context, q inventory.UnitQuerier, tena
 
 func validateBomBody(b bomBody) map[string]string {
 	errs := map[string]string{}
-	if strings.TrimSpace(b.BomCode) == "" {
+	bomType := normalizeBomType(b.BomType)
+	if bomType != "assembly" && strings.TrimSpace(b.BomCode) == "" {
 		errs["bom_code"] = "BOM code is required."
 	}
 	if strings.TrimSpace(b.BomName) == "" {
@@ -488,12 +550,17 @@ func validateBomBody(b bomBody) map[string]string {
 	if b.YieldPct != nil && *b.YieldPct <= 0 {
 		errs["yield_pct"] = "Yield % must be greater than zero."
 	}
-	bomType := normalizeBomType(b.BomType)
 	if bomType != "assembly" && bomType != "disassembly" {
 		errs["bom_type"] = "BOM type must be assembly or disassembly."
 	}
 	if b.ExpectedYieldPctMin != nil && b.ExpectedYieldPctMax != nil && *b.ExpectedYieldPctMin > *b.ExpectedYieldPctMax {
 		errs["expected_yield_pct_min"] = "Minimum yield cannot exceed maximum yield."
+	}
+	if b.DirectLaborCost != nil && *b.DirectLaborCost < 0 {
+		errs["direct_labor_cost"] = "Direct labor cost cannot be negative."
+	}
+	if b.InboundFreightCost != nil && *b.InboundFreightCost < 0 {
+		errs["inbound_freight_cost"] = "Inbound freight cost cannot be negative."
 	}
 	if len(b.Lines) == 0 {
 		errs["lines"] = "At least one component line is required."
@@ -514,6 +581,52 @@ func validateBomBody(b bomBody) map[string]string {
 		return errs
 	}
 	return nil
+}
+
+func resolveBomCostDefaults(body bomBody) (labor, freight float64) {
+	if body.DirectLaborCost != nil && *body.DirectLaborCost > 0 {
+		labor = *body.DirectLaborCost
+	}
+	if body.InboundFreightCost != nil && *body.InboundFreightCost > 0 {
+		freight = *body.InboundFreightCost
+	}
+	return labor, freight
+}
+
+func normalizeAdditionalCostType(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*v)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func resolveItemUnitCost(purchasePrice float64, standardCostsJSON []byte) float64 {
+	if purchasePrice > 0 {
+		return purchasePrice
+	}
+	if len(standardCostsJSON) == 0 {
+		return 0
+	}
+	var std map[string]float64
+	if err := json.Unmarshal(standardCostsJSON, &std); err != nil || len(std) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, v := range std {
+		sum += v
+	}
+	if sum > 0 {
+		return sum
+	}
+	return 0
+}
+
+func formatAssemblyBomCode(d time.Time, seq int) string {
+	return fmt.Sprintf("A%s-%06d", d.Format("01022006"), seq)
 }
 
 func replaceBomLines(ctx context.Context, tx pgx.Tx, tenantID, bomID int64, lines []bomLineBody) error {

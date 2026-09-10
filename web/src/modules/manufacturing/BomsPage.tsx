@@ -1,4 +1,4 @@
-import { createSignal, For, Show, createResource } from "solid-js";
+import { createSignal, For, Show, createResource, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
@@ -17,6 +17,7 @@ import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useProductionMode } from "../production/ProductionModeLayout";
 import { recipesHref } from "../production/mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "../production/mfgToast";
+
 type BomLine = {
   id?: number;
   line_no: number;
@@ -32,6 +33,8 @@ type BomLine = {
   stock_qty_preview?: number;
   base_unit_id?: number;
   base_unit_code?: string;
+  unit_cost?: number;
+  line_total?: number;
 };
 
 type Bom = {
@@ -50,6 +53,12 @@ type Bom = {
   bom_type?: string;
   expected_yield_pct_min?: number | null;
   expected_yield_pct_max?: number | null;
+  additional_cost_type?: string | null;
+  direct_labor_cost?: number;
+  inbound_freight_cost?: number;
+  materials_subtotal?: number;
+  additional_cost?: number;
+  total_cost?: number;
   is_active: boolean;
   notes?: string | null;
   components?: string;
@@ -70,6 +79,20 @@ function parseQtyInput(raw: string | number | undefined | null): number {
 function lineScrapQty(ln: BomLine): number {
   if (ln.scrap_input != null) return parseQtyInput(ln.scrap_input);
   return parseQtyInput(ln.scrap_qty);
+}
+
+function lineUnitCost(ln: BomLine): number {
+  const n = Number(ln.unit_cost);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+function lineTotalDisplay(ln: BomLine): number {
+  if (ln.line_total != null && Number.isFinite(ln.line_total)) return ln.line_total;
+  return lineUnitCost(ln) * Number(ln.qty || 0);
+}
+
+function formatCost(n: number): string {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 }
 
 function convertClient(fromId: number, toId: number, qty: number, convs: Conversion[]): number | null {
@@ -100,13 +123,19 @@ function liveStockPreview(ln: BomLine, convs: Conversion[]): { qty: number; code
 async function fetchItems(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", sort: "item_code", order: "asc" });
   if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; item_code: string; item_name: string; base_unit_id?: number; base_unit_code?: string }[]>(
-    `/api/v1/inventory/items?${qs}`,
-  );
+  const res = await apiFetch<
+    { id: number; item_code: string; item_name: string; base_unit_id?: number; base_unit_code?: string; purchase_price?: number }[]
+  >(`/api/v1/inventory/items?${qs}`);
   return (res.data ?? []).map((i) => ({
     id: i.id,
     label: `${i.item_code} — ${i.item_name}`,
-    meta: { base_unit_id: i.base_unit_id, base_unit_code: i.base_unit_code },
+    meta: {
+      base_unit_id: i.base_unit_id,
+      base_unit_code: i.base_unit_code,
+      item_code: i.item_code,
+      item_name: i.item_name,
+      purchase_price: i.purchase_price,
+    },
   }));
 }
 
@@ -118,7 +147,7 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 }
 
 function emptyLine(): BomLine {
-  return { line_no: 1, component_item_id: 0, qty: 1, scrap_input: "", unit_id: null };
+  return { line_no: 1, component_item_id: 0, qty: 1, scrap_input: "", unit_id: null, unit_cost: 0, line_total: 0 };
 }
 
 export default function BomsPage() {
@@ -149,6 +178,10 @@ export default function BomsPage() {
   const [yieldPct, setYieldPct] = createSignal("100");
   const [expectedYieldMin, setExpectedYieldMin] = createSignal("");
   const [expectedYieldMax, setExpectedYieldMax] = createSignal("");
+  const [directLaborCost, setDirectLaborCost] = createSignal("0");
+  const [inboundFreightCost, setInboundFreightCost] = createSignal("0");
+  const [additionalCostType, setAdditionalCostType] = createSignal("");
+  const [advancedOpen, setAdvancedOpen] = createSignal(false);
   const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
   const [notes, setNotes] = createSignal("");
   const [lines, setLines] = createSignal<BomLine[]>([emptyLine()]);
@@ -157,6 +190,20 @@ export default function BomsPage() {
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const client = useQueryClient();
+
+  const isAssembly = () => mode === "assembly";
+  const showScrapColumn = () => copy.showScrap && (!isAssembly() || advancedOpen());
+
+  const costEstimates = createMemo(() => {
+    const materials = lines().reduce((sum, ln) => {
+      if (!(ln.component_item_id > 0) || !(Number(ln.qty) > 0)) return sum;
+      return sum + lineTotalDisplay(ln);
+    }, 0);
+    const labor = parseQtyInput(directLaborCost());
+    const freight = parseQtyInput(inboundFreightCost());
+    const additional = labor + freight;
+    return { materials, additional, total: materials + additional };
+  });
 
   const [conversions, { refetch: refreshConversions }] = createResource(async () => {
     const res = await apiFetch<Conversion[]>("/api/v1/inventory/unit-conversions");
@@ -188,6 +235,13 @@ export default function BomsPage() {
     await client.refetchQueries({ queryKey: ["mfg-boms"] });
   };
 
+  const resetCostFields = () => {
+    setDirectLaborCost("0");
+    setInboundFreightCost("0");
+    setAdditionalCostType("");
+    setAdvancedOpen(false);
+  };
+
   const openNew = () => {
     setEditing(null);
     setBomCode("");
@@ -203,6 +257,7 @@ export default function BomsPage() {
     setYieldPct("100");
     setExpectedYieldMin("");
     setExpectedYieldMax("");
+    resetCostFields();
     setFieldErrors({});
     setNotes("");
     setLines([emptyLine()]);
@@ -238,6 +293,10 @@ export default function BomsPage() {
     setYieldPct(String(detail.yield_pct ?? 100));
     setExpectedYieldMin(detail.expected_yield_pct_min != null ? String(detail.expected_yield_pct_min) : "");
     setExpectedYieldMax(detail.expected_yield_pct_max != null ? String(detail.expected_yield_pct_max) : "");
+    setDirectLaborCost(String(detail.direct_labor_cost ?? 0));
+    setInboundFreightCost(String(detail.inbound_freight_cost ?? 0));
+    setAdditionalCostType(detail.additional_cost_type ?? "");
+    setAdvancedOpen(false);
     setFieldErrors({});
     setNotes(detail.notes ?? "");
     const loaded = detail.lines?.length ? detail.lines : [emptyLine()];
@@ -245,6 +304,8 @@ export default function BomsPage() {
       loaded.map((ln) => ({
         ...ln,
         scrap_input: ln.scrap_qty != null && ln.scrap_qty !== 0 ? String(ln.scrap_qty) : ln.scrap_input ?? "",
+        unit_cost: ln.unit_cost ?? 0,
+        line_total: ln.line_total ?? (ln.unit_cost ?? 0) * Number(ln.qty || 0),
       })),
     );
     setLineLabels(Object.fromEntries(loaded.map((ln, i) => [i, [ln.component_code, ln.component_name].filter(Boolean).join(" — ")])));
@@ -269,6 +330,9 @@ export default function BomsPage() {
       yield_pct: yieldPct(),
       expected_yield_min: expectedYieldMin(),
       expected_yield_max: expectedYieldMax(),
+      direct_labor_cost: directLaborCost(),
+      inbound_freight_cost: inboundFreightCost(),
+      additional_cost_type: additionalCostType(),
       bom_type: mode,
       notes: notes(),
       lines: lines(),
@@ -289,6 +353,9 @@ export default function BomsPage() {
       setYieldPct(payload.yield_pct ?? "100");
       setExpectedYieldMin(payload.expected_yield_min ?? "");
       setExpectedYieldMax(payload.expected_yield_max ?? "");
+      setDirectLaborCost(payload.direct_labor_cost ?? "0");
+      setInboundFreightCost(payload.inbound_freight_cost ?? "0");
+      setAdditionalCostType(payload.additional_cost_type ?? "");
       setNotes(payload.notes ?? "");
       setLines(payload.lines?.length ? payload.lines : [emptyLine()]);
       setLineLabels(payload.line_labels ?? {});
@@ -301,18 +368,19 @@ export default function BomsPage() {
   const addLine = () => setLines((prev) => [...prev, { ...emptyLine(), line_no: prev.length + 1 }]);
 
   const save = async () => {
-    const errs = collectRequiredFieldErrors(
-      {
-        bom_code: bomCode(),
-        bom_name: bomName(),
-        finished_item_id: finishedItemId(),
-      },
-      [
-        { key: "bom_code", label: "Recipe code" },
-        { key: "bom_name", label: copy.bomNameLabel },
-        { key: "finished_item_id", label: copy.headerItemLabel },
-      ],
-    );
+    const requiredValues: Record<string, unknown> = {
+      bom_name: bomName(),
+      finished_item_id: finishedItemId(),
+    };
+    const requiredFields: { key: string; label: string }[] = [
+      { key: "bom_name", label: copy.bomNameLabel },
+      { key: "finished_item_id", label: copy.headerItemLabel },
+    ];
+    if (!isAssembly()) {
+      requiredValues.bom_code = bomCode();
+      requiredFields.unshift({ key: "bom_code", label: "Recipe code" });
+    }
+    const errs = collectRequiredFieldErrors(requiredValues, requiredFields);
     const bodyLines = lines()
       .filter((ln) => ln.component_item_id > 0 && Number(ln.qty) > 0)
       .map((ln) => ({
@@ -332,8 +400,8 @@ export default function BomsPage() {
       return;
     }
     setFieldErrors({});
+    const ed = editing();
     const payload: Record<string, unknown> = {
-      bom_code: bomCode().trim(),
       bom_name: bomName().trim(),
       finished_item_id: finishedItemId(),
       default_location_id: locationId() ?? null,
@@ -345,24 +413,36 @@ export default function BomsPage() {
       notes: notes().trim() || null,
       lines: bodyLines,
     };
-    if (mode === "disassembly") {
+    if (isAssembly()) {
+      payload.bom_code = ed ? bomCode().trim() : "";
+      payload.direct_labor_cost = parseQtyInput(directLaborCost());
+      payload.inbound_freight_cost = parseQtyInput(inboundFreightCost());
+      payload.additional_cost_type = additionalCostType().trim() || null;
+    } else {
+      payload.bom_code = bomCode().trim();
       const minRaw = expectedYieldMin().trim();
       const maxRaw = expectedYieldMax().trim();
       payload.expected_yield_pct_min = minRaw ? Number(minRaw) : null;
       payload.expected_yield_pct_max = maxRaw ? Number(maxRaw) : null;
     }
-    const ed = editing();
     setSaving(true);
-    const res = await apiFetch(
+    const res = await apiFetch<Bom>(
       ed ? `/api/v1/manufacturing/boms/${ed.id}` : "/api/v1/manufacturing/boms",
       { method: ed ? "PATCH" : "POST", body: JSON.stringify(payload) },
       { silent: true },
     );
     setSaving(false);
-    const ok = handleSaveResult(res, toast, ed ? "Recipe updated." : "Recipe created.", {
+    const assignedCode = !ed && res.success && res.data?.bom_code ? String(res.data.bom_code) : "";
+    const successMsg = ed
+      ? "Recipe updated."
+      : assignedCode
+        ? `Recipe created. Code: ${assignedCode}`
+        : "Recipe created.";
+    const ok = handleSaveResult(res, toast, successMsg, {
       onFieldErrors: setFieldErrors,
     });
     if (!ok) return;
+    if (assignedCode) setBomCode(assignedCode);
     await draft.clearOnSave();
     setModalOpen(false);
     setQ("");
@@ -471,9 +551,11 @@ export default function BomsPage() {
         </div>
         <FormErrorSummary errors={fieldErrors} />
         <ModalFormGuide guideId={copy.bomGuideId} spanFull />
-        <Field label="Recipe code *">
-          <input class={inputClass} value={bomCode()} onInput={(e) => setBomCode(e.currentTarget.value)} />
-        </Field>
+        <Show when={!isAssembly()}>
+          <Field label="Recipe code *">
+            <input class={inputClass} value={bomCode()} onInput={(e) => setBomCode(e.currentTarget.value)} />
+          </Field>
+        </Show>
         <Field label={`${copy.bomNameLabel} *`}>
           <input class={inputClass} value={bomName()} onInput={(e) => setBomName(e.currentTarget.value)} />
         </Field>
@@ -502,7 +584,7 @@ export default function BomsPage() {
           />
         </div>
         <LookupCombo
-          label="Default production location"
+          label={isAssembly() ? "Warehouse" : "Default production location"}
           value={locationLabel}
           selectedId={locationId}
           onInput={setLocationLabel}
@@ -510,35 +592,85 @@ export default function BomsPage() {
           onClear={() => { setLocationId(null); setLocationLabel(""); }}
           fetchOptions={fetchLocations}
         />
-        <Field label={`${copy.batchQtyLabel} *`}>
-          <input class={inputClass} type="text" inputMode="decimal" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
-        </Field>
-        <UnitLookupCombo
-          label="Batch UoM"
-          selectedId={outputUnitId}
-          value={outputUnitLabel}
-          onInput={setOutputUnitLabel}
-          onSelect={(u) => {
-            setOutputUnitId(u.id);
-            setOutputUnitLabel(formatUnitLabel(u));
-            refreshConversions();
-          }}
-          onClear={() => {
-            setOutputUnitId(null);
-            setOutputUnitLabel("");
-          }}
-        />
-        <details class="col-span-full rounded-lg border border-stroke bg-slate-50/60 p-3">
+        <Show when={!isAssembly()}>
+          <Field label={`${copy.batchQtyLabel} *`}>
+            <input class={inputClass} type="text" inputMode="decimal" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
+          </Field>
+          <UnitLookupCombo
+            label="Batch UoM"
+            selectedId={outputUnitId}
+            value={outputUnitLabel}
+            onInput={setOutputUnitLabel}
+            onSelect={(u) => {
+              setOutputUnitId(u.id);
+              setOutputUnitLabel(formatUnitLabel(u));
+              refreshConversions();
+            }}
+            onClear={() => {
+              setOutputUnitId(null);
+              setOutputUnitLabel("");
+            }}
+          />
+        </Show>
+        <div class="col-span-full sm:col-span-2 lg:col-span-3">
+          <Field label="Notes">
+            <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
+          </Field>
+        </div>
+        <details
+          class="col-span-full rounded-lg border border-stroke bg-slate-50/60 p-3"
+          open={advancedOpen()}
+          onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
+        >
           <summary class="cursor-pointer text-sm font-medium text-text-primary">
             Advanced (optional)
           </summary>
           <p class="mt-1 text-xs text-text-secondary">
             Most users can leave these alone. Yield % defaults to 100 (no loss).
+            <Show when={isAssembly()}>{" "}Extra / spare on parts appears when this section is open.</Show>
           </p>
           <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Show when={isAssembly() && editing()}>
+              <Field label="Recipe code" description="Assigned automatically on create.">
+                <input class={inputClass} value={bomCode()} readOnly aria-readonly="true" />
+              </Field>
+            </Show>
+            <Show when={isAssembly()}>
+              <Field label={copy.batchQtyLabel}>
+                <input class={inputClass} type="text" inputMode="decimal" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
+              </Field>
+              <UnitLookupCombo
+                label="Batch UoM"
+                selectedId={outputUnitId}
+                value={outputUnitLabel}
+                onInput={setOutputUnitLabel}
+                onSelect={(u) => {
+                  setOutputUnitId(u.id);
+                  setOutputUnitLabel(formatUnitLabel(u));
+                  refreshConversions();
+                }}
+                onClear={() => {
+                  setOutputUnitId(null);
+                  setOutputUnitLabel("");
+                }}
+              />
+            </Show>
             <Field label={copy.yieldLabel} description={copy.yieldDescription}>
               <input class={inputClass} type="text" inputMode="decimal" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
             </Field>
+            <Show when={isAssembly()}>
+              <Field label="Additional cost type" description="Optional. Leave blank unless you track purchase-cost rollups.">
+                <select
+                  class={inputClass}
+                  value={additionalCostType()}
+                  onChange={(e) => setAdditionalCostType(e.currentTarget.value)}
+                  aria-label="Additional cost type"
+                >
+                  <option value="">None</option>
+                  <option value="bom_purchase_cost">BOM purchase cost</option>
+                </select>
+              </Field>
+            </Show>
             <Show when={mode === "disassembly"}>
               <Field label={copy.expectedYieldMinLabel} description={copy.expectedYieldMinDescription}>
                 <input class={inputClass} type="text" inputMode="decimal" value={expectedYieldMin()} onInput={(e) => setExpectedYieldMin(e.currentTarget.value)} />
@@ -554,24 +686,36 @@ export default function BomsPage() {
             Tip: turn on lot tracking for parts if you want lot numbers when you record them. Plain qty parts still work.
           </p>
         </Show>
-        <div class="col-span-full sm:col-span-2 lg:col-span-3">
-          <Field label="Notes">
-            <textarea class={inputClass} rows={2} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
-          </Field>
-        </div>
-        <Show when={copy.showScrap}>
-          <p class="col-span-full text-xs text-text-secondary">
-            Stock uses <strong>{copy.lineQtyLabel}</strong> plus any <strong>{copy.scrapLabel}</strong>. Leave spare blank if you don’t need it.
-          </p>
-        </Show>
-        <p class="col-span-full text-xs text-text-secondary">{copy.stockHint}</p>
         <div class="col-span-full space-y-2">
           <p class="text-sm font-medium text-text-primary">{copy.lineSectionTitle}</p>
           <For each={lines()}>
             {(ln, idx) => {
               const preview = () => liveStockPreview(ln, conversions() ?? []);
               return (
-                <div class={`grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 ${copy.showScrap ? "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_5.5rem_auto]" : "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_auto]"}`}>
+                <div
+                  class={`grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 ${
+                    isAssembly()
+                      ? showScrapColumn()
+                        ? "sm:grid-cols-[4.5rem_minmax(0,1.1fr)_4.5rem_minmax(7rem,0.75fr)_5rem_5rem_5.5rem_auto]"
+                        : "sm:grid-cols-[4.5rem_minmax(0,1.1fr)_4.5rem_minmax(7rem,0.75fr)_5rem_5rem_auto]"
+                      : showScrapColumn()
+                        ? "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_5.5rem_auto]"
+                        : "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_auto]"
+                  }`}
+                >
+                  <Show when={isAssembly()}>
+                    <label class="text-sm">
+                      <span class="text-text-secondary">Part no</span>
+                      <input
+                        class={`${inputClass} mt-1`}
+                        value={ln.component_code ?? ""}
+                        readOnly
+                        aria-readonly="true"
+                        aria-label={`Part number line ${idx() + 1}`}
+                        tabindex={0}
+                      />
+                    </label>
+                  </Show>
                   <LookupCombo
                     label={`Line ${idx() + 1}`}
                     required
@@ -579,17 +723,29 @@ export default function BomsPage() {
                     selectedId={() => ln.component_item_id || null}
                     onInput={(v) => setLineLabels((p) => ({ ...p, [idx()]: v }))}
                     onSelect={(o) => {
-                      const meta = o.meta as { base_unit_id?: number; base_unit_code?: string } | undefined;
+                      const meta = o.meta as {
+                        base_unit_id?: number;
+                        base_unit_code?: string;
+                        item_code?: string;
+                        item_name?: string;
+                        purchase_price?: number;
+                      } | undefined;
+                      const purchase = Number(meta?.purchase_price);
+                      const unitCost = Number.isFinite(purchase) && purchase > 0 ? purchase : 0;
                       setLines((prev) =>
                         prev.map((row, i) =>
                           i === idx()
                             ? {
                                 ...row,
                                 component_item_id: o.id,
+                                component_code: meta?.item_code ?? row.component_code,
+                                component_name: meta?.item_name ?? row.component_name,
                                 unit_id: meta?.base_unit_id ?? row.unit_id,
                                 unit_code: meta?.base_unit_code,
                                 base_unit_id: meta?.base_unit_id,
                                 base_unit_code: meta?.base_unit_code,
+                                unit_cost: unitCost,
+                                line_total: unitCost * Number(row.qty || 0),
                               }
                             : row,
                         ),
@@ -603,7 +759,13 @@ export default function BomsPage() {
                       }
                     }}
                     onClear={() => {
-                      setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, component_item_id: 0 } : row)));
+                      setLines((prev) =>
+                        prev.map((row, i) =>
+                          i === idx()
+                            ? { ...row, component_item_id: 0, component_code: "", component_name: "", unit_cost: 0, line_total: 0 }
+                            : row,
+                        ),
+                      );
                       setLineLabels((p) => ({ ...p, [idx()]: "" }));
                     }}
                     fetchOptions={fetchItems}
@@ -618,7 +780,14 @@ export default function BomsPage() {
                       onInput={(e) => {
                         const raw = e.currentTarget.value.trim();
                         const v = raw === "" ? 0 : Number(raw);
-                        setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, qty: Number.isFinite(v) ? v : row.qty } : row)));
+                        setLines((prev) =>
+                          prev.map((row, i) => {
+                            if (i !== idx()) return row;
+                            const qty = Number.isFinite(v) ? v : row.qty;
+                            const unitCost = lineUnitCost(row);
+                            return { ...row, qty, line_total: unitCost * qty };
+                          }),
+                        );
                       }}
                     />
                   </label>
@@ -639,7 +808,31 @@ export default function BomsPage() {
                       setLineUnitLabels((p) => ({ ...p, [idx()]: "" }));
                     }}
                   />
-                  <Show when={copy.showScrap}>
+                  <Show when={isAssembly()}>
+                    <label class="text-sm">
+                      <span class="text-text-secondary">Unit cost</span>
+                      <input
+                        class={`${inputClass} mt-1`}
+                        value={formatCost(lineUnitCost(ln))}
+                        readOnly
+                        aria-readonly="true"
+                        aria-label={`Unit cost line ${idx() + 1}`}
+                        tabindex={0}
+                      />
+                    </label>
+                    <label class="text-sm">
+                      <span class="text-text-secondary">Line total</span>
+                      <input
+                        class={`${inputClass} mt-1`}
+                        value={formatCost(lineTotalDisplay(ln))}
+                        readOnly
+                        aria-readonly="true"
+                        aria-label={`Line total line ${idx() + 1}`}
+                        tabindex={0}
+                      />
+                    </label>
+                  </Show>
+                  <Show when={showScrapColumn()}>
                     <label class="text-sm">
                       <span class="text-text-secondary">{copy.scrapLabel}</span>
                       <input
@@ -671,7 +864,47 @@ export default function BomsPage() {
           <button type="button" class="text-sm text-brand-600 hover:underline" onClick={addLine}>
             + {copy.addLineLabel}
           </button>
+          <p class="text-xs text-text-secondary">
+            {isAssembly()
+              ? "Costs are estimates from purchase price; open Advanced for spare qty and batch settings."
+              : copy.stockHint}
+          </p>
         </div>
+        <Show when={isAssembly()}>
+          <div class="col-span-full grid gap-3 rounded-lg border border-stroke bg-white p-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Direct labor">
+              <input
+                class={inputClass}
+                type="text"
+                inputMode="decimal"
+                value={directLaborCost()}
+                onInput={(e) => setDirectLaborCost(e.currentTarget.value)}
+                aria-label="Direct labor cost"
+              />
+            </Field>
+            <Field label="Inbound freight">
+              <input
+                class={inputClass}
+                type="text"
+                inputMode="decimal"
+                value={inboundFreightCost()}
+                onInput={(e) => setInboundFreightCost(e.currentTarget.value)}
+                aria-label="Inbound freight cost"
+              />
+            </Field>
+            <div class="sm:col-span-2 lg:col-span-2 flex flex-wrap items-end gap-x-6 gap-y-1 pb-1 text-sm">
+              <span class="text-text-secondary">
+                Subtotal <span class="font-medium text-text-primary">{formatCost(costEstimates().materials)}</span>
+              </span>
+              <span class="text-text-secondary">
+                Additional <span class="font-medium text-text-primary">{formatCost(costEstimates().additional)}</span>
+              </span>
+              <span class="text-text-secondary">
+                Total <span class="font-medium text-text-primary">{formatCost(costEstimates().total)}</span>
+              </span>
+            </div>
+          </div>
+        </Show>
       </EntityModal>
     </>
   );

@@ -23,35 +23,38 @@ import (
 )
 
 type WorkOrder struct {
-	ID                 int64   `json:"id"`
-	WorkOrderNo        string  `json:"work_order_no"`
-	BomID              int64   `json:"bom_id"`
-	BomCode            string  `json:"bom_code,omitempty"`
-	BomName            string  `json:"bom_name,omitempty"`
-	FinishedItemID     int64   `json:"finished_item_id"`
-	FinishedItemCode   string  `json:"finished_item_code,omitempty"`
-	FinishedItemName   string  `json:"finished_item_name,omitempty"`
-	FinishedBaseUnit   string  `json:"finished_base_unit_code,omitempty"`
-	LocationID         int64   `json:"location_id"`
-	LocationName       string  `json:"location_name,omitempty"`
-	QtyToProduce       float64 `json:"qty_to_produce"`
-	QtyProduced        float64 `json:"qty_produced"`
-	Status             string  `json:"status"`
-	OrderDate          string  `json:"order_date"`
-	Notes              *string `json:"notes,omitempty"`
-	ReleasedAt         *string  `json:"released_at,omitempty"`
-	CompletedAt        *string  `json:"completed_at,omitempty"`
-	ActualInputQty     *float64 `json:"actual_input_qty,omitempty"`
-	InputLotBatchID    *int64   `json:"input_lot_batch_id,omitempty"`
-	InspectionStatus   string   `json:"inspection_status"`
-	InspectionNotes    *string  `json:"inspection_notes,omitempty"`
-	InspectedAt        *string  `json:"inspected_at,omitempty"`
-	SourceSalesOrderID     *int64 `json:"source_sales_order_id,omitempty"`
-	SourceSalesOrderLineID *int64 `json:"source_sales_order_line_id,omitempty"`
-	BomType                string `json:"bom_type,omitempty"`
-	FinishedTrackSerial    bool   `json:"finished_track_serial,omitempty"`
-	FinishedTrackLot       bool   `json:"finished_track_lot,omitempty"`
-	ComponentsTracked      bool   `json:"components_tracked,omitempty"`
+	ID                     int64    `json:"id"`
+	WorkOrderNo            string   `json:"work_order_no"`
+	BomID                  int64    `json:"bom_id"`
+	BomCode                string   `json:"bom_code,omitempty"`
+	BomName                string   `json:"bom_name,omitempty"`
+	FinishedItemID         int64    `json:"finished_item_id"`
+	FinishedItemCode       string   `json:"finished_item_code,omitempty"`
+	FinishedItemName       string   `json:"finished_item_name,omitempty"`
+	FinishedBaseUnit       string   `json:"finished_base_unit_code,omitempty"`
+	LocationID             int64    `json:"location_id"`
+	LocationName           string   `json:"location_name,omitempty"`
+	QtyToProduce           float64  `json:"qty_to_produce"`
+	QtyProduced            float64  `json:"qty_produced"`
+	Status                 string   `json:"status"`
+	OrderDate              string   `json:"order_date"`
+	Notes                  *string  `json:"notes,omitempty"`
+	CreatedAt              *string  `json:"created_at,omitempty"`
+	ReleasedAt             *string  `json:"released_at,omitempty"`
+	CompletedAt            *string  `json:"completed_at,omitempty"`
+	TransactedAt           *string  `json:"transacted_at,omitempty"`
+	ActualInputQty         *float64 `json:"actual_input_qty,omitempty"`
+	InputLotBatchID        *int64   `json:"input_lot_batch_id,omitempty"`
+	InspectionStatus       string   `json:"inspection_status"`
+	InspectionNotes        *string  `json:"inspection_notes,omitempty"`
+	InspectedAt            *string  `json:"inspected_at,omitempty"`
+	SourceSalesOrderID     *int64   `json:"source_sales_order_id,omitempty"`
+	SourceSalesOrderLineID *int64   `json:"source_sales_order_line_id,omitempty"`
+	SourceSalesOrderNo     *string  `json:"source_sales_order_no,omitempty"`
+	BomType                string   `json:"bom_type,omitempty"`
+	FinishedTrackSerial    bool     `json:"finished_track_serial,omitempty"`
+	FinishedTrackLot       bool     `json:"finished_track_lot,omitempty"`
+	ComponentsTracked      bool     `json:"components_tracked,omitempty"`
 }
 
 type MaterialNeedLine struct {
@@ -99,9 +102,10 @@ type workOrderPatchBody struct {
 }
 
 type workOrderCompleteBody struct {
-	ActualInputQty  *float64         `json:"actual_input_qty"`
-	InputLotBatchID *int64           `json:"input_lot_batch_id"`
-	OutputWeighs    []woOutputWeigh  `json:"output_weighs"`
+	ActualInputQty  *float64        `json:"actual_input_qty"`
+	QtyProduced     *float64        `json:"qty_produced"`
+	InputLotBatchID *int64          `json:"input_lot_batch_id"`
+	OutputWeighs    []woOutputWeigh `json:"output_weighs"`
 }
 
 // woOutputWeigh is a weighed cut/output lot on disassembly complete (overrides scaled BOM qty).
@@ -118,10 +122,15 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		"work_order_no": "wo.work_order_no",
 		"order_date":    "wo.order_date",
 		"status":        "wo.status",
+		"transacted_at": "coalesce(wo.completed_at, wo.released_at, wo.created_at)",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		p := httputil.ParseListParams(r, "order_date", allowed)
+		defaultSort := "order_date"
+		if parseBomTypeListFilter(r.URL.Query().Get("bom_type")) == "assembly" {
+			defaultSort = "transacted_at"
+		}
+		p := httputil.ParseListParams(r, defaultSort, allowed)
 		if p.Order == "" {
 			p.Order = "desc"
 		}
@@ -146,9 +155,12 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			n++
 		}
 
-		sortCol := allowed[p.Sort]
+		sortCol := p.Sort
 		if sortCol == "" {
-			sortCol = "wo.order_date"
+			sortCol = allowed[defaultSort]
+			if sortCol == "" {
+				sortCol = "wo.order_date"
+			}
 		}
 		q := fmt.Sprintf(`
 			select wo.id, wo.work_order_no, wo.bom_id, b.bom_code, b.bom_name,
@@ -157,10 +169,12 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(bu.code, coalesce(nullif(trim(fi.unit), ''), 'ea')),
 			  wo.location_id, coalesce(loc.location_name, ''),
 			  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status,
-			  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text,
+			  wo.order_date::text, wo.notes,
+			  wo.created_at::text, wo.released_at::text, wo.completed_at::text,
+			  coalesce(wo.completed_at, wo.released_at, wo.created_at)::text,
 			  wo.actual_input_qty::float8, wo.input_lot_batch_id,
 			  wo.inspection_status, wo.inspection_notes, wo.inspected_at::text,
-			  wo.source_sales_order_id, wo.source_sales_order_line_id,
+			  wo.source_sales_order_id, wo.source_sales_order_line_id, so.sales_order_no,
 			  coalesce(fi.track_serial, false), coalesce(fi.track_lot, false),
 			  exists (
 			    select 1 from public.mfg_bom_lines bl
@@ -174,6 +188,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.inv_items fi on fi.id = wo.finished_item_id
 			left join public.inv_units bu on bu.id = fi.base_unit_id
 			left join public.inv_locations loc on loc.id = wo.location_id
+			left join public.so_sales_orders so on so.id = wo.source_sales_order_id
 			where %s
 			order by %s %s
 			limit $%d offset $%d`,
@@ -192,17 +207,18 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row WorkOrder
 			var notes *string
-			var released, completed, inspectedAt *string
+			var created, released, completed, transacted, inspectedAt *string
 			var inspectionNotes *string
+			var soNo *string
 			if err := rows.Scan(
 				&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName, &row.BomType,
 				&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 				&row.LocationID, &row.LocationName,
 				&row.QtyToProduce, &row.QtyProduced, &row.Status,
-				&row.OrderDate, &notes, &released, &completed,
+				&row.OrderDate, &notes, &created, &released, &completed, &transacted,
 				&row.ActualInputQty, &row.InputLotBatchID,
 				&row.InspectionStatus, &inspectionNotes, &inspectedAt,
-				&row.SourceSalesOrderID, &row.SourceSalesOrderLineID,
+				&row.SourceSalesOrderID, &row.SourceSalesOrderLineID, &soNo,
 				&row.FinishedTrackSerial, &row.FinishedTrackLot, &row.ComponentsTracked,
 				&total,
 			); err != nil {
@@ -210,10 +226,13 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			row.Notes = notes
+			row.CreatedAt = created
 			row.ReleasedAt = released
 			row.CompletedAt = completed
+			row.TransactedAt = transacted
 			row.InspectionNotes = inspectionNotes
 			row.InspectedAt = inspectedAt
+			row.SourceSalesOrderNo = soNo
 			out = append(out, row)
 		}
 		if out == nil {
@@ -482,6 +501,12 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			actualInputQty = *completeBody.ActualInputQty
 		}
 		qtyProduced := wo.QtyToProduce
+		if completeBody.QtyProduced != nil && *completeBody.QtyProduced > 0 {
+			qtyProduced = *completeBody.QtyProduced
+		} else if bomType == "assembly" && completeBody.ActualInputQty != nil && *completeBody.ActualInputQty > 0 {
+			// Assembly Finish dialog posts actual produced as actual_input_qty for compatibility.
+			qtyProduced = *completeBody.ActualInputQty
+		}
 
 		if bomType == "disassembly" {
 			fgSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, wo.FinishedItemID)
@@ -622,8 +647,18 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				qtyProduced = cutPostedTotal
 			}
 		} else {
+			fgSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, wo.FinishedItemID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load finished item settings.", "ERR_INTERNAL")
+				return
+			}
+			if fgSettings.TrackSerial || fgSettings.TrackLot {
+				if staged, err := stagedAssemblyOutputQty(r.Context(), tx, id, fgSettings.TrackSerial, fgSettings.TrackLot); err == nil && staged > 0 {
+					qtyProduced = staged
+				}
+			}
 			for _, ln := range bom.Lines {
-				issueQty, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, wo.QtyToProduce, bom.OutputQty, bom.YieldPct)
+				issueQty, unitCode, err := StockIssueForLine(r.Context(), tx, tu.TenantID, ln, qtyProduced, bom.OutputQty, bom.YieldPct)
 				if err != nil {
 					response.Validation(w, map[string]string{"stock": err.Error()})
 					return
@@ -655,21 +690,16 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 			}
-			fgSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, wo.FinishedItemID)
-			if err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to load finished item settings.", "ERR_INTERNAL")
-				return
-			}
 			if fgSettings.TrackSerial || fgSettings.TrackLot {
-				if err := postWoOutputTrace(r.Context(), tx, tu.TenantID, id, wo.LocationID, wo.FinishedItemID, wo.QtyToProduce, tu.AppUserID, bom.FinishedItemCode, fgSettings.DefaultShelfLifeDays); err != nil {
+				if err := postWoOutputTrace(r.Context(), tx, tu.TenantID, id, wo.LocationID, wo.FinishedItemID, qtyProduced, tu.AppUserID, bom.FinishedItemCode, fgSettings.DefaultShelfLifeDays); err != nil {
 					response.Validation(w, map[string]string{"stock": err.Error()})
 					return
 				}
-			} else if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, wo.QtyToProduce, tu.AppUserID, "mfg_work_order", id, "wo_backflush_receipt"); err != nil {
+			} else if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, qtyProduced, tu.AppUserID, "mfg_work_order", id, "wo_backflush_receipt"); err != nil {
 				response.Validation(w, map[string]string{"stock": err.Error()})
 				return
 			}
-			actualInputQty = wo.QtyToProduce
+			actualInputQty = qtyProduced
 		}
 
 		tag, err := tx.Exec(r.Context(), `
@@ -815,8 +845,9 @@ func buildMaterialNeeds(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (WorkOrder, error) {
 	var row WorkOrder
 	var notes *string
-	var released, completed, inspectedAt *string
+	var created, released, completed, inspectedAt *string
 	var inspectionNotes *string
+	var soNo *string
 	err := pool.QueryRow(ctx, `
 		select wo.id, wo.work_order_no, wo.bom_id, b.bom_code, b.bom_name,
 		  coalesce(b.bom_type, 'assembly'),
@@ -824,10 +855,11 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		  coalesce(bu.code, coalesce(nullif(trim(fi.unit), ''), 'ea')),
 		  wo.location_id, coalesce(loc.location_name, ''),
 		  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status,
-		  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text,
+		  wo.order_date::text, wo.notes,
+		  wo.created_at::text, wo.released_at::text, wo.completed_at::text,
 		  wo.actual_input_qty::float8, wo.input_lot_batch_id,
 		  wo.inspection_status, wo.inspection_notes, wo.inspected_at::text,
-		  wo.source_sales_order_id, wo.source_sales_order_line_id,
+		  wo.source_sales_order_id, wo.source_sales_order_line_id, so.sales_order_no,
 		  coalesce(fi.track_serial, false), coalesce(fi.track_lot, false),
 		  exists (
 		    select 1 from public.mfg_bom_lines bl
@@ -840,23 +872,33 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		join public.inv_items fi on fi.id = wo.finished_item_id
 		left join public.inv_units bu on bu.id = fi.base_unit_id
 		left join public.inv_locations loc on loc.id = wo.location_id
+		left join public.so_sales_orders so on so.id = wo.source_sales_order_id
 		where wo.id=$1 and wo.tenant_id=$2`, id, tenantID).Scan(
 		&row.ID, &row.WorkOrderNo, &row.BomID, &row.BomCode, &row.BomName, &row.BomType,
 		&row.FinishedItemID, &row.FinishedItemCode, &row.FinishedItemName, &row.FinishedBaseUnit,
 		&row.LocationID, &row.LocationName,
 		&row.QtyToProduce, &row.QtyProduced, &row.Status,
-		&row.OrderDate, &notes, &released, &completed, &row.ActualInputQty, &row.InputLotBatchID,
+		&row.OrderDate, &notes, &created, &released, &completed, &row.ActualInputQty, &row.InputLotBatchID,
 		&row.InspectionStatus, &inspectionNotes, &inspectedAt,
-		&row.SourceSalesOrderID, &row.SourceSalesOrderLineID,
+		&row.SourceSalesOrderID, &row.SourceSalesOrderLineID, &soNo,
 		&row.FinishedTrackSerial, &row.FinishedTrackLot, &row.ComponentsTracked)
 	if err != nil {
 		return WorkOrder{}, err
 	}
 	row.Notes = notes
+	row.CreatedAt = created
 	row.ReleasedAt = released
 	row.CompletedAt = completed
+	if completed != nil {
+		row.TransactedAt = completed
+	} else if released != nil {
+		row.TransactedAt = released
+	} else {
+		row.TransactedAt = created
+	}
 	row.InspectionNotes = inspectionNotes
 	row.InspectedAt = inspectedAt
+	row.SourceSalesOrderNo = soNo
 	return row, nil
 }
 
@@ -984,4 +1026,34 @@ func receiveDisassemblyCutLot(
 		return err
 	}
 	return inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, qty, userID, "mfg_work_order", woID, "wo_disassembly_receipt")
+}
+
+func stagedAssemblyOutputQty(ctx context.Context, tx pgx.Tx, woID int64, trackSerial, trackLot bool) (float64, error) {
+	if trackSerial {
+		var n int64
+		err := tx.QueryRow(ctx, `
+			select count(*) from public.mfg_wo_output_serials
+			where work_order_id = $1 and status = 'staged'`, woID).Scan(&n)
+		return float64(n), err
+	}
+	if trackLot {
+		var qty float64
+		err := tx.QueryRow(ctx, `
+			select coalesce(sum(coalesce(catch_weight, qty)), 0)::float8
+			from public.mfg_wo_output_lots
+			where work_order_id = $1 and status = 'staged' and component_item_id is null`, woID).Scan(&qty)
+		if err != nil {
+			return 0, err
+		}
+		if qty > 0 {
+			return qty, nil
+		}
+		// Older rows may omit null component_item_id filter.
+		err = tx.QueryRow(ctx, `
+			select coalesce(sum(coalesce(catch_weight, qty)), 0)::float8
+			from public.mfg_wo_output_lots
+			where work_order_id = $1 and status = 'staged'`, woID).Scan(&qty)
+		return qty, err
+	}
+	return 0, nil
 }

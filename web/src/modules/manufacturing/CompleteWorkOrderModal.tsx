@@ -37,6 +37,8 @@ type WorkOrder = {
   id: number;
   work_order_no: string;
   qty_to_produce: number;
+  qty_produced?: number;
+  status?: string;
   finished_base_unit_code?: string;
   bom_type?: string;
 };
@@ -45,10 +47,13 @@ export function CompleteWorkOrderModal(props: {
   open: boolean;
   workOrder: WorkOrder | null;
   mode: MfgMode;
+  /** When true, POST release before complete if the work order is still draft. */
+  releaseFirst?: boolean;
   onClose: () => void;
   onCompleted: () => void;
 }) {
   const copy = () => MFG_COPY[props.mode];
+  const isAssembly = () => props.mode === "assembly";
   const [actualQty, setActualQty] = createSignal("");
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
   const [loading, setLoading] = createSignal(false);
@@ -78,15 +83,38 @@ export function CompleteWorkOrderModal(props: {
     if (trimmed !== "") {
       const n = Number(trimmed);
       if (!Number.isFinite(n) || n <= 0) {
-        setFieldErrors({ actual_input_qty: "Enter how many you used (must be more than 0)." });
+        setFieldErrors({
+          actual_input_qty: isAssembly()
+            ? "Enter how many you produced (must be more than 0)."
+            : "Enter how many you used (must be more than 0).",
+        });
         return;
       }
       actualInputQty = n;
+    } else if (isAssembly()) {
+      actualInputQty = wo.qty_to_produce;
     }
     setFieldErrors({});
     setSaving(true);
-    const body: { actual_input_qty?: number } = {};
-    if (actualInputQty != null) body.actual_input_qty = actualInputQty;
+
+    if (props.releaseFirst && (wo.status ?? "").toLowerCase() === "draft") {
+      const rel = await apiFetch(
+        `/api/v1/manufacturing/work-orders/${wo.id}/release`,
+        { method: "POST" },
+        { silent: true },
+      );
+      if (!rel.success) {
+        setSaving(false);
+        mfgWarn(rel.message, "Couldn’t start this job before finishing. Try Start job, then Finish build.");
+        return;
+      }
+    }
+
+    const body: { actual_input_qty?: number; qty_produced?: number } = {};
+    if (actualInputQty != null) {
+      body.actual_input_qty = actualInputQty;
+      if (isAssembly()) body.qty_produced = actualInputQty;
+    }
     const res = await apiFetch(`/api/v1/manufacturing/work-orders/${wo.id}/complete`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -100,10 +128,15 @@ export function CompleteWorkOrderModal(props: {
         }
       }
       if (Object.keys(mapped).length > 0) setFieldErrors(mapped);
-      mfgWarn(res.message, "Could not finish this job. Check stock, then try again.");
+      mfgWarn(
+        res.message,
+        props.releaseFirst
+          ? "Job may have started but finish failed. Check the row and try Finish build again."
+          : "Could not finish this job. Check stock, then try again.",
+      );
       return;
     }
-    mfgSuccess("Job finished. Stock is updated.");
+    mfgSuccess(isAssembly() ? "Build finished. Stock is updated." : "Job finished. Stock is updated.");
     props.onCompleted();
     props.onClose();
   };
@@ -119,11 +152,11 @@ export function CompleteWorkOrderModal(props: {
   return (
     <EntityModal
       open={props.open}
-      title={`Finish ${props.workOrder?.work_order_no ?? "job"}`}
+      title={`${isAssembly() ? "Finish build" : "Finish"} ${props.workOrder?.work_order_no ?? "job"}`}
       onClose={props.onClose}
       onSave={() => void confirm()}
       saving={saving()}
-      saveLabel="Finish job"
+      saveLabel={isAssembly() ? "Finish build" : "Finish job"}
       singleColumn
     >
       <FormErrorSummary errors={fieldErrors} />
@@ -142,7 +175,7 @@ export function CompleteWorkOrderModal(props: {
               label={
                 props.mode === "disassembly"
                   ? `How many wholes you actually used (${unit()}) *`
-                  : `How many you used (${unit()}) — leave blank to use planned`
+                  : `Actual produced (${unit()})`
               }
             >
               <input
@@ -151,6 +184,7 @@ export function CompleteWorkOrderModal(props: {
                 inputMode="decimal"
                 value={actualQty()}
                 onInput={(e) => setActualQty(e.currentTarget.value)}
+                aria-label={isAssembly() ? "Actual produced" : "Actual quantity"}
               />
             </Field>
             <Show when={loading()}>

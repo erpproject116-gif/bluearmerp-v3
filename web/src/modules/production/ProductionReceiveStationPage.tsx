@@ -14,6 +14,9 @@ type WorkOrderOption = {
   work_order_no: string;
   finished_item_name?: string;
   bom_code?: string;
+  bom_name?: string;
+  qty_to_produce?: number;
+  source_sales_order_no?: string | null;
 };
 
 type ScanContext = {
@@ -29,6 +32,9 @@ type ScanContext = {
   track_lot: boolean;
   output_serials: number;
   output_lot_qty: number;
+  bom_code?: string;
+  bom_name?: string;
+  source_sales_order_no?: string | null;
 };
 
 type BatchSerialResult = {
@@ -63,7 +69,7 @@ export default function ProductionReceiveStationPage() {
   const [searchParams] = useSearchParams();
   const jobsBackHref = () => {
     const mode = parseMfgMode(String(searchParams.mode ?? "")) ?? "assembly";
-    return `${jobsHref(mode)}?status=released`;
+    return `${jobsHref(mode)}?status=open`;
   };
   const [woLabel, setWoLabel] = createSignal("");
   const [woId, setWoId] = createSignal<number | null>(null);
@@ -97,10 +103,16 @@ export default function ProductionReceiveStationPage() {
       setWoLabel(
         `${woRes.data.work_order_no} — ${woRes.data.finished_item_name ?? woRes.data.bom_code ?? ""}`.trim(),
       );
+      setContext({
+        ...res.data,
+        bom_code: woRes.data.bom_code,
+        bom_name: woRes.data.bom_name,
+        source_sales_order_no: woRes.data.source_sales_order_no,
+      });
     } else {
       setWoLabel(res.data.work_order_no);
+      setContext(res.data);
     }
-    setContext(res.data);
     setSerialPaste("");
     setLotPaste("");
     setLastResults([]);
@@ -221,11 +233,26 @@ export default function ProductionReceiveStationPage() {
           {(ctx) => (
             <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
               <p class="text-sm font-medium text-text-primary">
-                {ctx().work_order_no} · {ctx().finished_item_code} — {ctx().finished_item_name}
+                Job {ctx().work_order_no}
+                <Show when={ctx().bom_code}>
+                  {" "}
+                  · Recipe {ctx().bom_code}
+                  <Show when={ctx().bom_name}> — {ctx().bom_name}</Show>
+                </Show>
               </p>
               <p class="mt-1 text-xs text-text-secondary">
-                Qty to produce: {ctx().qty_to_produce} · Staged:{" "}
+                {ctx().finished_item_code} — {ctx().finished_item_name}
+              </p>
+              <p class="mt-1 text-xs text-text-secondary">
+                Planned: {ctx().qty_to_produce} · Staged:{" "}
                 {ctx().track_serial ? `${ctx().output_serials} serial(s)` : `${ctx().output_lot_qty.toFixed(4)} lot qty`}
+                <Show when={ctx().source_sales_order_no}>
+                  {" "}
+                  · Customer order {ctx().source_sales_order_no}
+                </Show>
+              </p>
+              <p class="mt-2 text-xs text-amber-800">
+                Staging does not update stock until you Finish build on the Jobs list.
               </p>
 
               <Show when={ctx().track_serial}>
@@ -269,9 +296,16 @@ export default function ProductionReceiveStationPage() {
 
               <Show when={!ctx().track_serial && !ctx().track_lot}>
                 <p class="mt-3 text-sm text-text-secondary">
-                  Finished item is not serial- or lot-tracked. Complete the work order from Work Orders to receive stock.
+                  Finished item is not serial- or lot-tracked. Use Finish build on Jobs to receive stock.
                 </p>
               </Show>
+
+              <A
+                href={jobsBackHref()}
+                class="mt-4 inline-flex rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-50"
+              >
+                Done — back to Finish build
+              </A>
             </section>
           )}
         </Show>

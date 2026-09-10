@@ -6,6 +6,7 @@ import {
   activeFlowStepIndex,
   isProductionHubPath,
   PRODUCTION_FLOWS,
+  visibleFlowSteps,
   type ProductionFlowStep,
 } from "./productionWorkflowDiagram";
 
@@ -49,6 +50,9 @@ function FlowDiagram(props: { mode: MfgMode }) {
   const loc = useLocation();
   const flow = () => PRODUCTION_FLOWS[props.mode];
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
+  const [showFull, setShowFull] = createSignal(false);
+
+  const steps = createMemo(() => visibleFlowSteps(flow(), showFull() || props.mode !== "assembly"));
 
   const routeStepIndex = createMemo(() => {
     if (isProductionHubPath(loc.pathname)) return -1;
@@ -60,18 +64,37 @@ function FlowDiagram(props: { mode: MfgMode }) {
     if (id) return flow().steps.find((s) => s.id === id) ?? null;
     const idx = routeStepIndex();
     if (idx >= 0) return flow().steps[idx];
-    return flow().steps[0];
+    return steps()[0] ?? flow().steps[0];
   });
 
-  const isYouAreHere = (index: number) => !selectedId() && routeStepIndex() === index;
+  const isYouAreHere = (stepId: string) => {
+    if (selectedId()) return false;
+    const idx = routeStepIndex();
+    if (idx < 0) return false;
+    return flow().steps[idx]?.id === stepId;
+  };
 
   return (
     <div>
       <p class="mb-0.5 text-xs font-semibold uppercase tracking-wide text-text-secondary">{flow().title}</p>
       <p class="mb-3 text-[11px] leading-snug text-text-secondary">{flow().tagline}</p>
 
+      <Show when={props.mode === "assembly"}>
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <p class="text-[11px] text-text-secondary">Default path: Recipe → Job → Finish build</p>
+          <button
+            type="button"
+            class="rounded border border-stroke bg-white px-2 py-0.5 text-[11px] font-medium text-text-primary hover:bg-slate-50"
+            onClick={() => setShowFull(!showFull())}
+            aria-pressed={showFull()}
+          >
+            {showFull() ? "Hide full process" : "Show full process"}
+          </button>
+        </div>
+      </Show>
+
       <div class="flex flex-wrap items-center gap-1.5">
-        <For each={flow().steps}>
+        <For each={steps()}>
           {(step, i) => (
             <>
               <Show when={i() > 0}>
@@ -82,7 +105,7 @@ function FlowDiagram(props: { mode: MfgMode }) {
               <StepPill
                 step={step}
                 active={selectedStep()?.id === step.id}
-                youAreHere={isYouAreHere(i())}
+                youAreHere={isYouAreHere(step.id)}
                 onSelect={() => setSelectedId(step.id)}
               />
             </>
@@ -111,7 +134,7 @@ function FlowDiagram(props: { mode: MfgMode }) {
             </Show>
             <Show when={step().onJobsRow}>
               <p class="mt-2 text-[10px] font-medium text-text-secondary">
-                This action lives on the Jobs list row (Next: …), not a separate menu item.
+                This action lives on the Jobs list row, not a separate menu item.
               </p>
             </Show>
           </div>
@@ -142,9 +165,9 @@ export function ProductionHubPage() {
       <header>
         <h1 class="text-lg font-semibold text-text-primary">Production</h1>
         <p class="mt-1 max-w-3xl text-sm text-text-secondary">
-          Map where you are from sales demand through finished goods. Click any step for what to do next, then use{" "}
-          <span class="font-medium text-text-primary">Open</span> to go there. Release, QC, and Complete are row actions
-          on the Jobs list.
+          Assembly happy path: Recipe → Job → <span class="font-medium text-text-primary">Finish build</span>. Expand
+          full process for SO link, serial/lot stations, QC, pack, and reports. Finish build posts stock quantities
+          only — it does not create items or post finished-goods cost.
         </p>
       </header>
 

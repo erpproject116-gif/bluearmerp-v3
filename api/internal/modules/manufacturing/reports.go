@@ -33,29 +33,32 @@ type woStatusReportRow struct {
 }
 
 type woProgressReportRow struct {
-	WorkOrderID      int64   `json:"work_order_id"`
-	WorkOrderNo      string  `json:"work_order_no"`
-	Status           string  `json:"status"`
-	QtyToProduce     float64 `json:"qty_to_produce"`
-	QtyProduced      float64 `json:"qty_produced"`
-	ProgressPct      float64 `json:"progress_pct"`
-	IssuedSerials    int     `json:"issued_serials"`
-	IssuedLotQty     float64 `json:"issued_lot_qty"`
-	OutputSerials    int     `json:"output_serials"`
-	OutputLotQty     float64 `json:"output_lot_qty"`
-	InspectionStatus string  `json:"inspection_status"`
+	WorkOrderID        int64   `json:"work_order_id"`
+	WorkOrderNo        string  `json:"work_order_no"`
+	Status             string  `json:"status"`
+	BomCode            string  `json:"bom_code"`
+	QtyToProduce       float64 `json:"qty_to_produce"`
+	QtyProduced        float64 `json:"qty_produced"`
+	ProgressPct        float64 `json:"progress_pct"`
+	IssuedSerials      int     `json:"issued_serials"`
+	IssuedLotQty       float64 `json:"issued_lot_qty"`
+	OutputSerials      int     `json:"output_serials"`
+	OutputLotQty       float64 `json:"output_lot_qty"`
+	InspectionStatus   string  `json:"inspection_status"`
+	SourceSalesOrderNo *string `json:"source_sales_order_no,omitempty"`
 }
 
 type woStockMovementRow struct {
-	ID           int64   `json:"id"`
-	WorkOrderID  int64   `json:"work_order_id"`
-	WorkOrderNo  string  `json:"work_order_no"`
-	ItemCode     string  `json:"item_code"`
-	ItemName     string  `json:"item_name"`
-	LocationName string  `json:"location_name"`
-	QtyDelta     float64 `json:"qty_delta"`
-	MovementType string  `json:"movement_type"`
-	CreatedAt    string  `json:"created_at"`
+	ID                 int64   `json:"id"`
+	WorkOrderID        int64   `json:"work_order_id"`
+	WorkOrderNo        string  `json:"work_order_no"`
+	ItemCode           string  `json:"item_code"`
+	ItemName           string  `json:"item_name"`
+	LocationName       string  `json:"location_name"`
+	QtyDelta           float64 `json:"qty_delta"`
+	MovementType       string  `json:"movement_type"`
+	CreatedAt          string  `json:"created_at"`
+	SourceSalesOrderNo *string `json:"source_sales_order_no,omitempty"`
 }
 
 func listWorkOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
@@ -166,14 +169,16 @@ func listWorkOrderProgressReport(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		q := fmt.Sprintf(`
-			select wo.id, wo.work_order_no, wo.status,
+			select wo.id, wo.work_order_no, wo.status, coalesce(b.bom_code, ''),
 			  wo.qty_to_produce::float8, wo.qty_produced::float8,
 			  case when wo.qty_to_produce > 0 then round((wo.qty_produced / wo.qty_to_produce) * 100, 2) else 0 end,
 			  coalesce(iss_s.serial_cnt, 0), coalesce(iss_l.lot_qty, 0),
 			  coalesce(out_s.cnt, 0), coalesce(out_l.qty, 0),
-			  wo.inspection_status,
+			  wo.inspection_status, so.sales_order_no,
 			  count(*) over()
 			from public.mfg_work_orders wo
+			join public.mfg_boms b on b.id = wo.bom_id
+			left join public.so_sales_orders so on so.id = wo.source_sales_order_id
 			left join (
 			  select work_order_id, count(*)::int as serial_cnt
 			  from public.mfg_wo_issue_serials
@@ -210,16 +215,18 @@ func listWorkOrderProgressReport(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		for rows.Next() {
 			var row woProgressReportRow
+			var soNo *string
 			if err := rows.Scan(
-				&row.WorkOrderID, &row.WorkOrderNo, &row.Status,
+				&row.WorkOrderID, &row.WorkOrderNo, &row.Status, &row.BomCode,
 				&row.QtyToProduce, &row.QtyProduced, &row.ProgressPct,
 				&row.IssuedSerials, &row.IssuedLotQty,
 				&row.OutputSerials, &row.OutputLotQty,
-				&row.InspectionStatus, &total,
+				&row.InspectionStatus, &soNo, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read work order progress.", "ERR_INTERNAL")
 				return
 			}
+			row.SourceSalesOrderNo = soNo
 			out = append(out, row)
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)
@@ -257,11 +264,13 @@ func listWorkOrderStockMovementsReport(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(i.item_code, ''), coalesce(i.item_name, ''),
 			  coalesce(loc.location_name, ''),
 			  sm.qty_delta::float8, sm.movement_type, sm.created_at::text,
+			  so.sales_order_no,
 			  count(*) over()
 			from public.inv_stock_movements sm
 			join public.mfg_work_orders wo on wo.id = sm.ref_id and wo.tenant_id = sm.tenant_id
 			join public.inv_items i on i.id = sm.item_id
 			left join public.inv_locations loc on loc.id = sm.location_id
+			left join public.so_sales_orders so on so.id = wo.source_sales_order_id
 			where %s
 			order by sm.created_at desc, sm.id desc
 			limit $%d offset $%d`, where, argN, argN+1)
@@ -278,14 +287,16 @@ func listWorkOrderStockMovementsReport(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		for rows.Next() {
 			var row woStockMovementRow
+			var soNo *string
 			if err := rows.Scan(
 				&row.ID, &row.WorkOrderID, &row.WorkOrderNo,
 				&row.ItemCode, &row.ItemName, &row.LocationName,
-				&row.QtyDelta, &row.MovementType, &row.CreatedAt, &total,
+				&row.QtyDelta, &row.MovementType, &row.CreatedAt, &soNo, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read stock movements.", "ERR_INTERNAL")
 				return
 			}
+			row.SourceSalesOrderNo = soNo
 			out = append(out, row)
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)

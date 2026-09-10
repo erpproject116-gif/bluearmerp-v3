@@ -1,8 +1,8 @@
-import { createSignal, For, Show, createEffect } from "solid-js";
+import { createSignal, For, Show, createEffect, createMemo } from "solid-js";
 import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
-import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, SpreadsheetGrid, inputClass, type Column } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import { collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
@@ -13,6 +13,7 @@ import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useListState } from "../../shared/useListState";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import { useProcessPolicy } from "../../shared/useProcessPolicy";
 import { useProductionMode } from "../production/ProductionModeLayout";
 import { jobsHref, type MfgMode } from "../production/mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "../production/mfgToast";
@@ -42,6 +43,12 @@ type WorkOrder = {
   finished_track_serial?: boolean;
   finished_track_lot?: boolean;
   components_tracked?: boolean;
+  source_sales_order_id?: number | null;
+  source_sales_order_no?: string | null;
+  created_at?: string | null;
+  released_at?: string | null;
+  completed_at?: string | null;
+  transacted_at?: string | null;
 };
 
 function needsTakeFromStock(r: WorkOrder): boolean {
@@ -58,6 +65,17 @@ function needsRecordFinished(r: WorkOrder): boolean {
 
 function qcBlocked(r: WorkOrder): boolean {
   return r.inspection_status === "pending" || r.inspection_status === "held";
+}
+
+function woTransactedAt(r: WorkOrder): string {
+  return r.transacted_at || r.completed_at || r.released_at || r.created_at || "";
+}
+
+function formatLocalDateTime(iso: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
 }
 
 type BomOption = { id: number; bom_code: string; bom_name: string };
@@ -103,7 +121,7 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
   return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
 }
 
-const STATUS_TABS = [
+const DISASSEMBLY_STATUS_TABS = [
   { value: "", label: "All" },
   { value: "draft", label: "Draft" },
   { value: "released", label: "In production" },
@@ -111,19 +129,39 @@ const STATUS_TABS = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+const ASSEMBLY_STATUS_TABS = [
+  { value: "open", label: "Open" },
+  { value: "completed", label: "Done" },
+  { value: "", label: "All" },
+];
+
 export default function WorkOrdersPage() {
   const { mode, copy } = useProductionMode();
+  const isAssembly = () => mode === "assembly";
   const auth = useAuth();
   const [searchParams] = useSearchParams();
   const canRelease = () => hasPermission(auth.me, "manufacturing.work_orders_release", "write");
   const canBulkWo = () => hasPermission(auth.me, "manufacturing.work_orders_bulk", "write");
   const canComplete = () => hasPermission(auth.me, "manufacturing.work_orders_complete", "write");
   const canInspect = () => hasPermission(auth.me, "quality.wo_inspection", "write");
+  const processPolicy = useProcessPolicy(() => isAssembly());
+  const requireFgQc = () => Boolean(processPolicy.data?.manufacturing_require_fg_qc);
+
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
-    useListState("order_date", 25, { defaultOrder: "desc", defaultStatus: "" });
+    useListState(isAssembly() ? "transacted_at" : "order_date", 25, {
+      defaultOrder: "desc",
+      defaultStatus: isAssembly() ? "open" : "",
+    });
 
   createEffect(() => {
     const st = String(searchParams.status ?? "").trim().toLowerCase();
+    if (isAssembly()) {
+      const allowed = ["open", "completed", "cancelled", "draft", "released", ""];
+      if (st && allowed.includes(st) && statusFilter() !== st) {
+        setStatusFilter(st);
+      }
+      return;
+    }
     if (st && ["draft", "released", "completed", "cancelled"].includes(st) && statusFilter() !== st) {
       setStatusFilter(st);
     }
@@ -159,6 +197,7 @@ export default function WorkOrdersPage() {
   const client = useQueryClient();
 
   const list = createQuery(() => {
+    const apiStatus = statusFilter() === "open" ? "" : statusFilter();
     const qs = new URLSearchParams({
       page: String(page()),
       pageSize: String(pageSize),
@@ -166,14 +205,18 @@ export default function WorkOrdersPage() {
       order: order(),
     });
     if (q()) qs.set("q", q());
-    if (statusFilter()) qs.set("status", statusFilter());
+    if (apiStatus) qs.set("status", apiStatus);
     qs.set("bom_type", mode);
     return {
       queryKey: ["mfg-work-orders", mode, page(), pageSize, sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<WorkOrder[]>(`/api/v1/manufacturing/work-orders?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
-        return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
+        let rows = res.data ?? [];
+        if (statusFilter() === "open") {
+          rows = rows.filter((r) => r.status === "draft" || r.status === "released");
+        }
+        return { rows, total: res.meta?.total ?? 0 };
       },
     };
   });
@@ -357,12 +400,15 @@ export default function WorkOrdersPage() {
     if (ok > 0) {
       const woLabel = lastWo?.work_order_no ? ` (${lastWo.work_order_no})` : "";
       mfgSuccess(`Created ${ok} job(s) from sales order(s)${woLabel}.`);
-      // Show the tab that matches the WO we got back (draft by default).
-      const st = (lastWo?.status || "draft").trim().toLowerCase();
-      if (["draft", "released", "completed", "cancelled"].includes(st)) {
-        setStatusAndUrl(st);
+      if (isAssembly()) {
+        setStatusAndUrl("open");
       } else {
-        setStatusAndUrl("");
+        const st = (lastWo?.status || "draft").trim().toLowerCase();
+        if (["draft", "released", "completed", "cancelled"].includes(st)) {
+          setStatusAndUrl(st);
+        } else {
+          setStatusAndUrl("");
+        }
       }
       if (lastWo?.id) setSelectedId(lastWo.id);
       invalidate();
@@ -414,156 +460,296 @@ export default function WorkOrdersPage() {
 
   const woType = (r: WorkOrder) => (r.bom_type === "disassembly" ? "disassembly" : "assembly") as MfgMode;
 
-  return (
-    <>
-      <p class="mb-3 text-sm text-text-secondary">
-        <span class="font-medium text-text-primary">{copy.jobTitle}:</span>{" "}
-        Start a job → take stock if needed → record results → finish. Stock updates when you finish.
-      </p>
-      <SpreadsheetGrid<WorkOrder>
-        columns={[
-          { key: "work_order_no", header: "Job no.", clickable: true },
-          { key: "order_date", header: "Date" },
-          { key: "bom_code", header: "Recipe" },
-          { key: "finished_item_name", header: copy.headerItemLabel },
-          { key: "location_name", header: "Location" },
-          {
-            key: "qty_to_produce",
-            header: "Qty",
-            render: (r) => `${r.qty_to_produce}${r.finished_base_unit_code ? ` ${r.finished_base_unit_code}` : ""}`,
+  const openFinish = (r: WorkOrder) => {
+    if (requireFgQc() && qcBlocked(r)) {
+      mfgWarn(null, "Quality check still open — mark it Passed, then Finish build.");
+      return;
+    }
+    setCompleteTarget(r);
+  };
+
+  const continueStationHref = (r: WorkOrder): string | null => {
+    if (needsTakeFromStock(r)) return `/app/production/issue-station${stationQuery(r.id)}`;
+    if (needsRecordFinished(r)) return `/app/production/receive-station${stationQuery(r.id)}`;
+    return null;
+  };
+
+  const columns = createMemo((): Column<WorkOrder>[] => {
+    if (isAssembly()) {
+      const cols: Column<WorkOrder>[] = [
+        { key: "work_order_no", header: "Job no.", clickable: true },
+        { key: "bom_code", header: "Recipe" },
+        { key: "finished_item_name", header: copy.headerItemLabel },
+        { key: "location_name", header: "Location" },
+        {
+          key: "qty_to_produce",
+          header: "Planned",
+          render: (r) => `${r.qty_to_produce}${r.finished_base_unit_code ? ` ${r.finished_base_unit_code}` : ""}`,
+        },
+        {
+          key: "qty_produced",
+          header: "Produced",
+          render: (r) =>
+            `${r.qty_produced ?? 0}${r.finished_base_unit_code ? ` ${r.finished_base_unit_code}` : ""}`,
+        },
+        {
+          key: "source_sales_order_no",
+          header: "Customer order",
+          sortable: false,
+          render: (r) => {
+            const no = r.source_sales_order_no;
+            if (!no) return <span class="text-text-secondary">—</span>;
+            if (r.source_sales_order_id) {
+              return (
+                <A
+                  href={`/app/sales-order/sales-orders?openId=${r.source_sales_order_id}`}
+                  class="font-medium text-brand-600 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {no}
+                </A>
+              );
+            }
+            return <span>{no}</span>;
           },
-          {
-            key: "inspection_status",
-            header: "Quality check",
-            sortable: false,
-            render: (r) => (
-              <div class="flex flex-wrap items-center gap-2 capitalize">
-                <span>{(r.inspection_status ?? "released").replace(/_/g, " ")}</span>
-                <Show when={r.status === "released" && qcBlocked(r)}>
-                  <span class="text-xs text-amber-700">Pass quality check before Finish</span>
-                </Show>
-                <Show when={r.status === "released" && canInspect()}>
+        },
+        {
+          key: "transacted_at",
+          header: "Transacted at",
+          render: (r) => formatLocalDateTime(woTransactedAt(r)),
+          exportValue: (r) => formatLocalDateTime(woTransactedAt(r)),
+        },
+      ];
+      if (requireFgQc()) {
+        cols.push({
+          key: "inspection_status",
+          header: "Quality check",
+          sortable: false,
+          render: (r) => (
+            <Show when={r.status === "released" && qcBlocked(r)} fallback={<span class="text-text-secondary">—</span>}>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs text-amber-700">Needs quality pass</span>
+                <Show when={canInspect()}>
                   <button
                     type="button"
-                    class="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                    class="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
                     disabled={inspectingId() === r.id}
+                    aria-label="Pass quality check"
                     onClick={(e) => { e.stopPropagation(); void patchInspection(r, "released"); }}
                   >
-                    Pass quality check
+                    Pass
                   </button>
                   <button
                     type="button"
-                    class="text-xs text-amber-700 hover:underline disabled:opacity-50"
+                    class="text-[11px] text-text-secondary hover:underline disabled:opacity-50"
                     disabled={inspectingId() === r.id}
+                    aria-label="Hold for quality"
                     onClick={(e) => { e.stopPropagation(); void patchInspection(r, "held"); }}
                   >
                     Hold
                   </button>
                 </Show>
               </div>
-            ),
-          },
-          {
-            key: "status",
-            header: "Status / actions",
-            sortable: false,
-            render: (r) => (
-              <div class="flex flex-wrap items-center gap-2 capitalize">
-                <span>{r.status.replace(/_/g, " ")}</span>
-                <Show when={r.status === "draft" && canRelease()}>
-                  <button
-                    type="button"
-                    class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
-                    disabled={actionId() === r.id}
-                    onClick={(e) => { e.stopPropagation(); void release(r); }}
-                  >
-                    Start job
-                  </button>
-                </Show>
-                <Show when={r.status === "released"}>
-                  <span class="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Steps</span>
-                  <Show when={woType(r) === "assembly"}>
-                    <Show when={needsTakeFromStock(r)}>
-                      <A
-                        href={`/app/production/issue-station${stationQuery(r.id)}`}
-                        class="text-xs font-medium text-brand-600 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        1. Take materials
-                      </A>
-                    </Show>
-                    <Show when={needsRecordFinished(r)}>
-                      <A
-                        href={`/app/production/receive-station${stationQuery(r.id)}`}
-                        class="text-xs font-medium text-brand-600 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        2. Record finished
-                      </A>
-                    </Show>
-                    <Show when={!needsTakeFromStock(r) && !needsRecordFinished(r)}>
-                      <span class="text-[10px] text-text-secondary">No serial/lot tracking — you can finish when ready.</span>
-                    </Show>
-                  </Show>
-                  <Show when={woType(r) === "disassembly"}>
-                    <Show when={needsTakeFromStock(r)}>
-                      <A
-                        href={`/app/production/issue-station${stationQuery(r.id)}`}
-                        class="text-xs font-medium text-brand-600 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        1. Take from stock
-                      </A>
-                    </Show>
-                    <A
-                      href={`/app/production/weigh-parts${stationQuery(r.id)}`}
-                      class="text-xs font-medium text-brand-600 hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {needsTakeFromStock(r) ? "2. Record parts" : "1. Record parts"}
-                    </A>
-                    <Show when={!needsTakeFromStock(r)}>
-                      <span class="text-[10px] text-text-secondary">No serial/lot on whole — skip take from stock.</span>
-                    </Show>
-                  </Show>
-                </Show>
-                <Show when={r.status === "released" && canComplete()}>
-                  <button
-                    type="button"
-                    class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
-                    disabled={actionId() === r.id || qcBlocked(r)}
-                    title={
-                      qcBlocked(r)
-                        ? "Quality check still open — mark it Passed, then Finish."
-                        : undefined
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (qcBlocked(r)) {
-                        mfgWarn(null, "Quality check still open — mark it Passed, then Finish.");
-                        return;
-                      }
-                      setCompleteTarget(r);
-                    }}
-                  >
-                    {woType(r) === "disassembly"
-                      ? (needsTakeFromStock(r) ? "3. Finish" : "2. Finish")
-                      : "3. Finish"}
-                  </button>
-                </Show>
-                <Show when={r.status === "completed"}>
+            </Show>
+          ),
+        });
+      }
+      cols.push({
+        key: "status",
+        header: "Status / actions",
+        sortable: false,
+        render: (r) => (
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="capitalize text-text-secondary">{r.status.replace(/_/g, " ")}</span>
+            <Show when={(r.status === "draft" || r.status === "released") && canComplete()}>
+              <Show when={r.status === "draft" ? canRelease() : true}>
+                <button
+                  type="button"
+                  class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+                  disabled={
+                    actionId() === r.id ||
+                    (r.status === "released" && requireFgQc() && qcBlocked(r))
+                  }
+                  title={
+                    r.status === "released" && requireFgQc() && qcBlocked(r)
+                      ? "Needs quality pass before Finish build."
+                      : undefined
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openFinish(r);
+                  }}
+                >
+                  Finish build
+                </button>
+              </Show>
+            </Show>
+            <Show when={r.status === "released" && continueStationHref(r)}>
+              {(href) => (
+                <A
+                  href={href()}
+                  class="text-xs font-medium text-brand-600 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Continue
+                </A>
+              )}
+            </Show>
+            <Show when={r.status === "draft" && canRelease()}>
+              <button
+                type="button"
+                class="text-[11px] text-text-secondary hover:underline disabled:opacity-50"
+                disabled={actionId() === r.id}
+                onClick={(e) => { e.stopPropagation(); void release(r); }}
+              >
+                Start job
+              </button>
+            </Show>
+            <Show when={r.status === "completed"}>
+              <A
+                href="/app/inventory/serial-lot/pack-station"
+                class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Next: Pack
+              </A>
+            </Show>
+          </div>
+        ),
+      });
+      return cols;
+    }
+
+    return [
+      { key: "work_order_no", header: "Job no.", clickable: true },
+      { key: "order_date", header: "Date" },
+      { key: "bom_code", header: "Recipe" },
+      { key: "finished_item_name", header: copy.headerItemLabel },
+      { key: "location_name", header: "Location" },
+      {
+        key: "qty_to_produce",
+        header: "Qty",
+        render: (r) => `${r.qty_to_produce}${r.finished_base_unit_code ? ` ${r.finished_base_unit_code}` : ""}`,
+      },
+      {
+        key: "inspection_status",
+        header: "Quality check",
+        sortable: false,
+        render: (r) => (
+          <div class="flex flex-wrap items-center gap-2 capitalize">
+            <span>{(r.inspection_status ?? "released").replace(/_/g, " ")}</span>
+            <Show when={r.status === "released" && qcBlocked(r)}>
+              <span class="text-xs text-amber-700">Pass quality check before Finish</span>
+            </Show>
+            <Show when={r.status === "released" && canInspect()}>
+              <button
+                type="button"
+                class="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                disabled={inspectingId() === r.id}
+                onClick={(e) => { e.stopPropagation(); void patchInspection(r, "released"); }}
+              >
+                Pass quality check
+              </button>
+              <button
+                type="button"
+                class="text-xs text-amber-700 hover:underline disabled:opacity-50"
+                disabled={inspectingId() === r.id}
+                onClick={(e) => { e.stopPropagation(); void patchInspection(r, "held"); }}
+              >
+                Hold
+              </button>
+            </Show>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        header: "Status / actions",
+        sortable: false,
+        render: (r) => (
+          <div class="flex flex-wrap items-center gap-2 capitalize">
+            <span>{r.status.replace(/_/g, " ")}</span>
+            <Show when={r.status === "draft" && canRelease()}>
+              <button
+                type="button"
+                class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+                disabled={actionId() === r.id}
+                onClick={(e) => { e.stopPropagation(); void release(r); }}
+              >
+                Start job
+              </button>
+            </Show>
+            <Show when={r.status === "released"}>
+              <span class="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Steps</span>
+              <Show when={woType(r) === "disassembly"}>
+                <Show when={needsTakeFromStock(r)}>
                   <A
-                    href="/app/inventory/serial-lot/pack-station"
-                    class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                    href={`/app/production/issue-station${stationQuery(r.id)}`}
+                    class="text-xs font-medium text-brand-600 hover:underline"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Next: Pack
+                    1. Take from stock
                   </A>
                 </Show>
-              </div>
-            ),
-          },
-        ]}
+                <A
+                  href={`/app/production/weigh-parts${stationQuery(r.id)}`}
+                  class="text-xs font-medium text-brand-600 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {needsTakeFromStock(r) ? "2. Record parts" : "1. Record parts"}
+                </A>
+                <Show when={!needsTakeFromStock(r)}>
+                  <span class="text-[10px] text-text-secondary">No serial/lot on whole — skip take from stock.</span>
+                </Show>
+              </Show>
+            </Show>
+            <Show when={r.status === "released" && canComplete()}>
+              <button
+                type="button"
+                class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+                disabled={actionId() === r.id || qcBlocked(r)}
+                title={
+                  qcBlocked(r)
+                    ? "Quality check still open — mark it Passed, then Finish."
+                    : undefined
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (qcBlocked(r)) {
+                    mfgWarn(null, "Quality check still open — mark it Passed, then Finish.");
+                    return;
+                  }
+                  setCompleteTarget(r);
+                }}
+              >
+                {needsTakeFromStock(r) ? "3. Finish" : "2. Finish"}
+              </button>
+            </Show>
+            <Show when={r.status === "completed"}>
+              <A
+                href="/app/inventory/serial-lot/pack-station"
+                class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Next: Pack
+              </A>
+            </Show>
+          </div>
+        ),
+      },
+    ];
+  });
+
+  return (
+    <>
+      <p class="mb-3 text-sm text-text-secondary">
+        <span class="font-medium text-text-primary">{copy.jobTitle}:</span>{" "}
+        {isAssembly()
+          ? "Finish build when ready. Continue only if take-from-stock or record-finished is needed."
+          : "Start a job → take stock if needed → record results → finish. Stock updates when you finish."}
+      </p>
+      <SpreadsheetGrid<WorkOrder>
+        columns={columns()}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
         selectedId={selectedId()}
@@ -596,7 +782,7 @@ export default function WorkOrdersPage() {
                 </button>
               </Show>
             </Show>
-            <Show when={mode === "assembly"}>
+            <Show when={isAssembly()}>
               <button
                 type="button"
                 class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
@@ -624,7 +810,7 @@ export default function WorkOrdersPage() {
         status={statusFilter()}
         onStatusChange={setStatusAndUrl}
         statusLabel="Status"
-        statusOptions={STATUS_TABS}
+        statusOptions={isAssembly() ? ASSEMBLY_STATUS_TABS : DISASSEMBLY_STATUS_TABS}
         onRefresh={invalidate}
       />
 
@@ -746,6 +932,7 @@ export default function WorkOrdersPage() {
         open={!!completeTarget()}
         workOrder={completeTarget()}
         mode={mode}
+        releaseFirst={isAssembly()}
         onClose={() => setCompleteTarget(null)}
         onCompleted={() => invalidate()}
       />

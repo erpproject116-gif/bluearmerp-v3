@@ -30,6 +30,8 @@ export type ProcessPolicy = {
   sales_require_attachment: boolean;
   purchase_order_require_attachment: boolean;
   supplier_invoice_require_attachment: boolean;
+  manufacturing_require_fg_qc?: boolean;
+  sales_count_completed_wo_toward_release?: boolean;
 };
 
 export type AttachmentDocKind =
@@ -178,6 +180,7 @@ export function useProcessPolicy(enabled: () => boolean = () => true) {
           sales_require_attachment: false,
           purchase_order_require_attachment: false,
           supplier_invoice_require_attachment: false,
+          manufacturing_require_fg_qc: false,
         };
       }
       return policy;

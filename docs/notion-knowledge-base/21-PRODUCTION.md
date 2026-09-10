@@ -15,34 +15,39 @@ Issue / Receive / Weigh stations remain valid URLs (`/app/production/issue-stati
 
 Enable under **User Management → Module & Features** (`manufacturing` module). Turn Manufacturing off if you only trade finished goods — Production nav is hidden. Permissions: `manufacturing.boms`, `manufacturing.work_orders`, `manufacturing.work_orders_release`, `manufacturing.work_orders_complete`, `manufacturing.boms_bulk`, `manufacturing.work_orders_bulk`, `quality.wo_inspection`.
 
-**Costing:** Disassembly and assembly complete post **stock quantities (and lots)** only. There is **no carcass→cut cost allocation** on work-order complete until a future inventory costing project.
+**Costing:** Recipe screens show **estimate-only** materials + labor/freight totals (from item `purchase_price` / `standard_costs`). Assembly and disassembly **Finish / Finish build** post **stock quantities (and lots) only**. There is **no carcass→FG cost allocation** and **no new item created** on Finish until a future inventory costing project.
+
+## Assembly happy path (floor)
+
+1. **Recipe** — Assembly → Recipes. Description, finished product, warehouse, parts. Recipe code is **auto-generated** as `A` + `mmddyyyy` + `-` + 6 digits (e.g. `A09102026-000001`).
+2. **Job** — Assembly → Jobs → New job (recipe, qty, location; optional From customer order).
+3. **Finish build** — On the Jobs row: releases a draft if needed, then completes. Confirm **Actual produced** (defaults to planned). Stock: parts out, FG in. Writes `qty_produced`.
+
+**Conditional only:** Continue → Take materials / Record finished when serial/lot tracking applies. QC Pass/Hold only when Process policies → Require FG QC is on (default off). Hub defaults to Recipe → Job → Finish build; use **Show full process** for the long flowchart.
 
 ## Work order flow
 
 ```mermaid
 flowchart LR
-  BOM[BOM] --> WO[Work Order draft]
-  SO[Sales Order line] -->|Create WO or Load Slip| WO
-  WO --> REL[Release]
-  REL --> QC{FG QC required?}
-  QC -->|Held| HOLD[Cannot complete]
-  QC -->|Released| ISSUE[Issue station optional]
-  ISSUE --> COMP[Complete]
-  COMP --> STK[Stock movements]
-  COMP --> FG[Receive station optional]
+  BOM[Recipe] --> WO[Job draft]
+  SO[Sales Order line] -->|From customer order| WO
+  WO --> FIN[Finish build]
+  FIN --> STK[Stock movements]
+  FIN --> QTY[qty_produced actual]
 ```
 
-1. **Create** — pick BOM, plant location, qty to produce. MTO: **Sales Order → Create work order(s)** or Production **Load Slip → Sales Order** sets `source_sales_order_id` / `source_sales_order_line_id`.
+1. **Create** — pick recipe (BOM), plant location, qty to produce. MTO: **From customer order** or Sales Order → Create work order(s) sets `source_sales_order_id` / `source_sales_order_line_id`.
 2. **Materials preview** — work order detail shows on-hand vs required (respects UoM conversion, scrap/spare qty, yield %).
-3. **Release** — status `released`; records `released_at`. From the WO row, open **Issue materials** / **Receive FG** for tracked lines (`?woId=`).
-4. **FG inspection** — default `released`; when **Process policies → Require FG QC** (or Production Setup) is on, new WOs start `pending` until Quality releases (`quality.wo_inspection`).
-5. **Complete** — backflush (assembly) or consume input + receive outputs (disassembly). Sets `qty_produced`, `completed_at`, and optional `actual_input_qty` / `input_lot_batch_id`.
+3. **Finish build** (assembly) — combined release+complete for draft; complete only when already released. Optional **Start job** remains as a secondary action.
+4. **Record finished** — stages serials/lots only; stock updates on Finish. Header shows job, recipe, planned, staged, SO when linked.
+5. **FG inspection** — default `released`; when **Require FG QC** is on, new WOs start `pending` until Quality releases (`quality.wo_inspection`). Jobs hide QC vocabulary when policy is off.
+6. **Complete** — backflush (assembly) or consume input + receive outputs (disassembly). Sets `qty_produced` (actual), `completed_at`, and optional `actual_input_qty` / `input_lot_batch_id`.
 
 ### BOM types
 
 | Type | Finished item | Component lines | Complete behavior |
 |------|---------------|-----------------|-----------------|
-| `assembly` | Output SKU | Materials consumed | Issue components, receive finished item |
+| `assembly` | Output SKU | Materials consumed | Issue components, receive finished item; code auto `Ammddyyyy-######` |
 | `disassembly` | Input SKU (e.g. fabric roll) | Yield outputs | Consume input qty, receive component lines |
 
 Disassembly supports yield variance via `actual_input_qty` on complete (golden **S16**).
@@ -53,9 +58,9 @@ Mirrors goods-receipt inspection:
 
 - Fields: `inspection_status` (`pending` / `held` / `released`), notes, inspected timestamp.
 - **Complete is blocked** until `inspection_status = released`.
-- Opt-in policy: `tenant_process_policies.manufacturing_require_fg_qc` (migration 275).
+- Opt-in policy: `tenant_process_policies.manufacturing_require_fg_qc` (migration 275). Default **false** — assembly Jobs omit Quality column/Pass/Hold.
 
-Route: patch inspection on the work order from the Work Orders grid/modal (Quality permission).
+Route: patch inspection on the work order from the Jobs grid when policy is on (`quality.wo_inspection`).
 
 ## Serial / lot stations
 
@@ -74,9 +79,9 @@ Perishable catch-weight lots use the same lot staging pattern as Inventory Recei
 
 **Push (Sales):** On a saved sales order (list or modal), **Create work order(s)** calls `POST /manufacturing/work-orders/from-sales-order/{id}` when Manufacturing is enabled and the user has WO write. Lines need an active BOM.
 
-**Pull (Production):** **New Work Order → Load Slip → Sales Order** lists open SO lines with balance qty (same API family as PR Load Slip).
+**Pull (Production):** **From customer order** / Load Slip lists open SO lines with balance qty.
 
-Linked lines show **Making** (open WO qty) and **Made** (completed WO `qty_produced`) on the sales order line grid.
+Linked lines show **Making** (open WO qty) and **Made** (completed WO `qty_produced`) on the sales order line grid. Jobs list shows **Customer order**; Progress and Stock movement reports include Source SO + Recipe when linked.
 
 **Optional release bridge** (default **off**): `tenant_process_policies.sales_count_completed_wo_toward_release` (migration 276). When on, completed linked WO qty can floor SO release stock availability. Leave off for bit-identical legacy release math.
 

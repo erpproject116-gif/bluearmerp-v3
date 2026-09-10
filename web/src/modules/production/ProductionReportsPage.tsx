@@ -29,6 +29,7 @@ type WoProgressRow = {
   work_order_id: number;
   work_order_no: string;
   status: string;
+  bom_code?: string;
   qty_to_produce: number;
   qty_produced: number;
   progress_pct: number;
@@ -37,6 +38,7 @@ type WoProgressRow = {
   output_serials: number;
   output_lot_qty: number;
   inspection_status: string;
+  source_sales_order_no?: string | null;
 };
 
 type WoStockMovementRow = {
@@ -49,6 +51,7 @@ type WoStockMovementRow = {
   qty_delta: number;
   movement_type: string;
   created_at: string;
+  source_sales_order_no?: string | null;
 };
 
 type YieldRow = {
@@ -285,6 +288,8 @@ export default function ProductionReportsPage() {
             <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
               <tr>
                 <th class="px-3 py-2">WO no.</th>
+                <th class="px-3 py-2">Recipe</th>
+                <th class="px-3 py-2">Source SO</th>
                 <th class="px-3 py-2">Status</th>
                 <th class="px-3 py-2 text-right">To produce</th>
                 <th class="px-3 py-2 text-right">Produced</th>
@@ -301,6 +306,8 @@ export default function ProductionReportsPage() {
                 {(row) => (
                   <tr class="border-t border-stroke/60">
                     <td class="px-3 py-2">{row.work_order_no}</td>
+                    <td class="px-3 py-2">{row.bom_code ?? "—"}</td>
+                    <td class="px-3 py-2">{row.source_sales_order_no ?? "—"}</td>
                     <td class="px-3 py-2 capitalize">{row.status.replace(/_/g, " ")}</td>
                     <td class="px-3 py-2 text-right">{row.qty_to_produce}</td>
                     <td class="px-3 py-2 text-right">{row.qty_produced}</td>
@@ -323,6 +330,7 @@ export default function ProductionReportsPage() {
               <tr>
                 <th class="px-3 py-2">Date</th>
                 <th class="px-3 py-2">WO no.</th>
+                <th class="px-3 py-2">Source SO</th>
                 <th class="px-3 py-2">Item</th>
                 <th class="px-3 py-2">Location</th>
                 <th class="px-3 py-2 text-right">Qty delta</th>
@@ -335,6 +343,7 @@ export default function ProductionReportsPage() {
                   <tr class="border-t border-stroke/60">
                     <td class="px-3 py-2">{row.created_at?.slice(0, 19).replace("T", " ")}</td>
                     <td class="px-3 py-2">{row.work_order_no}</td>
+                    <td class="px-3 py-2">{row.source_sales_order_no ?? "—"}</td>
                     <td class="px-3 py-2">{row.item_code} — {row.item_name}</td>
                     <td class="px-3 py-2">{row.location_name}</td>
                     <td class="px-3 py-2 text-right">{row.qty_delta.toFixed(4)}</td>

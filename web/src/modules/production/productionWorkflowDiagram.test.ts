@@ -3,6 +3,7 @@ import {
   activeFlowStepIndex,
   isProductionHubPath,
   PRODUCTION_FLOWS,
+  visibleFlowSteps,
 } from "./productionWorkflowDiagram";
 
 describe("productionWorkflowDiagram", () => {
@@ -10,6 +11,17 @@ describe("productionWorkflowDiagram", () => {
     expect(isProductionHubPath("/app/production")).toBe(true);
     expect(isProductionHubPath("/app/production/")).toBe(true);
     expect(isProductionHubPath("/app/production/assembly/jobs")).toBe(false);
+  });
+
+  it("assembly default strip is Recipe → Job → Finish build", () => {
+    const steps = visibleFlowSteps(PRODUCTION_FLOWS.assembly, false);
+    expect(steps.map((s) => s.id)).toEqual(["recipe", "job", "complete"]);
+  });
+
+  it("assembly full process includes optional stations", () => {
+    const steps = visibleFlowSteps(PRODUCTION_FLOWS.assembly, true);
+    expect(steps.length).toBeGreaterThan(3);
+    expect(steps.some((s) => s.id === "qc")).toBe(true);
   });
 
   it("highlights assembly recipe on recipes route", () => {
