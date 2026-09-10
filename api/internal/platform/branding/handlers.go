@@ -82,26 +82,16 @@ func putBranding(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		merged, err := mergeSettingsPatch(r.Context(), pool, tu.TenantID, patch)
+		merged, err := applySettingsPatch(r.Context(), pool, tu.TenantID, tu.AppUserID, patch)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save branding.", "ERR_INTERNAL")
 			return
 		}
-		_, err = pool.Exec(r.Context(), `
-			insert into public.tenant_branding (tenant_id, settings, updated_by_user_id)
-			values ($1, $2, $3)
-			on conflict (tenant_id) do update set
-			  settings = excluded.settings,
-			  updated_by_user_id = excluded.updated_by_user_id,
-			  updated_at = now()`, tu.TenantID, merged, tu.AppUserID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save branding.", "ERR_INTERNAL")
-			return
-		}
-		syncTenantTinFromBranding(r.Context(), pool, tu.TenantID, merged)
+		syncTenantIdentityFromBranding(r.Context(), pool, tu.TenantID, merged)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "branding.update", "tenant_branding", &tu.TenantID, nil, nil)
 		var out map[string]any
 		_ = json.Unmarshal(merged, &out)
+		enrichReceiptFromTenant(r.Context(), pool, tu.TenantID, out)
 		response.OK(w, map[string]any{"settings": out}, "Saved.")
 	}
 }
@@ -161,14 +151,14 @@ func logoURLFromSettings(settings map[string]any) string {
 	return ""
 }
 
-func storeAsset(ctx context.Context, pool *pgxpool.Pool, tenantID, userID, uploadedBy int64, kind, fileName, mime, storagePath string, size int64) (int64, error) {
+func storeAsset(ctx context.Context, pool *pgxpool.Pool, tenantID, userID, uploadedBy int64, kind, fileName, mime, storagePath string, data []byte) (int64, error) {
 	var id int64
 	err := pool.QueryRow(ctx, `
 		insert into public.tenant_branding_assets (
-		  tenant_id, asset_kind, user_id, file_name, mime_type, size_bytes, storage_path, uploaded_by_user_id
-		) values ($1, $2, $3, $4, $5, $6, $7, $8)
+		  tenant_id, asset_kind, user_id, file_name, mime_type, size_bytes, storage_path, file_bytes, uploaded_by_user_id
+		) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		returning id`,
-		tenantID, kind, nullableUserID(kind, userID), fileName, mime, size, storagePath, uploadedBy,
+		tenantID, kind, nullableUserID(kind, userID), fileName, mime, int64(len(data)), storagePath, data, uploadedBy,
 	).Scan(&id)
 	return id, err
 }
@@ -204,7 +194,7 @@ func parseID(s string) int64 {
 	return n
 }
 
-func syncTenantTinFromBranding(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settingsJSON []byte) {
+func syncTenantIdentityFromBranding(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settingsJSON []byte) {
 	var settings map[string]any
 	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
 		return
@@ -217,4 +207,14 @@ func syncTenantTinFromBranding(ctx context.Context, pool *pgxpool.Pool, tenantID
 	_, _ = pool.Exec(ctx, `
 		update public.tenants set tin = nullif(trim($1), ''), updated_at = now()
 		where id = $2`, taxID, tenantID)
+	if name, _ := receipt["company_name"].(string); strings.TrimSpace(name) != "" {
+		_, _ = pool.Exec(ctx, `
+			update public.tenants set company_name = trim($1), updated_at = now()
+			where id = $2`, strings.TrimSpace(name), tenantID)
+	}
+}
+
+// Deprecated name kept for any external references; prefer syncTenantIdentityFromBranding.
+func syncTenantTinFromBranding(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settingsJSON []byte) {
+	syncTenantIdentityFromBranding(ctx, pool, tenantID, settingsJSON)
 }

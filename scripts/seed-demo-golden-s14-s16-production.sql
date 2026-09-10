@@ -78,13 +78,16 @@ begin
     update public.inv_items set track_inventory_qty = true
     where tenant_id = v_tenant and item_code in ('00001', '00002', '00003', '00004');
 
-    -- Ensure base UoM + lot tracking on demo cut / perishable SKUs for floor weigh
+    -- Ensure base UoM + lot tracking on demo cut SKUs for floor weigh.
+    -- inv_items_track_serial_lot_exclusive: lot and serial cannot both be true
+    -- (migration 264 may have enabled serial on these rows).
     update public.inv_items i
     set base_unit_id = coalesce(
           i.base_unit_id,
           (select u.id from public.inv_units u where u.tenant_id = i.tenant_id order by u.id limit 1)
         ),
         track_lot = case when i.item_code in ('00002', '00003', '00004') then true else i.track_lot end,
+        track_serial = case when i.item_code in ('00002', '00003', '00004') then false else i.track_serial end,
         track_inventory_qty = true
     where i.tenant_id = v_tenant and i.item_code in ('00001', '00002', '00003', '00004');
 

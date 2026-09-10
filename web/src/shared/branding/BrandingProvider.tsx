@@ -39,7 +39,7 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
   const [canManage, setCanManage] = createSignal(false);
   const [logoPreviewUrl, setLogoPreviewUrl] = createSignal<string | undefined>();
   const [logoMissing, setLogoMissing] = createSignal(false);
-  const [loading, setLoading] = createSignal(false);
+  const [loading, setLoading] = createSignal(true);
 
   const loadLogoPreview = async (settings: BrandingSettings, missing: boolean) => {
     const id = settings.receipt.logo_asset_id;
@@ -101,12 +101,15 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
 
   const save = async (patch: Partial<BrandingSettings>) => {
     // Never send null logo_asset_id from a color/label save — that used to wipe the logo.
-    const liveLogoId = settings().receipt.logo_asset_id;
+    // Blank company_name from a stale draft must not overwrite a known live name.
+    const live = settings().receipt;
+    const liveLogoId = live.logo_asset_id;
     const receipt = patch.receipt
       ? {
           ...patch.receipt,
-          logo_asset_id:
-            patch.receipt.logo_asset_id ?? liveLogoId ?? null,
+          logo_asset_id: patch.receipt.logo_asset_id ?? liveLogoId ?? null,
+          company_name:
+            String(patch.receipt.company_name ?? "").trim() || live.company_name || "",
         }
       : undefined;
     const body: Partial<BrandingSettings> = receipt ? { ...patch, receipt } : { ...patch };

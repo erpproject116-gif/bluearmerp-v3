@@ -1,6 +1,7 @@
 package branding
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -45,20 +46,10 @@ func uploadCompanyLogo(pool *pgxpool.Pool) http.HandlerFunc {
 			writeUploadErr(w, err)
 			return
 		}
-		merged, err := mergeSettingsPatch(r.Context(), pool, tu.TenantID, json.RawMessage(fmt.Sprintf(`{"receipt":{"logo_asset_id":%d}}`, assetID)))
+		_, err = applySettingsPatch(r.Context(), pool, tu.TenantID, tu.AppUserID,
+			json.RawMessage(fmt.Sprintf(`{"receipt":{"logo_asset_id":%d}}`, assetID)))
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to link logo.", "ERR_INTERNAL")
-			return
-		}
-		_, err = pool.Exec(r.Context(), `
-			insert into public.tenant_branding (tenant_id, settings, updated_by_user_id)
-			values ($1, $2, $3)
-			on conflict (tenant_id) do update set
-			  settings = excluded.settings,
-			  updated_by_user_id = excluded.updated_by_user_id,
-			  updated_at = now()`, tu.TenantID, merged, tu.AppUserID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save branding.", "ERR_INTERNAL")
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "branding.logo_upload", "tenant_branding_asset", &assetID, nil, nil)
@@ -136,6 +127,13 @@ func saveUploadedImage(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUser, 
 	if safeName == "" || safeName == "." {
 		return 0, &uploadErr{fields: map[string]string{"file": "Invalid file name."}}
 	}
+	data, err := io.ReadAll(io.LimitReader(file, maxBytes+1))
+	if err != nil {
+		return 0, &uploadErr{status: http.StatusInternalServerError, code: "ERR_INTERNAL", msg: "Failed to read upload."}
+	}
+	if int64(len(data)) > maxBytes {
+		return 0, &uploadErr{fields: map[string]string{"file": fmt.Sprintf("File exceeds %d MB limit.", maxBytes/(1024*1024))}}
+	}
 	subdir := "logos"
 	if kind == "user_avatar" {
 		subdir = "avatars"
@@ -147,22 +145,11 @@ func saveUploadedImage(r *http.Request, pool *pgxpool.Pool, tu auth.TenantUser, 
 	}
 	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 	absPath := filepath.Join(absDir, storedName)
-	dst, err := os.Create(absPath)
-	if err != nil {
+	if err := os.WriteFile(absPath, data, 0o644); err != nil {
 		return 0, &uploadErr{status: http.StatusInternalServerError, code: "ERR_INTERNAL", msg: "Failed to store file."}
-	}
-	written, err := io.Copy(dst, io.LimitReader(file, maxBytes+1))
-	_ = dst.Close()
-	if err != nil {
-		_ = os.Remove(absPath)
-		return 0, &uploadErr{status: http.StatusInternalServerError, code: "ERR_INTERNAL", msg: "Failed to store file."}
-	}
-	if written > maxBytes {
-		_ = os.Remove(absPath)
-		return 0, &uploadErr{fields: map[string]string{"file": fmt.Sprintf("File exceeds %d MB limit.", maxBytes/(1024*1024))}}
 	}
 	storagePath := filepath.ToSlash(filepath.Join(relDir, storedName))
-	return storeAsset(r.Context(), pool, tu.TenantID, userID, tu.AppUserID, kind, safeName, mimeType, storagePath, written)
+	return storeAsset(r.Context(), pool, tu.TenantID, userID, tu.AppUserID, kind, safeName, mimeType, storagePath, data)
 }
 
 func downloadAsset(pool *pgxpool.Pool) http.HandlerFunc {
@@ -176,11 +163,12 @@ func downloadAsset(pool *pgxpool.Pool) http.HandlerFunc {
 		var fileName, storagePath, mimeType, kind string
 		var userID *int64
 		var createdAt time.Time
+		var fileBytes []byte
 		err = pool.QueryRow(r.Context(), `
-			select file_name, storage_path, coalesce(mime_type, ''), asset_kind, user_id, created_at
+			select file_name, storage_path, coalesce(mime_type, ''), asset_kind, user_id, created_at, file_bytes
 			from public.tenant_branding_assets
 			where id = $1 and tenant_id = $2`, assetID, tu.TenantID).
-			Scan(&fileName, &storagePath, &mimeType, &kind, &userID, &createdAt)
+			Scan(&fileName, &storagePath, &mimeType, &kind, &userID, &createdAt, &fileBytes)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Asset not found.", "ERR_NOT_FOUND")
 			return
@@ -190,28 +178,34 @@ func downloadAsset(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		inline := strings.TrimSpace(r.URL.Query().Get("inline")) == "1"
-		if inline {
-			abs, err := filedownload.ResolveSafePath(uploadDir(), storagePath)
-			if err != nil {
-				response.Err(w, http.StatusNotFound, "Asset not found.", "ERR_NOT_FOUND")
+		if abs, err := filedownload.ResolveSafePath(uploadDir(), storagePath); err == nil {
+			if f, err := os.Open(abs); err == nil {
+				defer f.Close()
+				if mimeType != "" {
+					w.Header().Set("Content-Type", mimeType)
+				}
+				if inline {
+					w.Header().Set("Content-Disposition", "inline")
+				} else {
+					w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, strings.ReplaceAll(fileName, `"`, "")))
+				}
+				http.ServeContent(w, r, fileName, createdAt, f)
 				return
 			}
-			f, err := os.Open(abs)
-			if err != nil {
-				response.Err(w, http.StatusNotFound, "Asset not found.", "ERR_NOT_FOUND")
-				return
-			}
-			defer f.Close()
+		}
+		if len(fileBytes) > 0 {
 			if mimeType != "" {
 				w.Header().Set("Content-Type", mimeType)
 			}
-			w.Header().Set("Content-Disposition", "inline")
-			http.ServeContent(w, r, fileName, createdAt, f)
+			if inline {
+				w.Header().Set("Content-Disposition", "inline")
+			} else {
+				w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, strings.ReplaceAll(fileName, `"`, "")))
+			}
+			http.ServeContent(w, r, fileName, createdAt, bytes.NewReader(fileBytes))
 			return
 		}
-		if err := filedownload.ServeStoredFile(w, r, uploadDir(), storagePath, fileName, mimeType, createdAt); err != nil {
-			response.Err(w, http.StatusNotFound, "Asset not found.", "ERR_NOT_FOUND")
-		}
+		response.Err(w, http.StatusNotFound, "Asset not found.", "ERR_NOT_FOUND")
 	}
 }
 
@@ -288,6 +282,56 @@ func mergeSettingsPatch(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 	if err != nil {
 		return nil, err
 	}
+	return mergeSettingsMaps(current, patch)
+}
+
+// applySettingsPatch locks the tenant branding row, merges the patch, and upserts
+// so concurrent Save vs logo upload cannot overwrite each other.
+func applySettingsPatch(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, patch json.RawMessage) ([]byte, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var raw []byte
+	err = tx.QueryRow(ctx, `
+		select settings from public.tenant_branding where tenant_id = $1 for update`, tenantID).Scan(&raw)
+	hasRow := true
+	if err != nil {
+		if err != pgx.ErrNoRows {
+			return nil, err
+		}
+		hasRow = false
+		raw = []byte("{}")
+	}
+	_ = hasRow
+	mergedDefaults := deepMergeJSON([]byte(DefaultSettingsJSON), raw)
+	var current map[string]any
+	_ = json.Unmarshal(mergedDefaults, &current)
+	enrichReceiptFromTenant(ctx, pool, tenantID, current)
+
+	out, err := mergeSettingsMaps(current, patch)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.Exec(ctx, `
+		insert into public.tenant_branding (tenant_id, settings, updated_by_user_id)
+		values ($1, $2, $3)
+		on conflict (tenant_id) do update set
+		  settings = excluded.settings,
+		  updated_by_user_id = excluded.updated_by_user_id,
+		  updated_at = now()`, tenantID, out, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func mergeSettingsMaps(current map[string]any, patch json.RawMessage) ([]byte, error) {
 	curBytes, _ := json.Marshal(current)
 	mergedBytes := deepMergeJSON(curBytes, patch)
 
@@ -296,6 +340,7 @@ func mergeSettingsPatch(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 	var mergedMap map[string]any
 	_ = json.Unmarshal(mergedBytes, &mergedMap)
 	preserveLogoAssetID(current, mergedMap, patch)
+	preserveReceiptTextFields(current, mergedMap, patch)
 	out, _ := json.Marshal(mergedMap)
 	return out, nil
 }
@@ -328,6 +373,37 @@ func preserveLogoAssetID(current, merged map[string]any, patch json.RawMessage) 
 	}
 }
 
+// preserveReceiptTextFields keeps non-empty company identity when a full-page save
+// sends blank strings (common when the UI drafts before branding has loaded).
+func preserveReceiptTextFields(current, merged map[string]any, patch json.RawMessage) {
+	curReceipt, _ := current["receipt"].(map[string]any)
+	merReceipt, _ := merged["receipt"].(map[string]any)
+	if curReceipt == nil || merReceipt == nil {
+		return
+	}
+	var patchMap map[string]any
+	_ = json.Unmarshal(patch, &patchMap)
+	patchReceipt, _ := patchMap["receipt"].(map[string]any)
+	if patchReceipt == nil {
+		return
+	}
+	for _, key := range []string{"company_name", "address", "phone", "email", "tax_id", "header_text", "footer_text"} {
+		pv, explicit := patchReceipt[key]
+		if !explicit {
+			continue
+		}
+		pStr, _ := pv.(string)
+		if strings.TrimSpace(pStr) != "" {
+			continue
+		}
+		curStr, _ := curReceipt[key].(string)
+		if strings.TrimSpace(curStr) == "" {
+			continue
+		}
+		merReceipt[key] = curStr
+	}
+}
+
 func enrichReceiptFromTenant(ctx context.Context, pool *pgxpool.Pool, tenantID int64, settings map[string]any) {
 	receipt, _ := settings["receipt"].(map[string]any)
 	if receipt == nil {
@@ -356,12 +432,16 @@ func logoAssetFileMissing(ctx context.Context, pool *pgxpool.Pool, tenantID int6
 		return false
 	}
 	var storagePath string
+	var hasBytes bool
 	err := pool.QueryRow(ctx, `
-		select storage_path
+		select storage_path, coalesce(octet_length(file_bytes), 0) > 0
 		from public.tenant_branding_assets
-		where id = $1 and tenant_id = $2`, assetID, tenantID).Scan(&storagePath)
+		where id = $1 and tenant_id = $2`, assetID, tenantID).Scan(&storagePath, &hasBytes)
 	if err != nil {
 		return true
+	}
+	if hasBytes {
+		return false
 	}
 	abs, err := filedownload.ResolveSafePath(uploadDir(), storagePath)
 	if err != nil {

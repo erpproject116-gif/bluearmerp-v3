@@ -51,6 +51,7 @@ export default function BrandingSettingsPage() {
   const [draft, setDraft] = createSignal<BrandingSettings>(DEFAULT_BRANDING);
   const [dirty, setDirty] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
+  const [hydrated, setHydrated] = createSignal(false);
 
   const syncDraft = () => {
     setDraft(branding.settings());
@@ -58,13 +59,20 @@ export default function BrandingSettingsPage() {
   };
 
   createEffect(() => {
+    if (branding.loading()) return;
     branding.settings();
     if (!dirty()) syncDraft();
+    setHydrated(true);
   });
+
+  const markDirty = () => {
+    if (!hydrated() || branding.loading()) return;
+    setDirty(true);
+  };
 
   const patchColors = (key: keyof BrandingColors, value: string) => {
     setDraft((d) => ({ ...d, colors: { ...d.colors, [key]: value } }));
-    setDirty(true);
+    markDirty();
   };
 
   const patchStage = (key: string, field: "bg" | "text", value: string) => {
@@ -72,37 +80,45 @@ export default function BrandingSettingsPage() {
       ...d,
       stages: { ...d.stages, [key]: { ...d.stages[key], [field]: value } },
     }));
-    setDirty(true);
+    markDirty();
   };
 
   const patchReceipt = (key: keyof BrandingReceipt, value: string) => {
     setDraft((d) => ({ ...d, receipt: { ...d.receipt, [key]: value } }));
-    setDirty(true);
+    markDirty();
   };
 
   const patchLabel = (key: string, value: string) => {
     setDraft((d) => ({ ...d, labels: { ...d.labels, [key]: value } }));
-    setDirty(true);
+    markDirty();
   };
 
   const patchPlaceholder = (key: string, value: string) => {
     setDraft((d) => ({ ...d, placeholders: { ...d.placeholders, [key]: value } }));
-    setDirty(true);
+    markDirty();
   };
 
   const save = async () => {
+    if (!hydrated() || branding.loading()) {
+      toast.warning("Still loading branding — wait a moment, then save again.");
+      return;
+    }
     setSaving(true);
     try {
-      const liveLogoId = branding.settings().receipt.logo_asset_id;
+      const live = branding.settings().receipt;
       const d = draft();
       const ok = await branding.save({
         ...d,
         receipt: {
           ...d.receipt,
-          logo_asset_id: liveLogoId ?? d.receipt.logo_asset_id,
+          logo_asset_id: live.logo_asset_id ?? d.receipt.logo_asset_id,
+          company_name: String(d.receipt.company_name ?? "").trim() || live.company_name || "",
         },
       });
-      if (ok) setDirty(false);
+      if (ok) {
+        setDirty(false);
+        toast.success("Branding saved.");
+      }
     } finally {
       setSaving(false);
     }
@@ -141,6 +157,12 @@ export default function BrandingSettingsPage() {
         </p>
       </header>
 
+      <Show when={branding.loading() || !hydrated()}>
+        <p class="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm text-text-secondary">
+          Loading saved branding…
+        </p>
+      </Show>
+
       <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
         <div class="flex items-center justify-between gap-4">
           <h2 class="text-lg font-medium text-text-primary">Color palette</h2>
@@ -149,7 +171,7 @@ export default function BrandingSettingsPage() {
             class="text-sm text-brand-600 hover:underline"
             onClick={() => {
               setDraft((d) => ({ ...d, colors: { ...DEFAULT_BRANDING.colors } }));
-              setDirty(true);
+              markDirty();
             }}
           >
             Reset colors
@@ -382,7 +404,7 @@ export default function BrandingSettingsPage() {
         <button
           type="button"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          disabled={!dirty() || saving()}
+          disabled={!dirty() || saving() || branding.loading() || !hydrated()}
           onClick={() => void save()}
         >
           {saving() ? "Saving…" : "Save branding"}
@@ -390,7 +412,7 @@ export default function BrandingSettingsPage() {
         <button
           type="button"
           class="rounded-lg border border-stroke px-4 py-2 text-sm"
-          disabled={!dirty()}
+          disabled={!dirty() || branding.loading() || !hydrated()}
           onClick={syncDraft}
         >
           Discard changes
