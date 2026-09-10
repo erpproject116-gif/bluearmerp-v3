@@ -3,7 +3,6 @@ import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
-import { useToast } from "../../shared/toast";
 import { parseAndDedupeSerialBulkInput } from "../../shared/serialBulkParse";
 import { parseAndDedupeLotBulkInput } from "../../shared/lotBulkParse";
 import { resolveSerialBulk } from "../../shared/resolveSerialBulk";
@@ -11,6 +10,7 @@ import { LotLineCell } from "../../shared/LotLineCell";
 import type { LotBatchRow } from "../../shared/useSerialLotList";
 import { ProductionLayout } from "./ProductionLayout";
 import { jobsHref, parseMfgMode } from "./mfgProductionMode";
+import { mfgSuccess, mfgWarn } from "./mfgToast";
 
 type WorkOrderOption = {
   id: number;
@@ -85,12 +85,10 @@ async function resolveLotBatchIds(
 }
 
 export default function ProductionIssueStationPage() {
-  const toast = useToast();
   const [searchParams] = useSearchParams();
-  const jobsBackHref = () => {
-    const mode = parseMfgMode(String(searchParams.mode ?? "")) ?? "assembly";
-    return `${jobsHref(mode)}?status=released`;
-  };
+  const mode = () => parseMfgMode(String(searchParams.mode ?? "")) ?? "assembly";
+  const jobsBackHref = () => `${jobsHref(mode())}?status=released`;
+  const stationTitle = () => (mode() === "disassembly" ? "Take from stock" : "Take materials");
   const [woLabel, setWoLabel] = createSignal("");
   const [woId, setWoId] = createSignal<number | null>(null);
   const [context, setContext] = createSignal<ScanContext | null>(null);
@@ -116,13 +114,13 @@ export default function ProductionIssueStationPage() {
     ]);
     setLoading(false);
     if (!ctxRes.success || !ctxRes.data) {
-      toast.warning(ctxRes.message ?? "Failed to load work order.");
+      mfgWarn(ctxRes.message, "This job isn’t available. Go back to Jobs and open it again.");
       setContext(null);
       setNeeds(null);
       return;
     }
     if (ctxRes.data.status !== "released") {
-      toast.warning("Select a released work order.");
+      mfgWarn(null, "Start the job first, then try this step again.");
       setContext(null);
       setNeeds(null);
       return;
@@ -139,6 +137,9 @@ export default function ProductionIssueStationPage() {
     setNeeds(needsRes.success ? needsRes.data ?? null : null);
     const firstTracked = ctxRes.data.components.find((c) => c.track_serial || c.track_lot);
     setActiveComponentId(firstTracked?.component_item_id ?? ctxRes.data.components[0]?.component_item_id ?? null);
+    if (!firstTracked) {
+      mfgWarn(null, "Nothing to take here — go back and Finish the job.");
+    }
   };
 
   createEffect(() => {
@@ -163,7 +164,7 @@ export default function ProductionIssueStationPage() {
     if (!wo || !comp || !id || !comp.track_serial) return;
     const serials = parseAndDedupeSerialBulkInput(serialPaste());
     if (serials.length === 0) {
-      toast.warning("Paste at least one serial number.");
+      mfgWarn(null, "Paste at least one serial number.");
       return;
     }
     setBusy(true);
@@ -173,7 +174,7 @@ export default function ProductionIssueStationPage() {
       context: "release",
     });
     if (resolved.errors.length > 0) {
-      toast.warning(resolved.errors.slice(0, 3).join(" "));
+      mfgWarn(resolved.errors.slice(0, 3).join(" "), "Could not match those serials. Check them and try again.");
       setBusy(false);
       return;
     }
@@ -183,10 +184,10 @@ export default function ProductionIssueStationPage() {
     });
     setBusy(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to issue serials.");
+      mfgWarn(res.message, "Could not take that from stock. Check the serial and try again.");
       return;
     }
-    toast.success("Serials staged for issue.");
+    mfgSuccess("Taken from stock. Next: Record parts (or Finish).");
     setSerialPaste("");
     await refreshContext();
   };
@@ -198,7 +199,7 @@ export default function ProductionIssueStationPage() {
     if (!wo || !comp || !id || !comp.track_lot) return;
     const rows = parseAndDedupeLotBulkInput(lotPaste());
     if (rows.length === 0) {
-      toast.warning("Paste lot lines (lot no., qty per line).");
+      mfgWarn(null, "Paste lot lines (lot number and qty per line).");
       return;
     }
     setBusy(true);
@@ -209,14 +210,14 @@ export default function ProductionIssueStationPage() {
         body: JSON.stringify({ lines }),
       });
       if (!res.success) {
-        toast.warning(res.message ?? "Failed to issue lots.");
+        mfgWarn(res.message, "Could not take those lots from stock. Try again.");
       } else {
-        toast.success("Lots staged for issue.");
+        mfgSuccess("Taken from stock. Next: Record parts (or Finish).");
         setLotPaste("");
         await refreshContext();
       }
     } catch (e) {
-      toast.warning(e instanceof Error ? e.message : "Failed to resolve lots.");
+      mfgWarn(e instanceof Error ? e.message : null, "Could not find those lots. Check the lot numbers.");
     }
     setBusy(false);
   };
@@ -228,7 +229,7 @@ export default function ProductionIssueStationPage() {
     if (!wo || !comp || !id || !comp.track_lot || !lotBatchId()) return;
     const qty = Number(lotQty());
     if (!(qty > 0)) {
-      toast.warning("Enter a positive quantity.");
+      mfgWarn(null, "Enter how many you got (must be more than 0).");
       return;
     }
     setBusy(true);
@@ -238,10 +239,10 @@ export default function ProductionIssueStationPage() {
     });
     setBusy(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to issue lot.");
+      mfgWarn(res.message, "Could not take that lot from stock. Try again.");
       return;
     }
-    toast.success("Lot staged for issue.");
+    mfgSuccess("Taken from stock. Next: Record parts (or Finish).");
     setLotBatchId(null);
     setLotNo("");
     setLotQty("1");
@@ -253,16 +254,15 @@ export default function ProductionIssueStationPage() {
       <div class="space-y-6">
         <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
           <A href={jobsBackHref()} class="text-xs font-medium text-brand-700 hover:underline">
-            ← Work orders
+            ← Jobs
           </A>
-          <h2 class="mt-2 text-lg font-semibold text-text-primary">Issue station</h2>
+          <h2 class="mt-2 text-lg font-semibold text-text-primary">{stationTitle()}</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            Select a released work order, then stage component serials or lots before completion.
-            For cut-apart jobs, stage the whole/input item here when it is lot or serial tracked.
+            Only needed when this item uses serial or lot numbers. If not, skip to the next step and Finish the job.
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo
-              label="Work order (released)"
+              label="Job (started)"
               value={woLabel}
               selectedId={woId}
               onInput={setWoLabel}
@@ -283,7 +283,7 @@ export default function ProductionIssueStationPage() {
         </section>
 
         <Show when={loading()}>
-          <p class="text-sm text-text-secondary">Loading work order…</p>
+          <p class="text-sm text-text-secondary">Loading job…</p>
         </Show>
 
         <Show when={context()}>

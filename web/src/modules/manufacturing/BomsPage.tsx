@@ -16,6 +16,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useProductionMode } from "../production/ProductionModeLayout";
 import { recipesHref } from "../production/mfgProductionMode";
+import { mfgSuccess, mfgWarn } from "../production/mfgToast";
 type BomLine = {
   id?: number;
   line_no: number;
@@ -213,13 +214,13 @@ export default function BomsPage() {
   const openEdit = async (row: Bom) => {
     const res = await apiFetch<Bom>(`/api/v1/manufacturing/boms/${row.id}`);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to load BOM.");
+      mfgWarn(res.message, "Could not load this recipe.");
       return;
     }
     const detail = res.data;
     const detailType = detail.bom_type === "disassembly" ? "disassembly" : "assembly";
     if (detailType !== mode) {
-      toast.warning(`This recipe is ${detailType === "disassembly" ? "Disassembly" : "Assembly"}. Opening in the correct section.`);
+      mfgWarn(null, `This recipe is for ${detailType === "disassembly" ? "Disassembly" : "Assembly"}. Opening in the correct section.`);
       navigate(recipesHref(detailType));
       return;
     }
@@ -382,10 +383,10 @@ export default function BomsPage() {
     );
     setBulkBusy(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Bulk deactivate failed.");
+      mfgWarn(res.message, "Could not deactivate those recipes.");
       return;
     }
-    toast.success(`Deactivated ${res.data.updated} BOM(s); ${res.data.skipped} skipped.`);
+    mfgSuccess(`Deactivated ${res.data.updated} recipe(s); ${res.data.skipped} skipped.`);
     setSelectedIds(new Set<number>());
     await invalidate();
   };
@@ -527,18 +528,30 @@ export default function BomsPage() {
             setOutputUnitLabel("");
           }}
         />
-        <Field label={copy.yieldLabel} description={copy.yieldDescription}>
-          <input class={inputClass} type="text" inputMode="decimal" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
-        </Field>
+        <details class="col-span-full rounded-lg border border-stroke bg-slate-50/60 p-3">
+          <summary class="cursor-pointer text-sm font-medium text-text-primary">
+            Advanced (optional)
+          </summary>
+          <p class="mt-1 text-xs text-text-secondary">
+            Most users can leave these alone. Yield % defaults to 100 (no loss).
+          </p>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label={copy.yieldLabel} description={copy.yieldDescription}>
+              <input class={inputClass} type="text" inputMode="decimal" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
+            </Field>
+            <Show when={mode === "disassembly"}>
+              <Field label={copy.expectedYieldMinLabel} description={copy.expectedYieldMinDescription}>
+                <input class={inputClass} type="text" inputMode="decimal" value={expectedYieldMin()} onInput={(e) => setExpectedYieldMin(e.currentTarget.value)} />
+              </Field>
+              <Field label={copy.expectedYieldMaxLabel} description={copy.expectedYieldMaxDescription}>
+                <input class={inputClass} type="text" inputMode="decimal" value={expectedYieldMax()} onInput={(e) => setExpectedYieldMax(e.currentTarget.value)} />
+              </Field>
+            </Show>
+          </div>
+        </details>
         <Show when={mode === "disassembly"}>
-          <Field label={copy.expectedYieldMinLabel} description={copy.expectedYieldMinDescription}>
-            <input class={inputClass} type="text" inputMode="decimal" value={expectedYieldMin()} onInput={(e) => setExpectedYieldMin(e.currentTarget.value)} />
-          </Field>
-          <Field label={copy.expectedYieldMaxLabel} description={copy.expectedYieldMaxDescription}>
-            <input class={inputClass} type="text" inputMode="decimal" value={expectedYieldMax()} onInput={(e) => setExpectedYieldMax(e.currentTarget.value)} />
-          </Field>
           <p class="col-span-full text-xs text-text-secondary">
-            Tip: enable lot tracking on cut output items for lot numbers on Weigh cuts. Non-lot cuts can still be weighed and post as plain qty on Complete.
+            Tip: turn on lot tracking for parts if you want lot numbers when you record them. Plain qty parts still work.
           </p>
         </Show>
         <div class="col-span-full sm:col-span-2 lg:col-span-3">
@@ -548,7 +561,7 @@ export default function BomsPage() {
         </div>
         <Show when={copy.showScrap}>
           <p class="col-span-full text-xs text-text-secondary">
-            Stock issue uses <strong>{copy.lineQtyLabel} + {copy.scrapLabel}</strong> (numeric only). Blank scrap is fine.
+            Stock uses <strong>{copy.lineQtyLabel}</strong> plus any <strong>{copy.scrapLabel}</strong>. Leave spare blank if you don’t need it.
           </p>
         </Show>
         <p class="col-span-full text-xs text-text-secondary">{copy.stockHint}</p>

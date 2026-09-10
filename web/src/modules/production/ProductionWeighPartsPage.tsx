@@ -4,9 +4,9 @@ import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { DateInput } from "../../shared/DateInput";
-import { useToast } from "../../shared/toast";
 import { ProductionLayout } from "./ProductionLayout";
 import { jobsHref, parseMfgMode } from "./mfgProductionMode";
+import { mfgSuccess, mfgWarn } from "./mfgToast";
 
 type WorkOrderOption = {
   id: number;
@@ -52,7 +52,6 @@ async function fetchReleasedWorkOrders(q: string): Promise<LookupOption[]> {
 }
 
 export default function ProductionWeighPartsPage() {
-  const toast = useToast();
   const [searchParams] = useSearchParams();
   const jobsBackHref = () => `${jobsHref(parseMfgMode(String(searchParams.mode ?? "")) ?? "disassembly")}?status=released`;
   const [woLabel, setWoLabel] = createSignal("");
@@ -73,19 +72,19 @@ export default function ProductionWeighPartsPage() {
     const woRes = await apiFetch<WorkOrderDetail>(`/api/v1/manufacturing/work-orders/${id}`);
     if (!woRes.success || !woRes.data) {
       setLoading(false);
-      toast.warning(woRes.message ?? "Failed to load job.");
+      mfgWarn(woRes.message, "Could not load this job. Go back to Jobs and open it again.");
       return;
     }
     setWo(woRes.data);
     const bomRes = await apiFetch<BomDetail>(`/api/v1/manufacturing/boms/${woRes.data.bom_id}`);
     setLoading(false);
     if (!bomRes.success || !bomRes.data) {
-      toast.warning(bomRes.message ?? "Failed to load recipe.");
+      mfgWarn(bomRes.message, "Could not load the recipe for this job.");
       return;
     }
     setBom(bomRes.data);
     if (bomRes.data.bom_type !== "disassembly") {
-      toast.warning("Weigh parts is for cut-apart (disassembly) jobs. Use Receive station for finished-good lots.");
+      mfgWarn(null, "Record parts is only for take-apart jobs. Use Record finished for build jobs.");
     }
     const first = bomRes.data.lines?.[0];
     setCutId(first?.component_item_id ?? null);
@@ -105,7 +104,7 @@ export default function ProductionWeighPartsPage() {
     if (!id || !cid) return;
     const kg = Number(weight());
     if (!Number.isFinite(kg) || kg <= 0) {
-      toast.warning("Enter a positive catch-weight (kg).");
+      mfgWarn(null, "Enter how many you got (must be more than 0).");
       return;
     }
     setBusy(true);
@@ -129,15 +128,15 @@ export default function ProductionWeighPartsPage() {
     );
     setBusy(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to stage cut lot.");
+      mfgWarn(res.message, "Could not record that part. Try again.");
       return;
     }
     const r = res.data.results?.[0];
     if (r && r.status !== "accepted" && r.status !== "idempotent_replay") {
-      toast.warning(r.message ?? `Stage failed: ${r.status}`);
+      mfgWarn(r.message, "Could not record that part. Try again.");
       return;
     }
-    toast.success(`Staged cut lot ${r?.lot_no ?? ""} — complete the job to post to stock.`);
+    mfgSuccess("Part recorded. Record the rest, then Finish.");
     setLotNo("");
     setWeight("");
   };
@@ -149,10 +148,9 @@ export default function ProductionWeighPartsPage() {
           <A href={jobsBackHref()} class="text-xs font-medium text-brand-700 hover:underline">
             ← Jobs
           </A>
-          <h2 class="mt-2 text-lg font-semibold text-text-primary">Weigh cuts</h2>
+          <h2 class="mt-2 text-lg font-semibold text-text-primary">Record parts</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            On a released cut-apart job, weigh each cut SKU (catch-weight). Lot-tracked cuts post as lots on complete;
-            non-lot cuts still stage here and post as plain qty. Enter actual whole weight when you Complete the job.
+            Enter how many of each part you got. Finish the job to put them in stock.
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo
@@ -186,7 +184,7 @@ export default function ProductionWeighPartsPage() {
               {wo()!.work_order_no} · {wo()!.finished_item_name} · planned {wo()!.qty_to_produce}
             </p>
             <div class="mt-4 grid gap-4 md:grid-cols-2">
-              <Field label="Cut SKU">
+              <Field label="Part">
                 <select
                   class={inputClass}
                   value={cutId() ?? ""}
@@ -204,7 +202,7 @@ export default function ProductionWeighPartsPage() {
               <Field label="Lot no. (optional)">
                 <input class={inputClass} value={lotNo()} onInput={(e) => setLotNo(e.currentTarget.value)} placeholder="Auto if blank" />
               </Field>
-              <Field label="Catch-weight (kg)">
+              <Field label="How many you got">
                 <input
                   class={inputClass}
                   type="text"
@@ -224,7 +222,7 @@ export default function ProductionWeighPartsPage() {
               disabled={busy() || !cutId()}
               onClick={() => void submitWeigh()}
             >
-              Stage weighed cut
+              Record this part
             </button>
           </section>
         </Show>

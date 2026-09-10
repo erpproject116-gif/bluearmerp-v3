@@ -49,6 +49,9 @@ type WorkOrder struct {
 	SourceSalesOrderID     *int64 `json:"source_sales_order_id,omitempty"`
 	SourceSalesOrderLineID *int64 `json:"source_sales_order_line_id,omitempty"`
 	BomType                string `json:"bom_type,omitempty"`
+	FinishedTrackSerial    bool   `json:"finished_track_serial,omitempty"`
+	FinishedTrackLot       bool   `json:"finished_track_lot,omitempty"`
+	ComponentsTracked      bool   `json:"components_tracked,omitempty"`
 }
 
 type MaterialNeedLine struct {
@@ -158,6 +161,13 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			  wo.actual_input_qty::float8, wo.input_lot_batch_id,
 			  wo.inspection_status, wo.inspection_notes, wo.inspected_at::text,
 			  wo.source_sales_order_id, wo.source_sales_order_line_id,
+			  coalesce(fi.track_serial, false), coalesce(fi.track_lot, false),
+			  exists (
+			    select 1 from public.mfg_bom_lines bl
+			    join public.inv_items ci on ci.id = bl.component_item_id
+			    where bl.bom_id = wo.bom_id
+			      and (coalesce(ci.track_serial, false) or coalesce(ci.track_lot, false))
+			  ),
 			  count(*) over()
 			from public.mfg_work_orders wo
 			join public.mfg_boms b on b.id = wo.bom_id
@@ -192,7 +202,9 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.OrderDate, &notes, &released, &completed,
 				&row.ActualInputQty, &row.InputLotBatchID,
 				&row.InspectionStatus, &inspectionNotes, &inspectedAt,
-				&row.SourceSalesOrderID, &row.SourceSalesOrderLineID, &total,
+				&row.SourceSalesOrderID, &row.SourceSalesOrderLineID,
+				&row.FinishedTrackSerial, &row.FinishedTrackLot, &row.ComponentsTracked,
+				&total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read work order.", "ERR_INTERNAL")
 				return
@@ -815,7 +827,14 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		  wo.order_date::text, wo.notes, wo.released_at::text, wo.completed_at::text,
 		  wo.actual_input_qty::float8, wo.input_lot_batch_id,
 		  wo.inspection_status, wo.inspection_notes, wo.inspected_at::text,
-		  wo.source_sales_order_id, wo.source_sales_order_line_id
+		  wo.source_sales_order_id, wo.source_sales_order_line_id,
+		  coalesce(fi.track_serial, false), coalesce(fi.track_lot, false),
+		  exists (
+		    select 1 from public.mfg_bom_lines bl
+		    join public.inv_items ci on ci.id = bl.component_item_id
+		    where bl.bom_id = wo.bom_id
+		      and (coalesce(ci.track_serial, false) or coalesce(ci.track_lot, false))
+		  )
 		from public.mfg_work_orders wo
 		join public.mfg_boms b on b.id = wo.bom_id
 		join public.inv_items fi on fi.id = wo.finished_item_id
@@ -828,7 +847,8 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		&row.QtyToProduce, &row.QtyProduced, &row.Status,
 		&row.OrderDate, &notes, &released, &completed, &row.ActualInputQty, &row.InputLotBatchID,
 		&row.InspectionStatus, &inspectionNotes, &inspectedAt,
-		&row.SourceSalesOrderID, &row.SourceSalesOrderLineID)
+		&row.SourceSalesOrderID, &row.SourceSalesOrderLineID,
+		&row.FinishedTrackSerial, &row.FinishedTrackLot, &row.ComponentsTracked)
 	if err != nil {
 		return WorkOrder{}, err
 	}

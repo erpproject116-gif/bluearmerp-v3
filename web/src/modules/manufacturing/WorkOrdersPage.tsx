@@ -15,6 +15,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useProductionMode } from "../production/ProductionModeLayout";
 import { jobsHref, type MfgMode } from "../production/mfgProductionMode";
+import { mfgSuccess, mfgWarn } from "../production/mfgToast";
 import { CompleteWorkOrderModal } from "./CompleteWorkOrderModal";
 import {
   WoSalesOrderLinePickerModal,
@@ -38,7 +39,26 @@ type WorkOrder = {
   order_date: string;
   notes?: string | null;
   bom_type?: string;
+  finished_track_serial?: boolean;
+  finished_track_lot?: boolean;
+  components_tracked?: boolean;
 };
+
+function needsTakeFromStock(r: WorkOrder): boolean {
+  if (r.bom_type === "disassembly") {
+    return Boolean(r.finished_track_serial || r.finished_track_lot);
+  }
+  return Boolean(r.components_tracked);
+}
+
+function needsRecordFinished(r: WorkOrder): boolean {
+  if (r.bom_type === "disassembly") return false;
+  return Boolean(r.finished_track_serial || r.finished_track_lot);
+}
+
+function qcBlocked(r: WorkOrder): boolean {
+  return r.inspection_status === "pending" || r.inspection_status === "held";
+}
 
 type BomOption = { id: number; bom_code: string; bom_name: string };
 
@@ -288,10 +308,10 @@ export default function WorkOrdersPage() {
     const res = await apiFetch(`/api/v1/manufacturing/work-orders/${row.id}/release`, { method: "POST" });
     setActionId(null);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to release.");
+      mfgWarn(res.message, "Couldn’t start this job. Try again.");
       return;
     }
-    toast.success("Work order released.");
+    mfgSuccess("Job started. Follow the steps on this row.");
     invalidate();
   };
 
@@ -304,10 +324,14 @@ export default function WorkOrdersPage() {
     });
     setInspectingId(null);
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to update inspection.");
+      mfgWarn(res.message, "Couldn’t update the quality check. Try again.");
       return;
     }
-    toast.success(status === "released" ? "FG QC passed." : "Work order held for QC.");
+    mfgSuccess(
+      status === "released"
+        ? "Quality check passed. You can Finish now."
+        : "Job held for quality check.",
+    );
     invalidate();
   };
 
@@ -327,12 +351,12 @@ export default function WorkOrdersPage() {
         continue;
       }
       const detail = res.errors ? Object.values(res.errors).filter(Boolean).join(" ") : "";
-      toast.warning(detail || res.message || `Failed to create work order from SO #${soId}.`);
+      mfgWarn(detail || res.message, "Couldn’t create a job from that sales order.");
     }
     setLoadSlipBusy(false);
     if (ok > 0) {
       const woLabel = lastWo?.work_order_no ? ` (${lastWo.work_order_no})` : "";
-      toast.success(`Created work order(s) from ${ok} sales order(s)${woLabel}.`);
+      mfgSuccess(`Created ${ok} job(s) from sales order(s)${woLabel}.`);
       // Show the tab that matches the WO we got back (draft by default).
       const st = (lastWo?.status || "draft").trim().toLowerCase();
       if (["draft", "released", "completed", "cancelled"].includes(st)) {
@@ -346,9 +370,10 @@ export default function WorkOrdersPage() {
   };
 
 
-  const bulkCancelDrafts = async () => {    const ids = [...selectedIds()];
+  const bulkCancelDrafts = async () => {
+    const ids = [...selectedIds()];
     if (ids.length === 0 || !canBulkWo()) return;
-    if (!window.confirm(`Cancel ${ids.length} selected draft work order(s)?`)) return;
+    if (!window.confirm(`Cancel ${ids.length} selected draft job(s)?`)) return;
     setBulkBusy(true);
     const res = await apiFetch<{ updated: number; skipped: number }>(
       "/api/v1/manufacturing/work-orders/actions/bulk-cancel",
@@ -357,10 +382,10 @@ export default function WorkOrdersPage() {
     );
     setBulkBusy(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Bulk cancel failed.");
+      mfgWarn(res.message, "Couldn’t cancel those jobs.");
       return;
     }
-    toast.success(`Cancelled ${res.data.updated} work order(s); ${res.data.skipped} skipped.`);
+    mfgSuccess(`Cancelled ${res.data.updated} job(s); ${res.data.skipped} skipped.`);
     setSelectedIds(new Set<number>());
     invalidate();
   };
@@ -368,7 +393,7 @@ export default function WorkOrdersPage() {
   const bulkReleaseDrafts = async () => {
     const ids = [...selectedIds()];
     if (ids.length === 0 || !canBulkWo()) return;
-    if (!window.confirm(`Release ${ids.length} selected draft work order(s) to the floor?`)) return;
+    if (!window.confirm(`Start ${ids.length} selected draft job(s)?`)) return;
     setBulkBusy(true);
     const res = await apiFetch<{ updated: number; skipped: number }>(
       "/api/v1/manufacturing/work-orders/actions/bulk-release",
@@ -377,10 +402,10 @@ export default function WorkOrdersPage() {
     );
     setBulkBusy(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Bulk release failed.");
+      mfgWarn(res.message, "Couldn’t start those jobs.");
       return;
     }
-    toast.success(`Released ${res.data.updated} work order(s); ${res.data.skipped} skipped.`);
+    mfgSuccess(`Started ${res.data.updated} job(s); ${res.data.skipped} skipped.`);
     setSelectedIds(new Set<number>());
     invalidate();
   };
@@ -393,11 +418,11 @@ export default function WorkOrdersPage() {
     <>
       <p class="mb-3 text-sm text-text-secondary">
         <span class="font-medium text-text-primary">{copy.jobTitle}:</span>{" "}
-        Draft → Release to floor → floor links → Pass QC → Complete. {copy.stockHint}.
+        Start a job → take stock if needed → record results → finish. Stock updates when you finish.
       </p>
       <SpreadsheetGrid<WorkOrder>
         columns={[
-          { key: "work_order_no", header: "WO no.", clickable: true },
+          { key: "work_order_no", header: "Job no.", clickable: true },
           { key: "order_date", header: "Date" },
           { key: "bom_code", header: "Recipe" },
           { key: "finished_item_name", header: copy.headerItemLabel },
@@ -409,13 +434,13 @@ export default function WorkOrdersPage() {
           },
           {
             key: "inspection_status",
-            header: "Inspection",
+            header: "Quality check",
             sortable: false,
             render: (r) => (
               <div class="flex flex-wrap items-center gap-2 capitalize">
                 <span>{(r.inspection_status ?? "released").replace(/_/g, " ")}</span>
-                <Show when={r.status === "released" && (r.inspection_status === "pending" || r.inspection_status === "held")}>
-                  <span class="text-xs text-amber-700">Pass FG QC before Complete</span>
+                <Show when={r.status === "released" && qcBlocked(r)}>
+                  <span class="text-xs text-amber-700">Pass quality check before Finish</span>
                 </Show>
                 <Show when={r.status === "released" && canInspect()}>
                   <button
@@ -424,7 +449,7 @@ export default function WorkOrdersPage() {
                     disabled={inspectingId() === r.id}
                     onClick={(e) => { e.stopPropagation(); void patchInspection(r, "released"); }}
                   >
-                    Pass QC
+                    Pass quality check
                   </button>
                   <button
                     type="button"
@@ -452,57 +477,78 @@ export default function WorkOrdersPage() {
                     disabled={actionId() === r.id}
                     onClick={(e) => { e.stopPropagation(); void release(r); }}
                   >
-                    Next: Release to floor
+                    Start job
                   </button>
                 </Show>
                 <Show when={r.status === "released"}>
-                  <span class="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Floor</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Steps</span>
                   <Show when={woType(r) === "assembly"}>
-                    <A
-                      href={`/app/production/issue-station${stationQuery(r.id)}`}
-                      class="text-xs font-medium text-brand-600 hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Issue materials
-                    </A>
-                    <A
-                      href={`/app/production/receive-station${stationQuery(r.id)}`}
-                      class="text-xs font-medium text-brand-600 hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Receive FG
-                    </A>
+                    <Show when={needsTakeFromStock(r)}>
+                      <A
+                        href={`/app/production/issue-station${stationQuery(r.id)}`}
+                        class="text-xs font-medium text-brand-600 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        1. Take materials
+                      </A>
+                    </Show>
+                    <Show when={needsRecordFinished(r)}>
+                      <A
+                        href={`/app/production/receive-station${stationQuery(r.id)}`}
+                        class="text-xs font-medium text-brand-600 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        2. Record finished
+                      </A>
+                    </Show>
+                    <Show when={!needsTakeFromStock(r) && !needsRecordFinished(r)}>
+                      <span class="text-[10px] text-text-secondary">No serial/lot tracking — you can finish when ready.</span>
+                    </Show>
                   </Show>
                   <Show when={woType(r) === "disassembly"}>
-                    <A
-                      href={`/app/production/issue-station${stationQuery(r.id)}`}
-                      class="text-xs font-medium text-brand-600 hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Issue whole
-                    </A>
+                    <Show when={needsTakeFromStock(r)}>
+                      <A
+                        href={`/app/production/issue-station${stationQuery(r.id)}`}
+                        class="text-xs font-medium text-brand-600 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        1. Take from stock
+                      </A>
+                    </Show>
                     <A
                       href={`/app/production/weigh-parts${stationQuery(r.id)}`}
                       class="text-xs font-medium text-brand-600 hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      Weigh cuts
+                      {needsTakeFromStock(r) ? "2. Record parts" : "1. Record parts"}
                     </A>
+                    <Show when={!needsTakeFromStock(r)}>
+                      <span class="text-[10px] text-text-secondary">No serial/lot on whole — skip take from stock.</span>
+                    </Show>
                   </Show>
                 </Show>
                 <Show when={r.status === "released" && canComplete()}>
                   <button
                     type="button"
                     class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
-                    disabled={actionId() === r.id || r.inspection_status === "pending" || r.inspection_status === "held"}
+                    disabled={actionId() === r.id || qcBlocked(r)}
                     title={
-                      r.inspection_status === "pending" || r.inspection_status === "held"
-                        ? "Pass FG QC first"
+                      qcBlocked(r)
+                        ? "Quality check still open — mark it Passed, then Finish."
                         : undefined
                     }
-                    onClick={(e) => { e.stopPropagation(); setCompleteTarget(r); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (qcBlocked(r)) {
+                        mfgWarn(null, "Quality check still open — mark it Passed, then Finish.");
+                        return;
+                      }
+                      setCompleteTarget(r);
+                    }}
                   >
-                    Next: Complete
+                    {woType(r) === "disassembly"
+                      ? (needsTakeFromStock(r) ? "3. Finish" : "2. Finish")
+                      : "3. Finish"}
                   </button>
                 </Show>
                 <Show when={r.status === "completed"}>
@@ -546,7 +592,7 @@ export default function WorkOrdersPage() {
                   disabled={selectedIds().size === 0 || bulkBusy()}
                   onClick={() => void bulkReleaseDrafts()}
                 >
-                  Release selected{selectedIds().size > 0 ? ` (${selectedIds().size})` : ""}
+                  Start selected{selectedIds().size > 0 ? ` (${selectedIds().size})` : ""}
                 </button>
               </Show>
             </Show>
@@ -574,7 +620,7 @@ export default function WorkOrdersPage() {
         onPageChange={setPage}
         search={q()}
         onSearchChange={setQ}
-        searchPlaceholder="Search WO, BOM, item…"
+        searchPlaceholder="Search job, recipe, item…"
         status={statusFilter()}
         onStatusChange={setStatusAndUrl}
         statusLabel="Status"

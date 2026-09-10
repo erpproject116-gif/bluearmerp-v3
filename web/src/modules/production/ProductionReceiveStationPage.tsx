@@ -3,11 +3,11 @@ import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
-import { useToast } from "../../shared/toast";
 import { parseAndDedupeSerialBulkInput } from "../../shared/serialBulkParse";
 import { parseAndDedupeLotBulkInput } from "../../shared/lotBulkParse";
 import { ProductionLayout } from "./ProductionLayout";
 import { jobsHref, parseMfgMode } from "./mfgProductionMode";
+import { mfgSuccess, mfgWarn } from "./mfgToast";
 
 type WorkOrderOption = {
   id: number;
@@ -60,7 +60,6 @@ async function fetchReleasedWorkOrders(q: string): Promise<LookupOption[]> {
 }
 
 export default function ProductionReceiveStationPage() {
-  const toast = useToast();
   const [searchParams] = useSearchParams();
   const jobsBackHref = () => {
     const mode = parseMfgMode(String(searchParams.mode ?? "")) ?? "assembly";
@@ -84,12 +83,12 @@ export default function ProductionReceiveStationPage() {
     ]);
     setLoading(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to load work order.");
+      mfgWarn(res.message, "This job is not available. Go back to Jobs and open it again.");
       setContext(null);
       return;
     }
     if (res.data.status !== "released") {
-      toast.warning("Select a released work order.");
+      mfgWarn(null, "Start the job first, then try this step again.");
       setContext(null);
       return;
     }
@@ -127,7 +126,7 @@ export default function ProductionReceiveStationPage() {
     if (!id || !ctx?.track_serial) return;
     const serials = parseAndDedupeSerialBulkInput(serialPaste());
     if (serials.length === 0) {
-      toast.warning("Paste at least one finished-good serial.");
+      mfgWarn(null, "Paste at least one serial number.");
       return;
     }
     setBusy(true);
@@ -138,12 +137,12 @@ export default function ProductionReceiveStationPage() {
     );
     setBusy(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to stage output serials.");
+      mfgWarn(res.message, "Could not record those serials. Try again.");
       return;
     }
     setLastResults(res.data.results ?? []);
     const accepted = (res.data.results ?? []).filter((r) => r.status === "accepted").length;
-    toast.success(`Staged ${accepted} of ${serials.length} serial(s).`);
+    mfgSuccess(`Recorded ${accepted} of ${serials.length} serial(s). Next: Finish the job.`);
     setSerialPaste("");
     await refreshContext();
   };
@@ -154,7 +153,7 @@ export default function ProductionReceiveStationPage() {
     if (!id || !ctx?.track_lot) return;
     const rows = parseAndDedupeLotBulkInput(lotPaste());
     if (rows.length === 0) {
-      toast.warning("Paste lot lines (lot no. tab qty; optional tab expiry YYYY-MM-DD).");
+      mfgWarn(null, "Paste lot lines (lot, qty, and optional expiry).");
       return;
     }
     setBusy(true);
@@ -171,12 +170,12 @@ export default function ProductionReceiveStationPage() {
     );
     setBusy(false);
     if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Failed to stage output lots.");
+      mfgWarn(res.message, "Could not record those lots. Try again.");
       return;
     }
     setLastResults(res.data.results ?? []);
     const accepted = (res.data.results ?? []).filter((r) => r.status === "accepted").length;
-    toast.success(`Staged ${accepted} of ${rows.length} lot row(s).`);
+    mfgSuccess(`Recorded ${accepted} of ${rows.length} lot row(s). Next: Finish the job.`);
     setLotPaste("");
     await refreshContext();
   };
@@ -186,17 +185,16 @@ export default function ProductionReceiveStationPage() {
       <div class="space-y-6">
         <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
           <A href={jobsBackHref()} class="text-xs font-medium text-brand-700 hover:underline">
-            ← Work orders
+            ← Jobs
           </A>
-          <h2 class="mt-2 text-lg font-semibold text-text-primary">Receive / weigh station</h2>
+          <h2 class="mt-2 text-lg font-semibold text-text-primary">Record finished product</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            Stage finished-good serials or lots on a released <span class="font-medium">assembly</span> job before completion posts them to stock.
-            For catch-weight, paste <span class="font-medium">lot · qty · expiry · catch-weight kg</span> (4th column optional; when set it becomes stock qty).
-            For cut-apart jobs, use <span class="font-medium">Weigh cuts</span> on the job row instead — this station stages the whole/FG item, not cut SKUs.
+            Only needed when the finished product uses serial or lot numbers. If not, skip this and Finish the job.
+            For take-apart jobs, use <span class="font-medium">Record parts</span> on the job row instead.
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo
-              label="Work order (released)"
+              label="Job (started)"
               value={woLabel}
               selectedId={woId}
               onInput={setWoLabel}
@@ -216,7 +214,7 @@ export default function ProductionReceiveStationPage() {
         </section>
 
         <Show when={loading()}>
-          <p class="text-sm text-text-secondary">Loading work order…</p>
+          <p class="text-sm text-text-secondary">Loading job…</p>
         </Show>
 
         <Show when={context()}>
@@ -245,7 +243,7 @@ export default function ProductionReceiveStationPage() {
                   disabled={busy()}
                   onClick={() => void submitSerials()}
                 >
-                  Stage output serials
+                  Record serials
                 </button>
               </Show>
 
@@ -265,7 +263,7 @@ export default function ProductionReceiveStationPage() {
                   disabled={busy()}
                   onClick={() => void submitLots()}
                 >
-                  Stage output lots
+                  Record lots
                 </button>
               </Show>
 

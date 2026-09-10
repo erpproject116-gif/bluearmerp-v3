@@ -1,12 +1,11 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
-import { handleSaveResult } from "../../shared/handleSaveResult";
 import type { FormErrors } from "../../shared/formValidation";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
-import { useToast } from "../../shared/toast";
 import type { MfgMode } from "../production/mfgProductionMode";
 import { MFG_COPY } from "../production/mfgProductionMode";
+import { friendlyMfgMessage, mfgSuccess, mfgWarn } from "../production/mfgToast";
 
 type MaterialNeedLine = {
   component_item_id: number;
@@ -49,7 +48,6 @@ export function CompleteWorkOrderModal(props: {
   onClose: () => void;
   onCompleted: () => void;
 }) {
-  const toast = useToast();
   const copy = () => MFG_COPY[props.mode];
   const [actualQty, setActualQty] = createSignal("");
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
@@ -80,7 +78,7 @@ export function CompleteWorkOrderModal(props: {
     if (trimmed !== "") {
       const n = Number(trimmed);
       if (!Number.isFinite(n) || n <= 0) {
-        setFieldErrors({ actual_input_qty: "Actual qty must be a positive number." });
+        setFieldErrors({ actual_input_qty: "Enter how many you used (must be more than 0)." });
         return;
       }
       actualInputQty = n;
@@ -94,8 +92,18 @@ export function CompleteWorkOrderModal(props: {
       body: JSON.stringify(body),
     }, { silent: true });
     setSaving(false);
-    const ok = handleSaveResult(res, toast, "Job completed.", { onFieldErrors: setFieldErrors });
-    if (!ok) return;
+    if (!res.success) {
+      const mapped: FormErrors = {};
+      if (res.errors) {
+        for (const [k, v] of Object.entries(res.errors)) {
+          mapped[k] = friendlyMfgMessage(v, String(v));
+        }
+      }
+      if (Object.keys(mapped).length > 0) setFieldErrors(mapped);
+      mfgWarn(res.message, "Could not finish this job. Check stock, then try again.");
+      return;
+    }
+    mfgSuccess("Job finished. Stock is updated.");
     props.onCompleted();
     props.onClose();
   };
@@ -111,11 +119,11 @@ export function CompleteWorkOrderModal(props: {
   return (
     <EntityModal
       open={props.open}
-      title={`Complete ${props.workOrder?.work_order_no ?? "job"}`}
+      title={`Finish ${props.workOrder?.work_order_no ?? "job"}`}
       onClose={props.onClose}
       onSave={() => void confirm()}
       saving={saving()}
-      saveLabel="Complete job"
+      saveLabel="Finish job"
       singleColumn
     >
       <FormErrorSummary errors={fieldErrors} />
@@ -127,14 +135,14 @@ export function CompleteWorkOrderModal(props: {
             </p>
             <Show when={props.mode === "disassembly" && stagedCutTotal() > 0}>
               <p class="text-sm text-text-secondary">
-                Staged cut total: <strong>{stagedCutTotal().toFixed(4)}</strong> (posted as produced qty on complete)
+                Parts recorded: <strong>{stagedCutTotal().toFixed(4)}</strong> (posted to stock when you Finish)
               </p>
             </Show>
             <Field
               label={
                 props.mode === "disassembly"
-                  ? `Actual whole weight (${unit()}) *`
-                  : `Actual input qty (${unit()}) — leave blank to use planned`
+                  ? `How many wholes you actually used (${unit()}) *`
+                  : `How many you used (${unit()}) — leave blank to use planned`
               }
             >
               <input
@@ -173,7 +181,7 @@ export function CompleteWorkOrderModal(props: {
                           <th class="px-2 py-1.5">Recipe qty</th>
                           <th class="px-2 py-1.5">{props.mode === "disassembly" ? "Expected" : "To issue"}</th>
                           <Show when={props.mode === "disassembly"}>
-                            <th class="px-2 py-1.5">Staged weigh</th>
+                            <th class="px-2 py-1.5">Parts recorded</th>
                           </Show>
                           <th class="px-2 py-1.5">On hand</th>
                         </tr>

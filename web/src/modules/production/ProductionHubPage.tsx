@@ -12,7 +12,7 @@ import {
 const MASTERS: { label: string; href: string; sub: string }[] = [
   { label: "Items", href: "/app/inventory/items", sub: "Products & materials" },
   { label: "Locations", href: "/app/inventory/locations", sub: "Warehouses" },
-  { label: "Setup", href: "/app/production/setup", sub: "FG QC & SO bridge" },
+  { label: "Setup", href: "/app/production/setup", sub: "Quality & SO bridge" },
 ];
 
 function StepPill(props: {
@@ -200,17 +200,17 @@ export function ProductionHubPage() {
           <div>
             <p class="text-xs font-semibold text-text-primary">In scope today</p>
             <ul class="mt-1 list-disc space-y-0.5 pl-4 text-[11px] leading-snug text-text-secondary">
-              <li>Assembly & disassembly recipes (BOM type, yield, scrap, locations)</li>
-              <li>Jobs: draft → release → floor stations → FG QC (policy) → complete</li>
-              <li>Sales order links, Load Slip, material needs, serial/lot at issue & receive</li>
-              <li>Disassembly catch-weight (weigh whole) and yield reports</li>
-              <li>Production reports and module setup (FG QC, completed WO → SO release)</li>
+              <li>Assembly & disassembly recipes (what you build or take apart)</li>
+              <li>Jobs: Start → take stock if needed → record results → Finish</li>
+              <li>Optional link to a sales order; serial/lot steps only when tracking is on</li>
+              <li>Record parts on take-apart jobs; stock updates when you Finish</li>
+              <li>Reports and setup (quality check policy, sales-order bridge)</li>
             </ul>
           </div>
           <div>
             <p class="text-xs font-semibold text-text-primary">Outside Production menu</p>
             <ul class="mt-1 list-disc space-y-0.5 pl-4 text-[11px] leading-snug text-text-secondary">
-              <li>Full Quality module (NCR, CAPA, supplier quality) — separate from WO FG QC column</li>
+              <li>Full Quality module (NCR, CAPA, supplier quality) — separate from job quality check</li>
               <li>In-process manufacturing QC (planned; not a full floor station yet)</li>
               <li>Multi-level BOM explosion (single-level recipes per job today)</li>
               <li>MRP, capacity planning, shop-floor scheduling beyond job status</li>
