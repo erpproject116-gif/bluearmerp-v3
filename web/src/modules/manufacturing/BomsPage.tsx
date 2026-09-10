@@ -499,7 +499,7 @@ export default function BomsPage() {
         selectedIds={selectedIds()}
         onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={openNew}
-        onEdit={openEdit}
+        onEdit={(row) => void openEdit(row)}
         settingsHref={recipesHref(mode)}
         codeKey="bom_code"
         nameKey="bom_name"

@@ -15,11 +15,22 @@ export function friendlyMfgMessage(raw: string | undefined | null, fallback: str
   if (lower.includes("must pass") && lower.includes("inspection")) {
     return "Quality check still open — mark it Passed, then Finish.";
   }
+  if (
+    lower.includes("staged serial") ||
+    lower.includes("staged lot") ||
+    lower.includes("staged issue") ||
+    (lower.includes("take materials") && lower.includes("finish"))
+  ) {
+    return "Take materials first (Continue → scan/take serials or lots), then Finish build.";
+  }
   if (lower.includes("insufficient") || lower.includes("shortage") || lower.includes("not enough")) {
     return "Not enough stock at this location. Add stock or lower the job qty.";
   }
   if (lower.includes("released work order") || (lower.includes("not released") && lower.includes("work"))) {
     return "Start the job first, then try this step again.";
+  }
+  if (lower.includes("only draft") && lower.includes("edit")) {
+    return "This job already started. Use Revert to draft (if shown) or finish/cancel it.";
   }
   if (lower.includes("active bom not found") || lower.includes("bom not found")) {
     return "That recipe isn’t available. Pick another recipe and try again.";

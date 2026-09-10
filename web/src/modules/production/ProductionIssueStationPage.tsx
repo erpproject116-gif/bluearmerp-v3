@@ -87,7 +87,7 @@ async function resolveLotBatchIds(
 export default function ProductionIssueStationPage() {
   const [searchParams] = useSearchParams();
   const mode = () => parseMfgMode(String(searchParams.mode ?? "")) ?? "assembly";
-  const jobsBackHref = () => `${jobsHref(mode())}?status=released`;
+  const jobsBackHref = () => `${jobsHref(mode())}?status=open`;
   const stationTitle = () => (mode() === "disassembly" ? "Take from stock" : "Take materials");
   const [woLabel, setWoLabel] = createSignal("");
   const [woId, setWoId] = createSignal<number | null>(null);
@@ -102,8 +102,46 @@ export default function ProductionIssueStationPage() {
   const [busy, setBusy] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
   const [prefilled, setPrefilled] = createSignal(false);
+  const [suggestedSerials, setSuggestedSerials] = createSignal<{ id: number; serial_no: string }[]>([]);
+  const [suggestBusy, setSuggestBusy] = createSignal(false);
 
   const activeComponent = () => context()?.components.find((c) => c.component_item_id === activeComponentId());
+
+  const remainingSerialNeed = (comp: ScanComponent) => {
+    const need = Math.max(0, Math.round(comp.stock_to_issue) - (comp.issued_serials || 0));
+    return need;
+  };
+
+  const prefetchAvailableSerials = async (comp: ScanComponent, locationId: number, fillPaste: boolean) => {
+    if (!comp.track_serial) {
+      setSuggestedSerials([]);
+      return;
+    }
+    const need = remainingSerialNeed(comp);
+    if (need <= 0) {
+      setSuggestedSerials([]);
+      if (fillPaste) setSerialPaste("");
+      return;
+    }
+    setSuggestBusy(true);
+    const qs = new URLSearchParams({
+      item_id: String(comp.component_item_id),
+      location_id: String(locationId),
+    });
+    const res = await apiFetch<{ id: number; serial_no: string }[]>(
+      `/api/v1/inventory/serial-units/available?${qs}`,
+      undefined,
+      { silent: true },
+    );
+    setSuggestBusy(false);
+    const rows = (res.data ?? []).slice(0, need);
+    setSuggestedSerials(rows);
+    if (fillPaste && rows.length > 0) {
+      setSerialPaste(rows.map((r) => r.serial_no).join("\n"));
+    } else if (fillPaste) {
+      setSerialPaste("");
+    }
+  };
 
   const loadWo = async (id: number) => {
     setLoading(true);
@@ -135,10 +173,23 @@ export default function ProductionIssueStationPage() {
     }
     setContext(ctxRes.data);
     setNeeds(needsRes.success ? needsRes.data ?? null : null);
-    const firstTracked = ctxRes.data.components.find((c) => c.track_serial || c.track_lot);
-    setActiveComponentId(firstTracked?.component_item_id ?? ctxRes.data.components[0]?.component_item_id ?? null);
-    if (!firstTracked) {
-      mfgWarn(null, "Nothing to take here — go back and Finish the job.");
+    const firstNeed =
+      ctxRes.data.components.find(
+        (c) =>
+          (c.track_serial && c.issued_serials < Math.round(c.stock_to_issue)) ||
+          (c.track_lot && c.issued_lot_qty + 0.0001 < c.stock_to_issue),
+      ) ?? ctxRes.data.components.find((c) => c.track_serial || c.track_lot);
+    const firstId = firstNeed?.component_item_id ?? ctxRes.data.components[0]?.component_item_id ?? null;
+    setActiveComponentId(firstId);
+    if (!firstNeed) {
+      mfgWarn(null, "Nothing left to take — go back and Finish build.");
+      setSuggestedSerials([]);
+      setSerialPaste("");
+    } else if (firstNeed.track_serial) {
+      await prefetchAvailableSerials(firstNeed, ctxRes.data.location_id, true);
+    } else {
+      setSuggestedSerials([]);
+      setSerialPaste("");
     }
   };
 
@@ -187,7 +238,7 @@ export default function ProductionIssueStationPage() {
       mfgWarn(res.message, "Could not take that from stock. Check the serial and try again.");
       return;
     }
-    mfgSuccess("Taken from stock. Next: Record parts (or Finish).");
+    mfgSuccess("Taken from stock. Next: Record finished (or Finish build).");
     setSerialPaste("");
     await refreshContext();
   };
@@ -312,7 +363,16 @@ export default function ProductionIssueStationPage() {
                               return (
                                 <tr
                                   class={`cursor-pointer ${activeComponentId() === ln.component_item_id ? "bg-brand-50" : ""} ${ln.shortage > 0 ? "text-red-800" : ""}`}
-                                  onClick={() => setActiveComponentId(ln.component_item_id)}
+                                  onClick={() => {
+                                    setActiveComponentId(ln.component_item_id);
+                                    const staged = ctx().components.find((c) => c.component_item_id === ln.component_item_id);
+                                    if (staged?.track_serial) {
+                                      void prefetchAvailableSerials(staged, ctx().location_id, true);
+                                    } else {
+                                      setSuggestedSerials([]);
+                                      setSerialPaste("");
+                                    }
+                                  }}
                                 >
                                   <td class="px-2 py-1.5">{ln.component_code} — {ln.component_name}</td>
                                   <td class="px-2 py-1.5">{ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}</td>
@@ -342,12 +402,40 @@ export default function ProductionIssueStationPage() {
                       Issue: {comp().component_code} — {comp().component_name}
                     </h3>
                     <Show when={comp().track_serial}>
-                      <Field label="Paste serial numbers (comma or newline separated)">
+                      <p class="mt-1 text-xs text-text-secondary">
+                        Need {remainingSerialNeed(comp())} more serial(s). Available at this location are filled in
+                        automatically when present — confirm then Stage.
+                      </p>
+                      <Show when={suggestBusy()}>
+                        <p class="mt-1 text-xs text-text-secondary">Looking up available serials…</p>
+                      </Show>
+                      <Show when={!suggestBusy() && suggestedSerials().length === 0 && remainingSerialNeed(comp()) > 0}>
+                        <p class="mt-1 text-xs text-amber-800">
+                          No available serials found at this location for this item. Receive stock first, or paste serials
+                          manually.
+                        </p>
+                      </Show>
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          class="rounded border border-stroke px-2 py-1 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                          disabled={suggestBusy() || !context()}
+                          onClick={() => {
+                            const c = activeComponent();
+                            const wo = context();
+                            if (c && wo) void prefetchAvailableSerials(c, wo.location_id, true);
+                          }}
+                        >
+                          Refresh available serials
+                        </button>
+                      </div>
+                      <Field label="Serial numbers (auto-filled from available stock)">
                         <textarea
                           class={inputClass}
                           rows={4}
                           value={serialPaste()}
                           onInput={(e) => setSerialPaste(e.currentTarget.value)}
+                          aria-label="Serial numbers to take"
                         />
                       </Field>
                       <button

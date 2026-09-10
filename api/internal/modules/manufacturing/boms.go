@@ -458,7 +458,7 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		select l.id, l.line_no, l.component_item_id, coalesce(i.item_code, ''), coalesce(i.item_name, ''),
 		  l.qty::float8, l.unit_id, coalesce(u.code, ''), coalesce(l.scrap_qty, 0)::float8,
 		  coalesce(i.base_unit_id, 0), coalesce(bu.code, coalesce(nullif(trim(i.unit), ''), 'ea')),
-		  coalesce(i.purchase_price, 0)::float8, coalesce(i.standard_costs, '{}'::jsonb)
+		  coalesce(i.purchase_price, 0)::float8, coalesce(i.standard_costs::text, '{}')
 		from public.mfg_bom_lines l
 		left join public.inv_items i on i.id = l.component_item_id
 		left join public.inv_units u on u.id = l.unit_id

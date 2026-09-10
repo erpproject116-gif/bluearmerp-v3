@@ -31,6 +31,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/output-serials/batch", batchWorkOrderOutputSerials(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/output-lots/batch", batchWorkOrderOutputLots(pool))
 		mr.With(auth.RequireSubmit("manufacturing.work_orders_release")).Post("/work-orders/{id}/release", releaseWorkOrder(pool))
+		mr.With(auth.RequireSubmit("manufacturing.work_orders_release")).Post("/work-orders/{id}/revert-draft", revertWorkOrderToDraft(pool))
 		mr.With(auth.RequireSubmit("manufacturing.work_orders_complete")).Post("/work-orders/{id}/complete", completeWorkOrder(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders_bulk", auth.AccessWrite)).Post("/work-orders/actions/bulk-cancel", bulkCancelWorkOrders(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders_bulk", auth.AccessWrite)).Post("/work-orders/actions/bulk-release", bulkReleaseWorkOrders(pool))

@@ -358,6 +358,18 @@ export default function WorkOrdersPage() {
     invalidate();
   };
 
+  const revertToDraft = async (row: WorkOrder) => {
+    setActionId(row.id);
+    const res = await apiFetch(`/api/v1/manufacturing/work-orders/${row.id}/revert-draft`, { method: "POST" }, { silent: true });
+    setActionId(null);
+    if (!res.success) {
+      mfgWarn(res.message, "Couldn’t put this job back to draft. Finish or cancel it instead.");
+      return;
+    }
+    mfgSuccess("Job is draft again — you can edit qty/location.");
+    invalidate();
+  };
+
   const patchInspection = async (row: WorkOrder, status: "held" | "released") => {
     if (row.status !== "released") return;
     setInspectingId(row.id);
@@ -605,6 +617,17 @@ export default function WorkOrdersPage() {
                 Start job
               </button>
             </Show>
+            <Show when={r.status === "released" && canRelease()}>
+              <button
+                type="button"
+                class="text-[11px] text-text-secondary hover:underline disabled:opacity-50"
+                disabled={actionId() === r.id}
+                aria-label="Revert job to draft"
+                onClick={(e) => { e.stopPropagation(); void revertToDraft(r); }}
+              >
+                Revert to draft
+              </button>
+            </Show>
             <Show when={r.status === "completed"}>
               <A
                 href="/app/inventory/serial-lot/pack-station"
@@ -829,6 +852,12 @@ export default function WorkOrdersPage() {
         singleColumn
         saveLabel={editing() ? (editing()!.status === "draft" ? "Save" : "Close") : "Create"}
       >
+        <Show when={editing() && editing()!.status !== "draft"}>
+          <p class="col-span-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            This job already started (not draft). Close and use <strong>Revert to draft</strong> on the row if you need
+            to change qty/location (only when nothing was taken from stock yet).
+          </p>
+        </Show>
         <Show when={!editing()}>
           <draft.DraftBanner />
         </Show>

@@ -1,10 +1,11 @@
+import { A } from "@solidjs/router";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import type { FormErrors } from "../../shared/formValidation";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import type { MfgMode } from "../production/mfgProductionMode";
-import { MFG_COPY } from "../production/mfgProductionMode";
+import { jobsHref, MFG_COPY } from "../production/mfgProductionMode";
 import { friendlyMfgMessage, mfgSuccess, mfgWarn } from "../production/mfgToast";
 
 type MaterialNeedLine = {
@@ -33,6 +34,23 @@ type MaterialNeeds = {
   lines: MaterialNeedLine[];
 };
 
+type ScanComponent = {
+  component_item_id: number;
+  component_code: string;
+  component_name: string;
+  stock_to_issue: number;
+  track_serial: boolean;
+  track_lot: boolean;
+  issued_serials: number;
+  issued_lot_qty: number;
+};
+
+type ScanContext = {
+  work_order_id: number;
+  status: string;
+  components: ScanComponent[];
+};
+
 type WorkOrder = {
   id: number;
   work_order_no: string;
@@ -41,39 +59,94 @@ type WorkOrder = {
   status?: string;
   finished_base_unit_code?: string;
   bom_type?: string;
+  components_tracked?: boolean;
+  finished_track_serial?: boolean;
+  finished_track_lot?: boolean;
 };
 
 export function CompleteWorkOrderModal(props: {
   open: boolean;
   workOrder: WorkOrder | null;
   mode: MfgMode;
-  /** When true, POST release before complete if the work order is still draft. */
-  releaseFirst?: boolean;
   onClose: () => void;
   onCompleted: () => void;
+  /** When true and WO is draft, release then complete (assembly Finish build). */
+  releaseFirst?: boolean;
 }) {
   const copy = () => MFG_COPY[props.mode];
   const isAssembly = () => props.mode === "assembly";
   const [actualQty, setActualQty] = createSignal("");
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
+  const [scan, setScan] = createSignal<ScanContext | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
+  const [didRelease, setDidRelease] = createSignal(false);
 
   createEffect(() => {
     if (!props.open || !props.workOrder) {
       setNeeds(null);
+      setScan(null);
       setActualQty("");
       setFieldErrors({});
+      setDidRelease(false);
       return;
     }
     setActualQty(String(props.workOrder.qty_to_produce));
     setLoading(true);
-    void apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${props.workOrder.id}/material-needs`).then((res) => {
+    setDidRelease(false);
+    void Promise.all([
+      apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${props.workOrder.id}/material-needs`),
+      apiFetch<ScanContext>(`/api/v1/manufacturing/work-orders/${props.workOrder.id}/scan-context`),
+    ]).then(([needsRes, scanRes]) => {
       setLoading(false);
-      if (res.success && res.data) setNeeds(res.data);
+      if (needsRes.success && needsRes.data) setNeeds(needsRes.data);
+      if (scanRes.success && scanRes.data) setScan(scanRes.data);
     });
   });
+
+  const takeMaterialsGap = (): string | null => {
+    const comps = scan()?.components ?? [];
+    for (const c of comps) {
+      if (c.track_serial) {
+        const need = Math.round(c.stock_to_issue);
+        if (c.issued_serials < need) {
+          return `${c.component_code || c.component_name}: need ${need} serial(s), taken ${c.issued_serials}`;
+        }
+      } else if (c.track_lot) {
+        if (c.issued_lot_qty + 0.0001 < c.stock_to_issue) {
+          return `${c.component_code || c.component_name}: need ${c.stock_to_issue}, taken ${c.issued_lot_qty}`;
+        }
+      }
+    }
+    return null;
+  };
+
+  const continueHref = () => {
+    const wo = props.workOrder;
+    if (!wo) return jobsHref(props.mode);
+    const gapComp = (scan()?.components ?? []).find(
+      (c) =>
+        (c.track_serial && c.issued_serials < Math.round(c.stock_to_issue)) ||
+        (c.track_lot && c.issued_lot_qty + 0.0001 < c.stock_to_issue),
+    );
+    if (gapComp || wo.components_tracked) {
+      return `/app/production/issue-station?woId=${wo.id}&mode=${props.mode}`;
+    }
+    if (wo.finished_track_serial || wo.finished_track_lot) {
+      return `/app/production/receive-station?woId=${wo.id}&mode=${props.mode}`;
+    }
+    return jobsHref(props.mode);
+  };
+
+  const tryRevertIfWeReleased = async (woId: number) => {
+    if (!didRelease()) return;
+    const rev = await apiFetch(`/api/v1/manufacturing/work-orders/${woId}/revert-draft`, { method: "POST" }, { silent: true });
+    if (rev.success) {
+      mfgWarn(null, "Finish failed — job put back to draft so you can edit or try again.");
+      props.onCompleted();
+    }
+  };
 
   const confirm = async () => {
     const wo = props.workOrder;
@@ -95,6 +168,37 @@ export function CompleteWorkOrderModal(props: {
       actualInputQty = wo.qty_to_produce;
     }
     setFieldErrors({});
+
+    const gap = isAssembly() ? takeMaterialsGap() : null;
+    if (gap) {
+      const status = (wo.status ?? "").toLowerCase();
+      if (props.releaseFirst && status === "draft") {
+        setSaving(true);
+        const rel = await apiFetch(
+          `/api/v1/manufacturing/work-orders/${wo.id}/release`,
+          { method: "POST" },
+          { silent: true },
+        );
+        setSaving(false);
+        if (!rel.success) {
+          mfgWarn(rel.message, "Couldn’t start this job. Try Start job, then Continue.");
+          return;
+        }
+        mfgWarn(
+          null,
+          "Job started. Take materials on the next screen, then Finish build.",
+        );
+        props.onCompleted();
+        props.onClose();
+        window.location.assign(continueHref());
+        return;
+      }
+      setFieldErrors({
+        stock: `Take materials first: ${gap}`,
+      });
+      return;
+    }
+
     setSaving(true);
 
     if (props.releaseFirst && (wo.status ?? "").toLowerCase() === "draft") {
@@ -108,6 +212,7 @@ export function CompleteWorkOrderModal(props: {
         mfgWarn(rel.message, "Couldn’t start this job before finishing. Try Start job, then Finish build.");
         return;
       }
+      setDidRelease(true);
     }
 
     const body: { actual_input_qty?: number; qty_produced?: number } = {};
@@ -128,10 +233,11 @@ export function CompleteWorkOrderModal(props: {
         }
       }
       if (Object.keys(mapped).length > 0) setFieldErrors(mapped);
+      await tryRevertIfWeReleased(wo.id);
       mfgWarn(
         res.message,
         props.releaseFirst
-          ? "Job may have started but finish failed. Check the row and try Finish build again."
+          ? "Could not finish this job. Take materials if needed, then try Finish build again."
           : "Could not finish this job. Check stock, then try again.",
       );
       return;
@@ -166,6 +272,17 @@ export function CompleteWorkOrderModal(props: {
             <p class="text-sm text-text-secondary">
               Planned {copy().jobQtyLabel.toLowerCase()}: <strong>{wo().qty_to_produce} {unit()}</strong>
             </p>
+            <Show when={isAssembly() && takeMaterialsGap()}>
+              {(gap) => (
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <p class="font-medium">Take materials before Finish build</p>
+                  <p class="mt-1 text-xs">{gap()}</p>
+                  <A href={continueHref()} class="mt-2 inline-block text-xs font-semibold text-brand-700 hover:underline">
+                    Open Take materials →
+                  </A>
+                </div>
+              )}
+            </Show>
             <Show when={props.mode === "disassembly" && stagedCutTotal() > 0}>
               <p class="text-sm text-text-secondary">
                 Parts recorded: <strong>{stagedCutTotal().toFixed(4)}</strong> (posted to stock when you Finish)
@@ -184,7 +301,7 @@ export function CompleteWorkOrderModal(props: {
                 inputMode="decimal"
                 value={actualQty()}
                 onInput={(e) => setActualQty(e.currentTarget.value)}
-                aria-label={isAssembly() ? "Actual produced" : "Actual quantity"}
+                aria-label="Actual produced"
               />
             </Field>
             <Show when={loading()}>

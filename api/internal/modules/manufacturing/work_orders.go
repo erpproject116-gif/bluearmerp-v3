@@ -442,6 +442,65 @@ func releaseWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// revertWorkOrderToDraft returns a released job to draft when no stock has been posted yet
+// (e.g. Finish build released then failed on take-materials / stock).
+func revertWorkOrderToDraft(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+
+		var status string
+		err = pool.QueryRow(r.Context(), `
+			select status from public.mfg_work_orders where id=$1 and tenant_id=$2`, id, tu.TenantID).Scan(&status)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if status != "released" {
+			response.Validation(w, map[string]string{"status": "Only released jobs with no stock posting can revert to draft."})
+			return
+		}
+
+		var hasMoves bool
+		_ = pool.QueryRow(r.Context(), `
+			select exists(
+			  select 1 from public.inv_stock_movements
+			  where tenant_id=$1 and ref_type='mfg_work_order' and ref_id=$2
+			)`, tu.TenantID, id).Scan(&hasMoves)
+		if hasMoves {
+			response.Validation(w, map[string]string{"status": "Cannot revert — stock was already posted for this job."})
+			return
+		}
+
+		var hasIssueTrace bool
+		_ = pool.QueryRow(r.Context(), `
+			select exists(select 1 from public.mfg_wo_issue_serials where work_order_id=$1)
+			    or exists(select 1 from public.mfg_wo_issue_lots where work_order_id=$1)
+			    or exists(select 1 from public.mfg_wo_output_serials where work_order_id=$1)
+			    or exists(select 1 from public.mfg_wo_output_lots where work_order_id=$1)`, id).Scan(&hasIssueTrace)
+		if hasIssueTrace {
+			response.Validation(w, map[string]string{"status": "Cannot revert — materials or finished goods were already staged. Finish or cancel via admin."})
+			return
+		}
+
+		tag, err := pool.Exec(r.Context(), `
+			update public.mfg_work_orders
+			set status = 'draft', released_at = null, updated_at = now()
+			where id = $1 and tenant_id = $2 and status = 'released'`, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusConflict, "Could not revert job to draft.", "ERR_CONFLICT")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.work_order_revert_draft", "mfg_work_order", &id, nil, nil)
+		row, _ := loadWorkOrder(r.Context(), pool, tu.TenantID, id)
+		response.OK(w, row, "Job reverted to draft.")
+	}
+}
+
 func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -674,7 +733,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 						if label == "" {
 							label = fmt.Sprintf("item %d", ln.ComponentItemID)
 						}
-						response.Validation(w, map[string]string{"stock": fmt.Sprintf("insufficient staged issue for %s: %s", label, err.Error())})
+						response.Validation(w, map[string]string{"stock": fmt.Sprintf("Take materials first: staged issue for %s: %s", label, err.Error())})
 						return
 					}
 				} else if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, -issueQty, tu.AppUserID, "mfg_work_order", id, "wo_backflush_issue"); err != nil {
