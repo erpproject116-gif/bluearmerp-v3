@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -521,8 +522,14 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var completeBody workOrderCompleteBody
-		if r.ContentLength > 0 {
-			_ = json.NewDecoder(r.Body).Decode(&completeBody)
+		if err := json.NewDecoder(r.Body).Decode(&completeBody); err != nil && !errors.Is(err, io.EOF) {
+			// Empty body is OK (use planned qty). Reject only malformed JSON.
+			var syn *json.SyntaxError
+			var typ *json.UnmarshalTypeError
+			if errors.As(err, &syn) || errors.As(err, &typ) {
+				response.Validation(w, map[string]string{"body": "Invalid JSON."})
+				return
+			}
 		}
 
 		tx, err := pool.Begin(r.Context())

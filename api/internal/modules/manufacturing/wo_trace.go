@@ -988,41 +988,36 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 
 	var stagedQty float64
 	err = tx.QueryRow(ctx, `
-		select coalesce(sum(coalesce(catch_weight, qty)), 0)::float8
+		select coalesce(sum(coalesce(nullif(catch_weight, 0), qty)), 0)::float8
 		from public.mfg_wo_output_lots
 		where work_order_id = $1 and status = 'staged'`, woID).Scan(&stagedQty)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read staged output lots: %w", err)
 	}
 	if stagedQty+0.0001 < outputQty {
 		return fmt.Errorf("staged output lot qty %.4f is less than required %.4f", stagedQty, outputQty)
 	}
 	rows, err := tx.Query(ctx, `
-		select id, lot_no, qty::float8, catch_weight::float8, expiry_date
+		select id, lot_no, coalesce(nullif(catch_weight, 0), qty)::float8, expiry_date
 		from public.mfg_wo_output_lots
 		where work_order_id = $1 and status = 'staged'
 		order by id`, woID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list staged output lots: %w", err)
 	}
 	defer rows.Close()
 	remaining := outputQty
 	for rows.Next() {
 		var rowID int64
 		var lotNo string
-		var qty float64
-		var catchWeight *float64
+		var lineQty float64
 		var expiry *time.Time
-		if err := rows.Scan(&rowID, &lotNo, &qty, &catchWeight, &expiry); err != nil {
-			return err
-		}
-		lineQty := qty
-		if catchWeight != nil && *catchWeight > 0 {
-			lineQty = *catchWeight
+		if err := rows.Scan(&rowID, &lotNo, &lineQty, &expiry); err != nil {
+			return fmt.Errorf("failed to scan staged output lot: %w", err)
 		}
 		if remaining <= 0.0001 {
 			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'void' where id = $1`, rowID); err != nil {
-				return err
+				return fmt.Errorf("failed to void extra staged lot: %w", err)
 			}
 			continue
 		}
@@ -1043,7 +1038,7 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 			returning id`,
 			tenantID, itemID, lotNo, locationID, take, expiry).Scan(&lotBatchID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to post finished lot %s: %w", lotNo, err)
 		}
 		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
 			TenantID:        tenantID,
@@ -1055,16 +1050,19 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 			RefID:           &woID,
 			CreatedByUserID: &userID,
 		}); err != nil {
-			return err
+			return fmt.Errorf("failed to record finished lot event: %w", err)
 		}
 		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, take, userID, "mfg_work_order", woID, "wo_trace_receipt"); err != nil {
-			return err
+			return fmt.Errorf("failed to receive finished lot stock: %w", err)
 		}
 		_, err = tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'posted' where id = $1`, rowID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to mark finished lot posted: %w", err)
 		}
 		remaining -= take
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed reading staged output lots: %w", err)
 	}
 	if remaining > 0.0001 {
 		return fmt.Errorf("staged output lot qty could not cover required %.4f", outputQty)

@@ -143,17 +143,19 @@ export function CompleteWorkOrderModal(props: {
     const wo = props.workOrder;
     const s = scan();
     if (!wo || !isAssembly()) return null;
-    const trackSerial = Boolean(s?.track_serial ?? wo.finished_track_serial);
-    const trackLot = Boolean(s?.track_lot ?? wo.finished_track_lot);
+    // Wait for scan-context — treating missing scan as 0 falsely blocks Finish after Record finished.
+    if (!s) return null;
+    const trackSerial = Boolean(s.track_serial ?? wo.finished_track_serial);
+    const trackLot = Boolean(s.track_lot ?? wo.finished_track_lot);
     const planned = Number(actualQty()) > 0 ? Number(actualQty()) : wo.qty_to_produce;
     if (trackSerial) {
       const need = Math.round(planned);
-      const have = s?.output_serials ?? 0;
+      const have = s.output_serials ?? 0;
       if (have < need) {
         return `Finished product: need ${need} serial(s), recorded ${have}`;
       }
     } else if (trackLot) {
-      const have = s?.output_lot_qty ?? 0;
+      const have = s.output_lot_qty ?? 0;
       if (have + 0.0001 < planned) {
         return `Finished product: need ${planned} lot qty, recorded ${have}`;
       }
