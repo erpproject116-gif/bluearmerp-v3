@@ -800,14 +800,19 @@ func consumeWoIssueTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locatio
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
 		var unitIDs []int64
 		for rows.Next() {
 			var id int64
 			if err := rows.Scan(&id); err != nil {
+				rows.Close()
 				return err
 			}
 			unitIDs = append(unitIDs, id)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
 		}
 		if len(unitIDs) < needCount {
 			return fmt.Errorf("staged serial count %d is less than required %d", len(unitIDs), needCount)
@@ -861,18 +866,30 @@ func consumeWoIssueTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locatio
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-	remaining := needQty
+	type stagedIssueLot struct {
+		lotID int64
+		qty   float64
+	}
+	var stagedLots []stagedIssueLot
 	for rows.Next() {
+		var ln stagedIssueLot
+		if err := rows.Scan(&ln.lotID, &ln.qty); err != nil {
+			rows.Close()
+			return err
+		}
+		stagedLots = append(stagedLots, ln)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	remaining := needQty
+	for _, ln := range stagedLots {
 		if remaining <= 0.0001 {
 			break
 		}
-		var lotID int64
-		var qty float64
-		if err := rows.Scan(&lotID, &qty); err != nil {
-			return err
-		}
-		take := qty
+		take := ln.qty
 		if take > remaining {
 			take = remaining
 		}
@@ -880,13 +897,13 @@ func consumeWoIssueTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locatio
 			update public.inv_lot_batches
 			set qty_on_hand = qty_on_hand - $1, updated_at = now()
 			where id = $2 and tenant_id = $3 and location_id = $4 and qty_on_hand >= $1`,
-			take, lotID, tenantID, locationID)
+			take, ln.lotID, tenantID, locationID)
 		if err != nil || tag.RowsAffected() == 0 {
-			return fmt.Errorf("failed to consume lot batch %d", lotID)
+			return fmt.Errorf("failed to consume lot batch %d", ln.lotID)
 		}
 		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
 			TenantID:        tenantID,
-			LotBatchID:      lotID,
+			LotBatchID:      ln.lotID,
 			EventType:       "consumed",
 			FromLocationID:  &locationID,
 			Qty:             take,
@@ -927,7 +944,6 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
 		type stagedSerial struct {
 			id       int64
 			serialNo string
@@ -936,9 +952,15 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 		for rows.Next() {
 			var s stagedSerial
 			if err := rows.Scan(&s.id, &s.serialNo); err != nil {
+				rows.Close()
 				return err
 			}
 			staged = append(staged, s)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
 		}
 		if len(staged) < needCount {
 			return fmt.Errorf("staged output serial count %d is less than required %d", len(staged), needCount)
@@ -1005,23 +1027,35 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 	if err != nil {
 		return fmt.Errorf("failed to list staged output lots: %w", err)
 	}
-	defer rows.Close()
-	remaining := outputQty
+	type stagedOutputLot struct {
+		id      int64
+		lotNo   string
+		lineQty float64
+		expiry  *time.Time
+	}
+	var stagedLots []stagedOutputLot
 	for rows.Next() {
-		var rowID int64
-		var lotNo string
-		var lineQty float64
-		var expiry *time.Time
-		if err := rows.Scan(&rowID, &lotNo, &lineQty, &expiry); err != nil {
+		var ln stagedOutputLot
+		if err := rows.Scan(&ln.id, &ln.lotNo, &ln.lineQty, &ln.expiry); err != nil {
+			rows.Close()
 			return fmt.Errorf("failed to scan staged output lot: %w", err)
 		}
+		stagedLots = append(stagedLots, ln)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return fmt.Errorf("failed reading staged output lots: %w", err)
+	}
+	remaining := outputQty
+	for _, ln := range stagedLots {
 		if remaining <= 0.0001 {
-			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'void' where id = $1`, rowID); err != nil {
+			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'void' where id = $1`, ln.id); err != nil {
 				return fmt.Errorf("failed to void extra staged lot: %w", err)
 			}
 			continue
 		}
-		take := lineQty
+		take := ln.lineQty
 		if take > remaining {
 			take = remaining
 		}
@@ -1036,9 +1070,9 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 			  expiry_date = coalesce(excluded.expiry_date, inv_lot_batches.expiry_date),
 			  updated_at = now()
 			returning id`,
-			tenantID, itemID, lotNo, locationID, take, expiry).Scan(&lotBatchID)
+			tenantID, itemID, ln.lotNo, locationID, take, ln.expiry).Scan(&lotBatchID)
 		if err != nil {
-			return fmt.Errorf("failed to post finished lot %s: %w", lotNo, err)
+			return fmt.Errorf("failed to post finished lot %s: %w", ln.lotNo, err)
 		}
 		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
 			TenantID:        tenantID,
@@ -1055,14 +1089,11 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, take, userID, "mfg_work_order", woID, "wo_trace_receipt"); err != nil {
 			return fmt.Errorf("failed to receive finished lot stock: %w", err)
 		}
-		_, err = tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'posted' where id = $1`, rowID)
+		_, err = tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'posted' where id = $1`, ln.id)
 		if err != nil {
 			return fmt.Errorf("failed to mark finished lot posted: %w", err)
 		}
 		remaining -= take
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("failed reading staged output lots: %w", err)
 	}
 	if remaining > 0.0001 {
 		return fmt.Errorf("staged output lot qty could not cover required %.4f", outputQty)
