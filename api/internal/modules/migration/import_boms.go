@@ -77,8 +77,8 @@ func mappedBomsHandler(pool *pgxpool.Pool, forcePreview bool) http.HandlerFunc {
 				continue
 			}
 			bomType := normalizeImportBomType(row["bom_type"])
-			if bomType != "assembly" && bomType != "disassembly" {
-				failRow(&result, rowNum, "bom_type must be assembly or disassembly")
+			if bomType != "assembly" && bomType != "disassembly" && bomType != "recipe" {
+				failRow(&result, rowNum, "bom_type must be assembly, disassembly, or recipe")
 				continue
 			}
 			qty := parseFloatDefault(row["qty"], 0)
@@ -260,6 +260,8 @@ func normalizeImportBomType(v string) string {
 	switch strings.TrimSpace(strings.ToLower(v)) {
 	case "disassembly":
 		return "disassembly"
+	case "recipe", "process", "processing":
+		return "recipe"
 	case "", "assembly":
 		return "assembly"
 	default:

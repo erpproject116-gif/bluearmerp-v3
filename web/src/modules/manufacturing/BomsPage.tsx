@@ -30,6 +30,7 @@ type BomLine = {
   /** Textbox value; parsed safely for stock math (blank/invalid → 0). */
   scrap_input?: string;
   scrap_qty?: number;
+  output_classification?: string;
   stock_qty_preview?: number;
   base_unit_id?: number;
   base_unit_code?: string;
@@ -147,7 +148,16 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 }
 
 function emptyLine(): BomLine {
-  return { line_no: 1, component_item_id: 0, qty: 1, scrap_input: "", unit_id: null, unit_cost: 0, line_total: 0 };
+  return {
+    line_no: 1,
+    component_item_id: 0,
+    qty: 1,
+    scrap_input: "",
+    unit_id: null,
+    unit_cost: 0,
+    line_total: 0,
+    output_classification: "finished",
+  };
 }
 
 export default function BomsPage() {
@@ -191,8 +201,11 @@ export default function BomsPage() {
   const toast = useToast();
   const client = useQueryClient();
 
-  const isAssembly = () => mode === "assembly";
-  const showScrapColumn = () => copy.showScrap && (!isAssembly() || advancedOpen());
+  const isAssemblyLike = () => mode === "assembly" || mode === "recipe" || mode === "all";
+  const isCutting = () => mode === "disassembly";
+  const showScrapColumn = () => copy.showScrap && (!isAssemblyLike() || advancedOpen() || mode === "recipe");
+  // Keep legacy name used in JSX
+  const isAssembly = isAssemblyLike;
 
   const costEstimates = createMemo(() => {
     const materials = lines().reduce((sum, ln) => {
@@ -219,7 +232,7 @@ export default function BomsPage() {
     });
     if (q()) qs.set("q", q());
     if (statusFilter()) qs.set("status", statusFilter());
-    qs.set("bom_type", mode);
+    qs.set("bom_type", mode === "all" ? "assembly" : mode);
     return {
       queryKey: ["mfg-boms", mode, page(), pageSize, sort(), order(), q(), statusFilter()],
       queryFn: async () => {
@@ -273,9 +286,12 @@ export default function BomsPage() {
       return;
     }
     const detail = res.data;
-    const detailType = detail.bom_type === "disassembly" ? "disassembly" : "assembly";
-    if (detailType !== mode) {
-      mfgWarn(null, `This recipe is for ${detailType === "disassembly" ? "Disassembly" : "Assembly"}. Opening in the correct section.`);
+    const detailType =
+      detail.bom_type === "disassembly" ? "disassembly" : detail.bom_type === "recipe" ? "recipe" : "assembly";
+    if (detailType !== mode && mode !== "all") {
+      const label =
+        detailType === "disassembly" ? "Cutting" : detailType === "recipe" ? "Recipe / Processing" : "Assembly";
+      mfgWarn(null, `This recipe is for ${label}. Opening in the correct section.`);
       navigate(recipesHref(detailType));
       return;
     }
@@ -333,7 +349,7 @@ export default function BomsPage() {
       direct_labor_cost: directLaborCost(),
       inbound_freight_cost: inboundFreightCost(),
       additional_cost_type: additionalCostType(),
-      bom_type: mode,
+      bom_type: mode === "all" ? "assembly" : mode,
       notes: notes(),
       lines: lines(),
       line_labels: lineLabels(),
@@ -388,6 +404,7 @@ export default function BomsPage() {
         qty: Number(ln.qty),
         unit_id: ln.unit_id || null,
         scrap_qty: copy.showScrap ? lineScrapQty(ln) : 0,
+        output_classification: !isAssembly() ? ln.output_classification || "finished" : undefined,
       }));
     if (bodyLines.length === 0) {
       errs.lines =
@@ -408,18 +425,20 @@ export default function BomsPage() {
       output_qty: Number(outputQty()) || 1,
       output_unit_id: outputUnitId(),
       yield_pct: Number(yieldPct()) || 100,
-      bom_type: mode,
+      bom_type: mode === "all" ? "assembly" : mode,
       is_active: isActive(),
       notes: notes().trim() || null,
       lines: bodyLines,
     };
-    if (isAssembly()) {
+    if (isAssemblyLike()) {
       payload.bom_code = ed ? bomCode().trim() : "";
       payload.direct_labor_cost = parseQtyInput(directLaborCost());
       payload.inbound_freight_cost = parseQtyInput(inboundFreightCost());
       payload.additional_cost_type = additionalCostType().trim() || null;
     } else {
       payload.bom_code = bomCode().trim();
+    }
+    if (isCutting() || mode === "recipe") {
       const minRaw = expectedYieldMin().trim();
       const maxRaw = expectedYieldMax().trim();
       payload.expected_yield_pct_min = minRaw ? Number(minRaw) : null;
@@ -671,7 +690,7 @@ export default function BomsPage() {
                 </select>
               </Field>
             </Show>
-            <Show when={mode === "disassembly"}>
+            <Show when={isCutting() || mode === "recipe"}>
               <Field label={copy.expectedYieldMinLabel} description={copy.expectedYieldMinDescription}>
                 <input class={inputClass} type="text" inputMode="decimal" value={expectedYieldMin()} onInput={(e) => setExpectedYieldMin(e.currentTarget.value)} />
               </Field>
@@ -681,7 +700,7 @@ export default function BomsPage() {
             </Show>
           </div>
         </details>
-        <Show when={mode === "disassembly"}>
+        <Show when={isCutting()}>
           <p class="col-span-full text-xs text-text-secondary">
             Tip: turn on lot tracking for parts if you want lot numbers when you record them. Plain qty parts still work.
           </p>
@@ -699,8 +718,8 @@ export default function BomsPage() {
                         ? "sm:grid-cols-[4.5rem_minmax(0,1.1fr)_4.5rem_minmax(7rem,0.75fr)_5rem_5rem_5.5rem_auto]"
                         : "sm:grid-cols-[4.5rem_minmax(0,1.1fr)_4.5rem_minmax(7rem,0.75fr)_5rem_5rem_auto]"
                       : showScrapColumn()
-                        ? "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_5.5rem_auto]"
-                        : "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_auto]"
+                        ? "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_7rem_5.5rem_auto]"
+                        : "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_7rem_auto]"
                   }`}
                 >
                   <Show when={isAssembly()}>
@@ -791,6 +810,28 @@ export default function BomsPage() {
                       }}
                     />
                   </label>
+                  <Show when={!isAssembly()}>
+                    <label class="text-sm">
+                      <span class="text-text-secondary">Class</span>
+                      <select
+                        class={`${inputClass} mt-1`}
+                        value={ln.output_classification || "finished"}
+                        onChange={(e) =>
+                          setLines((prev) =>
+                            prev.map((row, i) =>
+                              i === idx() ? { ...row, output_classification: e.currentTarget.value } : row,
+                            ),
+                          )
+                        }
+                        aria-label={`Output classification line ${idx() + 1}`}
+                      >
+                        <option value="finished">Finished</option>
+                        <option value="byproduct">By-product</option>
+                        <option value="rework">Rework</option>
+                        <option value="waste">Waste</option>
+                      </select>
+                    </label>
+                  </Show>
                   <UnitLookupCombo
                     label="UoM"
                     selectedId={() => ln.unit_id ?? null}

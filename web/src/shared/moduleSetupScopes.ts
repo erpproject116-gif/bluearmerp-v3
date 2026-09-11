@@ -12,6 +12,8 @@ export type ModuleSetupScope = {
   showBudgetControl?: boolean;
   /** Optional deep link to turn related modules on/off. */
   modulesHref?: string;
+  /** Optional extra setup links (e.g. waste reasons). */
+  extraLinks?: { label: string; href: string }[];
 };
 
 export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
@@ -146,9 +148,10 @@ export const MODULE_SETUP_SCOPES: Record<string, ModuleSetupScope> = {
     id: "production",
     title: "Production setup",
     blurb:
-      "Finished-goods QC and optional sales-release bridge. Turn off Manufacturing under Modules & Features if you only trade finished goods.",
+      "Finished-goods QC, sales-release bridge, and Cutting waste reasons. Turn off Manufacturing under Modules & Features if you only trade finished goods.",
     policyKeys: ["manufacturing_require_fg_qc", "sales_count_completed_wo_toward_release"],
     modulesHref: "/app/user-management/tenant-modules",
+    extraLinks: [{ label: "Waste reasons", href: "/app/production/waste-reasons" }],
   },
 };
 

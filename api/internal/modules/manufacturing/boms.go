@@ -22,20 +22,21 @@ import (
 )
 
 type BomLine struct {
-	ID              int64   `json:"id,omitempty"`
-	LineNo          int     `json:"line_no"`
-	ComponentItemID int64   `json:"component_item_id"`
-	ComponentCode   string  `json:"component_code,omitempty"`
-	ComponentName   string  `json:"component_name,omitempty"`
-	Qty             float64 `json:"qty"`
-	UnitID          *int64  `json:"unit_id,omitempty"`
-	UnitCode        string  `json:"unit_code,omitempty"`
-	ScrapQty        float64 `json:"scrap_qty"`
-	BaseUnitID      int64   `json:"base_unit_id,omitempty"`
-	BaseUnitCode    string  `json:"base_unit_code,omitempty"`
-	StockQtyPreview float64 `json:"stock_qty_preview,omitempty"`
-	UnitCost        float64 `json:"unit_cost,omitempty"`
-	LineTotal       float64 `json:"line_total,omitempty"`
+	ID                   int64   `json:"id,omitempty"`
+	LineNo               int     `json:"line_no"`
+	ComponentItemID      int64   `json:"component_item_id"`
+	ComponentCode        string  `json:"component_code,omitempty"`
+	ComponentName        string  `json:"component_name,omitempty"`
+	Qty                  float64 `json:"qty"`
+	UnitID               *int64  `json:"unit_id,omitempty"`
+	UnitCode             string  `json:"unit_code,omitempty"`
+	ScrapQty             float64 `json:"scrap_qty"`
+	OutputClassification string  `json:"output_classification,omitempty"`
+	BaseUnitID           int64   `json:"base_unit_id,omitempty"`
+	BaseUnitCode         string  `json:"base_unit_code,omitempty"`
+	StockQtyPreview      float64 `json:"stock_qty_preview,omitempty"`
+	UnitCost             float64 `json:"unit_cost,omitempty"`
+	LineTotal            float64 `json:"line_total,omitempty"`
 }
 
 type Bom struct {
@@ -86,10 +87,11 @@ type bomBody struct {
 }
 
 type bomLineBody struct {
-	ComponentItemID int64    `json:"component_item_id"`
-	Qty             float64  `json:"qty"`
-	UnitID          *int64   `json:"unit_id"`
-	ScrapQty        *float64 `json:"scrap_qty"`
+	ComponentItemID      int64    `json:"component_item_id"`
+	Qty                  float64  `json:"qty"`
+	UnitID               *int64   `json:"unit_id"`
+	ScrapQty             *float64 `json:"scrap_qty"`
+	OutputClassification *string  `json:"output_classification"`
 }
 
 func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
@@ -457,6 +459,7 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 	lines, err := q.Query(ctx, `
 		select l.id, l.line_no, l.component_item_id, coalesce(i.item_code, ''), coalesce(i.item_name, ''),
 		  l.qty::float8, l.unit_id, coalesce(u.code, ''), coalesce(l.scrap_qty, 0)::float8,
+		  coalesce(nullif(trim(l.output_classification), ''), 'finished'),
 		  coalesce(i.base_unit_id, 0), coalesce(bu.code, coalesce(nullif(trim(i.unit), ''), 'ea')),
 		  coalesce(i.purchase_price, 0)::float8, coalesce(i.standard_costs::text, '{}')
 		from public.mfg_bom_lines l
@@ -476,11 +479,13 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		var stdRaw []byte
 		if err := lines.Scan(
 			&ln.ID, &ln.LineNo, &ln.ComponentItemID, &ln.ComponentCode, &ln.ComponentName,
-			&ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.ScrapQty, &ln.BaseUnitID, &ln.BaseUnitCode,
+			&ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.ScrapQty, &ln.OutputClassification,
+			&ln.BaseUnitID, &ln.BaseUnitCode,
 			&purchase, &stdRaw,
 		); err != nil {
 			return Bom{}, err
 		}
+		ln.OutputClassification = NormalizeOutputClassification(ln.OutputClassification)
 		need := ln.Qty + ln.ScrapQty
 		if ln.UnitID != nil && ln.BaseUnitID > 0 {
 			if stock, err := inventory.ConvertQty(ctx, q, tenantID, *ln.UnitID, ln.BaseUnitID, need); err == nil {
@@ -661,15 +666,19 @@ func replaceBomLines(ctx context.Context, tx pgx.Tx, tenantID, bomID int64, line
 			scrapQty = *ln.ScrapQty
 		}
 		needQty += scrapQty
+		class := OutputClassFinished
+		if ln.OutputClassification != nil {
+			class = NormalizeOutputClassification(*ln.OutputClassification)
+		}
 		if unitID != nil && baseUnitID > 0 && *unitID != baseUnitID {
 			if _, err := inventory.ConvertQty(ctx, tx, tenantID, *unitID, baseUnitID, needQty); err != nil {
 				return fmt.Errorf("%s: %w", itemCode, err)
 			}
 		}
 		if _, err := tx.Exec(ctx, `
-			insert into public.mfg_bom_lines (bom_id, line_no, component_item_id, qty, unit_id, scrap_qty)
-			values ($1,$2,$3,$4,$5,$6)`,
-			bomID, i+1, ln.ComponentItemID, ln.Qty, unitID, scrapQty); err != nil {
+			insert into public.mfg_bom_lines (bom_id, line_no, component_item_id, qty, unit_id, scrap_qty, output_classification)
+			values ($1,$2,$3,$4,$5,$6,$7)`,
+			bomID, i+1, ln.ComponentItemID, ln.Qty, unitID, scrapQty, class); err != nil {
 			return err
 		}
 	}
@@ -722,6 +731,8 @@ func normalizeBomType(v string) string {
 	switch strings.TrimSpace(strings.ToLower(v)) {
 	case "disassembly":
 		return "disassembly"
+	case "recipe", "process", "processing":
+		return "recipe"
 	default:
 		return "assembly"
 	}
@@ -734,6 +745,8 @@ func parseBomTypeListFilter(raw string) string {
 		return "assembly"
 	case "disassembly":
 		return "disassembly"
+	case "recipe", "process", "processing":
+		return "recipe"
 	default:
 		return ""
 	}

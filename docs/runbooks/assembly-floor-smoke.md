@@ -24,7 +24,11 @@ Manual checks after deploying migration `289_mfg_bom_cost_and_assembly_code.sql`
 1. Progress: Recipe (`bom_code`) + Source SO columns populated when linked.
 2. Stock movements: Source SO when WO linked.
 
-## 4. QC policy (optional)
+## 5. Manufacturing dashboard + 3-step Assembly order (PDF Phase 1)
 
-1. Turn on `manufacturing_require_fg_qc` → new jobs pending; Pass appears when needed.
-2. Turn off → Quality column gone again.
+1. Open Manufacturing → Dashboard: KPIs, type cards, recent orders, shortages load from API.
+2. Assembly card → 3-step wizard: Save draft with shortage allowed; Assemble & Post blocked when short.
+3. Plain FG (no serial): Assemble & Post completes and updates stock.
+4. Serial/lot FG or parts: Assemble & Post starts job and opens Take materials / Record finished.
+5. Cutting card → Disassembly jobs; Recipe card → Coming soon.
+6. Sidebar shows Manufacturing with Dashboard / All Production / Assembly / Cutting / Recipe / QC / History / Reports / Setup.

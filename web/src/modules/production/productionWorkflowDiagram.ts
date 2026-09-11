@@ -153,8 +153,8 @@ const ASSEMBLY_FLOW: ProductionFlow = {
 
 const DISASSEMBLY_FLOW: ProductionFlow = {
   mode: "disassembly",
-  title: "Disassembly",
-  tagline: "Take one item apart into sellable parts.",
+  title: "Cutting / Breakdown",
+  tagline: "One raw material into multiple outputs.",
   steps: [
     {
       id: "sales_order",
@@ -247,7 +247,7 @@ const DISASSEMBLY_FLOW: ProductionFlow = {
   ],
 };
 
-export const PRODUCTION_FLOWS: Record<MfgMode, ProductionFlow> = {
+export const PRODUCTION_FLOWS: Record<"assembly" | "disassembly", ProductionFlow> = {
   assembly: ASSEMBLY_FLOW,
   disassembly: DISASSEMBLY_FLOW,
 };

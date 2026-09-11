@@ -9,12 +9,18 @@ import (
 
 func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/manufacturing", func(mr chi.Router) {
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/dashboard", getManufacturingDashboard(pool))
+
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessRead)).Get("/boms", listBoms(pool))
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessRead)).Get("/boms/{id}", getBom(pool))
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Post("/boms", createBom(pool))
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Patch("/boms/{id}", updateBom(pool))
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Delete("/boms/{id}", deleteBom(pool))
 		mr.With(auth.RequirePermission("manufacturing.boms_bulk", auth.AccessWrite)).Post("/boms/actions/bulk-deactivate", bulkDeactivateBoms(pool))
+
+		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessRead)).Get("/waste-reasons", listWasteReasons(pool))
+		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Post("/waste-reasons", createWasteReason(pool))
+		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Patch("/waste-reasons/{id}", updateWasteReason(pool))
 
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/sales-order-lines/open", listOpenSalesOrderSlipLinesForWO(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/open-sales-order-lines", listOpenSalesOrderLinesForWO(pool))
@@ -40,5 +46,6 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/progress", listWorkOrderProgressReport(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/stock-movements", listWorkOrderStockMovementsReport(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/disassembly-yield", listDisassemblyYieldReport(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/waste-variance", listWasteVarianceReport(pool))
 	})
 }

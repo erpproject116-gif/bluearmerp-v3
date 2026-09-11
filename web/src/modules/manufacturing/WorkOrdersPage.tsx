@@ -15,7 +15,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useProcessPolicy } from "../../shared/useProcessPolicy";
 import { useProductionMode } from "../production/ProductionModeLayout";
-import { jobsHref, type MfgMode } from "../production/mfgProductionMode";
+import { jobsHref, newAssemblyOrderHref, newCuttingOrderHref, newRecipeOrderHref, bomTypeForMode, type MfgMode } from "../production/mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "../production/mfgToast";
 import { CompleteWorkOrderModal } from "./CompleteWorkOrderModal";
 import {
@@ -137,14 +137,14 @@ const ASSEMBLY_STATUS_TABS = [
 
 export default function WorkOrdersPage() {
   const { mode, copy } = useProductionMode();
-  const isAssembly = () => mode === "assembly";
+  const isAssembly = () => mode === "assembly" || mode === "recipe" || mode === "all";
   const auth = useAuth();
   const [searchParams] = useSearchParams();
   const canRelease = () => hasPermission(auth.me, "manufacturing.work_orders_release", "write");
   const canBulkWo = () => hasPermission(auth.me, "manufacturing.work_orders_bulk", "write");
   const canComplete = () => hasPermission(auth.me, "manufacturing.work_orders_complete", "write");
   const canInspect = () => hasPermission(auth.me, "quality.wo_inspection", "write");
-  const processPolicy = useProcessPolicy(() => isAssembly());
+  const processPolicy = useProcessPolicy(() => mode === "assembly" || mode === "recipe");
   const requireFgQc = () => Boolean(processPolicy.data?.manufacturing_require_fg_qc);
 
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
@@ -206,7 +206,8 @@ export default function WorkOrdersPage() {
     });
     if (q()) qs.set("q", q());
     if (apiStatus) qs.set("status", apiStatus);
-    qs.set("bom_type", mode);
+    const bomType = bomTypeForMode(mode);
+    if (bomType) qs.set("bom_type", bomType);
     return {
       queryKey: ["mfg-work-orders", mode, page(), pageSize, sort(), order(), q(), statusFilter()],
       queryFn: async () => {
@@ -234,6 +235,18 @@ export default function WorkOrdersPage() {
   };
 
   const openNew = () => {
+    if (mode === "assembly" || mode === "all") {
+      window.location.assign(newAssemblyOrderHref());
+      return;
+    }
+    if (mode === "recipe") {
+      window.location.assign(newRecipeOrderHref());
+      return;
+    }
+    if (mode === "disassembly") {
+      window.location.assign(newCuttingOrderHref());
+      return;
+    }
     setEditing(null);
     setBomId(null);
     setBomLabel("");
@@ -470,7 +483,8 @@ export default function WorkOrdersPage() {
 
   const stationQuery = (woId: number) => `?woId=${woId}&mode=${mode}`;
 
-  const woType = (r: WorkOrder) => (r.bom_type === "disassembly" ? "disassembly" : "assembly") as MfgMode;
+  const woType = (r: WorkOrder) =>
+    (r.bom_type === "disassembly" ? "disassembly" : r.bom_type === "recipe" ? "recipe" : "assembly") as MfgMode;
 
   const openFinish = (r: WorkOrder) => {
     if (requireFgQc() && qcBlocked(r)) {

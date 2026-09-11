@@ -4,7 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { defaultReportDateRange, ReportPageLayout } from "../../shared/reports/ReportPageLayout";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 
-type ReportTab = "work-order-status" | "progress" | "stock-movements" | "disassembly-yield";
+type ReportTab = "work-order-status" | "progress" | "stock-movements" | "disassembly-yield" | "waste-variance";
 
 type WoStatusRow = {
   work_order_id: number;
@@ -60,11 +60,30 @@ type YieldRow = {
   bom_code: string;
   component_code: string;
   component_name: string;
+  output_classification?: string;
   planned_qty: number;
   actual_qty: number;
   variance_qty: number;
   actual_input_qty: number;
   qty_to_produce: number;
+  band_status?: string;
+};
+
+type WasteVarianceRow = {
+  work_order_id: number;
+  work_order_no: string;
+  bom_code: string;
+  component_code?: string;
+  component_name?: string;
+  classification: string;
+  expected_qty: number;
+  actual_qty: number;
+  excess_qty: number;
+  waste_reason_code?: string;
+  waste_reason_name?: string;
+  is_abnormal: boolean;
+  notes?: string;
+  order_date: string;
 };
 
 type DateFilters = { date_from: string; date_to: string; status?: string; work_order_id?: number; bom_type?: string };
@@ -73,7 +92,8 @@ const TAB_LABELS: Record<ReportTab, string> = {
   "work-order-status": "Job status",
   progress: "Progress",
   "stock-movements": "Stock movements",
-  "disassembly-yield": "Disassembly yield",
+  "disassembly-yield": "Cutting yield",
+  "waste-variance": "Waste & variance",
 };
 
 function reportPath(tab: ReportTab): string {
@@ -86,6 +106,8 @@ function reportPath(tab: ReportTab): string {
       return "/api/v1/manufacturing/reports/stock-movements";
     case "disassembly-yield":
       return "/api/v1/manufacturing/reports/disassembly-yield";
+    case "waste-variance":
+      return "/api/v1/manufacturing/reports/waste-variance";
   }
 }
 
@@ -146,7 +168,7 @@ export default function ProductionReportsPage() {
   return (
     <>
       <div class="mb-4 flex flex-wrap gap-2">
-        <For each={(["work-order-status", "progress", "stock-movements", "disassembly-yield"] as ReportTab[])}>
+        <For each={(["work-order-status", "progress", "stock-movements", "disassembly-yield", "waste-variance"] as ReportTab[])}>
           {(t) => (
             <button
               type="button"
@@ -193,7 +215,8 @@ export default function ProductionReportsPage() {
                 >
                   <option value="">All</option>
                   <option value="assembly">Assembly</option>
-                  <option value="disassembly">Disassembly</option>
+                  <option value="disassembly">Cutting</option>
+                  <option value="recipe">Recipe</option>
                 </select>
               </Field>
             </Show>
@@ -260,7 +283,13 @@ export default function ProductionReportsPage() {
                     <td class="px-3 py-2">
                       <a
                         class="text-brand-700 underline-offset-2 hover:underline"
-                        href={`/app/production/${row.bom_type === "disassembly" ? "disassembly" : "assembly"}/jobs?status=${encodeURIComponent(row.status)}`}
+                        href={`/app/production/${
+                          row.bom_type === "disassembly"
+                            ? "disassembly"
+                            : row.bom_type === "recipe"
+                              ? "recipe"
+                              : "assembly"
+                        }/jobs?status=${encodeURIComponent(row.status)}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {row.work_order_no}
@@ -269,7 +298,13 @@ export default function ProductionReportsPage() {
                     <td class="px-3 py-2">{row.order_date?.slice(0, 10)}</td>
                     <td class="px-3 py-2 capitalize">{row.status.replace(/_/g, " ")}</td>
                     <td class="px-3 py-2 capitalize">{row.inspection_status.replace(/_/g, " ")}</td>
-                    <td class="px-3 py-2 capitalize">{row.bom_type === "disassembly" ? "Disassembly" : "Assembly"}</td>
+                    <td class="px-3 py-2 capitalize">
+                      {row.bom_type === "disassembly"
+                        ? "Cutting"
+                        : row.bom_type === "recipe"
+                          ? "Recipe"
+                          : "Assembly"}
+                    </td>
                     <td class="px-3 py-2">{row.bom_code}</td>
                     <td class="px-3 py-2">{row.finished_item_code} — {row.finished_item_name}</td>
                     <td class="px-3 py-2">{row.location_name}</td>
@@ -360,11 +395,13 @@ export default function ProductionReportsPage() {
             <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
               <tr>
                 <th class="px-3 py-2">Job no.</th>
-                <th class="px-3 py-2">Recipe</th>
+                <th class="px-3 py-2">Template</th>
                 <th class="px-3 py-2">Cut SKU</th>
-                <th class="px-3 py-2 text-right">Planned kg</th>
-                <th class="px-3 py-2 text-right">Actual kg</th>
+                <th class="px-3 py-2">Class</th>
+                <th class="px-3 py-2 text-right">Planned</th>
+                <th class="px-3 py-2 text-right">Actual</th>
                 <th class="px-3 py-2 text-right">Variance</th>
+                <th class="px-3 py-2">Yield band</th>
                 <th class="px-3 py-2 text-right">Actual input</th>
               </tr>
             </thead>
@@ -375,10 +412,53 @@ export default function ProductionReportsPage() {
                     <td class="px-3 py-2">{row.work_order_no}</td>
                     <td class="px-3 py-2">{row.bom_code}</td>
                     <td class="px-3 py-2">{row.component_code} — {row.component_name}</td>
+                    <td class="px-3 py-2">{row.output_classification ?? "finished"}</td>
                     <td class="px-3 py-2 text-right">{row.planned_qty.toFixed(4)}</td>
                     <td class="px-3 py-2 text-right">{row.actual_qty.toFixed(4)}</td>
                     <td class="px-3 py-2 text-right">{row.variance_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2">{row.band_status ?? "n/a"}</td>
                     <td class="px-3 py-2 text-right">{row.actual_input_qty.toFixed(4)}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </Show>
+
+        <Show when={tab() === "waste-variance"}>
+          <table class="erp-grid min-w-full text-left text-sm">
+            <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
+              <tr>
+                <th class="px-3 py-2">Date</th>
+                <th class="px-3 py-2">Job no.</th>
+                <th class="px-3 py-2">Template</th>
+                <th class="px-3 py-2">Item</th>
+                <th class="px-3 py-2 text-right">Expected</th>
+                <th class="px-3 py-2 text-right">Actual</th>
+                <th class="px-3 py-2 text-right">Excess</th>
+                <th class="px-3 py-2">Reason</th>
+                <th class="px-3 py-2">Abnormal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={(report.data?.rows ?? []) as WasteVarianceRow[]}>
+                {(row) => (
+                  <tr class="border-t border-stroke/60">
+                    <td class="px-3 py-2">{row.order_date?.slice(0, 10)}</td>
+                    <td class="px-3 py-2">{row.work_order_no}</td>
+                    <td class="px-3 py-2">{row.bom_code}</td>
+                    <td class="px-3 py-2">
+                      {row.component_code ? `${row.component_code} — ${row.component_name}` : "—"}
+                    </td>
+                    <td class="px-3 py-2 text-right">{row.expected_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2 text-right">{row.actual_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2 text-right">{row.excess_qty.toFixed(4)}</td>
+                    <td class="px-3 py-2">
+                      {row.waste_reason_code
+                        ? `${row.waste_reason_code} — ${row.waste_reason_name}`
+                        : "—"}
+                    </td>
+                    <td class="px-3 py-2">{row.is_abnormal ? "Yes" : "No"}</td>
                   </tr>
                 )}
               </For>

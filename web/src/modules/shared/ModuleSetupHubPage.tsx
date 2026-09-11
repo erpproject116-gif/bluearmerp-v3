@@ -345,6 +345,19 @@ export default function ModuleSetupHubPage() {
                   Open Modules &amp; Features →
                 </A>
               </Show>
+              <Show when={(sc().extraLinks?.length ?? 0) > 0}>
+                <ul class="mt-3 space-y-1">
+                  <For each={sc().extraLinks ?? []}>
+                    {(link) => (
+                      <li>
+                        <A href={link.href} class="text-sm font-medium text-brand-600 hover:underline">
+                          {link.label} →
+                        </A>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
               <A
                 href="/app/user-management/process-policies"
                 class="mt-2 block text-xs text-text-secondary hover:underline"

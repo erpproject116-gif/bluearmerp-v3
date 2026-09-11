@@ -344,11 +344,16 @@ type disassemblyYieldRow struct {
 	BomCode          string  `json:"bom_code"`
 	ComponentCode    string  `json:"component_code"`
 	ComponentName    string  `json:"component_name"`
+	Classification   string  `json:"output_classification,omitempty"`
 	PlannedQty       float64 `json:"planned_qty"`
 	ActualQty        float64 `json:"actual_qty"`
 	VarianceQty      float64 `json:"variance_qty"`
 	ActualInputQty   float64 `json:"actual_input_qty"`
 	QtyToProduce     float64 `json:"qty_to_produce"`
+	YieldPct         float64 `json:"yield_pct,omitempty"`
+	ExpectedMinPct   *float64 `json:"expected_yield_pct_min,omitempty"`
+	ExpectedMaxPct   *float64 `json:"expected_yield_pct_max,omitempty"`
+	BandStatus       string  `json:"band_status,omitempty"` // in_band | below_min | above_max | n/a
 }
 
 func listDisassemblyYieldReport(pool *pgxpool.Pool) http.HandlerFunc {
@@ -365,6 +370,7 @@ func listDisassemblyYieldReport(pool *pgxpool.Pool) http.HandlerFunc {
 		q := `
 			select wo.id, wo.work_order_no, b.bom_code,
 			  coalesce(ci.item_code, ''), coalesce(ci.item_name, ''),
+			  coalesce(nullif(trim(bl.output_classification), ''), 'finished'),
 			  (bl.qty * (coalesce(wo.actual_input_qty, wo.qty_to_produce) / nullif(b.output_qty, 0))
 			    / greatest(coalesce(b.yield_pct, 100) / 100.0, 0.0001))::float8 as planned_qty,
 			  coalesce((
@@ -374,6 +380,8 @@ func listDisassemblyYieldReport(pool *pgxpool.Pool) http.HandlerFunc {
 			  ), 0)::float8 as actual_qty,
 			  coalesce(wo.actual_input_qty, wo.qty_to_produce)::float8,
 			  wo.qty_to_produce::float8,
+			  coalesce(b.yield_pct, 100)::float8,
+			  b.expected_yield_pct_min::float8, b.expected_yield_pct_max::float8,
 			  count(*) over()
 			from public.mfg_work_orders wo
 			join public.mfg_boms b on b.id = wo.bom_id and coalesce(b.bom_type, 'assembly') = 'disassembly'
@@ -396,14 +404,104 @@ func listDisassemblyYieldReport(pool *pgxpool.Pool) http.HandlerFunc {
 			var row disassemblyYieldRow
 			if err := rows.Scan(
 				&row.WorkOrderID, &row.WorkOrderNo, &row.BomCode,
-				&row.ComponentCode, &row.ComponentName,
+				&row.ComponentCode, &row.ComponentName, &row.Classification,
 				&row.PlannedQty, &row.ActualQty,
-				&row.ActualInputQty, &row.QtyToProduce, &total,
+				&row.ActualInputQty, &row.QtyToProduce, &row.YieldPct,
+				&row.ExpectedMinPct, &row.ExpectedMaxPct, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read yield report.", "ERR_INTERNAL")
 				return
 			}
 			row.VarianceQty = row.ActualQty - row.PlannedQty
+			row.BandStatus = yieldBandStatus(row.ActualQty, row.PlannedQty, row.ExpectedMinPct, row.ExpectedMaxPct)
+			out = append(out, row)
+		}
+		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}
+
+func yieldBandStatus(actual, planned float64, minPct, maxPct *float64) string {
+	if planned <= 0.0001 {
+		return "n/a"
+	}
+	pct := (actual / planned) * 100
+	if minPct == nil && maxPct == nil {
+		return "n/a"
+	}
+	if minPct != nil && pct+0.0001 < *minPct {
+		return "below_min"
+	}
+	if maxPct != nil && pct-0.0001 > *maxPct {
+		return "above_max"
+	}
+	return "in_band"
+}
+
+type wasteVarianceRow struct {
+	WorkOrderID     int64   `json:"work_order_id"`
+	WorkOrderNo     string  `json:"work_order_no"`
+	BomCode         string  `json:"bom_code"`
+	ComponentCode   string  `json:"component_code,omitempty"`
+	ComponentName   string  `json:"component_name,omitempty"`
+	Classification  string  `json:"classification"`
+	ExpectedQty     float64 `json:"expected_qty"`
+	ActualQty       float64 `json:"actual_qty"`
+	ExcessQty       float64 `json:"excess_qty"`
+	WasteReasonCode string  `json:"waste_reason_code,omitempty"`
+	WasteReasonName string  `json:"waste_reason_name,omitempty"`
+	IsAbnormal      bool    `json:"is_abnormal"`
+	Notes           string  `json:"notes,omitempty"`
+	OrderDate       string  `json:"order_date"`
+}
+
+func listWasteVarianceReport(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		filters, verr := parseWoReportDateRange(r)
+		if len(verr) > 0 {
+			response.Validation(w, verr)
+			return
+		}
+		p := httputil.ParseListParams(r, "work_order_no", map[string]string{"work_order_no": "wo.work_order_no"})
+		offset := httputil.Offset(p)
+		q := `
+			select wo.id, wo.work_order_no, coalesce(b.bom_code, ''),
+			  coalesce(ci.item_code, ''), coalesce(ci.item_name, ''),
+			  wl.classification,
+			  wl.expected_qty::float8, wl.qty::float8,
+			  coalesce(wr.code, ''), coalesce(wr.name, ''), coalesce(wr.is_abnormal, false),
+			  coalesce(wl.notes, ''), wo.order_date::text,
+			  count(*) over()
+			from public.mfg_wo_waste_lines wl
+			join public.mfg_work_orders wo on wo.id = wl.work_order_id and wo.tenant_id = wl.tenant_id
+			left join public.mfg_boms b on b.id = wo.bom_id
+			left join public.inv_items ci on ci.id = wl.component_item_id
+			left join public.mfg_waste_reasons wr on wr.id = wl.waste_reason_id
+			where wl.tenant_id = $1
+			  and wo.order_date >= $2::date and wo.order_date <= $3::date
+			order by wo.order_date desc, wo.work_order_no, wl.id
+			limit $4 offset $5`
+		rows, err := pool.Query(r.Context(), q, tu.TenantID, filters.DateFrom.Format("2006-01-02"), filters.DateTo.Format("2006-01-02"), p.PageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load waste report.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		var out []wasteVarianceRow
+		var total int64
+		for rows.Next() {
+			var row wasteVarianceRow
+			if err := rows.Scan(
+				&row.WorkOrderID, &row.WorkOrderNo, &row.BomCode,
+				&row.ComponentCode, &row.ComponentName, &row.Classification,
+				&row.ExpectedQty, &row.ActualQty,
+				&row.WasteReasonCode, &row.WasteReasonName, &row.IsAbnormal,
+				&row.Notes, &row.OrderDate, &total,
+			); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read waste report.", "ERR_INTERNAL")
+				return
+			}
+			row.ExcessQty = ExcessWasteQty(row.ExpectedQty, row.ActualQty)
 			out = append(out, row)
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)

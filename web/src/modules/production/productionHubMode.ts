@@ -34,7 +34,8 @@ export function readLastMfgMode(): MfgMode {
 
 export function persistLastMfgMode(mode: MfgMode): void {
   try {
-    localStorage.setItem(STORAGE_KEY, mode);
+    const store = mode === "all" ? "assembly" : mode;
+    localStorage.setItem(STORAGE_KEY, store);
   } catch {
     /* ignore */
   }

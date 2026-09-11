@@ -3,34 +3,46 @@ import { HOME_SIDEBAR_AREAS } from "../../shell/ecount-top-nav";
 import { visibleHeaderFeatures } from "../../shell/modules";
 
 describe("production nav", () => {
-  it("sidebar Production links to workflow hub", () => {
+  it("sidebar Manufacturing links to dashboard hub", () => {
     const production = HOME_SIDEBAR_AREAS.find((a) => a.id === "production");
+    expect(production?.label).toBe("Manufacturing");
     expect(production?.href).toBe("/app/production");
   });
 
-  it("sidebar lists Assembly and Disassembly without nested recipe/job links", () => {
+  it("sidebar matches PDF Phase 1 IA", () => {
     const production = HOME_SIDEBAR_AREAS.find((a) => a.id === "production");
     expect(production).toBeTruthy();
-    const assembly = production!.children?.find((c) => c.id === "production_assembly");
-    const disassembly = production!.children?.find((c) => c.id === "production_disassembly");
-    expect(assembly?.href).toBe("/app/production/assembly/jobs");
-    expect(assembly?.children).toBeUndefined();
-    expect(disassembly?.href).toBe("/app/production/disassembly/jobs");
-    expect(disassembly?.children).toBeUndefined();
     expect(production!.children?.map((c) => c.id)).toEqual([
       "production_workflow",
+      "production_all",
       "production_assembly",
       "production_disassembly",
+      "production_recipe",
+      "production_qc",
+      "production_history",
       "production_reports",
       "production_setup",
     ]);
-    const workflow = production!.children?.find((c) => c.id === "production_workflow");
-    expect(workflow?.href).toBe("/app/production");
-    expect(workflow?.label).toBe("Workflow");
+    expect(production!.children?.find((c) => c.id === "production_workflow")?.label).toBe("Dashboard");
+    expect(production!.children?.find((c) => c.id === "production_disassembly")?.label).toBe(
+      "Cutting / Breakdown",
+    );
+    expect(production!.children?.find((c) => c.id === "production_all")?.href).toBe(
+      "/app/production/all/jobs",
+    );
+    expect(production!.children?.find((c) => c.id === "production_recipe")?.href).toBe(
+      "/app/production/recipe/jobs",
+    );
   });
 
   it("does not render duplicate header feature tabs", () => {
-    const mod = { id: "production", label: "Production", href: "/app/production/assembly/jobs", basePath: "/app/production", features: [] };
+    const mod = {
+      id: "production",
+      label: "Production",
+      href: "/app/production/assembly/jobs",
+      basePath: "/app/production",
+      features: [],
+    };
     expect(visibleHeaderFeatures(mod)).toEqual([]);
   });
 });

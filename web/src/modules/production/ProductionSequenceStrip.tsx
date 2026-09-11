@@ -16,10 +16,12 @@ const STEPS = [
 ] as const;
 
 function matchStep(id: string, pathname: string, mode: MfgMode): boolean {
-  if (id === "recipe") return pathname.startsWith(recipesHref(mode));
+  const effective = mode === "all" ? "assembly" : mode;
+  if (id === "recipe") return pathname.startsWith(recipesHref(effective));
   if (id === "job") {
     return (
       pathname.startsWith(jobsHref(mode)) ||
+      pathname.startsWith(jobsHref(effective)) ||
       pathname.startsWith("/app/production/issue-station") ||
       pathname.startsWith("/app/production/receive-station") ||
       pathname.startsWith("/app/production/weigh-parts")

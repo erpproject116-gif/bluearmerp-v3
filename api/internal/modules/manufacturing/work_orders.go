@@ -58,18 +58,19 @@ type WorkOrder struct {
 }
 
 type MaterialNeedLine struct {
-	ComponentItemID int64   `json:"component_item_id"`
-	ComponentCode   string  `json:"component_code"`
-	ComponentName   string  `json:"component_name"`
-	BomQty          float64 `json:"bom_qty"`
-	BomUnitCode     string  `json:"bom_unit_code"`
-	ScrapQty        float64 `json:"scrap_qty"`
-	StockToIssue    float64 `json:"stock_to_issue"`
-	StockUnitCode   string  `json:"stock_unit_code"`
-	QtyOnHand       float64 `json:"qty_on_hand"`
-	Shortage        float64 `json:"shortage"`
-	StagedQty       float64 `json:"staged_qty,omitempty"`
-	TrackLot        bool    `json:"track_lot,omitempty"`
+	ComponentItemID      int64   `json:"component_item_id"`
+	ComponentCode        string  `json:"component_code"`
+	ComponentName        string  `json:"component_name"`
+	BomQty               float64 `json:"bom_qty"`
+	BomUnitCode          string  `json:"bom_unit_code"`
+	ScrapQty             float64 `json:"scrap_qty"`
+	StockToIssue         float64 `json:"stock_to_issue"`
+	StockUnitCode        string  `json:"stock_unit_code"`
+	QtyOnHand            float64 `json:"qty_on_hand"`
+	Shortage             float64 `json:"shortage"`
+	StagedQty            float64 `json:"staged_qty,omitempty"`
+	TrackLot             bool    `json:"track_lot,omitempty"`
+	OutputClassification string  `json:"output_classification,omitempty"`
 }
 
 type MaterialNeeds struct {
@@ -106,6 +107,16 @@ type workOrderCompleteBody struct {
 	QtyProduced     *float64        `json:"qty_produced"`
 	InputLotBatchID *int64          `json:"input_lot_batch_id"`
 	OutputWeighs    []woOutputWeigh `json:"output_weighs"`
+	WasteLines      []woWasteLine   `json:"waste_lines"`
+}
+
+type woWasteLine struct {
+	ComponentItemID *int64   `json:"component_item_id"`
+	Classification  string   `json:"classification"`
+	Qty             float64  `json:"qty"`
+	ExpectedQty     float64  `json:"expected_qty"`
+	WasteReasonID   *int64   `json:"waste_reason_id"`
+	Notes           *string  `json:"notes"`
 }
 
 // woOutputWeigh is a weighed cut/output lot on disassembly complete (overrides scaled BOM qty).
@@ -539,12 +550,12 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load work order.", "ERR_INTERNAL")
 			return
 		}
-		if status != "released" {
-			response.Validation(w, map[string]string{"status": "Only released work orders can be completed."})
-			return
-		}
-		if inspectionStatus != "released" {
-			response.Validation(w, map[string]string{"inspection_status": "Work order must pass FG inspection before completion."})
+		if ok, reason := CanCompleteWorkOrder(status, inspectionStatus); !ok {
+			field := "status"
+			if status == WOStatusReleased {
+				field = "inspection_status"
+			}
+			response.Validation(w, map[string]string{field: reason})
 			return
 		}
 
@@ -562,8 +573,8 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		qtyProduced := wo.QtyToProduce
 		if completeBody.QtyProduced != nil && *completeBody.QtyProduced > 0 {
 			qtyProduced = *completeBody.QtyProduced
-		} else if bomType == "assembly" && completeBody.ActualInputQty != nil && *completeBody.ActualInputQty > 0 {
-			// Assembly Finish dialog posts actual produced as actual_input_qty for compatibility.
+		} else if (bomType == "assembly" || bomType == "recipe") && completeBody.ActualInputQty != nil && *completeBody.ActualInputQty > 0 {
+			// Assembly/Recipe Finish may post actual produced as actual_input_qty for compatibility.
 			qtyProduced = *completeBody.ActualInputQty
 		}
 
@@ -631,6 +642,54 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				if err != nil {
 					response.Validation(w, map[string]string{"stock": err.Error()})
 					return
+				}
+				class := NormalizeOutputClassification(ln.OutputClassification)
+				if !ReceivesStockForClassification(class) {
+					// Waste outputs: record qty, do not add sellable stock.
+					wasteQty := plannedRecv
+					weighs := filterOutputWeighs(completeBody.OutputWeighs, ln.ComponentItemID)
+					if len(weighs) == 0 {
+						weighs, _ = loadStagedComponentOutputWeighs(r.Context(), tx, tu.TenantID, id, ln.ComponentItemID)
+					}
+					if len(weighs) > 0 {
+						wasteQty = 0
+						for _, ow := range weighs {
+							q := ow.Qty
+							if ow.CatchWeight != nil && *ow.CatchWeight > 0 {
+								q = *ow.CatchWeight
+							}
+							wasteQty += q
+						}
+					}
+					compID := ln.ComponentItemID
+					clientCovers := false
+					var reasonID *int64
+					for _, wl := range completeBody.WasteLines {
+						if wl.ComponentItemID != nil && *wl.ComponentItemID == ln.ComponentItemID {
+							clientCovers = true
+							if wl.WasteReasonID != nil && *wl.WasteReasonID > 0 {
+								reasonID = wl.WasteReasonID
+							}
+							break
+						}
+					}
+					if !clientCovers {
+						if msg := ValidateWasteLine(wasteQty, plannedRecv, false, reasonID, true); msg != "" {
+							response.Validation(w, map[string]string{"waste_lines": msg})
+							return
+						}
+						if _, err := tx.Exec(r.Context(), `
+							insert into public.mfg_wo_waste_lines
+							  (tenant_id, work_order_id, component_item_id, classification, qty, expected_qty, waste_reason_id, notes)
+							values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+							tu.TenantID, id, compID, OutputClassWaste, wasteQty, plannedRecv, reasonID,
+							"BOM line classified as waste"); err != nil {
+							response.Err(w, http.StatusInternalServerError, "Failed to record waste line.", "ERR_INTERNAL")
+							return
+						}
+					}
+					_ = markStagedComponentLotsPosted(r.Context(), tx, id, ln.ComponentItemID)
+					continue
 				}
 				compSettings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, ln.ComponentItemID)
 				if err != nil {
@@ -701,6 +760,10 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					cutPostedTotal += recvQty
 					_ = markStagedComponentLotsPosted(r.Context(), tx, id, ln.ComponentItemID)
 				}
+			}
+			if err := persistCompleteWasteLines(r.Context(), tx, tu.TenantID, id, completeBody.WasteLines); err != nil {
+				response.Validation(w, map[string]string{"waste_lines": err.Error()})
+				return
 			}
 			if cutPostedTotal > 0 {
 				qtyProduced = cutPostedTotal
@@ -846,16 +909,17 @@ func buildMaterialNeeds(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 			unitCodeBom = ln.BaseUnitCode
 		}
 		return MaterialNeedLine{
-			ComponentItemID: ln.ComponentItemID,
-			ComponentCode:   ln.ComponentCode,
-			ComponentName:   ln.ComponentName,
-			BomQty:          ln.Qty,
-			BomUnitCode:     unitCodeBom,
-			ScrapQty:        ln.ScrapQty,
-			StockToIssue:    stock,
-			StockUnitCode:   unitCode,
-			QtyOnHand:       onHand,
-			Shortage:        shortage,
+			ComponentItemID:      ln.ComponentItemID,
+			ComponentCode:        ln.ComponentCode,
+			ComponentName:        ln.ComponentName,
+			BomQty:               ln.Qty,
+			BomUnitCode:          unitCodeBom,
+			ScrapQty:             ln.ScrapQty,
+			StockToIssue:         stock,
+			StockUnitCode:        unitCode,
+			QtyOnHand:            onHand,
+			Shortage:             shortage,
+			OutputClassification: NormalizeOutputClassification(ln.OutputClassification),
 		}
 	}
 
@@ -1025,6 +1089,40 @@ func loadStagedComponentOutputWeighs(ctx context.Context, tx pgx.Tx, tenantID, w
 		})
 	}
 	return out, rows.Err()
+}
+
+func persistCompleteWasteLines(ctx context.Context, tx pgx.Tx, tenantID, woID int64, lines []woWasteLine) error {
+	for i, wl := range lines {
+		qty := wl.Qty
+		if qty <= 0.0001 {
+			continue
+		}
+		class := NormalizeOutputClassification(wl.Classification)
+		if class == "" {
+			class = OutputClassWaste
+		}
+		var isAbnormal bool
+		if wl.WasteReasonID != nil && *wl.WasteReasonID > 0 {
+			err := tx.QueryRow(ctx, `
+				select is_abnormal from public.mfg_waste_reasons
+				where id=$1 and tenant_id=$2`, *wl.WasteReasonID, tenantID).Scan(&isAbnormal)
+			if err != nil {
+				return fmt.Errorf("waste_lines[%d]: waste reason not found", i)
+			}
+		}
+		expected := wl.ExpectedQty
+		if msg := ValidateWasteLine(qty, expected, isAbnormal, wl.WasteReasonID, true); msg != "" {
+			return fmt.Errorf("waste_lines[%d]: %s", i, msg)
+		}
+		if _, err := tx.Exec(ctx, `
+			insert into public.mfg_wo_waste_lines
+			  (tenant_id, work_order_id, component_item_id, classification, qty, expected_qty, waste_reason_id, notes)
+			values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+			tenantID, woID, wl.ComponentItemID, class, qty, wl.ExpectedQty, wl.WasteReasonID, wl.Notes); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func markStagedComponentLotsPosted(ctx context.Context, tx pgx.Tx, woID, componentItemID int64) error {

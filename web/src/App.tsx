@@ -357,6 +357,8 @@ import { JobCostingRoute } from "./shared/JobCostingRoute";
 import { ManufacturingRoute } from "./shared/ManufacturingRoute";
 import { ProductionModeLayout } from "./modules/production/ProductionModeLayout";
 import { ProductionHubPage } from "./modules/production/ProductionHubPage";
+import ProductionOrderNewPage from "./modules/manufacturing/ProductionOrderNewPage";
+import WasteReasonsPage from "./modules/manufacturing/WasteReasonsPage";
 import { QualityRoute } from "./shared/QualityRoute";
 import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
 import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
@@ -554,6 +556,15 @@ export default function App() {
           <Route path="/inventory/serial-lot/settings" component={SerialLotSettingsPage} />
           <Route path="/production" component={() => (
             <ManufacturingRoute><ProductionHubPage /></ManufacturingRoute>
+          )} />
+          <Route path="/production/orders/new" component={() => (
+            <ManufacturingRoute><ProductionOrderNewPage /></ManufacturingRoute>
+          )} />
+          <Route path="/production/waste-reasons" component={() => (
+            <ManufacturingRoute><WasteReasonsPage /></ManufacturingRoute>
+          )} />
+          <Route path="/production/recipe-soon" component={() => (
+            <Navigate href="/app/production/orders/new?type=recipe" />
           )} />
           <Route path="/production/:mode/recipes" component={() => (
             <ManufacturingRoute><ProductionModeLayout><BomsPage /></ProductionModeLayout></ManufacturingRoute>

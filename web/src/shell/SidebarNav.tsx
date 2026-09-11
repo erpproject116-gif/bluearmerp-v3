@@ -261,9 +261,19 @@ export function SidebarNav() {
       const norm = p.replace(/\/$/, "");
       return norm === "/app/production";
     }
+    if (area.id === "production_all" || area.id === "production_history") {
+      return pathStarts(p, ["/app/production/all"]);
+    }
+    if (area.id === "production_recipe") {
+      return pathStarts(p, ["/app/production/recipe", "/app/production/orders/new"]);
+    }
+    if (area.id === "production_qc") {
+      return pathStarts(p, ["/app/quality"]);
+    }
     if (area.id === "production_assembly") {
       return (
         pathStarts(p, ["/app/production/assembly"]) ||
+        pathStarts(p, ["/app/production/orders"]) ||
         (pathStarts(p, ["/app/production/issue-station", "/app/production/receive-station"]) &&
           new URLSearchParams(loc.search).get("mode") !== "disassembly")
       );
