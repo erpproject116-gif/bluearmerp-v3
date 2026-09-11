@@ -481,7 +481,10 @@ export default function WorkOrdersPage() {
     invalidate();
   };
 
-  const stationQuery = (woId: number) => `?woId=${woId}&mode=${mode}`;
+  const stationQuery = (woId: number, r?: WorkOrder) => {
+    const m = r ? woType(r) : mode === "all" ? "assembly" : mode;
+    return `?woId=${woId}&mode=${m}`;
+  };
 
   const woType = (r: WorkOrder) =>
     (r.bom_type === "disassembly" ? "disassembly" : r.bom_type === "recipe" ? "recipe" : "assembly") as MfgMode;
@@ -495,8 +498,8 @@ export default function WorkOrdersPage() {
   };
 
   const continueStationHref = (r: WorkOrder): string | null => {
-    if (needsTakeFromStock(r)) return `/app/production/issue-station${stationQuery(r.id)}`;
-    if (needsRecordFinished(r)) return `/app/production/receive-station${stationQuery(r.id)}`;
+    if (needsTakeFromStock(r)) return `/app/production/issue-station${stationQuery(r.id, r)}`;
+    if (needsRecordFinished(r)) return `/app/production/receive-station${stationQuery(r.id, r)}`;
     return null;
   };
 
@@ -629,7 +632,7 @@ export default function WorkOrdersPage() {
               }
             >
               <A
-                href={`/app/production/receive-station${stationQuery(r.id)}`}
+                href={`/app/production/receive-station${stationQuery(r.id, r)}`}
                 class="text-xs font-medium text-brand-600 hover:underline"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -736,7 +739,7 @@ export default function WorkOrdersPage() {
               <Show when={woType(r) === "disassembly"}>
                 <Show when={needsTakeFromStock(r)}>
                   <A
-                    href={`/app/production/issue-station${stationQuery(r.id)}`}
+                    href={`/app/production/issue-station${stationQuery(r.id, r)}`}
                     class="text-xs font-medium text-brand-600 hover:underline"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -744,7 +747,7 @@ export default function WorkOrdersPage() {
                   </A>
                 </Show>
                 <A
-                  href={`/app/production/weigh-parts${stationQuery(r.id)}`}
+                  href={`/app/production/weigh-parts${stationQuery(r.id, r)}`}
                   class="text-xs font-medium text-brand-600 hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -982,8 +985,12 @@ export default function WorkOrdersPage() {
       <CompleteWorkOrderModal
         open={!!completeTarget()}
         workOrder={completeTarget()}
-        mode={mode}
-        releaseFirst={isAssembly()}
+        mode={completeTarget() ? woType(completeTarget()!) : mode === "all" ? "assembly" : mode}
+        releaseFirst={
+          completeTarget()
+            ? woType(completeTarget()!) === "assembly" || woType(completeTarget()!) === "recipe"
+            : isAssembly()
+        }
         onClose={() => setCompleteTarget(null)}
         onCompleted={() => invalidate()}
       />

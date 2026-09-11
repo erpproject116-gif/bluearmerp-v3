@@ -78,8 +78,20 @@ export function CompleteWorkOrderModal(props: {
   /** When true and WO is draft, release then complete (assembly Finish build). */
   releaseFirst?: boolean;
 }) {
-  const copy = () => MFG_COPY[props.mode];
-  const isAssembly = () => props.mode === "assembly";
+  const copy = () => MFG_COPY[effectiveMode()];
+  const effectiveMode = (): Exclude<MfgMode, "all"> => {
+    const bt = props.workOrder?.bom_type;
+    if (bt === "disassembly") return "disassembly";
+    if (bt === "recipe") return "recipe";
+    if (props.mode === "disassembly") return "disassembly";
+    if (props.mode === "recipe") return "recipe";
+    return "assembly";
+  };
+  /** Assembly + Recipe: multi-in → one FG (take materials / record finished gates). */
+  const isAssembly = () => {
+    const m = effectiveMode();
+    return m === "assembly" || m === "recipe";
+  };
   const [actualQty, setActualQty] = createSignal("");
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
   const [scan, setScan] = createSignal<ScanContext | null>(null);
@@ -151,20 +163,21 @@ export function CompleteWorkOrderModal(props: {
 
   const continueHref = (kind: "issue" | "receive" | "auto" = "auto") => {
     const wo = props.workOrder;
-    if (!wo) return jobsHref(props.mode);
+    const m = effectiveMode();
+    if (!wo) return jobsHref(m);
     if (kind === "issue" || (kind === "auto" && takeMaterialsGap())) {
-      return `/app/production/issue-station?woId=${wo.id}&mode=${props.mode}`;
+      return `/app/production/issue-station?woId=${wo.id}&mode=${m}`;
     }
     if (kind === "receive" || (kind === "auto" && recordFinishedGap())) {
-      return `/app/production/receive-station?woId=${wo.id}&mode=${props.mode}`;
+      return `/app/production/receive-station?woId=${wo.id}&mode=${m}`;
     }
     if (wo.components_tracked) {
-      return `/app/production/issue-station?woId=${wo.id}&mode=${props.mode}`;
+      return `/app/production/issue-station?woId=${wo.id}&mode=${m}`;
     }
     if (wo.finished_track_serial || wo.finished_track_lot) {
-      return `/app/production/receive-station?woId=${wo.id}&mode=${props.mode}`;
+      return `/app/production/receive-station?woId=${wo.id}&mode=${m}`;
     }
-    return jobsHref(props.mode);
+    return jobsHref(m);
   };
 
   const redirectAfterRelease = (message: string, kind: "issue" | "receive") => {
@@ -343,14 +356,14 @@ export function CompleteWorkOrderModal(props: {
                 </div>
               )}
             </Show>
-            <Show when={props.mode === "disassembly" && stagedCutTotal() > 0}>
+            <Show when={effectiveMode() === "disassembly" && stagedCutTotal() > 0}>
               <p class="text-sm text-text-secondary">
                 Parts recorded: <strong>{stagedCutTotal().toFixed(4)}</strong> (posted to stock when you Finish)
               </p>
             </Show>
             <Field
               label={
-                props.mode === "disassembly"
+                effectiveMode() === "disassembly"
                   ? `How many wholes you actually used (${unit()}) *`
                   : `Actual produced (${unit()})`
               }
@@ -382,7 +395,7 @@ export function CompleteWorkOrderModal(props: {
                     )}
                   </Show>
                   <p class="text-sm font-medium text-text-primary">
-                    {props.mode === "disassembly" ? copy().materialsOutputLabel : "Materials needed"}
+                    {effectiveMode() === "disassembly" ? copy().materialsOutputLabel : "Materials needed"}
                   </p>
                   <div class="overflow-x-auto rounded border border-stroke">
                     <table class="min-w-full text-left text-xs">
@@ -390,8 +403,8 @@ export function CompleteWorkOrderModal(props: {
                         <tr>
                           <th class="px-2 py-1.5">Item</th>
                           <th class="px-2 py-1.5">Recipe qty</th>
-                          <th class="px-2 py-1.5">{props.mode === "disassembly" ? "Expected" : "To issue"}</th>
-                          <Show when={props.mode === "disassembly"}>
+                          <th class="px-2 py-1.5">{effectiveMode() === "disassembly" ? "Expected" : "To issue"}</th>
+                          <Show when={effectiveMode() === "disassembly"}>
                             <th class="px-2 py-1.5">Parts recorded</th>
                           </Show>
                           <th class="px-2 py-1.5">On hand</th>
@@ -403,13 +416,13 @@ export function CompleteWorkOrderModal(props: {
                             <tr class={ln.shortage > 0 ? "bg-red-50 text-red-800" : ""}>
                               <td class="px-2 py-1.5">
                                 {ln.component_code} — {ln.component_name}
-                                <Show when={props.mode === "disassembly" && ln.track_lot === false}>
+                                <Show when={effectiveMode() === "disassembly" && ln.track_lot === false}>
                                   <span class="ml-1 text-[10px] text-amber-700">(qty, not lot)</span>
                                 </Show>
                               </td>
                               <td class="px-2 py-1.5">{ln.bom_qty} {ln.bom_unit_code}</td>
                               <td class="px-2 py-1.5">{ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}</td>
-                              <Show when={props.mode === "disassembly"}>
+                              <Show when={effectiveMode() === "disassembly"}>
                                 <td class="px-2 py-1.5">{(ln.staged_qty ?? 0).toFixed(4)}</td>
                               </Show>
                               <td class="px-2 py-1.5">
