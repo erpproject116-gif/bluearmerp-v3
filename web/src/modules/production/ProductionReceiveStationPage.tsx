@@ -86,6 +86,22 @@ export default function ProductionReceiveStationPage() {
   const remainingOutputSerials = (ctx: ScanContext) =>
     Math.max(0, Math.round(ctx.qty_to_produce) - (ctx.output_serials || 0));
 
+  const remainingOutputLotQty = (ctx: ScanContext) =>
+    Math.max(0, Number(ctx.qty_to_produce) - (ctx.output_lot_qty || 0));
+
+  /** Suggest one lot line for the remaining finished qty (operator can edit before Record). */
+  const suggestLotPaste = (ctx: ScanContext) => {
+    const need = remainingOutputLotQty(ctx);
+    if (need <= 0) {
+      setLotPaste("");
+      return;
+    }
+    const code = (ctx.finished_item_code || "ITEM").trim() || "ITEM";
+    const day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const qtyStr = Number.isInteger(need) ? String(need) : need.toFixed(4);
+    setLotPaste(`${day}-${code}-001\t${qtyStr}`);
+  };
+
   const autoAllocateSerials = async (ctx: ScanContext, fillPaste: boolean) => {
     if (!ctx.track_serial) return;
     const need = remainingOutputSerials(ctx);
@@ -149,12 +165,16 @@ export default function ProductionReceiveStationPage() {
       setWoLabel(res.data.work_order_no);
     }
     setContext(nextCtx);
-    setLotPaste("");
     setLastResults([]);
     if (nextCtx.track_serial && remainingOutputSerials(nextCtx) > 0) {
+      setLotPaste("");
       await autoAllocateSerials(nextCtx, true);
+    } else if (nextCtx.track_lot && remainingOutputLotQty(nextCtx) > 0) {
+      setSerialPaste("");
+      suggestLotPaste(nextCtx);
     } else {
       setSerialPaste("");
+      setLotPaste("");
     }
   };
 
@@ -228,6 +248,43 @@ export default function ProductionReceiveStationPage() {
     setLastResults(res.data.results ?? []);
     const accepted = (res.data.results ?? []).filter((r) => r.status === "accepted").length;
     mfgSuccess(`Recorded ${accepted} of ${rows.length} lot row(s). Next: Finish the job.`);
+    setLotPaste("");
+    await refreshContext();
+  };
+
+  /** One-click: stage remaining finished qty; API invents lot no. if blank. */
+  const recordRemainingLot = async () => {
+    const id = woId();
+    const ctx = context();
+    if (!id || !ctx?.track_lot) return;
+    const need = remainingOutputLotQty(ctx);
+    if (need <= 0) {
+      mfgWarn(null, "Nothing left to record — go back and Finish build.");
+      return;
+    }
+    setBusy(true);
+    const res = await apiFetch<{ results: BatchLotResult[] }>(
+      `/api/v1/manufacturing/work-orders/${id}/output-lots/batch`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          scans: [{ client_scan_id: newClientScanId(), lot_no: "", qty: need }],
+        }),
+      },
+    );
+    setBusy(false);
+    if (!res.success || !res.data) {
+      mfgWarn(res.message, "Could not record the finished lot. Try again.");
+      return;
+    }
+    setLastResults(res.data.results ?? []);
+    const accepted = (res.data.results ?? []).filter((r) => r.status === "accepted" || r.status === "idempotent_replay");
+    const lotLabel = accepted[0] && "lot_no" in accepted[0] ? accepted[0].lot_no : "";
+    mfgSuccess(
+      lotLabel
+        ? `Recorded lot ${lotLabel} (${need}). Next: Finish the job.`
+        : `Recorded finished lot qty ${need}. Next: Finish the job.`,
+    );
     setLotPaste("");
     await refreshContext();
   };
@@ -330,22 +387,44 @@ export default function ProductionReceiveStationPage() {
               </Show>
 
               <Show when={ctx().track_lot && !ctx().track_serial}>
-                <Field label="Paste lots (lot no. tab qty [tab expiry] [tab catch-weight kg])">
+                <p class="mt-3 text-xs text-text-secondary">
+                  Need {remainingOutputLotQty(ctx()).toFixed(4)} more lot qty. A lot line is filled in for you — confirm,
+                  or use one-click Record remaining.
+                </p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={busy() || remainingOutputLotQty(ctx()) <= 0}
+                    onClick={() => void recordRemainingLot()}
+                  >
+                    Record remaining lot
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-stroke px-2 py-1 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                    disabled={busy() || remainingOutputLotQty(ctx()) <= 0}
+                    onClick={() => suggestLotPaste(ctx())}
+                  >
+                    Refill suggested lot
+                  </button>
+                </div>
+                <Field label="Optional: edit lot (lot no. tab qty [tab expiry] [tab catch-weight kg])">
                   <textarea
                     class={`${inputClass} mt-2`}
-                    rows={5}
-                    placeholder={"LOT-001\t10\t2025-07-01\t9.85\nLOT-002\t5"}
+                    rows={3}
+                    placeholder={"LOT-001\t1"}
                     value={lotPaste()}
                     onInput={(e) => setLotPaste(e.currentTarget.value)}
                   />
                 </Field>
                 <button
                   type="button"
-                  class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  disabled={busy()}
+                  class="mt-3 rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-medium text-brand-800 hover:bg-brand-50 disabled:opacity-50"
+                  disabled={busy() || !lotPaste().trim()}
                   onClick={() => void submitLots()}
                 >
-                  Record lots
+                  Record edited lots
                 </button>
               </Show>
 
