@@ -8,7 +8,6 @@ import { collectRequiredFieldErrors } from "../../shared/handleSaveResult";
 import type { FormErrors } from "../../shared/formValidation";
 import {
   canPostWithShortage,
-  materialNeedsHasShortage,
   normalizeOutputClassification,
   receivesStockForClassification,
   validateWasteLine,
@@ -354,7 +353,7 @@ function NewCuttingOrderWizard() {
         </For>
       </nav>
 
-      <FormErrorSummary errors={fieldErrors()} />
+      <FormErrorSummary errors={fieldErrors} />
 
       <Show when={step() === 1}>
         <section class="grid gap-4 rounded-xl border border-stroke bg-white p-4 md:grid-cols-2">
