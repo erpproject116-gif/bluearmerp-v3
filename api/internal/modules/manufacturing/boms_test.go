@@ -32,16 +32,15 @@ func TestValidateBomBodyAssemblyAllowsEmptyCode(t *testing.T) {
 	}
 }
 
-func TestValidateBomBodyDisassemblyRequiresCode(t *testing.T) {
+func TestValidateBomBodyRecipeAllowsEmptyCode(t *testing.T) {
 	body := bomBody{
-		BomName:        "Cut recipe",
+		BomName:        "Process recipe",
 		FinishedItemID: 1,
-		BomType:        "disassembly",
+		BomType:        "recipe",
 		Lines:          []bomLineBody{{ComponentItemID: 2, Qty: 1}},
 	}
-	errs := validateBomBody(body)
-	if errs == nil || errs["bom_code"] == "" {
-		t.Fatalf("expected bom_code required for disassembly, got %#v", errs)
+	if errs := validateBomBody(body); errs != nil {
+		t.Fatalf("expected no errors for empty recipe code, got %#v", errs)
 	}
 }
 
