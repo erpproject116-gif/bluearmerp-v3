@@ -261,28 +261,34 @@ export function SidebarNav() {
       const norm = p.replace(/\/$/, "");
       return norm === "/app/production";
     }
-    if (area.id === "production_all" || area.id === "production_history") {
+    if (area.id === "production_all") {
       return pathStarts(p, ["/app/production/all"]);
     }
     if (area.id === "production_recipe") {
-      return pathStarts(p, ["/app/production/recipe", "/app/production/orders/new"]);
-    }
-    if (area.id === "production_qc") {
-      return pathStarts(p, ["/app/quality"]);
+      return (
+        pathStarts(p, ["/app/production/recipe"]) ||
+        (pathStarts(p, ["/app/production/orders/new"]) &&
+          new URLSearchParams(loc.search).get("type") === "recipe")
+      );
     }
     if (area.id === "production_assembly") {
+      const orderType = new URLSearchParams(loc.search).get("type");
       return (
         pathStarts(p, ["/app/production/assembly"]) ||
-        pathStarts(p, ["/app/production/orders"]) ||
+        (pathStarts(p, ["/app/production/orders/new"]) &&
+          (!orderType || orderType === "assembly")) ||
         (pathStarts(p, ["/app/production/issue-station", "/app/production/receive-station"]) &&
-          new URLSearchParams(loc.search).get("mode") !== "disassembly")
+          new URLSearchParams(loc.search).get("mode") !== "disassembly" &&
+          new URLSearchParams(loc.search).get("mode") !== "recipe")
       );
     }
     if (area.id === "production_disassembly") {
       return (
         pathStarts(p, ["/app/production/disassembly"]) ||
         pathStarts(p, ["/app/production/weigh-parts"]) ||
-        (pathStarts(p, ["/app/production/receive-station"]) &&
+        (pathStarts(p, ["/app/production/orders/new"]) &&
+          ["cutting", "disassembly"].includes(new URLSearchParams(loc.search).get("type") ?? "")) ||
+        (pathStarts(p, ["/app/production/issue-station", "/app/production/receive-station"]) &&
           new URLSearchParams(loc.search).get("mode") === "disassembly")
       );
     }

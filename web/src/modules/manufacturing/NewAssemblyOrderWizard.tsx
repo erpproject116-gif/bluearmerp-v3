@@ -6,7 +6,6 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import { collectRequiredFieldErrors } from "../../shared/handleSaveResult";
 import type { FormErrors } from "../../shared/formValidation";
-import { useToast } from "../../shared/toast";
 import {
   canPostWithShortage,
   componentStockStatus,
@@ -74,7 +73,6 @@ const STEPS = [
 
 export default function NewAssemblyOrderWizard() {
   const navigate = useNavigate();
-  const toast = useToast();
   const [step, setStep] = createSignal(1);
   const [woId, setWoId] = createSignal<number | null>(null);
   const [woNo, setWoNo] = createSignal("");
@@ -246,8 +244,11 @@ export default function NewAssemblyOrderWizard() {
       navigate(jobsHref("assembly"));
       return;
     }
-    mfgSuccess("Assembled & posted. Stock updated.");
-    toast.success(additionalCost() > 0 ? `Note: extra cost ₱${additionalCost().toLocaleString()} recorded in notes only for now.` : "Done.");
+    mfgSuccess(
+      additionalCost() > 0
+        ? `Assembled & posted. Stock updated. Extra cost ₱${additionalCost().toLocaleString()} noted only for now.`
+        : "Assembled & posted. Stock updated.",
+    );
     navigate(jobsHref("assembly"));
   };
 
@@ -258,8 +259,7 @@ export default function NewAssemblyOrderWizard() {
           <p class="text-xs text-text-secondary">
             <A href="/app/production" class="hover:underline">
               Manufacturing
-            </A>{" "}
-            / New Assembly order
+            </A>
           </p>
           <h1 class="mt-1 text-xl font-semibold">New Assembly order</h1>
           <Show when={woNo()}>

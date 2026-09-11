@@ -15,7 +15,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useProcessPolicy } from "../../shared/useProcessPolicy";
 import { useProductionMode } from "../production/ProductionModeLayout";
-import { jobsHref, newAssemblyOrderHref, newCuttingOrderHref, newRecipeOrderHref, bomTypeForMode, type MfgMode } from "../production/mfgProductionMode";
+import { newAssemblyOrderHref, newCuttingOrderHref, newRecipeOrderHref, bomTypeForMode, type MfgMode } from "../production/mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "../production/mfgToast";
 import { CompleteWorkOrderModal } from "./CompleteWorkOrderModal";
 import {
@@ -794,12 +794,6 @@ export default function WorkOrdersPage() {
 
   return (
     <>
-      <p class="mb-3 text-sm text-text-secondary">
-        <span class="font-medium text-text-primary">{copy.jobTitle}:</span>{" "}
-        {isAssembly()
-          ? "Finish build when ready. Continue only if take-from-stock or record-finished is needed."
-          : "Start a job → take stock if needed → record results → finish. Stock updates when you finish."}
-      </p>
       <SpreadsheetGrid<WorkOrder>
         columns={columns()}
         rows={list.data?.rows ?? []}
@@ -811,7 +805,6 @@ export default function WorkOrdersPage() {
         onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={openNew}
         onEdit={(row) => void openEdit(row)}
-        settingsHref={jobsHref(mode)}
         toolbarExtra={
           <>
             <Show when={canBulkWo()}>

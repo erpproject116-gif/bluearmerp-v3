@@ -9,7 +9,7 @@ describe("production nav", () => {
     expect(production?.href).toBe("/app/production");
   });
 
-  it("sidebar matches PDF Phase 1 IA", () => {
+  it("sidebar stays lean (no History / QC duplicates)", () => {
     const production = HOME_SIDEBAR_AREAS.find((a) => a.id === "production");
     expect(production).toBeTruthy();
     expect(production!.children?.map((c) => c.id)).toEqual([
@@ -18,20 +18,13 @@ describe("production nav", () => {
       "production_assembly",
       "production_disassembly",
       "production_recipe",
-      "production_qc",
-      "production_history",
       "production_reports",
       "production_setup",
     ]);
-    expect(production!.children?.find((c) => c.id === "production_workflow")?.label).toBe("Dashboard");
-    expect(production!.children?.find((c) => c.id === "production_disassembly")?.label).toBe(
-      "Cutting / Breakdown",
-    );
+    expect(production!.children?.find((c) => c.id === "production_disassembly")?.label).toBe("Cutting");
+    expect(production!.children?.find((c) => c.id === "production_recipe")?.label).toBe("Recipe");
     expect(production!.children?.find((c) => c.id === "production_all")?.href).toBe(
       "/app/production/all/jobs",
-    );
-    expect(production!.children?.find((c) => c.id === "production_recipe")?.href).toBe(
-      "/app/production/recipe/jobs",
     );
   });
 

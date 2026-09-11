@@ -313,10 +313,9 @@ function NewCuttingOrderWizard() {
           <p class="text-xs text-text-secondary">
             <A href="/app/production" class="hover:underline">
               Manufacturing
-            </A>{" "}
-            / New Cutting order
+            </A>
           </p>
-          <h1 class="mt-1 text-xl font-semibold">New Cutting / Breakdown order</h1>
+          <h1 class="mt-1 text-xl font-semibold">New Cutting order</h1>
           <Show when={woNo()}>
             <p class="text-xs text-text-secondary">Draft {woNo()}</p>
           </Show>

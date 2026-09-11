@@ -59,7 +59,7 @@ export const MFG_COPY: Record<MfgMode, MfgCopy> = {
     sequenceHint: "Save the recipe, then open Jobs → Start job → take parts if needed → Finish.",
   },
   disassembly: {
-    branchTitle: "Cutting / Breakdown",
+    branchTitle: "Cutting",
     recipeTitle: "Cutting templates",
     jobTitle: "Cutting jobs",
     newRecipeTitle: "New Cutting template",
@@ -87,7 +87,7 @@ export const MFG_COPY: Record<MfgMode, MfgCopy> = {
     sequenceHint: "Save the template, then New Cutting order → enter actuals → Post Production.",
   },
   recipe: {
-    branchTitle: "Recipe / Processing",
+    branchTitle: "Recipe",
     recipeTitle: "Processing recipes",
     jobTitle: "Processing jobs",
     newRecipeTitle: "New Processing recipe",

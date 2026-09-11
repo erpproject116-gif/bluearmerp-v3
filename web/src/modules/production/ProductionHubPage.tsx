@@ -54,26 +54,26 @@ const TYPE_CARDS = [
     title: "Assembly",
     color: "border-blue-200 bg-blue-50 hover:border-blue-400",
     badge: "bg-blue-600",
-    description: "Many components into one finished product.",
-    example: "CPU + RAM + SSD → Desktop PC",
+    description: "Many parts → one finished product",
+    example: "CPU + RAM + SSD → PC",
     href: newAssemblyOrderHref(),
   },
   {
     id: "cutting",
-    title: "Cutting / Breakdown",
+    title: "Cutting",
     color: "border-emerald-200 bg-emerald-50 hover:border-emerald-400",
     badge: "bg-emerald-600",
-    description: "One raw material into multiple products.",
-    example: "Whole Pork → Belly, Kasim, Ribs",
+    description: "One whole → multiple cuts",
+    example: "Whole pork → Belly, Kasim, Ribs",
     href: newCuttingOrderHref(),
   },
   {
     id: "recipe",
-    title: "Recipe / Processing",
+    title: "Recipe",
     color: "border-orange-200 bg-orange-50 hover:border-orange-400",
     badge: "bg-orange-500",
-    description: "Multiple ingredients into finished product(s).",
-    example: "Pork + Spices → Tocino",
+    description: "Ingredients → finished product",
+    example: "Pork + spices → Tocino",
     href: newRecipeOrderHref(),
   },
 ] as const;
@@ -99,52 +99,35 @@ export function ProductionHubPage() {
   });
 
   return (
-    <div class="space-y-6">
-      <header class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 class="text-2xl font-semibold tracking-tight text-text-primary">Manufacturing</h1>
-          <p class="mt-1 text-sm text-text-secondary">Plan. Produce. Track. Grow.</p>
-        </div>
-        <A
-          href={newAssemblyOrderHref()}
-          class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
-        >
-          + New production order
-        </A>
+    <div class="space-y-5">
+      <header>
+        <h1 class="text-2xl font-semibold tracking-tight text-text-primary">Manufacturing</h1>
+        <p class="mt-1 text-sm text-text-secondary">Pick a type to start. Stock moves only when you post.</p>
       </header>
 
       <Show when={dash.error}>
         <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Could not load live dashboard metrics. You can still open Assembly or Cutting jobs.
+          Could not load live metrics. You can still open Assembly, Cutting, or Recipe.
         </p>
       </Show>
 
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Total production today"
-          value={dash()?.kpi.total_production_today?.toLocaleString() ?? "—"}
-          hint="Units completed today"
-        />
-        <KpiCard
-          label="In progress"
-          value={String(dash()?.kpi.in_progress_orders ?? "—")}
-          hint="Started jobs"
-        />
+      <div class="grid gap-3 sm:grid-cols-3">
+        <KpiCard label="In progress" value={String(dash()?.kpi.in_progress_orders ?? "—")} hint="Started jobs" />
         <KpiCard
           label="Completed today"
           value={String(dash()?.kpi.completed_today ?? "—")}
-          hint="Orders finished today"
+          hint={`${dash()?.kpi.total_production_today?.toLocaleString() ?? "—"} units`}
         />
         <KpiCard
-          label="Material shortage"
+          label="Shortages"
           value={String(dash()?.kpi.material_shortage_items ?? "—")}
-          hint="Items short on open jobs"
+          hint="Open jobs short on materials"
           danger={(dash()?.kpi.material_shortage_items ?? 0) > 0}
         />
       </div>
 
       <section>
-        <h2 class="mb-2 text-sm font-semibold text-text-primary">Create new production order</h2>
+        <h2 class="mb-2 text-sm font-semibold text-text-primary">New order</h2>
         <div class="grid gap-3 md:grid-cols-3">
           <For each={[...TYPE_CARDS]}>
             {(card) => (
@@ -152,7 +135,7 @@ export function ProductionHubPage() {
                 type="button"
                 class={`rounded-xl border p-4 text-left transition ${card.color}`}
                 onClick={() => navigate(card.href)}
-                aria-label={card.title}
+                aria-label={`New ${card.title} order`}
               >
                 <span class={`inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white ${card.badge}`}>
                   {card.title}
@@ -168,7 +151,7 @@ export function ProductionHubPage() {
       <div class="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(16rem,1fr)]">
         <section class="rounded-xl border border-stroke bg-white">
           <div class="flex items-center justify-between border-b border-stroke px-4 py-3">
-            <h2 class="text-sm font-semibold">Recent production orders</h2>
+            <h2 class="text-sm font-semibold">Recent orders</h2>
             <A href="/app/production/all/jobs" class="text-xs font-medium text-brand-700 hover:underline">
               View all
             </A>
@@ -190,7 +173,7 @@ export function ProductionHubPage() {
                   fallback={
                     <tr>
                       <td colSpan={5} class="px-3 py-6 text-center text-text-secondary">
-                        No orders yet. Start with Assembly.
+                        No orders yet. Use a type card above.
                       </td>
                     </tr>
                   }
@@ -223,24 +206,6 @@ export function ProductionHubPage() {
 
         <div class="space-y-4">
           <section class="rounded-xl border border-stroke bg-white p-4">
-            <h2 class="text-sm font-semibold">Quick actions</h2>
-            <div class="mt-3 flex flex-col gap-2">
-              <A href={newAssemblyOrderHref()} class="rounded-lg bg-brand-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-brand-700">
-                + New production order
-              </A>
-              <A href="/app/production/assembly/recipes" class="rounded-lg border border-stroke px-3 py-2 text-center text-sm hover:bg-slate-50">
-                Manage BOM / recipes
-              </A>
-              <A href="/app/production/all/jobs?status=completed" class="rounded-lg border border-stroke px-3 py-2 text-center text-sm hover:bg-slate-50">
-                View production history
-              </A>
-              <A href="/app/production/reports" class="rounded-lg border border-stroke px-3 py-2 text-center text-sm hover:bg-slate-50">
-                Open reports
-              </A>
-            </div>
-          </section>
-
-          <section class="rounded-xl border border-stroke bg-white p-4">
             <h2 class="text-sm font-semibold">Material shortage</h2>
             <Show
               when={(dash()?.shortages?.length ?? 0) > 0}
@@ -250,9 +215,7 @@ export function ProductionHubPage() {
                 <For each={dash()?.shortages ?? []}>
                   {(s) => (
                     <li class="rounded-lg border border-red-100 bg-red-50/80 px-3 py-2 text-xs">
-                      <p class="font-medium text-red-900">
-                        {s.component_name || s.component_code}
-                      </p>
+                      <p class="font-medium text-red-900">{s.component_name || s.component_code}</p>
                       <p class="text-red-800">
                         {s.available_qty}/{s.required_qty} · short {s.shortage_qty} · {s.work_order_no}
                       </p>
@@ -278,6 +241,9 @@ export function ProductionHubPage() {
                 )}
               </For>
             </ul>
+            <Show when={(dash()?.recent_activity?.length ?? 0) === 0}>
+              <p class="mt-2 text-xs text-text-secondary">No recent activity.</p>
+            </Show>
           </section>
         </div>
       </div>

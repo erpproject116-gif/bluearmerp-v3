@@ -492,10 +492,6 @@ export default function BomsPage() {
 
   return (
     <>
-      <p class="mb-3 text-sm text-text-secondary">
-        <span class="font-medium text-text-primary">{copy.recipeTitle}:</span>{" "}
-        {copy.stockHint}. Amounts are per one recipe batch.
-      </p>
       <SpreadsheetGrid<Bom>
         columns={[
           { key: "bom_code", header: "Recipe code", clickable: true },
@@ -519,7 +515,6 @@ export default function BomsPage() {
         onSelectionChange={(ids) => setSelectedIds(new Set(ids))}
         onNew={openNew}
         onEdit={(row) => void openEdit(row)}
-        settingsHref={recipesHref(mode)}
         codeKey="bom_code"
         nameKey="bom_name"
         sortKey={sort()}

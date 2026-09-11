@@ -1,108 +1,53 @@
-import { For } from "solid-js";
+import { Show } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import {
-  jobsHref,
-  recipesHref,
-  type MfgMode,
-  MFG_COPY,
-} from "./mfgProductionMode";
+import { jobsHref, recipesHref, type MfgMode, MFG_COPY } from "./mfgProductionMode";
 import { inferMfgModeFromPath } from "./productionHubMode";
 
-const MODES: MfgMode[] = ["assembly", "disassembly"];
-
-const STEPS = [
-  { id: "recipe", short: "1. Recipe" },
-  { id: "job", short: "2. Jobs" },
-] as const;
-
-function matchStep(id: string, pathname: string, mode: MfgMode): boolean {
-  const effective = mode === "all" ? "assembly" : mode;
-  if (id === "recipe") return pathname.startsWith(recipesHref(effective));
-  if (id === "job") {
-    return (
-      pathname.startsWith(jobsHref(mode)) ||
-      pathname.startsWith(jobsHref(effective)) ||
-      pathname.startsWith("/app/production/issue-station") ||
-      pathname.startsWith("/app/production/receive-station") ||
-      pathname.startsWith("/app/production/weigh-parts")
-    );
-  }
-  return false;
-}
-
-function modeStepHref(mode: MfgMode, pathname: string): string {
-  if (pathname.startsWith(recipesHref(mode)) || pathname.includes("/recipes")) {
-    return recipesHref(mode);
-  }
-  return jobsHref(mode);
-}
-
+/** Compact Recipes ↔ Jobs switch for the current mode (sidebar owns Assembly/Cutting/Recipe). */
 export function ProductionSequenceStrip(props: { mode?: MfgMode }) {
   const loc = useLocation();
-  const mode = () => props.mode ?? inferMfgModeFromPath(loc.pathname, loc.search) ?? "assembly";
+  const rawMode = () => props.mode ?? inferMfgModeFromPath(loc.pathname, loc.search) ?? "assembly";
+  const mode = () => {
+    const m = rawMode();
+    return m === "all" ? "assembly" : m;
+  };
   const copy = () => MFG_COPY[mode()];
+  const onRecipes = () => loc.pathname.includes("/recipes");
+  const onJobs = () =>
+    loc.pathname.includes("/jobs") ||
+    loc.pathname.startsWith("/app/production/issue-station") ||
+    loc.pathname.startsWith("/app/production/receive-station") ||
+    loc.pathname.startsWith("/app/production/weigh-parts");
 
   return (
-    <div class="mb-4 rounded-xl border border-stroke bg-slate-50/80 px-3 py-2">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="text-xs font-medium text-text-primary">{copy().branchTitle}</p>
-        <nav class="flex items-center gap-1 rounded-lg border border-stroke bg-white p-0.5" aria-label="Production mode">
-          <For each={MODES}>
-            {(m) => {
-              const active = () => mode() === m;
-              const href = () => modeStepHref(m, loc.pathname);
-              return (
-                <A
-                  href={href()}
-                  class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                  classList={{
-                    "bg-brand-600 text-white": active(),
-                    "text-text-secondary hover:text-text-primary": !active(),
-                  }}
-                  aria-current={active() ? "page" : undefined}
-                >
-                  {MFG_COPY[m].branchTitle}
-                </A>
-              );
+    <Show when={rawMode() !== "all"}>
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <p class="text-sm font-semibold text-text-primary">{copy().branchTitle}</p>
+        <nav class="flex items-center gap-1 rounded-lg border border-stroke bg-white p-0.5" aria-label={`${copy().branchTitle} section`}>
+          <A
+            href={recipesHref(mode())}
+            class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+            classList={{
+              "bg-brand-600 text-white": onRecipes(),
+              "text-text-secondary hover:text-text-primary": !onRecipes(),
             }}
-          </For>
+            aria-current={onRecipes() ? "page" : undefined}
+          >
+            Recipes
+          </A>
+          <A
+            href={jobsHref(mode())}
+            class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+            classList={{
+              "bg-brand-600 text-white": onJobs() && !onRecipes(),
+              "text-text-secondary hover:text-text-primary": !(onJobs() && !onRecipes()),
+            }}
+            aria-current={onJobs() && !onRecipes() ? "page" : undefined}
+          >
+            Jobs
+          </A>
         </nav>
       </div>
-      <p class="mt-0.5 text-[11px] text-text-secondary">{copy().sequenceHint}</p>
-      <nav class="mt-2 flex flex-wrap items-center gap-1.5" aria-label={`${copy().branchTitle} workflow`}>
-        <For each={STEPS}>
-          {(step, i) => {
-            const active = () => matchStep(step.id, loc.pathname, mode());
-            const href = () => (step.id === "recipe" ? recipesHref(mode()) : jobsHref(mode()));
-            return (
-              <>
-                <ShowLink step={step} href={href()} active={active()} />
-                {i() < STEPS.length - 1 ? (
-                  <span class="text-text-secondary" aria-hidden="true">
-                    →
-                  </span>
-                ) : null}
-              </>
-            );
-          }}
-        </For>
-      </nav>
-    </div>
-  );
-}
-
-function ShowLink(props: { step: { id: string; short: string }; href: string; active: boolean }) {
-  return (
-    <A
-      href={props.href}
-      class="rounded-lg px-2.5 py-1 text-xs font-medium transition-colors"
-      classList={{
-        "bg-brand-600 text-white": props.active,
-        "border border-stroke bg-white text-text-secondary hover:text-text-primary": !props.active,
-      }}
-      aria-current={props.active ? "step" : undefined}
-    >
-      {props.step.short}
-    </A>
+    </Show>
   );
 }

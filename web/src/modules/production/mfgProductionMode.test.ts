@@ -20,8 +20,8 @@ describe("mfgProductionMode", () => {
 
   it("uses Assembly / Cutting / Recipe branch titles", () => {
     expect(MFG_COPY.assembly.branchTitle).toBe("Assembly");
-    expect(MFG_COPY.disassembly.branchTitle).toBe("Cutting / Breakdown");
-    expect(MFG_COPY.recipe.branchTitle).toBe("Recipe / Processing");
+    expect(MFG_COPY.disassembly.branchTitle).toBe("Cutting");
+    expect(MFG_COPY.recipe.branchTitle).toBe("Recipe");
     expect(MFG_COPY.all.branchTitle).toBe("All production");
   });
 
