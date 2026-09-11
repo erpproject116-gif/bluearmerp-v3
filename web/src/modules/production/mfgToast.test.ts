@@ -18,14 +18,23 @@ describe("friendlyMfgMessage", () => {
 
   it("maps staged output serial gap", () => {
     expect(
-      friendlyMfgMessage("Record finished product first: staged output serial count 0 does not match required 1", "x"),
-    ).toContain("Record finished");
+      friendlyMfgMessage("Record finished product first: staged output serial count 0 is less than required 1", "x"),
+    ).toContain("less than required");
   });
 
   it("maps insufficient staged issue wrapper", () => {
-    expect(friendlyMfgMessage("insufficient staged issue for Mouse: staged serial count 0", "x")).toContain(
+    expect(friendlyMfgMessage("Take materials first: staged issue for Mouse: missing", "x")).toContain(
       "Take materials",
     );
+  });
+
+  it("keeps staged count mismatch details", () => {
+    expect(
+      friendlyMfgMessage(
+        "Take materials first: staged issue for 00154: staged serial count 7 is less than required 10",
+        "x",
+      ),
+    ).toContain("7 is less than required 10");
   });
 
   it("keeps unknown messages", () => {

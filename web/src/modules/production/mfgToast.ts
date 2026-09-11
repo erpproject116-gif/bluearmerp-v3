@@ -23,6 +23,10 @@ export function friendlyMfgMessage(raw: string | undefined | null, fallback: str
     (lower.includes("take materials") && lower.includes("finish")) ||
     lower.includes("record finished")
   ) {
+    // Keep count/qty mismatch details so operators know under- vs over-stage.
+    if (lower.includes("less than required") || lower.includes("does not match") || lower.includes("could not cover")) {
+      return msg;
+    }
     if (lower.includes("output") || lower.includes("record finished")) {
       return "Record finished product first (Continue → Record finished serials/lots), then Finish build.";
     }

@@ -571,11 +571,14 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			actualInputQty = *completeBody.ActualInputQty
 		}
 		qtyProduced := wo.QtyToProduce
+		explicitProducedQty := false
 		if completeBody.QtyProduced != nil && *completeBody.QtyProduced > 0 {
 			qtyProduced = *completeBody.QtyProduced
+			explicitProducedQty = true
 		} else if (bomType == "assembly" || bomType == "recipe") && completeBody.ActualInputQty != nil && *completeBody.ActualInputQty > 0 {
 			// Assembly/Recipe Finish may post actual produced as actual_input_qty for compatibility.
 			qtyProduced = *completeBody.ActualInputQty
+			explicitProducedQty = true
 		}
 
 		if bomType == "disassembly" {
@@ -775,8 +778,11 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			if fgSettings.TrackSerial || fgSettings.TrackLot {
-				if staged, err := stagedAssemblyOutputQty(r.Context(), tx, id, fgSettings.TrackSerial, fgSettings.TrackLot); err == nil && staged > 0 {
-					qtyProduced = staged
+				// Prefer operator-entered Actual produced. Only fall back to staged qty when body omitted it.
+				if !explicitProducedQty {
+					if staged, err := stagedAssemblyOutputQty(r.Context(), tx, id, fgSettings.TrackSerial, fgSettings.TrackLot); err == nil && staged > 0 {
+						qtyProduced = staged
+					}
 				}
 			}
 			for _, ln := range bom.Lines {

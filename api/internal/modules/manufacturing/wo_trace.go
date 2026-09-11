@@ -809,9 +809,11 @@ func consumeWoIssueTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locatio
 			}
 			unitIDs = append(unitIDs, id)
 		}
-		if len(unitIDs) != needCount {
-			return fmt.Errorf("staged serial count %d does not match required %d", len(unitIDs), needCount)
+		if len(unitIDs) < needCount {
+			return fmt.Errorf("staged serial count %d is less than required %d", len(unitIDs), needCount)
 		}
+		// Allow over-staging: consume earliest staged serials only.
+		unitIDs = unitIDs[:needCount]
 		for _, unitID := range unitIDs {
 			var serialNo string
 			err := tx.QueryRow(ctx, `
@@ -848,8 +850,8 @@ func consumeWoIssueTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locatio
 	if err != nil {
 		return err
 	}
-	if stagedQty+0.0001 < needQty || stagedQty-needQty > 0.0001 {
-		return fmt.Errorf("staged lot qty %.4f does not match required %.4f", stagedQty, needQty)
+	if stagedQty+0.0001 < needQty {
+		return fmt.Errorf("staged lot qty %.4f is less than required %.4f", stagedQty, needQty)
 	}
 	rows, err := tx.Query(ctx, `
 		select lot_batch_id, qty::float8
@@ -860,17 +862,25 @@ func consumeWoIssueTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locatio
 		return err
 	}
 	defer rows.Close()
+	remaining := needQty
 	for rows.Next() {
+		if remaining <= 0.0001 {
+			break
+		}
 		var lotID int64
 		var qty float64
 		if err := rows.Scan(&lotID, &qty); err != nil {
 			return err
 		}
+		take := qty
+		if take > remaining {
+			take = remaining
+		}
 		tag, err := tx.Exec(ctx, `
 			update public.inv_lot_batches
 			set qty_on_hand = qty_on_hand - $1, updated_at = now()
 			where id = $2 and tenant_id = $3 and location_id = $4 and qty_on_hand >= $1`,
-			qty, lotID, tenantID, locationID)
+			take, lotID, tenantID, locationID)
 		if err != nil || tag.RowsAffected() == 0 {
 			return fmt.Errorf("failed to consume lot batch %d", lotID)
 		}
@@ -879,16 +889,20 @@ func consumeWoIssueTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locatio
 			LotBatchID:      lotID,
 			EventType:       "consumed",
 			FromLocationID:  &locationID,
-			Qty:             qty,
+			Qty:             take,
 			RefType:         "mfg_work_order",
 			RefID:           &woID,
 			CreatedByUserID: &userID,
 		}); err != nil {
 			return err
 		}
-		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, -qty, userID, "mfg_work_order", woID, "wo_trace_issue"); err != nil {
+		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, -take, userID, "mfg_work_order", woID, "wo_trace_issue"); err != nil {
 			return err
 		}
+		remaining -= take
+	}
+	if remaining > 0.0001 {
+		return fmt.Errorf("staged lot qty could not cover required %.4f", needQty)
 	}
 	return nil
 }
@@ -926,9 +940,11 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 			}
 			staged = append(staged, s)
 		}
-		if len(staged) != needCount {
-			return fmt.Errorf("staged output serial count %d does not match required %d", len(staged), needCount)
+		if len(staged) < needCount {
+			return fmt.Errorf("staged output serial count %d is less than required %d", len(staged), needCount)
 		}
+		extra := staged[needCount:]
+		staged = staged[:needCount]
 		recvAt := time.Now()
 		var warrantyMonths int
 		_ = tx.QueryRow(ctx, `select coalesce(warranty_duration_months, 0) from public.inv_items where id = $1`, itemID).Scan(&warrantyMonths)
@@ -962,22 +978,27 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 				return err
 			}
 		}
+		for _, s := range extra {
+			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_serials set status = 'void' where id = $1`, s.id); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 
 	var stagedQty float64
 	err = tx.QueryRow(ctx, `
-		select coalesce(sum(qty), 0)::float8
+		select coalesce(sum(coalesce(catch_weight, qty)), 0)::float8
 		from public.mfg_wo_output_lots
 		where work_order_id = $1 and status = 'staged'`, woID).Scan(&stagedQty)
 	if err != nil {
 		return err
 	}
-	if stagedQty+0.0001 < outputQty || stagedQty-outputQty > 0.0001 {
-		return fmt.Errorf("staged output lot qty %.4f does not match required %.4f", stagedQty, outputQty)
+	if stagedQty+0.0001 < outputQty {
+		return fmt.Errorf("staged output lot qty %.4f is less than required %.4f", stagedQty, outputQty)
 	}
 	rows, err := tx.Query(ctx, `
-		select id, lot_no, qty::float8, expiry_date
+		select id, lot_no, qty::float8, catch_weight::float8, expiry_date
 		from public.mfg_wo_output_lots
 		where work_order_id = $1 and status = 'staged'
 		order by id`, woID)
@@ -985,13 +1006,29 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 		return err
 	}
 	defer rows.Close()
+	remaining := outputQty
 	for rows.Next() {
 		var rowID int64
 		var lotNo string
 		var qty float64
+		var catchWeight *float64
 		var expiry *time.Time
-		if err := rows.Scan(&rowID, &lotNo, &qty, &expiry); err != nil {
+		if err := rows.Scan(&rowID, &lotNo, &qty, &catchWeight, &expiry); err != nil {
 			return err
+		}
+		lineQty := qty
+		if catchWeight != nil && *catchWeight > 0 {
+			lineQty = *catchWeight
+		}
+		if remaining <= 0.0001 {
+			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'void' where id = $1`, rowID); err != nil {
+				return err
+			}
+			continue
+		}
+		take := lineQty
+		if take > remaining {
+			take = remaining
 		}
 		var lotBatchID int64
 		err = tx.QueryRow(ctx, `
@@ -1004,7 +1041,7 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 			  expiry_date = coalesce(excluded.expiry_date, inv_lot_batches.expiry_date),
 			  updated_at = now()
 			returning id`,
-			tenantID, itemID, lotNo, locationID, qty, expiry).Scan(&lotBatchID)
+			tenantID, itemID, lotNo, locationID, take, expiry).Scan(&lotBatchID)
 		if err != nil {
 			return err
 		}
@@ -1013,20 +1050,24 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 			LotBatchID:      lotBatchID,
 			EventType:       "produced",
 			ToLocationID:    &locationID,
-			Qty:             qty,
+			Qty:             take,
 			RefType:         "mfg_work_order",
 			RefID:           &woID,
 			CreatedByUserID: &userID,
 		}); err != nil {
 			return err
 		}
-		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, qty, userID, "mfg_work_order", woID, "wo_trace_receipt"); err != nil {
+		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, take, userID, "mfg_work_order", woID, "wo_trace_receipt"); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'posted' where id = $1`, rowID)
 		if err != nil {
 			return err
 		}
+		remaining -= take
+	}
+	if remaining > 0.0001 {
+		return fmt.Errorf("staged output lot qty could not cover required %.4f", outputQty)
 	}
 	return nil
 }

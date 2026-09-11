@@ -229,9 +229,15 @@ export default function ProductionIssueStationPage() {
       setBusy(false);
       return;
     }
+    const need = remainingSerialNeed(comp);
+    let unitIds = resolved.units.map((u) => u.serial_unit_id);
+    if (need > 0 && unitIds.length > need) {
+      unitIds = unitIds.slice(0, need);
+      mfgWarn(null, `Only the first ${need} serial(s) are needed — extra lines were ignored.`);
+    }
     const res = await apiFetch(`/api/v1/manufacturing/work-orders/${id}/issue-serials`, {
       method: "POST",
-      body: JSON.stringify({ serial_unit_ids: resolved.units.map((u) => u.serial_unit_id) }),
+      body: JSON.stringify({ serial_unit_ids: unitIds }),
     });
     setBusy(false);
     if (!res.success) {
