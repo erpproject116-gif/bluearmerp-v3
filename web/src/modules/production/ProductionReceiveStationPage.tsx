@@ -387,45 +387,66 @@ export default function ProductionReceiveStationPage() {
               </Show>
 
               <Show when={ctx().track_lot && !ctx().track_serial}>
-                <p class="mt-3 text-xs text-text-secondary">
-                  Need {remainingOutputLotQty(ctx()).toFixed(4)} more lot qty. A lot line is filled in for you — confirm,
-                  or use one-click Record remaining.
-                </p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    disabled={busy() || remainingOutputLotQty(ctx()) <= 0}
-                    onClick={() => void recordRemainingLot()}
-                  >
-                    Record remaining lot
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded border border-stroke px-2 py-1 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
-                    disabled={busy() || remainingOutputLotQty(ctx()) <= 0}
-                    onClick={() => suggestLotPaste(ctx())}
-                  >
-                    Refill suggested lot
-                  </button>
-                </div>
-                <Field label="Optional: edit lot (lot no. tab qty [tab expiry] [tab catch-weight kg])">
-                  <textarea
-                    class={`${inputClass} mt-2`}
-                    rows={3}
-                    placeholder={"LOT-001\t1"}
-                    value={lotPaste()}
-                    onInput={(e) => setLotPaste(e.currentTarget.value)}
-                  />
-                </Field>
-                <button
-                  type="button"
-                  class="mt-3 rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-medium text-brand-800 hover:bg-brand-50 disabled:opacity-50"
-                  disabled={busy() || !lotPaste().trim()}
-                  onClick={() => void submitLots()}
+                <Show
+                  when={remainingOutputLotQty(ctx()) > 0}
+                  fallback={
+                    <div class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-950">
+                      <p class="font-medium">Finished lot qty is already staged.</p>
+                      <p class="mt-1 text-xs text-emerald-900">
+                        Planned {ctx().qty_to_produce}, staged {ctx().output_lot_qty.toFixed(4)}.
+                        {ctx().output_lot_qty > ctx().qty_to_produce + 0.0001
+                          ? " Extra staged qty is OK — Finish build uses the Actual produced amount."
+                          : " No more recording needed here."}
+                      </p>
+                      <A
+                        href={jobsBackHref()}
+                        class="mt-3 inline-flex rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+                      >
+                        Back to Jobs → Finish build
+                      </A>
+                    </div>
+                  }
                 >
-                  Record edited lots
-                </button>
+                  <p class="mt-3 text-xs text-text-secondary">
+                    Need {remainingOutputLotQty(ctx()).toFixed(4)} more lot qty. A lot line is filled in for you — confirm,
+                    or use one-click Record remaining.
+                  </p>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                      disabled={busy()}
+                      onClick={() => void recordRemainingLot()}
+                    >
+                      Record remaining lot
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded border border-stroke px-2 py-1 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                      disabled={busy()}
+                      onClick={() => suggestLotPaste(ctx())}
+                    >
+                      Refill suggested lot
+                    </button>
+                  </div>
+                  <Field label="Optional: edit lot (lot no. tab qty [tab expiry] [tab catch-weight kg])">
+                    <textarea
+                      class={`${inputClass} mt-2`}
+                      rows={3}
+                      placeholder={"LOT-001\t1"}
+                      value={lotPaste()}
+                      onInput={(e) => setLotPaste(e.currentTarget.value)}
+                    />
+                  </Field>
+                  <button
+                    type="button"
+                    class="mt-3 rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-medium text-brand-800 hover:bg-brand-50 disabled:opacity-50"
+                    disabled={busy() || !lotPaste().trim()}
+                    onClick={() => void submitLots()}
+                  >
+                    Record edited lots
+                  </button>
+                </Show>
               </Show>
 
               <Show when={!ctx().track_serial && !ctx().track_lot}>
@@ -434,12 +455,14 @@ export default function ProductionReceiveStationPage() {
                 </p>
               </Show>
 
-              <A
-                href={jobsBackHref()}
-                class="mt-4 inline-flex rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-50"
-              >
-                Done — back to Finish build
-              </A>
+              <Show when={!(ctx().track_lot && !ctx().track_serial && remainingOutputLotQty(ctx()) <= 0)}>
+                <A
+                  href={jobsBackHref()}
+                  class="mt-4 inline-flex rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-50"
+                >
+                  Done — back to Finish build
+                </A>
+              </Show>
             </section>
           )}
         </Show>
