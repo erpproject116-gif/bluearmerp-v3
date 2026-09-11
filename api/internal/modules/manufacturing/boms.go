@@ -261,6 +261,14 @@ func createBom(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 		}
+		if bomCode == "" && bomType == "recipe" {
+			err = tx.QueryRow(r.Context(), `
+				select public.allocate_mfg_recipe_bom_code($1, current_date)`, tu.TenantID).Scan(&bomCode)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to allocate recipe code.", "ERR_INTERNAL")
+				return
+			}
+		}
 		labor, freight := resolveBomCostDefaults(body)
 		addCostType := normalizeAdditionalCostType(body.AdditionalCostType)
 
@@ -540,7 +548,8 @@ func resolveBomHeaderDefaults(ctx context.Context, q inventory.UnitQuerier, tena
 func validateBomBody(b bomBody) map[string]string {
 	errs := map[string]string{}
 	bomType := normalizeBomType(b.BomType)
-	if bomType != "assembly" && strings.TrimSpace(b.BomCode) == "" {
+	// Assembly + recipe auto-allocate codes on create when blank.
+	if bomType != "assembly" && bomType != "recipe" && strings.TrimSpace(b.BomCode) == "" {
 		errs["bom_code"] = "BOM code is required."
 	}
 	if strings.TrimSpace(b.BomName) == "" {
@@ -555,8 +564,8 @@ func validateBomBody(b bomBody) map[string]string {
 	if b.YieldPct != nil && *b.YieldPct <= 0 {
 		errs["yield_pct"] = "Yield % must be greater than zero."
 	}
-	if bomType != "assembly" && bomType != "disassembly" {
-		errs["bom_type"] = "BOM type must be assembly or disassembly."
+	if bomType != "assembly" && bomType != "disassembly" && bomType != "recipe" {
+		errs["bom_type"] = "BOM type must be assembly, disassembly, or recipe."
 	}
 	if b.ExpectedYieldPctMin != nil && b.ExpectedYieldPctMax != nil && *b.ExpectedYieldPctMin > *b.ExpectedYieldPctMax {
 		errs["expected_yield_pct_min"] = "Minimum yield cannot exceed maximum yield."
