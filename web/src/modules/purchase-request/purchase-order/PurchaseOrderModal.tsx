@@ -834,7 +834,7 @@ export function PurchaseOrderModal(props: Props) {
               <Show
                 when={isDraft()}
                 fallback={
-                  <ModalField settings={byKey} fieldKey="location_id" fallbackLabel="Location" fallbackRequired>
+                  <ModalField settings={byKey} fieldKey="location_id" fallbackLabel="Location In" fallbackRequired>
                     {(m) => <input class={inputClass} value={locationLabel()} readOnly disabled={m.disabled} />}
                   </ModalField>
                 }
@@ -842,7 +842,7 @@ export function PurchaseOrderModal(props: Props) {
                 <ModalLookupField
                   settings={byKey}
                   fieldKey="location_id"
-                  fallbackLabel="Location"
+                  fallbackLabel="Location In"
                   fallbackRequired
                   value={locationLabel}
                   selectedId={locationId}

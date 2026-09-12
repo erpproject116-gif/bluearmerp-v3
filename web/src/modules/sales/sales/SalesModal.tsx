@@ -1245,7 +1245,7 @@ export function SalesModal(props: Props) {
         <ModalLookupField
           settings={byKey}
           fieldKey="location_id"
-          fallbackLabel="Location"
+          fallbackLabel="Location Out"
           fallbackRequired
           value={locationLabel}
           selectedId={locationId}

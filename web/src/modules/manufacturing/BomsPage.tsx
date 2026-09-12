@@ -398,19 +398,43 @@ export default function BomsPage() {
     }
     const errs = collectRequiredFieldErrors(requiredValues, requiredFields);
     const bodyLines = lines()
-      .filter((ln) => ln.component_item_id > 0 && Number(ln.qty) > 0)
+      .map((ln) => ({
+        ...ln,
+        component_item_id: Number(ln.component_item_id) || 0,
+        qty: Number(ln.qty) || 0,
+      }))
+      .filter((ln) => ln.component_item_id > 0 && ln.qty > 0)
       .map((ln) => ({
         component_item_id: ln.component_item_id,
-        qty: Number(ln.qty),
+        qty: ln.qty,
         unit_id: ln.unit_id || null,
         scrap_qty: copy.showScrap ? lineScrapQty(ln) : 0,
         output_classification: !isAssembly() ? ln.output_classification || "finished" : undefined,
       }));
     if (bodyLines.length === 0) {
+      const typedWithoutPick = lines().some((ln, i) => {
+        const label = (lineLabels()[i] ?? "").trim();
+        return label.length > 0 && !(Number(ln.component_item_id) > 0);
+      });
       errs.lines =
         mode === "disassembly"
-          ? "Add at least one output piece."
-          : "Add at least one raw material line.";
+          ? typedWithoutPick
+            ? "Pick each output from the search list (click or press Enter) — typing the name alone is not enough."
+            : "Add at least one output piece."
+          : typedWithoutPick
+            ? "Pick each material from the search list (click or press Enter) — typing the name alone is not enough."
+            : "Add at least one raw material line.";
+    } else {
+      const orphanLabels = lines().some((ln, i) => {
+        const label = (lineLabels()[i] ?? "").trim();
+        return label.length > 0 && !(Number(ln.component_item_id) > 0);
+      });
+      if (orphanLabels) {
+        errs.lines =
+          mode === "disassembly"
+            ? "Some output lines were typed but not picked from the list. Click each item (or press Enter) so every line is linked."
+            : "Some material lines were typed but not picked from the list. Click each item (or press Enter) so every line is linked.";
+      }
     }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -773,14 +797,14 @@ export default function BomsPage() {
                       }
                     }}
                     onClear={() => {
+                      // Keep typed label; Clear button clears text via onInput("").
                       setLines((prev) =>
                         prev.map((row, i) =>
                           i === idx()
-                            ? { ...row, component_item_id: 0, component_code: "", component_name: "", unit_cost: 0, line_total: 0 }
+                            ? { ...row, component_item_id: 0, unit_cost: 0, line_total: 0 }
                             : row,
                         ),
                       );
-                      setLineLabels((p) => ({ ...p, [idx()]: "" }));
                     }}
                     fetchOptions={fetchItems}
                   />

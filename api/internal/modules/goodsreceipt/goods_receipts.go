@@ -1438,7 +1438,10 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 
-			if ln.TrackInventory && ln.ItemID != nil && ln.ReceivedQty > 0 {
+			// Qty ledger: track_inventory_qty, or lot/serial (those imply stock even if the
+			// inventory-qty flag was left off on the item master).
+			postsQty := ln.TrackInventory || ln.TrackLot || ln.TrackSerial
+			if postsQty && ln.ItemID != nil && ln.ReceivedQty > 0 {
 				_, err = tx.Exec(r.Context(), `
 					insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
 					values ($1, $2, $3, $4)
@@ -1473,7 +1476,8 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var glLines []inventorygl.Line
 		for _, ln := range lines {
-			if ln.ItemID == nil || !ln.TrackInventory || ln.BaseQty <= 0 {
+			postsQty := ln.TrackInventory || ln.TrackLot || ln.TrackSerial
+			if ln.ItemID == nil || !postsQty || ln.BaseQty <= 0 {
 				continue
 			}
 			glLines = append(glLines, inventorygl.Line{
@@ -1756,7 +1760,8 @@ func reverseGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 
-			if ln.TrackInventory && ln.ItemID != nil {
+			postsQty := ln.TrackInventory || ln.TrackLot || ln.TrackSerial
+			if postsQty && ln.ItemID != nil {
 				tag, err := tx.Exec(r.Context(), `
 					update public.inv_item_location_balances
 					set qty_on_hand = qty_on_hand - $1, updated_at = now()

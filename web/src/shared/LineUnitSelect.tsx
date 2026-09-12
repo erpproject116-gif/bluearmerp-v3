@@ -1,4 +1,4 @@
-import { For, Show, createResource } from "solid-js";
+import { For, Show, createEffect, createResource } from "solid-js";
 import { apiFetch } from "./api";
 import { inputClass } from "./SpreadsheetGrid";
 import type { UnitOption } from "./UnitLookupCombo";
@@ -36,24 +36,40 @@ export function LineUnitSelect(props: Props) {
     props.unitId != null && props.unitId > 0
       ? (units() ?? []).find((u) => u.id === props.unitId)
       : undefined;
+  const listedByCode = () => {
+    const code = currentCode();
+    if (!code) return undefined;
+    return (units() ?? []).find((u) => u.code.toLowerCase() === code.toLowerCase());
+  };
   const isUnlistedCode = () =>
-    !props.unitId && currentCode() !== "" && !(units() ?? []).some((u) => u.code === currentCode());
+    !props.unitId && currentCode() !== "" && !listedByCode();
   const isOrphanId = () =>
     props.unitId != null && props.unitId > 0 && !listedById() && (units() !== undefined);
 
   const orphanLabel = () => currentCode() || `unit #${props.unitId}`;
+  const selectValue = () => {
+    if (props.unitId) return String(props.unitId);
+    const byCode = listedByCode();
+    if (byCode) return String(byCode.id);
+    if (isUnlistedCode()) return `code:${currentCode()}`;
+    return "";
+  };
+
+  // Persist free-text unit_code as a real unit_id once the master list loads.
+  createEffect(() => {
+    const list = units();
+    if (!list || props.disabled) return;
+    if (props.unitId != null && props.unitId > 0) return;
+    const byCode = listedByCode();
+    if (!byCode) return;
+    props.onChange({ unit_id: byCode.id, unit_code: byCode.code });
+  });
 
   return (
     <select
       class={`${inputClass} w-full`}
       disabled={props.disabled}
-      value={
-        props.unitId
-          ? String(props.unitId)
-          : isUnlistedCode()
-            ? `code:${currentCode()}`
-            : ""
-      }
+      value={selectValue()}
       onChange={(e) => {
         const raw = e.currentTarget.value;
         if (!raw) {

@@ -73,7 +73,7 @@ function PrintDocument(props: { payload: SalesOrderPrintPayload }) {
             <dd>{so().tax_type_name ?? "—"}</dd>
             <dt>Currency</dt>
             <dd>{so().currency_code ?? "—"}</dd>
-            <dt>Location</dt>
+            <dt>Location Out</dt>
             <dd>{so().location_name ?? "—"}</dd>
             <dt>PIC</dt>
             <dd>{so().pic_name || "—"}</dd>

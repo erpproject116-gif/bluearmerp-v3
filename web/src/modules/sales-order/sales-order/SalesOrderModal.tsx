@@ -818,7 +818,7 @@ export function SalesOrderModal(props: Props) {
         <ModalLookupField
           settings={byKey}
           fieldKey="location_id"
-          fallbackLabel="Location-Out"
+          fallbackLabel="Location Out"
           fallbackRequired
           formId={SALES_ORDER_FORM_ID}
           errors={fieldErrors}

@@ -123,11 +123,51 @@ export function LookupCombo(props: Props) {
             const v = e.currentTarget.value;
             setDraft(v);
             props.onInput(v);
+            // Typing invalidates a prior pick so save cannot keep a stale id with different text.
+            if (props.selectedId() != null && v.trim() !== props.value().trim()) {
+              props.onClear();
+            }
             setOpen(true);
             search(v);
           }}
+          onKeyDown={(e) => {
+            if (props.disabled) return;
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const text = draft().trim().toLowerCase();
+              const opts = options();
+              const hit =
+                opts.find((o) => o.label.toLowerCase() === text) ??
+                opts.find((o) => {
+                  const code = o.label.split("—")[0]?.trim().toLowerCase() ?? "";
+                  return code === text || o.label.toLowerCase().startsWith(text + " —");
+                }) ??
+                opts.find((o) => o.label.toLowerCase().startsWith(text) && text.length >= 2) ??
+                (opts.length === 1 ? opts[0] : undefined);
+              if (hit) {
+                props.onSelect(hit);
+                setDraft(hit.label);
+                setOpen(false);
+              }
+            }
+          }}
           onBlur={() => {
             setFocused(false);
+            const text = draft().trim();
+            if (props.selectedId() == null && text) {
+              const opts = options();
+              const lower = text.toLowerCase();
+              const hit =
+                opts.find((o) => o.label.toLowerCase() === lower) ??
+                opts.find((o) => {
+                  const code = o.label.split("—")[0]?.trim().toLowerCase() ?? "";
+                  return code === lower || o.label.toLowerCase().startsWith(lower + " —");
+                });
+              if (hit) {
+                props.onSelect(hit);
+                setDraft(hit.label);
+              }
+            }
             setTimeout(() => setOpen(false), 150);
           }}
         />

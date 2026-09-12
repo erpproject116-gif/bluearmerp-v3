@@ -905,7 +905,7 @@ export default function SerialReceivePage() {
             {(po) => (
               <div class="mt-4 rounded-lg border border-stroke bg-slate-50 p-4 text-sm">
                 <p>
-                  <span class="text-text-secondary">Location:</span>{" "}
+                  <span class="text-text-secondary">Location In:</span>{" "}
                   <span class="font-medium">{po().location_name ?? po().location_id}</span>
                   {" · "}
                   <span class="text-text-secondary">Partner:</span>{" "}

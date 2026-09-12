@@ -421,7 +421,7 @@ func PreferStockLineUnit(ctx context.Context, q UnitQuerier, tenantID int64, ite
 
 // ResolveLineUnit normalizes the unit captured on a document line.
 // An explicit unit wins (its code is refreshed from the units master); otherwise
-// the item base unit is used. Lines without an item keep whatever free text was sent.
+// free-text unit codes are resolved when possible; otherwise the item base unit is used.
 func ResolveLineUnit(ctx context.Context, q UnitQuerier, tenantID int64, itemID *int64, unitID *int64, unitCode string) (*int64, *string) {
 	code := strings.TrimSpace(unitCode)
 	if unitID != nil && *unitID > 0 {
@@ -430,6 +430,11 @@ func ResolveLineUnit(ctx context.Context, q UnitQuerier, tenantID int64, itemID 
 			select code from public.inv_units where id=$1 and tenant_id=$2`,
 			*unitID, tenantID).Scan(&resolved); err == nil {
 			id := *unitID
+			return &id, &resolved
+		}
+	}
+	if code != "" {
+		if id, resolved, ok := LookupUnitByCode(ctx, q, tenantID, code); ok {
 			return &id, &resolved
 		}
 	}
@@ -477,7 +482,8 @@ func BaseQtyForLine(ctx context.Context, q UnitQuerier, tenantID, itemID int64, 
 		return 0, fmt.Errorf("item %d: base unit lookup failed", itemID)
 	}
 	if baseUnitID <= 0 {
-		return 0, fmt.Errorf("item %d: set a base unit under Inventory → Items before posting stock", itemID)
+		// Item master has no base unit yet — treat document qty as inventory qty.
+		return qty, nil
 	}
 	if *lineUnitID == baseUnitID {
 		return qty, nil

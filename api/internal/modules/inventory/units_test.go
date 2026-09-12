@@ -134,8 +134,9 @@ func TestBaseQtyForLine(t *testing.T) {
 	if _, err := BaseQtyForLine(ctx, db, 1, 100, &unknownUnit, 2); err == nil {
 		t.Fatal("unknown conversion should fail closed")
 	}
-	if _, err := BaseQtyForLine(ctx, db, 1, 200, &boxUnit, 2); err == nil {
-		t.Fatal("item without base unit should fail closed")
+	// Items with no base unit still accept document qty (demo / incomplete masters).
+	if got, err := BaseQtyForLine(ctx, db, 1, 200, &boxUnit, 2); err != nil || got != 2 {
+		t.Fatalf("item without base unit should pass qty through: got %v, err %v", got, err)
 	}
 }
 

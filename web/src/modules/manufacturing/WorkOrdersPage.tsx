@@ -349,13 +349,8 @@ export default function WorkOrdersPage() {
     const ok = handleSaveResult(res, toast, ed ? "Job updated." : "Job created.", { onFieldErrors: setFieldErrors });
     if (!ok) return;
     await draft.clearOnSave();
-    const saved = res.data as WorkOrder | undefined;
-    if (saved?.id) {
-      setEditing(saved);
-      await loadMaterials(saved.id);
-    } else {
-      setModalOpen(false);
-    }
+    setModalOpen(false);
+    setEditing(null);
     invalidate();
   };
 
@@ -440,6 +435,23 @@ export default function WorkOrdersPage() {
     }
   };
 
+
+  const cancelDraft = async (row: WorkOrder) => {
+    if (!window.confirm(`Cancel draft job ${row.work_order_no}?`)) return;
+    setActionId(row.id);
+    const res = await apiFetch<{ updated: number; skipped: number }>(
+      "/api/v1/manufacturing/work-orders/actions/bulk-cancel",
+      { method: "POST", body: JSON.stringify({ ids: [row.id] }) },
+      { silent: true },
+    );
+    setActionId(null);
+    if (!res.success || !res.data || res.data.updated < 1) {
+      mfgWarn(res.message, "Couldn’t cancel this job. Only draft jobs can be cancelled.");
+      return;
+    }
+    mfgSuccess("Job cancelled.");
+    invalidate();
+  };
 
   const bulkCancelDrafts = async () => {
     const ids = [...selectedIds()];
@@ -649,6 +661,19 @@ export default function WorkOrdersPage() {
                 Start job
               </button>
             </Show>
+            <Show when={r.status === "draft"}>
+              <button
+                type="button"
+                class="text-[11px] text-red-700 hover:underline disabled:opacity-50"
+                disabled={actionId() === r.id || bulkBusy()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void cancelDraft(r);
+                }}
+              >
+                Cancel
+              </button>
+            </Show>
             <Show when={r.status === "released" && canRelease()}>
               <button
                 type="button"
@@ -732,6 +757,19 @@ export default function WorkOrdersPage() {
                 onClick={(e) => { e.stopPropagation(); void release(r); }}
               >
                 Start job
+              </button>
+            </Show>
+            <Show when={r.status === "draft"}>
+              <button
+                type="button"
+                class="rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                disabled={actionId() === r.id || bulkBusy()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void cancelDraft(r);
+                }}
+              >
+                Cancel
               </button>
             </Show>
             <Show when={r.status === "released"}>

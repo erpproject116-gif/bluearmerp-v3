@@ -163,7 +163,7 @@ export default function GoodsReceiptListPage() {
         columns={[
           { key: "receipt_date", header: "Receipt date", clickable: true },
           { key: "purchase_order_no", header: "PO no.", clickable: true },
-          { key: "location_name", header: "Location" },
+          { key: "location_name", header: "Location In" },
           {
             key: "inspection_status",
             header: "Inspection",
