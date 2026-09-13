@@ -42,7 +42,14 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: "autoUpdate",
-        includeAssets: ["favicon.png", "apple-touch-icon.png", "pwa-192.png", "pwa-512.png"],
+        includeAssets: [
+          "favicon.png",
+          "apple-touch-icon.png",
+          "pwa-192.png",
+          "pwa-512.png",
+          "pwa-512-maskable.png",
+          "bluearm-computer-logo.png",
+        ],
         manifest: {
           name: "Bluearm ERP",
           short_name: "Bluearm",
@@ -50,8 +57,8 @@ export default defineConfig(({ mode }) => {
           display: "standalone",
           start_url: "/app/production",
           scope: "/",
-          theme_color: "#3c50e0",
-          background_color: "#f1f5f9",
+          theme_color: "#000000",
+          background_color: "#000000",
           icons: [
             {
               src: "/pwa-192.png",
@@ -66,7 +73,7 @@ export default defineConfig(({ mode }) => {
               purpose: "any",
             },
             {
-              src: "/pwa-512.png",
+              src: "/pwa-512-maskable.png",
               sizes: "512x512",
               type: "image/png",
               purpose: "maskable",
