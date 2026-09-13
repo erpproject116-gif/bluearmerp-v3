@@ -27,6 +27,16 @@ func TestIsBootstrapExemptFromOccupancyConcept(t *testing.T) {
 	}
 }
 
+func TestReleaseCustomerEmailClaimSkipsBootstrap(t *testing.T) {
+	n, err := ReleaseCustomerEmailClaim(t.Context(), nil, "bluearmph@gmail.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("expected 0 rows for bootstrap, got %d", n)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
 		(func() bool {

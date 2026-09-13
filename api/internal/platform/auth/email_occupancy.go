@@ -21,7 +21,8 @@ type EmailOccupancy struct {
 // CustomerEmailOccupancy returns the primary customer tenant claim for an email.
 // Demo and non-demo tenants both count. Bootstrap/platform-console emails are exempt
 // (Occupied=false) so ops can keep internal memberships without blocking flows.
-// Prefer active+linked, then invited, then disabled; skip cancelled/suspended tenants.
+// Prefer active+linked, then invited; skip disabled (User Management / Command remove
+// frees the email) and cancelled/suspended tenants.
 func CustomerEmailOccupancy(ctx context.Context, pool *pgxpool.Pool, email string) (EmailOccupancy, error) {
 	email = normalizeEmail(email)
 	var out EmailOccupancy
@@ -41,7 +42,7 @@ func CustomerEmailOccupancy(ctx context.Context, pool *pgxpool.Pool, email strin
 		from public.users u
 		join public.tenants t on t.id = u.tenant_id
 		where lower(u.email) = $1
-		  and u.status in ('invited', 'active', 'disabled')
+		  and u.status in ('invited', 'active')
 		  and t.status not in ('suspended', 'cancelled')
 		order by
 		  case
@@ -74,6 +75,36 @@ func OccupiedElsewhere(ctx context.Context, pool *pgxpool.Pool, email string, fo
 		return occ, false, nil
 	}
 	return occ, true, nil
+}
+
+// ReleaseCustomerEmailClaim frees an email for re-provision / new trial after Platform
+// Command remove-contact. Revokes open invites and disables active/invited user rows.
+// Bootstrap console emails are never released here. Disabled rows no longer occupy.
+func ReleaseCustomerEmailClaim(ctx context.Context, pool *pgxpool.Pool, email string) (int64, error) {
+	email = normalizeEmail(email)
+	if email == "" || isBootstrapSuperadminEmail(email) {
+		return 0, nil
+	}
+	_, err := pool.Exec(ctx, `
+		update public.user_invites ui
+		set revoked_at = coalesce(ui.revoked_at, now())
+		from public.users u
+		where ui.user_id = u.id
+		  and lower(u.email) = $1
+		  and ui.revoked_at is null
+		  and ui.accepted_at is null`, email)
+	if err != nil {
+		return 0, err
+	}
+	tag, err := pool.Exec(ctx, `
+		update public.users
+		set status = 'disabled', updated_at = now()
+		where lower(email) = $1
+		  and status in ('invited', 'active')`, email)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 // CrossTenantOccupancyMessage is the user-facing conflict copy for invites / trial.

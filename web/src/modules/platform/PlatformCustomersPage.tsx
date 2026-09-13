@@ -106,8 +106,8 @@ export default function PlatformCustomersPage() {
     const code = c.company_code || "";
     const typedEmail = window.prompt(
       hasWorkspace
-        ? `Remove ${email}?\nThis will WIPE company ${code || "(workspace)"} and delete the contact.\nType the email to confirm:`
-        : `Remove contact ${email} from Platform Command?\nType the email to confirm:`,
+        ? `Remove ${email}?\nThis will WIPE company ${code || "(workspace)"}, free the email for re-use, and delete the contact.\nType the email to confirm:`
+        : `Remove contact ${email} from Platform Command?\nAlso frees any workspace memberships so the email can be provisioned again.\nType the email to confirm:`,
       "",
     );
     if (typedEmail == null) return;
@@ -191,7 +191,7 @@ export default function PlatformCustomersPage() {
     return f.plan_id > 0 ? String(f.plan_id) : "trial_90d";
   };
 
-  const submitProvision = async () => {
+  const submitProvision = async (forceRelease = false) => {
     if (busy()) return;
     const f = form();
     if (!f.email.trim() || !f.full_name.trim()) {
@@ -205,6 +205,7 @@ export default function PlatformCustomersPage() {
       company_name: f.company_name.trim(),
       mobile: f.mobile.trim(),
     };
+    if (forceRelease) body.force_release_memberships = true;
     if (f.plan_id > 0) {
       body.plan_id = f.plan_id;
       body.plan_kind = f.plan_kind;
@@ -224,7 +225,18 @@ export default function PlatformCustomersPage() {
     setBusy(false);
 
     if (!res.ok) {
-      toast.error(res.message ?? "Failed to provision workspace.");
+      const msg = res.message ?? "Failed to provision workspace.";
+      if (!forceRelease && /already belongs to another business/i.test(msg)) {
+        if (
+          confirm(
+            `${msg}\n\nFree this email's existing memberships (e.g. Bluearm Philippines) and provision anyway?`,
+          )
+        ) {
+          await submitProvision(true);
+          return;
+        }
+      }
+      toast.error(msg);
       return;
     }
 
@@ -316,8 +328,8 @@ export default function PlatformCustomersPage() {
       </Show>
 
       <Show when={showModal()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-6 shadow-lg">
+        <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center">
+          <div class="my-4 w-full max-w-md rounded-xl border border-stroke bg-white p-6 shadow-lg sm:my-0">
             <h2 class="text-lg font-semibold text-text-primary">Provision workspace (exceptions)</h2>
             <p class="mt-1 text-sm text-text-secondary">
               For manual onboarding, re-provision after wipe, or sales-assisted signup — not the default self-serve trial

@@ -412,6 +412,15 @@ func (s *service) deleteCustomer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Contact row alone does not own the one-email→one-business claim — free users/invites too.
+	released, relErr := auth.ReleaseCustomerEmailClaim(r.Context(), s.pool, email)
+	if relErr != nil {
+		log.Printf("console: release email claim for %s after contact delete: %v", email, relErr)
+		response.Err(w, http.StatusInternalServerError,
+			"Contact removed but could not free email memberships: "+relErr.Error(), "ERR_INTERNAL")
+		return
+	}
+
 	tu, _ := auth.FromContext(r.Context())
 	logPlatformAudit(r.Context(), s.pool, tu, platformAuditEntry{
 		ActionCode: "platform.customer.delete", EventKind: "change",
@@ -424,5 +433,67 @@ func (s *service) deleteCustomer(w http.ResponseWriter, r *http.Request) {
 	if wiped {
 		msg = "Company " + companyCode + " wiped and contact " + email + " removed from Platform Command."
 	}
-	response.OK(w, map[string]any{"deleted": true, "wiped": wiped, "email": email}, msg)
+	if released > 0 {
+		msg += fmt.Sprintf(" Freed %d workspace membership(s) so the email can be provisioned or start a trial again.", released)
+	}
+	response.OK(w, map[string]any{
+		"deleted": true, "wiped": wiped, "email": email, "memberships_released": released,
+	}, msg)
+}
+
+// releaseEmailClaim frees an email that still has users/invites after the Platform
+// Command contact row was already deleted (or never existed).
+func (s *service) releaseEmailClaim(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email        string `json:"email"`
+		ConfirmEmail string `json:"confirm_email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.Validation(w, map[string]string{"body": "Invalid JSON."})
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(body.Email))
+	confirm := strings.ToLower(strings.TrimSpace(body.ConfirmEmail))
+	if email == "" || !strings.Contains(email, "@") {
+		response.Validation(w, map[string]string{"email": "Enter a valid email address."})
+		return
+	}
+	if confirm != email {
+		response.Validation(w, map[string]string{"confirm_email": "Type the exact email to confirm release."})
+		return
+	}
+	if auth.IsPlatformConsoleEmail(email) {
+		response.Err(w, http.StatusConflict, "Cannot release a product owner / platform superadmin email.", "ERR_FORBIDDEN")
+		return
+	}
+
+	occ, err := auth.CustomerEmailOccupancy(r.Context(), s.pool, email)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to check email.", "ERR_INTERNAL")
+		return
+	}
+
+	released, err := auth.ReleaseCustomerEmailClaim(r.Context(), s.pool, email)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to release email: "+err.Error(), "ERR_INTERNAL")
+		return
+	}
+
+	tu, _ := auth.FromContext(r.Context())
+	logPlatformAudit(r.Context(), s.pool, tu, platformAuditEntry{
+		ActionCode: "platform.email.release", EventKind: "change",
+		HTTPMethod: "POST", RoutePath: r.URL.Path,
+		TargetType: "users", Summary: "Released email claim for " + email,
+	})
+
+	msg := "Email " + email + " is free for provision or trial."
+	if released == 0 && !occ.Occupied {
+		msg = "Email " + email + " was already free."
+	} else if occ.Occupied {
+		msg = fmt.Sprintf("Freed %d membership(s) for %s (was on %s).", released, email, occ.CompanyName)
+	}
+	response.OK(w, map[string]any{
+		"email": email, "memberships_released": released, "was_occupied": occ.Occupied,
+		"previous_company": occ.CompanyName,
+	}, msg)
 }
