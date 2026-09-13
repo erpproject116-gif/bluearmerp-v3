@@ -123,7 +123,12 @@ export default function PlatformCommandPage() {
 
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Stat label="Day 1 payments" value={counts()?.awaiting_day1_payment} href="/app/platform-command/day1-payments" accent />
-        <Stat label="Pending approvals" value={counts()?.pending_approvals} href="/app/platform-command/customers?tenant_status=pending_approval" accent />
+        <Stat
+          label="Workspace approvals"
+          value={counts()?.pending_approvals}
+          href="/app/platform-command/customers?tenant_status=pending_approval"
+          accent
+        />
         <Stat label="Open tickets" value={counts()?.open_tickets} href="/app/platform-command/tickets" />
         <Stat label="Churn risk" value={counts()?.churn_risk} href="/app/platform-command/customers" accent />
         <Stat label="Trials ending" value={counts()?.trial_ending} href="/app/platform-command/customers" />

@@ -86,10 +86,10 @@ export default function SignUpPage() {
       title="Create your account"
       subtitle="Register with Google or email. Your admin can also invite you to a company workspace."
       heroTitle="Start with a workspace you can trust."
-      heroBody="Create your login in minutes. Join your company when an admin invites you with that exact email—or start a free trial with an email that is not already used on another company."
+      heroBody="Create your login, then on Welcome start a free trial — your workspace is created immediately (setup wizard → Day 1 stock → playbook). Or join your company when an admin invites that exact email."
       trustPoints={[
+        "Own business: sign up → Welcome → Start free trial (self-serve, no wait on Bluearm)",
         "Join by invite: sign in with the invited Google email",
-        "Own business: start trial only with an unused email",
         "One email → one customer business",
       ]}
       footer={

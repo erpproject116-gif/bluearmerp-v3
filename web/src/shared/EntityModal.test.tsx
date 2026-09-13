@@ -72,4 +72,13 @@ describe("WideEntityModal", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Lines" }));
     expect(onTabChange).toHaveBeenCalledWith("lines");
   });
+
+  it("shows Saving… while busy", () => {
+    render(() => (
+      <WideEntityModal open title="Busy Save" onClose={() => undefined} onSave={() => undefined} saving>
+        <p>Wide form</p>
+      </WideEntityModal>
+    ));
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeInTheDocument();
+  });
 });

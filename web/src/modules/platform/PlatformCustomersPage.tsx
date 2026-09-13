@@ -194,7 +194,7 @@ export default function PlatformCustomersPage() {
             >
               <p class="text-xs uppercase text-amber-900">Pending approvals</p>
               <p class="mt-1 text-2xl font-semibold text-amber-950">{pendingApprovals()}</p>
-              <p class="text-xs text-amber-900">Self-serve signups waiting</p>
+              <p class="text-xs text-amber-900">Exception workspaces (pending_approval)</p>
             </button>
             <div class="rounded-xl border border-stroke bg-white p-4">
               <p class="text-xs uppercase text-text-secondary">MRR</p>
@@ -221,9 +221,11 @@ export default function PlatformCustomersPage() {
       <Show when={showModal()}>
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-6 shadow-lg">
-            <h2 class="text-lg font-semibold text-text-primary">Provision workspace</h2>
+            <h2 class="text-lg font-semibold text-text-primary">Provision workspace (exceptions)</h2>
             <p class="mt-1 text-sm text-text-secondary">
-              Creates a customer record, ERP workspace, and subscription. The owner signs in with Google using the email below.
+              For manual onboarding, re-provision after wipe, or sales-assisted signup — not the default self-serve trial
+              (users create workspaces from Welcome → Start free trial). Creates customer, workspace, and subscription;
+              owner signs in with Google using the email below.
             </p>
             <div class="mt-4 space-y-3">
               <label class="block text-sm">

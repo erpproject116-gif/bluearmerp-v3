@@ -1,6 +1,10 @@
 package manufacturing
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // Phase 1 posting / edit rules (PDF §5–7, §12, §42–44, §47, §53, §59).
 // UI mirrors these in web mfgRules.ts; the API remains authoritative.
@@ -20,9 +24,9 @@ const (
 type StockAvailabilityStatus string
 
 const (
-	StockInStock       StockAvailabilityStatus = "in_stock"
-	StockLowStock      StockAvailabilityStatus = "low_stock"
-	StockInsufficient  StockAvailabilityStatus = "insufficient"
+	StockInStock      StockAvailabilityStatus = "in_stock"
+	StockLowStock     StockAvailabilityStatus = "low_stock"
+	StockInsufficient StockAvailabilityStatus = "insufficient"
 )
 
 // ComponentStockStatus classifies on-hand vs required.
@@ -70,6 +74,13 @@ func CanCompleteWorkOrder(status, inspectionStatus string) (ok bool, reason stri
 		return false, "Quality check must pass before Finish."
 	}
 	return true, ""
+}
+
+func CanCompleteWorkOrderWithPolicy(status, inspectionStatus string, requireFgQc bool) (ok bool, reason string) {
+	if !requireFgQc {
+		inspectionStatus = InspectionReleased
+	}
+	return CanCompleteWorkOrder(status, inspectionStatus)
 }
 
 // CanPostAssemblyWithShortage is false by default (negative inventory OFF).
@@ -161,4 +172,20 @@ func ExcessWasteQty(expected, actual float64) float64 {
 func IsAssemblyLikeBomType(bomType string) bool {
 	t := normalizeBomType(bomType)
 	return t == "assembly" || t == "recipe"
+}
+
+// workOrderNoPrefix returns ASM-/CUT-/REC- for matrix S41 numbering.
+func workOrderNoPrefix(bomType string) string {
+	switch normalizeBomType(bomType) {
+	case "disassembly":
+		return "CUT"
+	case "recipe":
+		return "REC"
+	default:
+		return "ASM"
+	}
+}
+
+func allocateWorkOrderNo(bomType string, orderDate time.Time, salt int64) string {
+	return fmt.Sprintf("%s-%s-%04d", workOrderNoPrefix(bomType), orderDate.Format("20060102"), salt%10000)
 }

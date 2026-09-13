@@ -42,6 +42,16 @@ func TestAssistFromMessageKnownCodes(t *testing.T) {
 		{"Not enough available stock for Pick List release. Check Inv Per Branch, or free reserved qty, then try again.", SAInsufficientStock},
 		{"Couldn't finish Pick List release automatically. Open the sales order Pick List and release manually, then try again.", SASINeedsPickRelease},
 		{"Goods receipt must be inspection-released before posting. Release QC on this receipt, then post again.", SASISerialLotNeedsGR},
+		{"Only draft work orders can be released.", SAMfgWOReleaseDraftOnly},
+		{"Only started (released) jobs can be finished.", SAMfgWOCompleteReleasedOnly},
+		{"Quality check must pass before Finish.", SAMfgWOQCPassRequired},
+		{"Abnormal or excess waste requires a waste reason.", SAMfgWOWasteReasonRequired},
+		{"waste_lines[0]: waste reason not found", SAMfgWOWasteReasonNotFound},
+		{"Take materials first: staged issue for SKU-1: staged serial count 0 is less than required 2", SAMfgWOTakeMaterials},
+		{"Record finished product first: staged lot qty 0.0000 is less than required 1.0000", SAMfgWORecordFinished},
+		{"insufficient stock for COMP-A: need 5.0000 EA at location", SAMfgWOComponentShortage},
+		{"Insufficient qty on input lot batch.", SAMfgWOInputLotShortage},
+		{"Only released work orders accept issue scans.", SAMfgWOCompleteReleasedOnly},
 	}
 	for _, tc := range cases {
 		a := AssistFromMessage("field", tc.msg)

@@ -29,12 +29,12 @@ export default function PendingApprovalPage() {
   return (
     <AuthShell
       title="Waiting for approval"
-      subtitle="Your workspace was created and is pending product owner review."
-      heroTitle="Almost there."
-      heroBody="Self-serve signups need a Bluearm product owner to approve your company before you can open the ERP. Invited team members skip this step and join an already-approved company."
+      subtitle="This workspace is on an exception approval path — not the default free trial."
+      heroTitle="Waiting for product owner approval."
+      heroBody="New free trials usually start immediately from Welcome (no Bluearm provisioning step). Your account is tied to a workspace that still needs a product owner to approve it in Platform Command before you can sign in. Invited team members join an already-active company instead."
       trustPoints={[
-        "You will keep the same Google sign-in after approval",
-        "No action needed on your side while you wait",
+        "Default trial: Welcome → Start free trial → setup wizard (no approval wait)",
+        "You keep the same Google sign-in after approval",
         "Contact your Bluearm partner if this takes longer than expected",
       ]}
     >

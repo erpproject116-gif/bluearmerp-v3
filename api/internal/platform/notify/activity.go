@@ -26,25 +26,7 @@ func FromAudit(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID in
 	title, body := describeAction(actionCode, targetType, targetID)
 	body = enrichTrailBody(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, body, oldJSON, newJSON)
 	if writeBell {
-		dedupe := activityBellDedupeKey(actionCode, targetType, targetID, time.Now().UTC())
-		var entityID any
-		if targetID != nil {
-			entityID = *targetID
-		} else {
-			entityID = nil
-		}
-		var actor any
-		if actorUserID > 0 {
-			actor = actorUserID
-		} else {
-			actor = nil
-		}
-		_, _ = pool.Exec(ctx, `
-			insert into public.crm_notifications
-			  (tenant_id, user_id, rule_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id, source)
-			values ($1, null, null, 'info', $2, $3, $4, $5, $6, $7, 'activity')
-			on conflict (tenant_id, dedupe_key) do nothing`,
-			tenantID, title, body, nullIfEmpty(targetType), entityID, dedupe, actor)
+		writeActivityBellRows(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, title, body)
 	}
 	if queueDigest {
 		QueueChangeAlert(ctx, pool, tenantID, actorUserID, actionCode, title, body, targetType, targetID)
@@ -114,7 +96,7 @@ func hasNotifyModulePrefix(actionCode string) bool {
 	prefixes := []string{
 		"quotation.", "sales.", "sales_order.", "purchase.", "purchase_order.", "purchase_request.",
 		"goods_receipt.", "delivery_receipt.", "finance.", "inventory.", "crm.", "support.",
-		"hr.", "pos.", "operations.", "shipping.", "booking.",
+		"manufacturing.", "hr.", "pos.", "operations.", "shipping.", "booking.",
 	}
 	for _, p := range prefixes {
 		if strings.HasPrefix(actionCode, p) {
@@ -122,6 +104,31 @@ func hasNotifyModulePrefix(actionCode string) bool {
 		}
 	}
 	return false
+}
+
+func writeActivityBellRows(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, title, body string) {
+	baseDedupe := activityBellDedupeKey(actionCode, targetType, targetID, time.Now().UTC())
+	var entityID any
+	if targetID != nil {
+		entityID = *targetID
+	}
+	var actor any
+	if actorUserID > 0 {
+		actor = actorUserID
+	}
+	recipients := activityBellAudienceUserIDs(ctx, pool, tenantID, actorUserID, actionCode, targetType)
+	if len(recipients) == 0 {
+		return
+	}
+	for _, userID := range recipients {
+		dedupe := activityBellDedupeKeyForUser(baseDedupe, userID)
+		_, _ = pool.Exec(ctx, `
+			insert into public.crm_notifications
+			  (tenant_id, user_id, rule_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id, source)
+			values ($1, $2, null, 'info', $3, $4, $5, $6, $7, $8, 'activity')
+			on conflict (tenant_id, dedupe_key) do nothing`,
+			tenantID, userID, title, body, nullIfEmpty(targetType), entityID, dedupe, actor)
+	}
 }
 
 func activityBellDedupeKey(actionCode, targetType string, targetID *int64, at time.Time) string {

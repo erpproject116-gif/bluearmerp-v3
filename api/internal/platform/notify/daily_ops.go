@@ -29,44 +29,6 @@ type dailyOpsMetrics struct {
 	ReconGaps           int64
 }
 
-// opsAdminEmails returns CHANGE_ALERT_DIGEST_TO override, else business owners only
-// (tenant owner_user_id and active owner / store_owner roles — not store_admin or below).
-func opsAdminEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]string, error) {
-	if override := parseDigestToEnv(); len(override) > 0 {
-		return override, nil
-	}
-	rows, err := pool.Query(ctx, `
-		select distinct lower(trim(u.email))
-		from public.users u
-		left join public.tenants t on t.id = u.tenant_id
-		where u.tenant_id = $1
-		  and u.status = 'active'
-		  and coalesce(trim(u.email), '') <> ''
-		  and (
-		    u.id = t.owner_user_id
-		    or u.tenant_role in ('owner', 'store_owner')
-		  )`, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	seen := map[string]bool{}
-	for rows.Next() {
-		var e string
-		if rows.Scan(&e) != nil {
-			continue
-		}
-		e = strings.TrimSpace(e)
-		if e == "" || seen[e] {
-			continue
-		}
-		seen[e] = true
-		out = append(out, e)
-	}
-	return out, rows.Err()
-}
-
 func countInt64(ctx context.Context, pool *pgxpool.Pool, q string, args ...any) int64 {
 	var n int64
 	if err := pool.QueryRow(ctx, q, args...).Scan(&n); err != nil {
@@ -375,7 +337,7 @@ func DrainDailyOpsDigests(ctx context.Context, pool *pgxpool.Pool) (tenants, sen
 		from public.owner_change_alert_prefs p
 		join public.tenants t on t.id = p.tenant_id
 		where t.status = 'active'
-		  and coalesce(p.daily_ops_enabled, true)
+		  and coalesce(p.daily_ops_enabled, false)
 		  and (
 		    p.last_daily_ops_at is null
 		    or p.last_daily_ops_at < date_trunc('day', now() at time zone 'utc')
@@ -405,7 +367,7 @@ func DrainDailyOpsDigests(ctx context.Context, pool *pgxpool.Pool) (tenants, sen
 
 	for _, tid := range ids {
 		tenants++
-		emails, eErr := opsAdminEmails(ctx, pool, tid)
+		emails, eErr := BusinessOwnerEmails(ctx, pool, tid)
 		if eErr != nil || len(emails) == 0 {
 			log.Printf("daily-ops: tenant=%d no recipients (%v)", tid, eErr)
 			details = append(details, map[string]any{"tenant_id": tid, "delivered": false, "reason": "no_recipients"})
@@ -449,6 +411,16 @@ func dailyOpsDigestJob(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if hdr != secret {
 			response.Err(w, http.StatusUnauthorized, "Invalid job secret.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if SkipDailyOpsDigest() {
+			response.OK(w, map[string]any{
+				"tenants": 0,
+				"sent":    0,
+				"details": []map[string]any{},
+				"skipped": true,
+				"reason":  "OPS_EMAIL_SKIP_DAILY_OPS_DIGEST",
+			}, "Daily ops digest skipped (env).")
 			return
 		}
 		tenants, sent, details, err := DrainDailyOpsDigests(r.Context(), pool)

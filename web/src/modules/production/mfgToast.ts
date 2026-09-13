@@ -87,3 +87,40 @@ export function mfgWarn(raw: string | undefined | null, fallback: string) {
 export function mfgError(raw: string | undefined | null, fallback: string) {
   getGlobalToast()?.error(friendlyMfgMessage(raw, fallback));
 }
+
+type StationHandoffKind = "issue" | "receive" | "disassembly_issue";
+
+const STATION_HANDOFF: Record<
+  StationHandoffKind,
+  { title: string; message: string; actionLabel: string }
+> = {
+  issue: {
+    title: "Job started — Take materials next",
+    message: "Scan or pick component serials/lots, then finish the job from Jobs.",
+    actionLabel: "Open Take materials",
+  },
+  receive: {
+    title: "Job started — Record finished next",
+    message: "Enter finished serials/lots, then finish the job from Jobs.",
+    actionLabel: "Open Record finished",
+  },
+  disassembly_issue: {
+    title: "Job started — Take from stock next",
+    message: "Take the whole serial/lot, weigh parts if needed, then finish from Jobs.",
+    actionLabel: "Open Take from stock",
+  },
+};
+
+/** Sticky toast with CTA when wizards hand off to issue/receive stations. */
+export function mfgStationHandoff(kind: StationHandoffKind, href: string) {
+  const copy = STATION_HANDOFF[kind];
+  getGlobalToast()?.action({
+    type: "success",
+    title: copy.title,
+    message: copy.message,
+    actionLabel: copy.actionLabel,
+    href,
+    sticky: true,
+    askHelp: false,
+  });
+}

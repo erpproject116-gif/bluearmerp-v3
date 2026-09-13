@@ -594,7 +594,13 @@ export function SalesOrderModal(props: Props) {
       : apiFetch<SalesOrderDetail>("/api/v1/sales-order/sales-orders", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, props.editing ? "Sales order updated." : "Sales order created.", {
+      handleSaveResult(
+        res,
+        toast,
+        props.editing
+          ? "Sales order saved. Use Pick List when you are ready to ship."
+          : "Sales order created. Confirm, then Pick List before invoicing.",
+        {
         onFieldErrors: setFieldErrors,
       });
       return;

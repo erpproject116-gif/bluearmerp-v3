@@ -72,7 +72,7 @@ export const documentationSections: DocSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Every new workspace is provisioned with a standard Philippine SME chart of accounts (general ledger), PHP currency, standard VAT types, and a default Main location. Bank accounts for banking are a separate setup — they are not the same as GL cash accounts. The setup wizard makes you review and confirm those seeds, then add at least one partner and one product. Until required steps are done, the API blocks new selling and buying documents.",
+        text: "Every new trial workspace is created immediately on Welcome (self-serve) with a standard Philippine SME chart of accounts (general ledger), PHP currency, standard VAT types, and a default Main location. Bank accounts for banking are a separate setup — they are not the same as GL cash accounts. The setup wizard makes you review and confirm those seeds, then add at least one partner and one product. Until required steps are done, the API blocks new selling and buying documents.",
       },
       {
         type: "steps",

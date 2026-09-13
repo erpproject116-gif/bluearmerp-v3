@@ -984,10 +984,10 @@ export function SalesModal(props: Props) {
       : apiFetch<SalesDetail>("/api/v1/sales", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, ed ? "Sale updated." : "Sale created.", { onFieldErrors: setFieldErrors });
+      handleSaveResult(res, toast, ed ? "Sale saved. Open the Invoice tab to print or collect payment." : "Sale created. Open the Invoice tab next, then collect payment.", { onFieldErrors: setFieldErrors });
       return;
     }
-    toast.success(ed ? "Sale updated." : "Sale created.");
+    toast.success(ed ? "Sale saved. Open the Invoice tab to print or collect payment." : "Sale created. Open the Invoice tab next, then collect payment.");
     if (ed?.id) {
       invalidateRecordHistory(queryClient, "sa_sales", ed.id);
     }

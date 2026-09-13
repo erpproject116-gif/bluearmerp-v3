@@ -19,77 +19,81 @@ import (
 )
 
 type WorkItem struct {
-	ID               int64          `json:"id"`
-	WorkspaceID      int64          `json:"workspace_id"`
-	ColumnID         int64          `json:"column_id"`
-	ColumnKey        string         `json:"column_key,omitempty"`
-	ColumnName       string         `json:"column_name,omitempty"`
-	ItemCode         *string        `json:"item_code,omitempty"`
-	Title            string         `json:"title"`
-	Description      *string        `json:"description,omitempty"`
-	Status           string         `json:"status"`
-	Priority         string         `json:"priority"`
-	AssigneeUserID   *int64         `json:"assignee_user_id,omitempty"`
-	AssigneeName     string         `json:"assignee_name,omitempty"`
-	PartnerID        *int64         `json:"partner_id,omitempty"`
-	PartnerName      string         `json:"partner_name,omitempty"`
-	StartDate        *string        `json:"start_date,omitempty"`
-	EndDate          *string        `json:"end_date,omitempty"`
-	StartTime        *string        `json:"start_time,omitempty"`
-	EndTime          *string        `json:"end_time,omitempty"`
-	AllDay           bool           `json:"all_day"`
-	ReminderOffsetMinutes *int     `json:"reminder_offset_minutes,omitempty"`
-	ReminderAt       *string        `json:"reminder_at,omitempty"`
-	ReminderSentAt   *string        `json:"reminder_sent_at,omitempty"`
-	BlockedByItemID  *int64         `json:"blocked_by_item_id,omitempty"`
-	BlockedByTitle   string         `json:"blocked_by_title,omitempty"`
-	QuotationID      *int64         `json:"quotation_id,omitempty"`
-	QuotationRef     string         `json:"quotation_reference,omitempty"`
-	SortOrder        int            `json:"sort_order"`
-	CustomValues     map[string]any `json:"custom_values,omitempty"`
+	ID                    int64          `json:"id"`
+	WorkspaceID           int64          `json:"workspace_id"`
+	ColumnID              int64          `json:"column_id"`
+	ColumnKey             string         `json:"column_key,omitempty"`
+	ColumnName            string         `json:"column_name,omitempty"`
+	ItemCode              *string        `json:"item_code,omitempty"`
+	Title                 string         `json:"title"`
+	Description           *string        `json:"description,omitempty"`
+	Status                string         `json:"status"`
+	Priority              string         `json:"priority"`
+	AssigneeUserID        *int64         `json:"assignee_user_id,omitempty"`
+	AssigneeName          string         `json:"assignee_name,omitempty"`
+	PartnerID             *int64         `json:"partner_id,omitempty"`
+	PartnerName           string         `json:"partner_name,omitempty"`
+	StartDate             *string        `json:"start_date,omitempty"`
+	EndDate               *string        `json:"end_date,omitempty"`
+	StartTime             *string        `json:"start_time,omitempty"`
+	EndTime               *string        `json:"end_time,omitempty"`
+	AllDay                bool           `json:"all_day"`
+	ReminderOffsetMinutes *int           `json:"reminder_offset_minutes,omitempty"`
+	ReminderAt            *string        `json:"reminder_at,omitempty"`
+	ReminderSentAt        *string        `json:"reminder_sent_at,omitempty"`
+	ItemKind              string         `json:"item_kind"`
+	AllHands              bool           `json:"all_hands"`
+	MeetingPlace          *string        `json:"meeting_place,omitempty"`
+	BlockedByItemID       *int64         `json:"blocked_by_item_id,omitempty"`
+	BlockedByTitle        string         `json:"blocked_by_title,omitempty"`
+	QuotationID           *int64         `json:"quotation_id,omitempty"`
+	QuotationRef          string         `json:"quotation_reference,omitempty"`
+	SortOrder             int            `json:"sort_order"`
+	CustomValues          map[string]any `json:"custom_values,omitempty"`
 }
 
 type workItemBody struct {
-	WorkspaceID     int64          `json:"workspace_id"`
-	ColumnID        int64          `json:"column_id"`
-	Title           string         `json:"title"`
-	Description     *string        `json:"description"`
-	Status          string         `json:"status"`
-	Priority        string         `json:"priority"`
-	AssigneeUserID  *int64         `json:"assignee_user_id"`
-	PartnerID       *int64         `json:"partner_id"`
-	StartDate       *string        `json:"start_date"`
-	EndDate         *string        `json:"end_date"`
-	StartTime       *string        `json:"start_time"`
-	EndTime         *string        `json:"end_time"`
-	AllDay          *bool          `json:"all_day"`
-	ReminderOffsetMinutes *int     `json:"reminder_offset_minutes"`
-	BlockedByItemID *int64         `json:"blocked_by_item_id"`
-	CustomValues    map[string]any `json:"custom_values"`
+	WorkspaceID           int64          `json:"workspace_id"`
+	ColumnID              int64          `json:"column_id"`
+	Title                 string         `json:"title"`
+	Description           *string        `json:"description"`
+	Status                string         `json:"status"`
+	Priority              string         `json:"priority"`
+	AssigneeUserID        *int64         `json:"assignee_user_id"`
+	PartnerID             *int64         `json:"partner_id"`
+	StartDate             *string        `json:"start_date"`
+	EndDate               *string        `json:"end_date"`
+	StartTime             *string        `json:"start_time"`
+	EndTime               *string        `json:"end_time"`
+	AllDay                *bool          `json:"all_day"`
+	ReminderOffsetMinutes *int           `json:"reminder_offset_minutes"`
+	BlockedByItemID       *int64         `json:"blocked_by_item_id"`
+	CustomValues          map[string]any `json:"custom_values"`
 }
 
 type workItemPatchBody struct {
-	ColumnID        *int64         `json:"column_id"`
-	Title           *string        `json:"title"`
-	Description     *string        `json:"description"`
-	Status          *string        `json:"status"`
-	Priority        *string        `json:"priority"`
-	AssigneeUserID  *int64         `json:"assignee_user_id"`
-	PartnerID       *int64         `json:"partner_id"`
-	StartDate       *string        `json:"start_date"`
-	EndDate         *string        `json:"end_date"`
-	StartTime       *string        `json:"start_time"`
-	EndTime         *string        `json:"end_time"`
-	AllDay          *bool          `json:"all_day"`
-	ReminderOffsetMinutes *int     `json:"reminder_offset_minutes"`
-	ReminderSentAt  *string        `json:"reminder_sent_at"`
-	BlockedByItemID *int64         `json:"blocked_by_item_id"`
-	CustomValues    map[string]any `json:"custom_values"`
+	ColumnID              *int64         `json:"column_id"`
+	Title                 *string        `json:"title"`
+	Description           *string        `json:"description"`
+	Status                *string        `json:"status"`
+	Priority              *string        `json:"priority"`
+	AssigneeUserID        *int64         `json:"assignee_user_id"`
+	PartnerID             *int64         `json:"partner_id"`
+	StartDate             *string        `json:"start_date"`
+	EndDate               *string        `json:"end_date"`
+	StartTime             *string        `json:"start_time"`
+	EndTime               *string        `json:"end_time"`
+	AllDay                *bool          `json:"all_day"`
+	ReminderOffsetMinutes *int           `json:"reminder_offset_minutes"`
+	ReminderSentAt        *string        `json:"reminder_sent_at"`
+	BlockedByItemID       *int64         `json:"blocked_by_item_id"`
+	CustomValues          map[string]any `json:"custom_values"`
 }
 
 func registerWorkItemRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("operations.work_items", auth.AccessRead)).Get("/work-items", listWorkItems(pool))
 	r.With(auth.RequirePermission("operations.work_items_new", auth.AccessWrite)).Post("/work-items", createWorkItem(pool))
+	r.With(auth.RequirePermission("operations.work_items_new", auth.AccessWrite)).Post("/meetings", createAllHandsMeeting(pool))
 	r.With(auth.RequirePermission("operations.work_items", auth.AccessRead)).Get("/work-items/{id}", getWorkItem(pool))
 	r.With(auth.RequirePermission("operations.work_items", auth.AccessWrite)).Patch("/work-items/{id}", patchWorkItem(pool))
 	r.With(auth.RequirePermission("operations.create_quotation", auth.AccessWrite)).Post("/work-items/{id}/create-quotation", createQuotationFromWorkItem(pool))
@@ -157,6 +161,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 			  to_char(wi.start_time, 'HH24:MI'), to_char(wi.end_time, 'HH24:MI'),
 			  wi.all_day,
 			  wi.reminder_offset_minutes, wi.reminder_at::text, wi.reminder_sent_at::text,
+			  wi.item_kind, wi.all_hands, wi.meeting_place,
 			  wi.blocked_by_item_id, coalesce(blocker.title, ''),
 			  wi.quotation_id, coalesce(q.reference_no, ''),
 			  wi.sort_order`
@@ -190,6 +195,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 					&row.StartDate, &row.EndDate,
 					&row.StartTime, &row.EndTime, &row.AllDay,
 					&row.ReminderOffsetMinutes, &row.ReminderAt, &row.ReminderSentAt,
+					&row.ItemKind, &row.AllHands, &row.MeetingPlace,
 					&row.BlockedByItemID, &row.BlockedByTitle,
 					&row.QuotationID, &row.QuotationRef,
 					&row.SortOrder,
@@ -237,6 +243,7 @@ func listWorkItems(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.StartDate, &row.EndDate,
 				&row.StartTime, &row.EndTime, &row.AllDay,
 				&row.ReminderOffsetMinutes, &row.ReminderAt, &row.ReminderSentAt,
+				&row.ItemKind, &row.AllHands, &row.MeetingPlace,
 				&row.BlockedByItemID, &row.BlockedByTitle,
 				&row.QuotationID, &row.QuotationRef,
 				&row.SortOrder, &total,
@@ -558,6 +565,7 @@ func loadWorkItem(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		  to_char(wi.start_time, 'HH24:MI'), to_char(wi.end_time, 'HH24:MI'),
 		  wi.all_day,
 		  wi.reminder_offset_minutes, wi.reminder_at::text, wi.reminder_sent_at::text,
+		  wi.item_kind, wi.all_hands, wi.meeting_place,
 		  wi.blocked_by_item_id, coalesce(blocker.title, ''),
 		  wi.quotation_id, coalesce(q.reference_no, ''),
 		  wi.sort_order
@@ -575,6 +583,7 @@ func loadWorkItem(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		&row.StartDate, &row.EndDate,
 		&row.StartTime, &row.EndTime, &row.AllDay,
 		&row.ReminderOffsetMinutes, &row.ReminderAt, &row.ReminderSentAt,
+		&row.ItemKind, &row.AllHands, &row.MeetingPlace,
 		&row.BlockedByItemID, &row.BlockedByTitle,
 		&row.QuotationID, &row.QuotationRef,
 		&row.SortOrder,

@@ -1,5 +1,5 @@
 import { A, useNavigate } from "@solidjs/router";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
@@ -12,8 +12,11 @@ import {
   materialNeedsHasShortage,
   stockChipLabel,
 } from "../production/mfgRules";
-import { mfgSuccess, mfgWarn } from "../production/mfgToast";
+import { MfgWizardStickyAlerts } from "../production/MfgWizardStickyAlerts";
+import { recipeAssemblyStepGuidance } from "../production/mfgWizardStepGuidance";
+import { mfgStationHandoff, mfgSuccess, mfgWarn } from "../production/mfgToast";
 import { jobsHref } from "../production/mfgProductionMode";
+import { submitBusyLabel } from "../../shared/submitCopy";
 
 type BomOption = { id: number; bom_code: string; bom_name: string; finished_item_name?: string };
 type WorkOrder = {
@@ -42,6 +45,17 @@ type MaterialNeedLine = {
 type MaterialNeeds = {
   work_order_id: number;
   lines: MaterialNeedLine[];
+};
+
+type JournalPreview = {
+  accounting_enabled: boolean;
+  costs: {
+    material_cost: number;
+    labor_cost: number;
+    overhead_cost: number;
+    other_cost: number;
+    total_cost: number;
+  };
 };
 
 const searchBoms = async (q: string): Promise<LookupOption[]> => {
@@ -86,6 +100,7 @@ export default function NewRecipeOrderWizard() {
   const [overhead, setOverhead] = createSignal("");
   const [otherCost, setOtherCost] = createSignal("");
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
+  const [journalPreview, setJournalPreview] = createSignal<JournalPreview | null>(null);
   const [saving, setSaving] = createSignal(false);
   const [posting, setPosting] = createSignal(false);
   const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
@@ -96,8 +111,17 @@ export default function NewRecipeOrderWizard() {
 
   const additionalCost = () =>
     (Number(labor()) || 0) + (Number(overhead()) || 0) + (Number(otherCost()) || 0);
+  const estimatedTotalCost = () => (journalPreview()?.costs.material_cost ?? 0) + additionalCost();
 
   const hasShortage = () => materialNeedsHasShortage(needs()?.lines ?? []);
+
+  const stepGuidance = createMemo(() =>
+    recipeAssemblyStepGuidance(step(), {
+      hasShortage: hasShortage(),
+      postBlockedLabel: "Process & Post",
+      takeMaterialsNext: step() === 3 && (trackHint().components || trackHint().finished),
+    }),
+  );
 
   const loadNeeds = async (id: number) => {
     const res = await apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${id}/material-needs`, undefined, {
@@ -105,6 +129,15 @@ export default function NewRecipeOrderWizard() {
     });
     if (res.success && res.data) setNeeds(res.data);
     else setNeeds(null);
+  };
+
+  const loadJournalPreview = async (id: number) => {
+    const res = await apiFetch<JournalPreview>(
+      `/api/v1/manufacturing/work-orders/${id}/journal-preview`,
+      undefined,
+      { silent: true },
+    );
+    setJournalPreview(res.success && res.data ? res.data : null);
   };
 
   const persistDraft = async (): Promise<WorkOrder | null> => {
@@ -183,6 +216,7 @@ export default function NewRecipeOrderWizard() {
   const handleContinueFrom2 = async () => {
     const row = await persistDraft();
     if (!row) return;
+    await loadJournalPreview(row.id);
     setStep(3);
   };
 
@@ -196,6 +230,22 @@ export default function NewRecipeOrderWizard() {
     const row = await persistDraft();
     if (!row) return;
     const id = row.id;
+    const costInput = await apiFetch(
+      `/api/v1/manufacturing/work-orders/${id}/cost-input`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          labor_cost: Number(labor()) || 0,
+          overhead_cost: Number(overhead()) || 0,
+          other_cost: Number(otherCost()) || 0,
+        }),
+      },
+      { silent: true },
+    );
+    if (!costInput.success) {
+      mfgWarn(costInput.message, "Could not save production costs.");
+      return;
+    }
 
     if (trackHint().components || trackHint().finished) {
       setPosting(true);
@@ -208,15 +258,10 @@ export default function NewRecipeOrderWizard() {
         }
       }
       setPosting(false);
-      mfgWarn(
-        null,
-        trackHint().components
-          ? "Job started. Take materials next (serials/lots), then Finish process."
-          : "Job started. Record finished serials/lots next, then Finish process.",
-      );
       const next = trackHint().components
         ? `/app/production/issue-station?woId=${id}&mode=recipe`
         : `/app/production/receive-station?woId=${id}&mode=recipe`;
+      mfgStationHandoff(trackHint().components ? "issue" : "receive", next);
       navigate(next);
       return;
     }
@@ -234,7 +279,13 @@ export default function NewRecipeOrderWizard() {
       `/api/v1/manufacturing/work-orders/${id}/complete`,
       {
         method: "POST",
-        body: JSON.stringify({ qty_produced: Number(qty()), actual_input_qty: Number(qty()) }),
+        body: JSON.stringify({
+          qty_produced: Number(qty()),
+          actual_input_qty: Number(qty()),
+          labor_cost: Number(labor()) || 0,
+          overhead_cost: Number(overhead()) || 0,
+          other_cost: Number(otherCost()) || 0,
+        }),
       },
       { silent: true },
     );
@@ -244,11 +295,7 @@ export default function NewRecipeOrderWizard() {
       navigate(jobsHref("recipe"));
       return;
     }
-    mfgSuccess(
-      additionalCost() > 0
-        ? `Processed & posted. Stock updated. Extra cost ₱${additionalCost().toLocaleString()} noted only for now.`
-        : "Processed & posted. Stock updated.",
-    );
+    mfgSuccess("Processed & posted. Stock and manufacturing costs updated.");
     navigate(jobsHref("recipe"));
   };
 
@@ -298,7 +345,10 @@ export default function NewRecipeOrderWizard() {
         </For>
       </nav>
 
-      <FormErrorSummary errors={fieldErrors} />
+      <Show when={step() === 1}>
+        <FormErrorSummary errors={fieldErrors} />
+      </Show>
+      <MfgWizardStickyAlerts step={step} validationErrors={fieldErrors} stepGuidance={stepGuidance} />
 
       <Show when={step() === 1}>
         <section class="grid gap-4 rounded-xl border border-stroke bg-white p-4 md:grid-cols-2">
@@ -393,11 +443,6 @@ export default function NewRecipeOrderWizard() {
               Refresh availability
             </button>
           </div>
-          <Show when={hasShortage()}>
-            <p class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Some components are short. You can still save the draft. Process &amp; Post stays blocked until stock is enough.
-            </p>
-          </Show>
           <div class="overflow-x-auto">
             <table class="min-w-full text-left text-sm">
               <thead class="bg-slate-50 text-xs text-text-secondary">
@@ -471,7 +516,7 @@ export default function NewRecipeOrderWizard() {
             </Field>
             <p class="text-sm font-medium">Total additional: ₱{additionalCost().toLocaleString()}</p>
             <p class="text-[11px] text-text-secondary">
-              Phase 1 keeps these as reference on the job notes when you post; full cost allocation comes later.
+              These costs are capitalized into the finished-goods estimate when you post.
             </p>
           </div>
           <div class="rounded-xl border border-stroke bg-white p-4">
@@ -481,12 +526,35 @@ export default function NewRecipeOrderWizard() {
             <p class="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-950">
               After posting, component items are deducted and finished products are added — only if Process &amp; Post succeeds.
             </p>
-            <Show when={trackHint().components || trackHint().finished}>
-              <p class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                This job needs serial/lot steps on the floor. Process &amp; Post will start the job and open Take materials /
-                Record finished first.
-              </p>
-            </Show>
+            <div class="mt-4 border-t border-stroke pt-3">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Journal preview</h3>
+              <Show
+                when={journalPreview()}
+                fallback={<p class="mt-2 text-xs text-text-secondary">Cost preview is unavailable. Posting remains server-validated.</p>}
+              >
+                <div class="mt-2 space-y-1 text-xs">
+                  <div class="flex justify-between gap-3">
+                    <span>Dr Finished goods inventory</span>
+                    <span class="tabular-nums">₱{estimatedTotalCost().toLocaleString()}</span>
+                  </div>
+                  <div class="flex justify-between gap-3">
+                    <span>Cr Materials inventory</span>
+                    <span class="tabular-nums">₱{(journalPreview()?.costs.material_cost ?? 0).toLocaleString()}</span>
+                  </div>
+                  <Show when={additionalCost() > 0}>
+                    <div class="flex justify-between gap-3">
+                      <span>Cr Production cost absorption</span>
+                      <span class="tabular-nums">₱{additionalCost().toLocaleString()}</span>
+                    </div>
+                  </Show>
+                </div>
+                <Show when={!journalPreview()?.accounting_enabled}>
+                  <p class="mt-2 text-[11px] text-amber-700">
+                    Preview only: Inventory GL is disabled, so this job will store costs without creating a journal.
+                  </p>
+                </Show>
+              </Show>
+            </div>
           </div>
         </section>
         <div class="flex justify-between">
@@ -499,7 +567,7 @@ export default function NewRecipeOrderWizard() {
             disabled={posting() || saving()}
             onClick={() => void handleProcessAndPost()}
           >
-            {posting() ? "Posting…" : "Process & Post"}
+            {submitBusyLabel("post", posting(), "Process & Post")}
           </button>
         </div>
       </Show>

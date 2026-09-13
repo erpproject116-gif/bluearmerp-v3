@@ -18,7 +18,7 @@ export const knowledgebaseArticles: KbArticle[] = [
       {
         type: "steps",
         items: [
-          "Have the new owner sign up at /signup with an email that is not already invited or linked to another Bluearm company, then start a trial—or ask your BluearmERP platform contact to provision a workspace.",
+          "Have the new owner sign up at /signup with an email that is not already invited or linked to another Bluearm company, then on /welcome click Start free trial (workspace is created immediately). Platform Command provision is only for exceptions (manual sales, re-provision after wipe).",
           "When that workspace is ready, an administrator invites teammates under User Management → Users using emails that are not already used on another company.",
         ],
       },
@@ -284,18 +284,19 @@ export const knowledgebaseArticles: KbArticle[] = [
   },
   {
     id: "start-90-day-trial",
-    title: "How do I start a 90-day free trial?",
+    title: "How do I start a free trial?",
     scenario: "You want an empty workspace for your real company data.",
     intro:
-      "Trials are self-service: sign up, confirm email, then provision an isolated tenant with seeded accounting defaults.",
+      "Trials are self-service: sign up, confirm email if needed, then start trial on Welcome — no waiting for Bluearm to provision.",
     blocks: [
       {
         type: "steps",
         items: [
           "Open /signup and register with email or Google.",
-          "On /welcome, click Start 90-day free trial.",
-          "BluearmERP creates your workspace (company code like TRIAL-xxx) and opens the setup wizard.",
-          "Complete foundation setup, then use Home → Onboarding for module-by-module guidance.",
+          "On /welcome, click Start 14-day free trial — your workspace is created immediately (company code like TRIAL-xxx).",
+          "Complete the setup wizard, then Day 1 on Stocks (places, products, opening stock).",
+          "Pay Day 1 via GCash; a Bluearm product owner confirms payment before buying and selling unlock.",
+          "Use Home → Onboarding for the week-by-week playbook.",
         ],
       },
       {

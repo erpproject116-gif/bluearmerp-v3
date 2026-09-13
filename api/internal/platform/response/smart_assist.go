@@ -34,6 +34,16 @@ const (
 	SASerialNotInStock       = "SA_SERIAL_NOT_IN_STOCK"
 	SAPRNotConfirmed         = "SA_PR_NOT_CONFIRMED"
 	SARFQIncomplete          = "SA_RFQ_INCOMPLETE"
+	// Manufacturing work orders
+	SAMfgWOReleaseDraftOnly    = "SA_MFG_WO_RELEASE_DRAFT_ONLY"
+	SAMfgWOCompleteReleasedOnly = "SA_MFG_WO_COMPLETE_RELEASED"
+	SAMfgWOQCPassRequired      = "SA_MFG_WO_QC_PASS"
+	SAMfgWOTakeMaterials       = "SA_MFG_WO_TAKE_MATERIALS"
+	SAMfgWORecordFinished      = "SA_MFG_WO_RECORD_FINISHED"
+	SAMfgWOWasteReasonRequired = "SA_MFG_WO_WASTE_REASON"
+	SAMfgWOWasteReasonNotFound = "SA_MFG_WO_WASTE_REASON_NOT_FOUND"
+	SAMfgWOComponentShortage   = "SA_MFG_WO_COMPONENT_SHORTAGE"
+	SAMfgWOInputLotShortage    = "SA_MFG_WO_INPUT_LOT_SHORTAGE"
 )
 
 const (
@@ -53,6 +63,10 @@ const (
 	hrefRFQ              = "/app/rfq/rfqs"
 	hrefInvPerBranch     = "/app/inventory/find-stock"
 	hrefSerials          = "/app/inventory/serial-lot/serials"
+	hrefProductionJobs   = "/app/production/all/jobs"
+	hrefProductionIssue  = "/app/production/issue-station"
+	hrefProductionReceive = "/app/production/receive-station"
+	hrefProductionWaste  = "/app/production/waste-reasons"
 )
 
 // AssistLinkContext deep-links Assist CTAs when a document id is known.
@@ -111,6 +125,7 @@ func AssistFromErrors(errors map[string]string) *Assist {
 	// Stable order: prefer qty / applied_amount / entry_date style fields when present.
 	preferred := []string{
 		"received_qty", "applied_amount", "official_receipt_id", "entry_date",
+		"waste_lines", "stock", "inspection_status", "status", "actual_input_qty",
 		"withholding_lines", "lines", "qty",
 	}
 	for _, key := range preferred {
@@ -167,6 +182,40 @@ func AssistFromMessage(field, msg string) *Assist {
 			Title:  "Stock must be reserved before Pick List release",
 			Detail: "Confirm the sales order to reserve stock, or free up available qty at this location, then release again.",
 			Actions: []AssistAction{{Label: "Open Sales Orders", Href: hrefSalesOrders}},
+		}
+	case strings.Contains(lower, "take materials first"):
+		return &Assist{
+			Code: SAMfgWOTakeMaterials, Field: field,
+			Title:  "Take materials before finishing",
+			Detail: "Open Take materials, scan/issue the required components at this plant, then come back and Finish.",
+			Actions: []AssistAction{{Label: "Open Take materials", Href: hrefProductionIssue}},
+		}
+	case strings.Contains(lower, "record finished product first"):
+		return &Assist{
+			Code: SAMfgWORecordFinished, Field: field,
+			Title:  "Record finished product before finishing",
+			Detail: "Open Record finished, scan or enter the finished qty/serials/lots, then try Finish again.",
+			Actions: []AssistAction{{Label: "Open Record finished", Href: hrefProductionReceive}},
+		}
+	case strings.Contains(lower, "insufficient qty on input lot batch"):
+		return &Assist{
+			Code: SAMfgWOInputLotShortage, Field: field,
+			Title:  "Not enough qty on the input lot",
+			Detail: "Lower actual input qty, pick a lot with enough on hand at this location, or receive/adjust stock first.",
+			Actions: []AssistAction{
+				{Label: "Open Inv Per Branch", Href: hrefInvPerBranch},
+				{Label: "Open Production jobs", Href: hrefProductionJobs},
+			},
+		}
+	case strings.Contains(lower, "insufficient stock for") && strings.Contains(lower, "at location"):
+		return &Assist{
+			Code: SAMfgWOComponentShortage, Field: field,
+			Title:  "Not enough component stock to finish",
+			Detail: "Issue components under Take materials, receive stock, or lower the finish qty to match what’s on hand.",
+			Actions: []AssistAction{
+				{Label: "Open Take materials", Href: hrefProductionIssue},
+				{Label: "Open Inv Per Branch", Href: hrefInvPerBranch},
+			},
 		}
 	case strings.Contains(lower, "not enough stock") || strings.Contains(lower, "not enough available stock") ||
 		(strings.Contains(lower, "insufficient") && (strings.Contains(lower, "stock") || strings.Contains(lower, "lot"))):
@@ -380,6 +429,54 @@ func AssistFromMessage(field, msg string) *Assist {
 			Title:  "Goods receipt needs QC release first",
 			Detail: "Release the inspection on this receipt, then post Purchase Receive again.",
 			Actions: []AssistAction{{Label: "Open Purchase Receive", Href: hrefGoodsReceipt}},
+		}
+	case strings.Contains(lower, "only draft work orders can be released"):
+		return &Assist{
+			Code: SAMfgWOReleaseDraftOnly, Field: field,
+			Title:  "This job can’t be released from its current status",
+			Detail: "Release only works on draft jobs. Pick a draft job, or finish/cancel the one you have open.",
+			Actions: []AssistAction{{Label: "Open Production jobs", Href: hrefProductionJobs}},
+		}
+	case strings.Contains(lower, "only started (released) jobs can be finished"):
+		return &Assist{
+			Code: SAMfgWOCompleteReleasedOnly, Field: field,
+			Title:  "Release the job before you finish",
+			Detail: "Open the job and release it (Start job), then run Take materials / Record finished if needed, then Finish.",
+			Actions: []AssistAction{{Label: "Open Production jobs", Href: hrefProductionJobs}},
+		}
+	case strings.Contains(lower, "only released work orders accept"):
+		return &Assist{
+			Code: SAMfgWOCompleteReleasedOnly, Field: field,
+			Title:  "Release the job first",
+			Detail: "Take materials and Record finished work only after the job is released (Start job).",
+			Actions: []AssistAction{{Label: "Open Production jobs", Href: hrefProductionJobs}},
+		}
+	case strings.Contains(lower, "quality check must pass before finish"):
+		return &Assist{
+			Code: SAMfgWOQCPassRequired, Field: field,
+			Title:  "Quality check must pass first",
+			Detail: "Pass QC on this job (or turn off finished-goods QC in process policies), then try Finish again.",
+			Actions: []AssistAction{
+				{Label: "Open Production jobs", Href: hrefProductionJobs},
+				{Label: "Process policies", Href: hrefProcessPolicies},
+			},
+		}
+	case strings.Contains(lower, "abnormal or excess waste requires a waste reason"):
+		return &Assist{
+			Code: SAMfgWOWasteReasonRequired, Field: field,
+			Title:  "Pick a waste reason for excess or abnormal waste",
+			Detail: "On Step 2 (outputs), choose a waste reason for extra waste, or add reasons under Production setup.",
+			Actions: []AssistAction{
+				{Label: "Open Waste reasons", Href: hrefProductionWaste},
+				{Label: "Open Production jobs", Href: hrefProductionJobs},
+			},
+		}
+	case strings.Contains(lower, "waste reason not found"):
+		return &Assist{
+			Code: SAMfgWOWasteReasonNotFound, Field: field,
+			Title:  "Waste reason is missing or inactive",
+			Detail: "Pick an active waste reason on the waste line, or create one under Production setup.",
+			Actions: []AssistAction{{Label: "Open Waste reasons", Href: hrefProductionWaste}},
 		}
 	default:
 		return nil

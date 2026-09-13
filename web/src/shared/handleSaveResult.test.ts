@@ -49,15 +49,20 @@ describe("handleSaveResult", () => {
   });
 
   it("adds how-to-fix when field error has a specific recovery hint", () => {
+    const action = vi.fn();
     const toast = {
       success: vi.fn(),
       error: vi.fn(),
       warning: vi.fn(),
-      action: vi.fn(),
+      action,
     };
     handleSaveResult(failRes({ errors: { name: "Name is required." } }), toast);
-    expect(toast.warning).toHaveBeenCalledWith(
-      expect.stringMatching(/name is required.*fill in the highlighted fields/i),
+    expect(action).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Name is required.",
+        message: expect.stringMatching(/fill in the highlighted fields/i),
+        askHelp: true,
+      }),
     );
     expect(toast.error).not.toHaveBeenCalled();
   });
@@ -136,11 +141,18 @@ describe("showBlockerResult", () => {
   });
 
   it("uses fallbackTitle when message is empty", () => {
-    const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), action: vi.fn() };
+    const action = vi.fn();
+    const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), action };
     showBlockerResult(failRes({ message: "", code: "ERR_INTERNAL", errors: undefined }), toast, {
       fallbackTitle: "Couldn't finish that step. Try again.",
     });
-    expect(toast.error).toHaveBeenCalledWith("Couldn't finish that step. Try again.");
+    expect(action).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Couldn't finish that step. Try again.",
+        type: "error",
+        askHelp: true,
+      }),
+    );
   });
 });
 

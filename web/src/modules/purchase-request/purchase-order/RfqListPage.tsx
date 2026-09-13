@@ -111,7 +111,7 @@ export default function RfqListPage() {
       toast.warning(res.message ?? "Failed to create RFQ.");
       return;
     }
-    toast.success(`RFQ ${res.data?.rfq_no ?? "created"}.`);
+    toast.success(`RFQ ${res.data?.rfq_no ?? "created"}. Open it to add suppliers and collect quotes.`);
     setLines([emptyRfqLine()]);
     setCreateOpen(false);
     invalidate();
@@ -313,7 +313,7 @@ export default function RfqListPage() {
                 disabled={creating()}
                 onClick={() => void createRfq()}
               >
-                {creating() ? "Creating…" : "Create RFQ"}
+                {creating() ? "Saving…" : "Create RFQ"}
               </button>
             </div>
           </div>

@@ -7,7 +7,11 @@ import { canManageWorkspaceSetup } from "../../shared/resolveAppEntryPath";
 import { resolveGettingStarted } from "../../shared/setupProgress";
 import { useAuth } from "../../shared/auth-context";
 import { useOnboarding, useSetupReadiness } from "../../shared/usePlatform";
-import { ONBOARDING_KB_QUICK_LINKS, ONBOARDING_PLAYBOOK_WEEKS } from "./onboardingPlaybookData";
+import {
+  ONBOARDING_KB_QUICK_LINKS,
+  ONBOARDING_PLAYBOOK_WEEKS,
+  resolvePlaybookWeek,
+} from "./onboardingPlaybookData";
 
 /** Home → Onboarding: foundation checklist + full ERP/POS playbook (merged from /app/onboarding). */
 export function HomeOnboarding() {
@@ -23,8 +27,6 @@ export function HomeOnboarding() {
   const tracks = () => data()?.tracks ?? [];
   const overall = () => data()?.overall_percent ?? 0;
   const showPlaybook = () => data()?.show_playbook ?? false;
-
-  const trackById = (id: string) => tracks().find((t) => t.id === id);
 
   const dismiss = async (snoozeOnly: boolean) => {
     await apiFetch(
@@ -151,29 +153,52 @@ export function HomeOnboarding() {
 
         <div class="space-y-6">
           <For each={ONBOARDING_PLAYBOOK_WEEKS}>
-            {(week) => (
-              <div>
-                <h3 class="text-sm font-semibold text-text-primary">{week.title}</h3>
-                <p class="mt-1 text-xs text-text-secondary">{week.body}</p>
-                <div class="mt-3 space-y-3">
-                  <For each={week.tracks}>
-                    {(tid) => {
-                      const tr = () => trackById(tid);
-                      return (
-                        <Show when={tr()}>
-                          {(t) => (
-                            <OnboardingTrackPanel
-                              track={t()}
-                              defaultOpen={t().percent < 100 && t().percent > 0}
-                            />
-                          )}
-                        </Show>
-                      );
-                    }}
-                  </For>
-                </div>
-              </div>
-            )}
+            {(week) => {
+              const steps = () => resolvePlaybookWeek(week, tracks(), setup.data);
+              return (
+                <Show when={steps().length > 0}>
+                  <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+                    <h3 class="text-sm font-semibold text-text-primary">{week.title}</h3>
+                    <p class="mt-1 text-xs text-text-secondary">{week.summary}</p>
+                    <ul class="mt-4 space-y-3">
+                      <For each={steps()}>
+                        {(step) => (
+                          <li class="flex flex-wrap items-start gap-3 rounded-lg border border-stroke/80 bg-slate-50/50 px-3 py-3">
+                            <span
+                              class={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+                                step.done ? "bg-emerald-100 text-emerald-800" : "bg-white text-text-secondary ring-1 ring-stroke"
+                              }`}
+                              aria-hidden
+                            >
+                              {step.done ? "✓" : ""}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                              <p
+                                class="text-sm leading-snug"
+                                classList={{
+                                  "text-text-secondary line-through": step.done,
+                                  "text-text-primary": !step.done,
+                                }}
+                              >
+                                {step.sentence}
+                              </p>
+                              <Show when={!step.done}>
+                                <A
+                                  href={step.href}
+                                  class="mt-2 inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+                                >
+                                  {step.cta}
+                                </A>
+                              </Show>
+                            </div>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </section>
+                </Show>
+              );
+            }}
           </For>
         </div>
 

@@ -569,7 +569,7 @@ export function PurchaseRequestModal(props: Props) {
           ? apiFetch(`/api/v1/purchase-request/purchase-requests/${ed.id}`, { method: "PATCH", body: JSON.stringify(body) }, { silent: true })
           : apiFetch("/api/v1/purchase-request/purchase-requests", { method: "POST", body: JSON.stringify(body) }, { silent: true }),
       toast,
-      ed ? "Purchase request updated." : "Purchase request created.",
+      ed ? "Purchase request saved. Submit for approval when lines look right." : "Purchase request created. Submit for approval, then create a PO.",
     );
     setSaving(false);
     if (!ok) return;

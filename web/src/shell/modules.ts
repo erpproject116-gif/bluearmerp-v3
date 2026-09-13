@@ -140,8 +140,10 @@ export const appModules: AppModule[] = [
     features: [
       { label: "Assembly · Recipes", href: "/app/production/assembly/recipes", settingsHref: "/app/production/assembly/recipes", featureCode: "manufacturing.boms", headerPriority: "primary" },
       { label: "Assembly · Jobs", href: "/app/production/assembly/jobs", settingsHref: "/app/production/assembly/jobs", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
-      { label: "Disassembly · Recipes", href: "/app/production/disassembly/recipes", settingsHref: "/app/production/disassembly/recipes", featureCode: "manufacturing.boms", headerPriority: "primary" },
-      { label: "Disassembly · Jobs", href: "/app/production/disassembly/jobs", settingsHref: "/app/production/disassembly/jobs", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
+      { label: "Cutting · Recipes", href: "/app/production/disassembly/recipes", settingsHref: "/app/production/disassembly/recipes", featureCode: "manufacturing.boms", headerPriority: "primary" },
+      { label: "Cutting · Jobs", href: "/app/production/disassembly/jobs", settingsHref: "/app/production/disassembly/jobs", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
+      { label: "Recipe · Recipes", href: "/app/production/recipe/recipes", settingsHref: "/app/production/recipe/recipes", featureCode: "manufacturing.boms", headerPriority: "primary" },
+      { label: "Recipe · Jobs", href: "/app/production/recipe/jobs", settingsHref: "/app/production/recipe/jobs", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
       { label: "Reports", href: "/app/production/reports", settingsHref: "/app/production/reports", featureCode: "manufacturing.work_orders", headerPriority: "primary" },
       setupFeatureTab("/app/production"),
     ],
@@ -790,15 +792,31 @@ export type HeaderFeatureSplit = {
   overflow: ModuleFeature[];
 };
 
+/** Max primary header tabs before extras move to the More menu (erp UX simplification). */
+export const HEADER_PRIMARY_TAB_CAP = 6;
+
+function capPrimaryHeaderTabs(primary: ModuleFeature[], overflow: ModuleFeature[]): HeaderFeatureSplit {
+  if (primary.length <= HEADER_PRIMARY_TAB_CAP) {
+    return { primary, overflow };
+  }
+  const setupTabs = primary.filter((f) => f.href.endsWith("/setup"));
+  const rest = primary.filter((f) => !f.href.endsWith("/setup"));
+  const room = Math.max(0, HEADER_PRIMARY_TAB_CAP - setupTabs.length);
+  return {
+    primary: [...rest.slice(0, room), ...setupTabs],
+    overflow: [...rest.slice(room), ...overflow],
+  };
+}
+
 /** Split visible header features into primary tabs vs More menu. */
 export function splitHeaderFeatures(module: AppModule, me?: MeData | null): HeaderFeatureSplit {
   const all = visibleHeaderFeatures(module, me);
   const hasExplicit = all.some((f) => f.headerPriority != null);
   if (!hasExplicit) {
-    return { primary: all, overflow: [] };
+    return capPrimaryHeaderTabs(all, []);
   }
-  return {
-    primary: all.filter((f) => f.headerPriority === "primary"),
-    overflow: all.filter((f) => f.headerPriority !== "primary"),
-  };
+  return capPrimaryHeaderTabs(
+    all.filter((f) => f.headerPriority === "primary"),
+    all.filter((f) => f.headerPriority !== "primary"),
+  );
 }

@@ -439,6 +439,16 @@ func changeAlertDigestJob(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Invalid job secret.", "ERR_UNAUTHORIZED")
 			return
 		}
+		if SkipHourlyChangeAlertDigest() {
+			response.OK(w, map[string]any{
+				"tenants":  0,
+				"events":   0,
+				"details":  []map[string]any{},
+				"skipped":  true,
+				"reason":   "OPS_EMAIL_SKIP_HOURLY_DIGEST",
+			}, "Digested.")
+			return
+		}
 		tenants, events, details, err := DrainHourlyDigests(r.Context(), pool)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Digest failed.", "ERR_INTERNAL")

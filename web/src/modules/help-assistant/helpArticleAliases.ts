@@ -206,6 +206,23 @@ export const helpArticleAliases: Record<string, HelpArticleAlias> = {
   "manufacturing-wo-issue-complete": {
     questions: ["issue bom components", "complete work order", "produce finished goods"],
   },
+  "mfg-recipe-assembly-shortage": {
+    questions: [
+      "recipe component shortage",
+      "assembly not enough parts",
+      "process and post blocked stock",
+      "components short wizard",
+    ],
+    errorPhrases: ["not enough parts on hand", "posting stays blocked"],
+  },
+  "mfg-cutting-shortage": {
+    questions: ["cutting raw material short", "post production blocked cutting", "input quantity shortage"],
+    errorPhrases: ["raw material is short", "not enough raw material"],
+  },
+  "mfg-waste-reason-required": {
+    questions: ["waste reason required cutting", "abnormal waste reason", "extra waste qty reason"],
+    errorPhrases: ["waste reason", "abnormal or excess waste requires"],
+  },
   "job-costing-link-expenses": {
     questions: ["put cost on job", "link purchase to project", "job budget vs actual"],
   },

@@ -253,7 +253,8 @@ export default function PlatformCustomerDetailPage() {
                 <Show when={String(c().tenant_status ?? "") === "pending_approval"}>
                   <div class="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <p class="flex-1 text-sm text-amber-950">
-                      Self-serve signup waiting for product owner approval before this company can use the ERP.
+                      Exception path: workspace status pending_approval (default self-serve trials are active
+                      immediately). Approve before this company can sign in.
                     </p>
                     <button
                       type="button"

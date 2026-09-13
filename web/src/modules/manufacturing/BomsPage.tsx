@@ -1,5 +1,5 @@
 import { createSignal, For, Show, createResource, createMemo } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { UnitLookupCombo, formatUnitLabel } from "../../shared/UnitLookupCombo";
@@ -514,8 +514,41 @@ export default function BomsPage() {
     await invalidate();
   };
 
+  const listEmpty = () => !list.isFetching && (list.data?.total ?? 0) === 0 && !q() && !statusFilter();
+
   return (
     <>
+      <Show when={mode === "recipe" && listEmpty()}>
+        <section class="mb-4 rounded-xl border border-orange-200 bg-orange-50/60 p-5">
+          <h2 class="text-sm font-semibold text-text-primary">Create a processing recipe</h2>
+          <p class="mt-2 text-sm text-text-secondary">
+            Pick batch size, ingredients, and yield bands — code is generated on save. Then start Recipe / Processing from
+            the hub: Save draft does not move stock; Process &amp; Post moves ingredients and finished goods when stock is
+            enough.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700"
+              onClick={openNew}
+            >
+              New processing recipe
+            </button>
+            <A
+              href="/app/production"
+              class="rounded-lg border border-stroke bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
+            >
+              Manufacturing hub
+            </A>
+            <A
+              href="/app/production/orders/new?type=recipe"
+              class="rounded-lg border border-stroke bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
+            >
+              New processing order
+            </A>
+          </div>
+        </section>
+      </Show>
       <SpreadsheetGrid<Bom>
         columns={[
           { key: "bom_code", header: "Recipe code", clickable: true },

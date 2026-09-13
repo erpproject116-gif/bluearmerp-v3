@@ -673,7 +673,13 @@ export function SupplierInvoiceModal(props: Props) {
       : apiFetch<SupplierInvoiceDetail>("/api/v1/finance/supplier-invoices", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, props.editing ? "Purchase updated." : "Purchase created.");
+      handleSaveResult(
+        res,
+        toast,
+        props.editing
+          ? "Bill saved. Approve when ready, then record payment."
+          : "Bill created. Check lines, then submit for approval.",
+      );
       return;
     }
     toast.success(props.editing ? "Purchase updated." : "Purchase created.");

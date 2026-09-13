@@ -59,8 +59,28 @@ type ToastLike = {
     message?: string;
     actionLabel?: string;
     href?: string;
+    askHelp?: boolean;
   }) => void;
 };
+
+function pushHelpBlocker(
+  toast: ToastLike,
+  title: string,
+  message?: string,
+  type: "error" | "warning" = "warning",
+) {
+  if (toast.action) {
+    toast.action({
+      type,
+      title,
+      message,
+      askHelp: true,
+    });
+    return;
+  }
+  if (type === "error") toast.error([title, message].filter(Boolean).join(" — "));
+  else toast.warning([title, message].filter(Boolean).join(" — "));
+}
 
 export function handleSaveResult(
   res: ApiResult<unknown>,
@@ -91,11 +111,12 @@ export function showBlockerResult(
       message: assist.detail || undefined,
       actionLabel: primary?.label ?? "View",
       href: primary?.href,
+      askHelp: true,
     });
     return false;
   }
   if (assist?.title) {
-    toast.warning([assist.title, assist.detail].filter(Boolean).join(" — "));
+    pushHelpBlocker(toast, assist.title, assist.detail || undefined);
     return false;
   }
 
@@ -109,14 +130,15 @@ export function showBlockerResult(
       message: recoveryHintFromError(fieldErrors),
       actionLabel: hint.label,
       href: hint.href,
+      askHelp: true,
     });
     return false;
   }
   if (fieldErrors) {
     if (hasSpecificRecoveryHint(fieldErrors)) {
-      toast.warning(`${fieldErrors} — ${recoveryHintFromError(fieldErrors)}`);
+      pushHelpBlocker(toast, fieldErrors, recoveryHintFromError(fieldErrors));
     } else {
-      toast.error(fieldErrors);
+      pushHelpBlocker(toast, fieldErrors, undefined, "error");
     }
     return false;
   }
@@ -133,6 +155,7 @@ export function showBlockerResult(
         message: "Turn it on under Modules & Features, then try again.",
         actionLabel: "Open Modules & Features",
         href: next.includes("tenant-modules") ? next : "/app/user-management/tenant-modules",
+        askHelp: true,
       });
       return false;
     }
@@ -141,20 +164,23 @@ export function showBlockerResult(
   }
 
   if (res.code === "ERR_VALIDATION") {
-    toast.warning(res.message ?? "Something on this form needs fixing. Check the highlighted fields and try again.");
+    pushHelpBlocker(
+      toast,
+      res.message ?? "Something on this form needs fixing. Check the highlighted fields and try again.",
+    );
     return false;
   }
 
   const msg = (res.message ?? "").trim();
   if (msg && hasSpecificRecoveryHint(msg)) {
-    toast.warning(`${msg} — ${recoveryHintFromError(msg)}`);
+    pushHelpBlocker(toast, msg, recoveryHintFromError(msg));
     return false;
   }
   if (msg) {
-    toast.warning(msg);
+    pushHelpBlocker(toast, msg);
     return false;
   }
-  toast.error(options?.fallbackTitle ?? NOTIFICATION_DEFAULT_SAVE_ERROR);
+  pushHelpBlocker(toast, options?.fallbackTitle ?? NOTIFICATION_DEFAULT_SAVE_ERROR, undefined, "error");
   return false;
 }
 
