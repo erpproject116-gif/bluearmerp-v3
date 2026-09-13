@@ -20,12 +20,13 @@ import (
 )
 
 type provisionCustomerBody struct {
-	Email       string `json:"email"`
-	FullName    string `json:"full_name"`
-	CompanyName string `json:"company_name"`
-	Mobile      string `json:"mobile"`
-	PlanKind    string `json:"plan_kind"`
-	PlanID      int64  `json:"plan_id"`
+	Email                   string `json:"email"`
+	FullName                string `json:"full_name"`
+	CompanyName             string `json:"company_name"`
+	Mobile                  string `json:"mobile"`
+	PlanKind                string `json:"plan_kind"`
+	PlanID                  int64  `json:"plan_id"`
+	ForceReleaseMemberships bool   `json:"force_release_memberships"`
 }
 
 func (s *service) provisionCustomer(w http.ResponseWriter, r *http.Request) {
@@ -55,11 +56,18 @@ func (s *service) provisionCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if body.ForceReleaseMemberships {
+		if _, err := auth.ReleaseCustomerEmailClaim(ctx, s.pool, email); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to free existing memberships: "+err.Error(), "ERR_INTERNAL")
+			return
+		}
+	}
+
 	if occ, err := auth.CustomerEmailOccupancy(ctx, s.pool, email); err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to register customer.", "ERR_INTERNAL")
 		return
 	} else if occ.Occupied {
-		response.Err(w, http.StatusConflict, auth.CrossTenantOccupancyMessage(occ), "ERR_CONFLICT")
+		response.Err(w, http.StatusConflict, auth.CrossTenantOccupancyMessage(occ)+" Confirm force_release_memberships to free this email first.", "ERR_CONFLICT")
 		return
 	}
 

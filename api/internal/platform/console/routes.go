@@ -34,6 +34,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.With(requirePlatformPermission("platform.followups.read")).Get("/platform/console/customers/{id}/follow-ups", svc.listCustomerFollowUps)
 		cr.With(requirePlatformPermission("platform.customers.write")).Post("/platform/console/customers", svc.createCustomer)
 		cr.With(requirePlatformPermission("platform.provisioning.write")).Post("/platform/console/customers/provision", svc.provisionCustomer)
+		cr.With(requirePlatformPermission("platform.provisioning.write")).Post("/platform/console/emails/release", svc.releaseEmailClaim)
 		cr.With(requirePlatformPermission("platform.provisioning.write")).Post("/platform/console/customers/{id}/approve", svc.approveCustomer)
 		cr.With(requirePlatformPermission("platform.provisioning.write")).Post("/platform/console/customers/{id}/reject", svc.rejectCustomer)
 		cr.With(requirePlatformPermission("platform.customers.read")).Get("/platform/console/day1-payments", svc.listDay1Payments)

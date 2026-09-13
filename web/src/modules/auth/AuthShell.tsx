@@ -42,9 +42,11 @@ export const AuthShell: ParentComponent<Props> = (props) => {
       <div class="hidden w-1/2 flex-col justify-between bg-brand-600 p-12 text-white lg:flex">
         <div>
           <div class="flex items-center gap-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-bold shadow-sm">
-              B
-            </div>
+            <img
+              src="/bluearm-computer-logo.png"
+              alt=""
+              class="h-12 w-12 rounded-xl bg-black object-contain p-1 shadow-sm"
+            />
             <div>
               <span class="text-2xl font-semibold tracking-tight">BluearmERP</span>
               <p class="text-sm font-medium text-brand-100">Business management, simplified.</p>
@@ -83,9 +85,11 @@ export const AuthShell: ParentComponent<Props> = (props) => {
         <div class="mx-auto w-full max-w-md">
           <div class="mb-8 lg:hidden">
             <div class="flex items-center gap-2.5">
-              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">
-                B
-              </div>
+              <img
+                src="/bluearm-computer-logo.png"
+                alt=""
+                class="h-10 w-10 rounded-xl bg-black object-contain p-0.5"
+              />
               <span class="text-lg font-semibold text-text-primary">BluearmERP</span>
             </div>
           </div>
