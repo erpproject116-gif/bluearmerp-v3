@@ -50,11 +50,11 @@ export function CommercialPaywallHost() {
   const status = () => auth.me?.commercial?.status;
   const amount = () => auth.me?.commercial?.amount_centavos ?? 450000;
   const onTradeScreen = () => isCommercialTradeAppPath(loc.pathname);
-  /** Full-screen lock only on buy/sell routes, or after a trade API returns ERR_COMMERCIAL_LOCKED. */
+  /** Full-screen lock only on buy/sell routes — never on Production/floor, even if forceOpen. */
   const showPaywall = () => {
     if (status() === "unlocked") return false;
-    if (forceOpen()) return true;
-    return status() === "awaiting_payment" && onTradeScreen();
+    if (!onTradeScreen()) return false;
+    return forceOpen() || status() === "awaiting_payment";
   };
 
   createEffect(() => {

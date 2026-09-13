@@ -81,10 +81,13 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          // App shell + icons only. Never cache API mutations (Workbox caches GET by default).
-          // Exclude OCR WASM/JS under public/tess (multi-MB; not part of floor PWA shell).
-          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,webmanifest}"],
-          globIgnores: ["**/tess/**"],
+          // Precache JS/CSS/icons only — never precache index.html (stale shell trapped PWAs
+          // behind old paywall UI after deploy). Documents are NetworkFirst below.
+          globPatterns: ["**/*.{js,css,ico,png,svg,woff2,webmanifest}"],
+          globIgnores: ["**/tess/**", "**/index.html"],
+          cleanupOutdatedCaches: true,
+          skipWaiting: true,
+          clientsClaim: true,
           navigateFallback: "/index.html",
           navigateFallbackDenylist: [/^\/api/],
           runtimeCaching: [
@@ -94,12 +97,13 @@ export default defineConfig(({ mode }) => {
               method: "GET",
             },
             {
-              urlPattern: ({ request }) => request.destination === "document",
+              urlPattern: ({ request, url }) =>
+                request.destination === "document" || url.pathname === "/" || url.pathname.endsWith(".html"),
               handler: "NetworkFirst",
               options: {
                 cacheName: "bluearm-documents",
-                networkTimeoutSeconds: 8,
-                expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 },
+                networkTimeoutSeconds: 3,
+                expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 },
               },
             },
           ],
