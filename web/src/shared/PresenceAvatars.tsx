@@ -23,7 +23,7 @@ function activitySummary(user: PresenceUser): string {
   return `${verb} ${user.current_label}`;
 }
 
-export function PresenceAvatars() {
+export function PresenceAvatars(props: { compact?: boolean } = {}) {
   const auth = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
@@ -33,8 +33,8 @@ export function PresenceAvatars() {
 
   const users = () => online.data ?? [];
   const others = () => users().filter((u) => !u.is_self);
-  const stack = () => others().slice(0, MAX_STACK);
-  const overflow = () => Math.max(0, others().length - MAX_STACK);
+  const stack = () => others().slice(0, props.compact ? 2 : MAX_STACK);
+  const overflow = () => Math.max(0, others().length - (props.compact ? 2 : MAX_STACK));
   const canMessage = () => hasPermission(auth.me, "comms.chat", "write");
 
   const messageUser = async (user: PresenceUser, e?: MouseEvent) => {
@@ -130,7 +130,9 @@ export function PresenceAvatars() {
             title="Who's online"
             onClick={() => setOpen((v) => !v)}
           >
-            {others().length + 1} online
+            <Show when={props.compact} fallback={<>{others().length + 1} online</>}>
+              {others().length + 1}
+            </Show>
           </button>
         </Show>
       </div>

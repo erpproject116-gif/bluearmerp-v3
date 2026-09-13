@@ -27,6 +27,11 @@ export type PlatformCustomer = {
   days_remaining?: number;
   crm_lead_id?: number | null;
   likely_misjoin?: boolean;
+  is_product_owner?: boolean;
+  is_platform_superadmin?: boolean;
+  is_operator_workspace?: boolean;
+  access_label?: string | null;
+  workspace_label?: string | null;
 };
 
 export type PlatformBillingSummary = {

@@ -16,6 +16,7 @@ import { HomeShortcuts } from "./HomeShortcuts";
 import { DEFAULT_HOME_WIDGETS, normalizeHomeWidgets, type HomeWidgetId } from "./homeWidgets";
 import { HOME_ONBOARDING_HREF, resolveHomeTab } from "./homeTabs";
 import { useHomeLayout, useSaveHomeLayout } from "./useHomeLayout";
+import { InstallAppBanner } from "../../shell/InstallAppBanner";
 
 /** Home: Dashboard · Onboarding · Recent updates (product releases). */
 export default function DashboardPage() {
@@ -96,6 +97,7 @@ export default function DashboardPage() {
         <Navigate href={HOME_ONBOARDING_HREF} />
       </Show>
       <Show when={tab() !== "intel" && tab() !== "mypage"}>
+        <InstallAppBanner />
         <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 class="text-xl font-semibold text-text-primary">{hello()}</h2>

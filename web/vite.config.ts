@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 /** Local .env files + Vercel/CI process.env (dashboard vars are not in .env files). */
 function pickEnv(env: Record<string, string>, key: string, viteKey: string) {
@@ -36,7 +37,71 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [solid(), tailwindcss()],
+    plugins: [
+      solid(),
+      tailwindcss(),
+      VitePWA({
+        registerType: "autoUpdate",
+        includeAssets: ["favicon.png", "apple-touch-icon.png", "pwa-192.png", "pwa-512.png"],
+        manifest: {
+          name: "Bluearm ERP",
+          short_name: "Bluearm",
+          description: "Floor-first manufacturing ERP — online only",
+          display: "standalone",
+          start_url: "/app/production",
+          scope: "/",
+          theme_color: "#3c50e0",
+          background_color: "#f1f5f9",
+          icons: [
+            {
+              src: "/pwa-192.png",
+              sizes: "192x192",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/pwa-512.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/pwa-512.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "maskable",
+            },
+          ],
+        },
+        workbox: {
+          // App shell + icons only. Never cache API mutations (Workbox caches GET by default).
+          // Exclude OCR WASM/JS under public/tess (multi-MB; not part of floor PWA shell).
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,webmanifest}"],
+          globIgnores: ["**/tess/**"],
+          navigateFallback: "/index.html",
+          navigateFallbackDenylist: [/^\/api/],
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith("/api"),
+              handler: "NetworkOnly",
+              method: "GET",
+            },
+            {
+              urlPattern: ({ request }) => request.destination === "document",
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "bluearm-documents",
+                networkTimeoutSeconds: 8,
+                expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          enabled: false,
+        },
+      }),
+    ],
     envDir: ".",
     resolve: {
       dedupe: ["solid-js", "@solidjs/router"],

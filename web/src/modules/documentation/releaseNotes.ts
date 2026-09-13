@@ -8,6 +8,16 @@ export type ReleaseNote = {
 export const releaseNotes: ReleaseNote[] = [
   {
     date: "2026-09-13",
+    title: "Install Bluearm on phone + clearer laptop chrome",
+    bullets: [
+      "Install as an app (Android Chrome prompt, or iPhone Share → Add to Home Screen). Floor-first start opens Production; posting still needs network.",
+      "On phones and installed PWA: bottom nav for Home, Production, Stock, Chat, and Bell; sell/buy stay reachable from the menu or Search.",
+      "13–14\" laptops: sidebar collapses by default between 1024–1279px; below 1024px the menu is a drawer so tables and documents get more width.",
+      "Wide document modals scroll on short screens so Save stays reachable — form fields themselves are unchanged.",
+    ],
+  },
+  {
+    date: "2026-09-13",
     title: "Recipe production, smarter notifications, and clearer saves",
     bullets: [
       "Production adds a Recipe branch (ingredients → finished goods) with recipe BOM codes, wizard guidance, and jobs beside Assembly and Cutting.",
