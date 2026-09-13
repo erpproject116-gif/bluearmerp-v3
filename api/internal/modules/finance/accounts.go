@@ -55,6 +55,7 @@ func registerAccountRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/accounts", createAccount(pool))
 	r.Post("/accounts/import-template", importAccountTemplate(pool))
 	r.Post("/accounts/ensure-purchase-cogs", ensurePurchaseCogsAccount(pool))
+	r.Post("/accounts/ensure-grni", ensureGrniAccount(pool))
 	r.Get("/accounts/defaults", getFinanceDefaults(pool))
 	r.Patch("/accounts/defaults", saveFinanceDefaults(pool))
 	registerCoaReplaceRoutes(r, pool)
@@ -531,6 +532,111 @@ func ensurePurchaseCogsAccount(pool *pgxpool.Pool) http.HandlerFunc {
 			"mapped":   mapped,
 			"defaults": outDefaults,
 		}, "Purchases / COGS account ready.")
+	}
+}
+
+// ensureGrniAccount creates (or reuses) an active liability posting account for GRNI
+// and always maps it as the tenant grni_account_id default.
+func ensureGrniAccount(pool *pgxpool.Pool) http.HandlerFunc {
+	const code = "2115"
+	const name = "Goods Received Not Invoiced"
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+
+		resolveLiability := func() (int64, bool, error) {
+			var id int64
+			err := pool.QueryRow(r.Context(), `
+				select id from public.fin_accounts
+				where tenant_id = $1 and deleted_at is null and is_active
+				  and account_type = 'liability' and coalesce(is_group, false) = false
+				  and account_code = $2
+				order by id asc limit 1`, tu.TenantID, code).Scan(&id)
+			if err == nil && id > 0 {
+				return id, false, nil
+			}
+
+			err = pool.QueryRow(r.Context(), `
+				update public.fin_accounts
+				set deleted_at = null, is_active = true, is_group = false,
+				    account_type = 'liability', account_name = $3
+				where tenant_id = $1 and account_code = $2
+				returning id`, tu.TenantID, code, name).Scan(&id)
+			if err == nil && id > 0 {
+				return id, true, nil
+			}
+
+			err = pool.QueryRow(r.Context(), `
+				insert into public.fin_accounts (
+				  tenant_id, account_code, account_name, account_type,
+				  parent_id, is_group, is_active, is_system, sort_order
+				) values ($1, $2, $3, 'liability', null, false, true, false, 2115)
+				returning id`, tu.TenantID, code, name).Scan(&id)
+			if err == nil {
+				return id, true, nil
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), "unique") {
+				return 0, false, err
+			}
+			for i := 2116; i <= 2199; i++ {
+				alt := fmt.Sprintf("%d", i)
+				err = pool.QueryRow(r.Context(), `
+					insert into public.fin_accounts (
+					  tenant_id, account_code, account_name, account_type,
+					  parent_id, is_group, is_active, is_system, sort_order
+					) values ($1, $2, $3, 'liability', null, false, true, false, $4)
+					returning id`, tu.TenantID, alt, name, i).Scan(&id)
+				if err == nil {
+					return id, true, nil
+				}
+				if !strings.Contains(strings.ToLower(err.Error()), "unique") {
+					return 0, false, err
+				}
+			}
+			return 0, false, fmt.Errorf("could not allocate liability account code")
+		}
+
+		accountID, created, err := resolveLiability()
+		if err != nil || accountID <= 0 {
+			msg := "Failed to create GRNI account."
+			if err != nil && strings.Contains(strings.ToLower(err.Error()), "allocate") {
+				response.Err(w, http.StatusConflict, "Could not allocate a liability account code for GRNI.", "ERR_CONFLICT")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, msg, "ERR_INTERNAL")
+			return
+		}
+
+		d, err := financedefaults.Load(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load defaults.", "ERR_INTERNAL")
+			return
+		}
+		prev := d.GRNIAccountID
+		mapped := prev == nil || *prev != accountID
+		d.GRNIAccountID = &accountID
+		if err := financedefaults.Save(r.Context(), pool, tu.TenantID, d); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Account ready but failed to save mapping.", "ERR_INTERNAL")
+			return
+		}
+
+		acct, err := fetchAccount(r, pool, tu.TenantID, accountID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Account created but failed to load record.", "ERR_INTERNAL")
+			return
+		}
+		outDefaults, _ := financedefaults.Load(r.Context(), pool, tu.TenantID)
+		outDefaults.TenantID = tu.TenantID
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.account.ensure_grni", "fin_account", &accountID, nil, map[string]any{
+			"created": created,
+			"mapped":  mapped,
+		})
+		response.OK(w, map[string]any{
+			"account":  acct,
+			"created":  created,
+			"mapped":   mapped,
+			"defaults": outDefaults,
+		}, "GRNI account ready.")
 	}
 }
 
