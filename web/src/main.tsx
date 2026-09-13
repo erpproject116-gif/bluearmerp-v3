@@ -6,6 +6,17 @@ import { applyResolvedTheme } from "./shared/theme-preference";
 
 applyResolvedTheme();
 
-registerSW({ immediate: true });
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    // Auto-activate new shell so paywall/route fixes are not stuck behind an old SW.
+    void updateSW(true);
+  },
+  onRegisteredSW(_url, registration) {
+    if (!registration) return;
+    void registration.update();
+    window.setInterval(() => void registration.update(), 60_000);
+  },
+});
 
 render(() => <App />, document.getElementById("root")!);

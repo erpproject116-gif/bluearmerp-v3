@@ -14,4 +14,9 @@ describe("isCommercialTradeAppPath", () => {
     expect(isCommercialTradeAppPath("/app/inventory/items")).toBe(false);
     expect(isCommercialTradeAppPath("/app/dashboard")).toBe(false);
   });
+
+  it("treats only listed trade prefixes as locked screens", () => {
+    expect(isCommercialTradeAppPath("/app/comms/chat")).toBe(false);
+    expect(isCommercialTradeAppPath("/app/crm/notifications")).toBe(false);
+  });
 });
