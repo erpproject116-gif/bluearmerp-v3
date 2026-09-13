@@ -29,6 +29,7 @@ export const knowledgebaseGroups: KbGroup[] = [
       "skip-setup-remind-later",
       "invited-during-setup",
       "onboarding-playbook",
+      "install-on-phone",
       "load-slip-overview",
       "mapping-center-when-to-use",
       "migration-center",

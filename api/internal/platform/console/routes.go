@@ -47,6 +47,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.With(requirePlatformPermission("platform.provisioning.write")).Post("/platform/console/coa-replace-requests/{id}/approve", svc.decidePlatformCoaReplace(true))
 		cr.With(requirePlatformPermission("platform.provisioning.write")).Post("/platform/console/coa-replace-requests/{id}/reject", svc.decidePlatformCoaReplace(false))
 		cr.With(requirePlatformPermission("platform.customers.write")).Patch("/platform/console/customers/{id}", svc.patchCustomer)
+		cr.With(requirePlatformPermission("platform.provisioning.write")).Delete("/platform/console/customers/{id}", svc.deleteCustomer)
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/customers/{id}/subscriptions", svc.createSubscription)
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/customers/{id}/extend-trial", svc.extendTrial)
 		cr.With(requirePlatformPermission("platform.billing.write")).Post("/platform/console/customers/{id}/convert-demo", svc.convertDemo)

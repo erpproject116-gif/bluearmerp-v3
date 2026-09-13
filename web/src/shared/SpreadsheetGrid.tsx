@@ -366,7 +366,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   });
 
   return (
-    <div class="overflow-hidden rounded-xl border border-stroke erp-surface shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-stroke erp-surface shadow-sm">
       <div class="border-b border-stroke px-5 py-4">
         <div class="flex flex-wrap items-end gap-3">
           <Show when={props.onStatusChange}>

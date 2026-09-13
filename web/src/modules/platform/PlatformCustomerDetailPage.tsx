@@ -1,8 +1,8 @@
-import { A, useParams } from "@solidjs/router";
+import { A, useNavigate, useParams } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
-import { useAuth } from "../../shared/auth-context";
+import { PLATFORM_CONSOLE_EMAILS, useAuth } from "../../shared/auth-context";
 import {
   usePlatformCustomer,
   usePlatformCustomerEngagement,
@@ -17,6 +17,8 @@ import { useToast } from "../../shared/toast";
 type WipePreflight = {
   can_wipe?: boolean;
   blockers?: string[];
+  blockers_are_warnings?: boolean;
+  operator_protected?: boolean;
   company_code?: string;
   company_name?: string;
   tenant_id?: number;
@@ -111,6 +113,7 @@ function fmtDuration(sec?: number | null): string {
 export default function PlatformCustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const id = () => Number(params.id);
+  const navigate = useNavigate();
   const toast = useToast();
   const auth = useAuth();
   const q = usePlatformCustomer(id);
@@ -124,6 +127,7 @@ export default function PlatformCustomerDetailPage() {
   const [wipeAck, setWipeAck] = createSignal(false);
   const [wipeBlockers, setWipeBlockers] = createSignal<string[]>([]);
   const [wipeCan, setWipeCan] = createSignal(true);
+  const [wipeWarningsOnly, setWipeWarningsOnly] = createSignal(false);
   const [wipeSnap, setWipeSnap] = createSignal<WipePreflight | null>(null);
   const sessionDetail = usePlatformCustomerSession(id, openSessionId);
 
@@ -163,8 +167,68 @@ export default function PlatformCustomerDetailPage() {
     }
     setWipeCan(Boolean(res.data?.can_wipe));
     setWipeBlockers(res.data?.blockers ?? []);
+    setWipeWarningsOnly(Boolean(res.data?.blockers_are_warnings));
     setWipeSnap(res.data ?? null);
     setWipeOpen(true);
+  };
+
+  const removeContact = async () => {
+    const cust = q.data?.customer as Record<string, unknown> | undefined;
+    if (!cust) return;
+    const email = String(cust.email || "");
+    const protectedContact =
+      Boolean(cust.is_product_owner) ||
+      Boolean(cust.is_platform_superadmin) ||
+      Boolean(cust.is_operator_workspace) ||
+      PLATFORM_CONSOLE_EMAILS.has(email.trim().toLowerCase());
+    if (protectedContact) {
+      toast.warning("Product owner / superadmin contacts and BLUEARM cannot be removed.");
+      return;
+    }
+    const hasWorkspace = Boolean(cust.tenant_id);
+    const code = String(cust.company_code || "");
+    const typedEmail = window.prompt(
+      hasWorkspace
+        ? `Remove ${email}? This wipes ${code} and deletes the contact. Type the email:`
+        : `Remove contact ${email}? Type the email:`,
+      "",
+    );
+    if (typedEmail == null) return;
+    if (typedEmail.trim().toLowerCase() !== email.trim().toLowerCase()) {
+      toast.warning("Email did not match.");
+      return;
+    }
+    let companyCodeConfirm = "";
+    if (hasWorkspace) {
+      const typedCode = window.prompt(`Type company code ${code}:`, "");
+      if (typedCode == null || typedCode.trim() !== code) {
+        toast.warning("Company code did not match.");
+        return;
+      }
+      companyCodeConfirm = typedCode.trim();
+    }
+    if (!confirm(hasWorkspace ? `Wipe ${code} and remove ${email}?` : `Remove ${email}?`)) return;
+    setBusy(true);
+    const res = await apiFetch(
+      `/api/v1/platform/console/customers/${id()}`,
+      {
+        method: "DELETE",
+        body: JSON.stringify({
+          confirm_email: email,
+          acknowledge_irreversible: true,
+          wipe_if_linked: hasWorkspace,
+          confirm_company_code: companyCodeConfirm || undefined,
+        }),
+      },
+      { silent: true },
+    );
+    setBusy(false);
+    if (!res.ok) {
+      toast.error(res.message ?? "Could not remove this contact.");
+      return;
+    }
+    toast.success(res.message ?? "Contact removed.");
+    navigate("/app/platform-command/customers");
   };
 
   const runWipe = async () => {
@@ -241,6 +305,18 @@ export default function PlatformCustomerDetailPage() {
                       <Show when={c().company_code}> ({String(c().company_code)})</Show>
                     </Show>
                   </p>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <Show when={Boolean(c().is_product_owner) || Boolean(c().is_platform_superadmin) || c().access_label}>
+                      <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-900">
+                        {String(c().access_label || "Product owner / superadmin")}
+                      </span>
+                    </Show>
+                    <Show when={Boolean(c().is_operator_workspace) || c().workspace_label}>
+                      <span class="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-medium text-white">
+                        {String(c().workspace_label || "Operator (BLUEARM)")}
+                      </span>
+                    </Show>
+                  </div>
                 </div>
 
                 <Show when={Boolean(c().likely_misjoin)}>
@@ -285,14 +361,21 @@ export default function PlatformCustomerDetailPage() {
                   </div>
                 </Show>
 
-                <Show when={String(c().tenant_status ?? "") === "active" || String(c().tenant_status ?? "") === "suspended"}>
+                <Show
+                  when={
+                    String(c().tenant_status ?? "") === "active" ||
+                    String(c().tenant_status ?? "") === "suspended" ||
+                    String(c().tenant_status ?? "") === "cancelled" ||
+                    String(c().tenant_status ?? "") === "pending_approval"
+                  }
+                >
                   <div class="space-y-3 rounded-xl border border-stroke bg-white p-4">
                     <h2 class="text-sm font-semibold text-text-primary">Company lifecycle</h2>
                     <p class="text-xs text-text-secondary">
                       This page is the <strong>contact</strong>, not one ERP user. To remove a staff member, use User
-                      Management inside that company. To remove the owner as a person, transfer ownership first — wipe
-                      is not that. <strong>Suspend</strong> locks sign-in and keeps data. <strong>Close &amp; wipe</strong>{" "}
-                      deletes the whole company (every user, including the owner) and all books.
+                      Management inside that company. <strong>Suspend</strong> locks sign-in and keeps data.{" "}
+                      <strong>Close &amp; wipe</strong> deletes the whole company. <strong>Remove contact</strong> wipes
+                      (if linked) and deletes this Platform Command row.
                     </p>
                     <div class="flex flex-wrap gap-2">
                       <Show when={String(c().tenant_status) === "active"}>
@@ -324,22 +407,64 @@ export default function PlatformCustomerDetailPage() {
                           Reactivate
                         </button>
                       </Show>
-                      <button
-                        type="button"
-                        class="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 disabled:opacity-50"
-                        disabled={busy()}
-                        onClick={() => void openWipe()}
+                      <Show when={Boolean(c().tenant_id)}>
+                        <button
+                          type="button"
+                          class="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 disabled:opacity-50"
+                          disabled={busy()}
+                          onClick={() => void openWipe()}
+                        >
+                          Close &amp; wipe…
+                        </button>
+                      </Show>
+                      <Show
+                        when={
+                          !(
+                            Boolean(c().is_product_owner) ||
+                            Boolean(c().is_platform_superadmin) ||
+                            Boolean(c().is_operator_workspace) ||
+                            PLATFORM_CONSOLE_EMAILS.has(String(c().email || "").trim().toLowerCase())
+                          )
+                        }
                       >
-                        Close &amp; wipe…
-                      </button>
+                        <button
+                          type="button"
+                          class="rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                          disabled={busy()}
+                          onClick={() => void removeContact()}
+                        >
+                          Remove contact
+                        </button>
+                      </Show>
                     </div>
                   </div>
                 </Show>
 
                 <Show when={!c().tenant_id}>
-                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
-                    No workspace linked. Use <strong>Provision</strong> on the customers list (or create subscription /
-                    provision flow) to create a new empty company for this email.
+                  <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+                    <p>
+                      No workspace linked. Use <strong>Provision</strong> on the customers list to create a new empty
+                      company for this email, or remove the contact below.
+                    </p>
+                    <Show
+                      when={
+                        !(
+                          Boolean(c().is_product_owner) ||
+                          Boolean(c().is_platform_superadmin) ||
+                          Boolean(c().is_operator_workspace) ||
+                          PLATFORM_CONSOLE_EMAILS.has(String(c().email || "").trim().toLowerCase())
+                        )
+                      }
+                    >
+                      <button
+                        type="button"
+                        class="rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                        disabled={busy()}
+                        onClick={() => void removeContact()}
+                      >
+                        Remove contact
+                      </button>
+                    </Show>
                   </div>
                 </Show>
 
@@ -362,8 +487,18 @@ export default function PlatformCustomerDetailPage() {
                         everyone in this company is deleted.
                       </p>
                       <Show when={wipeBlockers().length > 0}>
-                        <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
-                          <p class="font-medium">Wipe is blocked — the company was not deleted:</p>
+                        <div
+                          class={`rounded-lg border p-3 text-xs ${
+                            wipeWarningsOnly()
+                              ? "border-amber-200 bg-amber-50 text-amber-950"
+                              : "border-red-200 bg-red-50 text-red-900"
+                          }`}
+                        >
+                          <p class="font-medium">
+                            {wipeWarningsOnly()
+                              ? "Schema warnings (wipe can still be attempted):"
+                              : "Wipe is blocked — the company was not deleted:"}
+                          </p>
                           <ul class="mt-1 list-disc pl-4">
                             <For each={wipeBlockers()}>{(b) => <li>{b}</li>}</For>
                           </ul>

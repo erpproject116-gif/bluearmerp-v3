@@ -4,6 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { floorStatusLabel } from "./mfgRules";
 import { PageCoachMark } from "../../shared/PageCoachMark";
 import { newAssemblyOrderHref, newCuttingOrderHref, newRecipeOrderHref } from "./mfgProductionMode";
+import { InstallAppBanner } from "../../shell/InstallAppBanner";
 
 type DashboardKPI = {
   total_production_today: number;
@@ -101,6 +102,7 @@ export function ProductionHubPage() {
 
   return (
     <div class="space-y-5">
+      <InstallAppBanner />
       <PageCoachMark
         storageKey="bluearm:coach:production-hub"
         message="Draft or started jobs do not change stock — ingredients and finished goods move only when Assemble & Post, Post Production, or Process & Post succeeds."

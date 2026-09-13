@@ -158,17 +158,22 @@ func (s *service) wipePreflightCustomer(w http.ResponseWriter, r *http.Request) 
 		response.OK(w, snap, "Wipe is not ready — preflight check failed.")
 		return
 	}
-	if auth.IsOperatorCompanyCode(code) {
+	operatorProtected := auth.IsOperatorCompanyCode(code)
+	if operatorProtected {
 		blockers = append([]string{
 			"BLUEARM is the operator company. Close & wipe on a contact must not delete it. Unlink this contact from BLUEARM first.",
 		}, blockers...)
 		snap["operator_protected"] = true
 	}
-	snap["can_wipe"] = len(blockers) == 0
+	// Schema catalog warnings must not permanently disable wipe — attempt wipe and surface real FK errors.
+	snap["can_wipe"] = !operatorProtected
 	snap["blockers"] = blockers
+	snap["blockers_are_warnings"] = !operatorProtected && len(blockers) > 0
 	msg := "Wipe will permanently delete company " + code + " and every user in it, including the owner."
-	if len(blockers) > 0 {
+	if operatorProtected {
 		msg = "Wipe is blocked. Company " + code + " was not deleted."
+	} else if len(blockers) > 0 {
+		msg = "Wipe may hit schema warnings — you can still try; the API will report if delete fails."
 	}
 	response.OK(w, snap, msg)
 }
@@ -205,8 +210,8 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 		response.Err(w, http.StatusBadRequest, "This contact has no company workspace to wipe. Nothing to delete.", "ERR_BAD_REQUEST")
 		return
 	}
-	if status != "active" && status != "suspended" {
-		response.Err(w, http.StatusBadRequest, "Only active or suspended companies can be wiped (current status: "+status+").", "ERR_BAD_REQUEST")
+	if status != "active" && status != "suspended" && status != "cancelled" && status != "pending_approval" {
+		response.Err(w, http.StatusBadRequest, "Only active, suspended, cancelled, or pending companies can be wiped (current status: "+status+").", "ERR_BAD_REQUEST")
 		return
 	}
 	if strings.TrimSpace(body.ConfirmCompanyCode) != code {
@@ -220,17 +225,11 @@ func (s *service) wipeCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	blockers, err := s.tenantWipeBlockers(r.Context())
-	if err != nil {
+	if blockers, err := s.tenantWipeBlockers(r.Context()); err != nil {
 		log.Printf("console: wipe blockers customer %d: %v", id, err)
-		// Catalog check failed — proceed; DELETE will surface real FK violations.
-		blockers = nil
-	}
-	if len(blockers) > 0 {
-		response.Err(w, http.StatusConflict,
-			"Wipe blocked: tenant FKs without ON DELETE CASCADE ("+strings.Join(blockers, "; ")+").",
-			"ERR_WIPE_BLOCKED")
-		return
+	} else if len(blockers) > 0 {
+		// Warn only — attempt wipe; DELETE tenants surfaces real FK failures.
+		log.Printf("console: wipe customer %d proceeding despite %d catalog warnings", id, len(blockers))
 	}
 
 	tx, err := s.pool.Begin(r.Context())

@@ -13,6 +13,7 @@ import {
   type HomeSidebarArea,
 } from "./ecount-top-nav";
 import { useChatUnreadTotal } from "../modules/comms/useChatUnreadTotal";
+import { canManageWorkspaceSetup } from "../shared/resolveAppEntryPath";
 
 export function isFinanceModulePath(pathname: string): boolean {
   if (pathname === "/app/finance" || pathname.startsWith("/app/finance/")) return true;
@@ -207,6 +208,7 @@ function HomeAreaBlock(props: {
 export function SidebarNav() {
   const auth = useAuth();
   const loc = useLocation();
+  const shell = useShell();
   const chatUnread = useChatUnreadTotal();
   let navEl: HTMLElement | undefined;
   let savedScrollTop = 0;
@@ -224,6 +226,14 @@ export function SidebarNav() {
 
   const childrenOf = (area: HomeSidebarArea) =>
     (area.children ?? []).filter((c) => areaEnabled(c, auth.me));
+
+  /** Floor standalone: hide More Apps noise unless owner/admin (drawer still has core modules). */
+  const sidebarAreas = () =>
+    HOME_SIDEBAR_AREAS.filter((area) => {
+      if (area.id !== "more") return true;
+      if (!shell.viewport.isStandalone()) return true;
+      return canManageWorkspaceSetup(auth.me);
+    });
 
   const homeActive = (area: HomeSidebarArea) => {
     const p = loc.pathname;
@@ -443,7 +453,7 @@ export function SidebarNav() {
         savedScrollTop = e.currentTarget.scrollTop;
       }}
     >
-      <For each={HOME_SIDEBAR_AREAS}>
+      <For each={sidebarAreas()}>
         {(area) => (
           <Show when={areaEnabled(area, auth.me)}>
             <HomeAreaBlock

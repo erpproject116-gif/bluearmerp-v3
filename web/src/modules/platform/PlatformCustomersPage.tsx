@@ -9,9 +9,11 @@ import {
   usePlatformCustomers,
   usePlatformPlansAdmin,
   usePlatformBillingSummary,
+  type PlatformCustomer,
   type PlatformPlan,
 } from "../../shared/usePlatform";
 import { LoadingText } from "../../shared/LoadingText";
+import { PLATFORM_CONSOLE_EMAILS } from "../../shared/auth-context";
 
 const urgencyBadge: Record<string, string> = {
   trial_critical: "bg-red-100 text-red-800",
@@ -43,6 +45,37 @@ function planOptionLabel(p: PlatformPlan) {
   return p.display_name;
 }
 
+function isProtectedContact(c: PlatformCustomer) {
+  return Boolean(
+    c.is_product_owner ||
+      c.is_platform_superadmin ||
+      c.is_operator_workspace ||
+      PLATFORM_CONSOLE_EMAILS.has((c.email || "").trim().toLowerCase()),
+  );
+}
+
+function CustomerAccessBadges(props: { c: PlatformCustomer }) {
+  return (
+    <div class="mt-1 flex flex-wrap gap-1">
+      <Show when={props.c.is_product_owner || props.c.is_platform_superadmin || props.c.access_label}>
+        <span class="inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-900">
+          {props.c.access_label || "Product owner / superadmin"}
+        </span>
+      </Show>
+      <Show when={props.c.is_operator_workspace || props.c.workspace_label}>
+        <span class="inline-block rounded-full bg-slate-800 px-2 py-0.5 text-xs font-medium text-white">
+          {props.c.workspace_label || "Operator (BLUEARM)"}
+        </span>
+      </Show>
+      <Show when={props.c.likely_misjoin}>
+        <span class="inline-block rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900">
+          Likely mis-join
+        </span>
+      </Show>
+    </div>
+  );
+}
+
 export default function PlatformCustomersPage() {
   const [searchParams] = useSearchParams();
   const initialStatus = () => {
@@ -54,6 +87,7 @@ export default function PlatformCustomersPage() {
   const [showModal, setShowModal] = createSignal(false);
   const [form, setForm] = createSignal<ProvisionForm>(emptyForm());
   const [busy, setBusy] = createSignal(false);
+  const [removingId, setRemovingId] = createSignal<number | null>(null);
   const q = usePlatformCustomers({ q: () => search(), tenantStatus: () => tenantStatus() });
   const summaryQ = usePlatformBillingSummary();
   const commandQ = usePlatformCommandOverview();
@@ -61,6 +95,69 @@ export default function PlatformCustomersPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const pendingApprovals = () => commandQ.data?.counts?.pending_approvals ?? 0;
+
+  const removeCustomer = async (c: PlatformCustomer) => {
+    if (isProtectedContact(c)) {
+      toast.warning("Product owner / superadmin contacts and BLUEARM cannot be removed from this list.");
+      return;
+    }
+    const email = c.email;
+    const hasWorkspace = Boolean(c.tenant_id);
+    const code = c.company_code || "";
+    const typedEmail = window.prompt(
+      hasWorkspace
+        ? `Remove ${email}?\nThis will WIPE company ${code || "(workspace)"} and delete the contact.\nType the email to confirm:`
+        : `Remove contact ${email} from Platform Command?\nType the email to confirm:`,
+      "",
+    );
+    if (typedEmail == null) return;
+    if (typedEmail.trim().toLowerCase() !== email.trim().toLowerCase()) {
+      toast.warning("Email did not match — nothing was removed.");
+      return;
+    }
+    let companyCodeConfirm = "";
+    if (hasWorkspace) {
+      const typedCode = window.prompt(`Type company code ${code} to wipe the workspace:`, "");
+      if (typedCode == null) return;
+      if (typedCode.trim() !== code) {
+        toast.warning("Company code did not match — nothing was removed.");
+        return;
+      }
+      companyCodeConfirm = typedCode.trim();
+      if (
+        !confirm(
+          `Permanently wipe ${code} and remove ${email} from Platform Command? This cannot be undone.`,
+        )
+      ) {
+        return;
+      }
+    } else if (!confirm(`Remove contact ${email}? This cannot be undone.`)) {
+      return;
+    }
+
+    setRemovingId(c.id);
+    const res = await apiFetch(
+      `/api/v1/platform/console/customers/${c.id}`,
+      {
+        method: "DELETE",
+        body: JSON.stringify({
+          confirm_email: email,
+          acknowledge_irreversible: true,
+          wipe_if_linked: hasWorkspace,
+          confirm_company_code: companyCodeConfirm || undefined,
+        }),
+      },
+      { silent: true },
+    );
+    setRemovingId(null);
+    if (!res.ok) {
+      toast.error(res.message ?? "Could not remove that customer.");
+      return;
+    }
+    toast.success(res.message ?? "Customer removed.");
+    void queryClient.invalidateQueries({ queryKey: ["platform-customers"] });
+    await q.refetch();
+  };
 
   const planOptions = () => {
     const plans = plansQ.data ?? [];
@@ -306,15 +403,15 @@ export default function PlatformCustomersPage() {
 
       <Show when={q.isPending} fallback={
         <Show when={q.isError} fallback={
-          <div class="overflow-hidden rounded-xl border border-stroke bg-white">
-            <table class="w-full text-left text-sm">
+          <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
+            <table class="w-full min-w-[40rem] text-left text-sm">
               <thead class="border-b border-stroke bg-slate-50 text-xs uppercase text-text-secondary">
                 <tr>
                   <th class="px-4 py-3">Customer</th>
                   <th class="px-4 py-3">Workspace</th>
-                  <th class="px-4 py-3">Plan</th>
-                  <th class="px-4 py-3">Urgency</th>
-                  <th class="px-4 py-3">Days left</th>
+                  <th class="hidden px-4 py-3 md:table-cell">Plan</th>
+                  <th class="hidden px-4 py-3 lg:table-cell">Urgency</th>
+                  <th class="hidden px-4 py-3 lg:table-cell">Days left</th>
                   <th class="px-4 py-3" />
                 </tr>
               </thead>
@@ -328,11 +425,7 @@ export default function PlatformCustomersPage() {
                         <Show when={c.company_code}>
                           <div class="text-xs text-text-secondary">{c.company_code}</div>
                         </Show>
-                        <Show when={c.likely_misjoin}>
-                          <span class="mt-1 inline-block rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900">
-                            Likely mis-join
-                          </span>
-                        </Show>
+                        <CustomerAccessBadges c={c} />
                       </td>
                       <td class="px-4 py-3">
                         <Show
@@ -355,17 +448,29 @@ export default function PlatformCustomersPage() {
                           </span>
                         </Show>
                       </td>
-                      <td class="px-4 py-3">{c.plan_kind ?? "—"}</td>
-                      <td class="px-4 py-3">
+                      <td class="hidden px-4 py-3 md:table-cell">{c.plan_kind ?? "—"}</td>
+                      <td class="hidden px-4 py-3 lg:table-cell">
                         <span class={`rounded-full px-2 py-0.5 text-xs ${urgencyBadge[c.urgency_label] ?? "bg-slate-100"}`}>
                           {c.urgency_label.replace(/_/g, " ")}
                         </span>
                       </td>
-                      <td class="px-4 py-3">{c.days_remaining ?? "—"}</td>
+                      <td class="hidden px-4 py-3 lg:table-cell">{c.days_remaining ?? "—"}</td>
                       <td class="px-4 py-3 text-right">
-                        <A href={`/app/platform-command/customers/${c.id}`} class="text-brand-600 hover:underline">
-                          View
-                        </A>
+                        <div class="flex flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
+                          <A href={`/app/platform-command/customers/${c.id}`} class="text-brand-600 hover:underline">
+                            View
+                          </A>
+                          <Show when={!isProtectedContact(c)}>
+                            <button
+                              type="button"
+                              class="text-red-700 hover:underline disabled:opacity-50"
+                              disabled={removingId() === c.id || busy()}
+                              onClick={() => void removeCustomer(c)}
+                            >
+                              {removingId() === c.id ? "Removing…" : "Remove"}
+                            </button>
+                          </Show>
+                        </div>
                       </td>
                     </tr>
                   )}

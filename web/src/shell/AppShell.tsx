@@ -1,6 +1,6 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { Show, createSignal, For, onCleanup, onMount } from "solid-js";
+import { Show, createEffect, createSignal, For, onCleanup, onMount } from "solid-js";
 import { useAuth, canViewCrmNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
@@ -51,6 +51,8 @@ import { JoinCompanyConfirm } from "../shared/JoinCompanyConfirm";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
 import { CommandPalette, useCommandPaletteHotkey } from "./CommandPalette";
 import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
+import { FloorBottomNav } from "./FloorBottomNav";
+import { DesktopPreferredHint } from "./DesktopPreferredHint";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
   if (prefix === TAX_MNGT_PREFIX) return taxMngtHeaderTitle(pathname);
@@ -218,6 +220,21 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     auth.me?.tenant.company_name ||
     "Bluearm";
   const appTagline = () => brandingLabel("app.tagline", "ERP v3");
+  const hideBreadcrumbs = () => shell.viewport.isNarrow() || shell.viewport.isStandalone();
+
+  // Close drawer on route change.
+  createEffect(() => {
+    loc.pathname;
+    shell.closeDrawer();
+  });
+
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") shell.closeDrawer();
+    };
+    document.addEventListener("keydown", onKey);
+    onCleanup(() => document.removeEventListener("keydown", onKey));
+  });
 
   const activeModule = () => resolveModule(loc.pathname);
   const moduleLabel = (mod: NonNullable<ReturnType<typeof resolveModule>>) => {
@@ -247,19 +264,48 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     return mod;
   };
 
+  const pageTitle = () => {
+    if (isReviewPurchasesPath(loc.pathname)) return reviewPurchasesHeaderTitle(loc.pathname);
+    const mod = activeModule();
+    if (!mod) return "Home";
+    if (activeSubBranch()) return subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix);
+    const f = activeFeature();
+    if (f) {
+      const base = featureLabel(mod.id, f);
+      return loc.pathname === f.settingsHref && f.settingsHref !== f.href ? `${base} settings` : base;
+    }
+    return moduleLabel(mod);
+  };
+
   const layout = (
-    <div class="flex min-h-screen bg-body">
+    <div
+      class="flex min-h-screen bg-body"
+      classList={{ "pb-16": shell.viewport.useDrawer() || shell.viewport.isStandalone() }}
+    >
       <SetupFirstRunRedirect />
+      <Show when={shell.viewport.useDrawer() && shell.drawerOpen()}>
+        <button
+          type="button"
+          class="fixed inset-0 z-[45] bg-slate-900/40"
+          aria-label="Close menu"
+          onClick={() => shell.closeDrawer()}
+        />
+      </Show>
       <aside
-        class="erp-surface fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-stroke py-6 transition-[width,padding] duration-200 ease-in-out"
+        class="erp-surface fixed inset-y-0 left-0 z-50 flex h-screen flex-col overflow-hidden border-r border-stroke py-6 transition-[width,padding,transform] duration-200 ease-in-out"
         classList={{
-          "w-[4.5rem] px-2": shell.collapsed(),
-          "w-[18.125rem] px-5": !shell.collapsed(),
+          "w-[18.125rem] px-5": shell.viewport.useDrawer() || !shell.collapsed(),
+          "w-[4.5rem] px-2": !shell.viewport.useDrawer() && shell.collapsed(),
+          "-translate-x-full": shell.viewport.useDrawer() && !shell.drawerOpen(),
+          "translate-x-0 shadow-xl": shell.viewport.useDrawer() && shell.drawerOpen(),
         }}
       >
         <div
           class="mb-6 shrink-0 flex items-center gap-3"
-          classList={{ "justify-center px-0": shell.collapsed(), "px-2": !shell.collapsed() }}
+          classList={{
+            "justify-center px-0": shell.collapsed(),
+            "px-2": !shell.collapsed(),
+          }}
         >
           <Show
             when={!shell.collapsed()}
@@ -277,136 +323,136 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         <div class="mt-4 shrink-0 space-y-2 border-t border-stroke pt-3">
           <BusinessBranchSwitcher />
           <UserAccountMenu />
-          <button
-          type="button"
-          class="flex items-center rounded-lg border border-stroke text-sm text-text-secondary transition hover:erp-panel hover:text-text-primary"
-          classList={{
-            "mx-auto h-9 w-9 justify-center": shell.collapsed(),
-            "w-full justify-center gap-2 px-3 py-2": !shell.collapsed(),
-          }}
-          aria-label={shell.collapsed() ? "Expand sidebar" : "Collapse sidebar"}
-          onClick={() => shell.toggleCollapsed()}
-        >
-          <svg
-            class="h-4 w-4 transition-transform duration-200"
-            classList={{ "rotate-180": shell.collapsed() }}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
-          </svg>
-          <Show when={!shell.collapsed()}>
-            <span>{brandingLabel("app.collapse_sidebar", "Collapse")}</span>
+          <Show when={!shell.viewport.useDrawer()}>
+            <button
+              type="button"
+              class="flex items-center rounded-lg border border-stroke text-sm text-text-secondary transition hover:erp-panel hover:text-text-primary"
+              classList={{
+                "mx-auto h-9 w-9 justify-center": shell.collapsed(),
+                "w-full justify-center gap-2 px-3 py-2": !shell.collapsed(),
+              }}
+              aria-label={shell.collapsed() ? "Expand sidebar" : "Collapse sidebar"}
+              onClick={() => shell.toggleCollapsed()}
+            >
+              <svg
+                class="h-4 w-4 transition-transform duration-200"
+                classList={{ "rotate-180": shell.collapsed() }}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+              </svg>
+              <Show when={!shell.collapsed()}>
+                <span>{brandingLabel("app.collapse_sidebar", "Collapse")}</span>
+              </Show>
+            </button>
           </Show>
-        </button>
         </div>
       </aside>
 
       <div
-        class="flex min-w-0 flex-1 flex-col transition-[margin] duration-200 ease-in-out"
-        classList={{
-          "ml-[4.5rem]": shell.collapsed(),
-          "ml-[18.125rem]": !shell.collapsed(),
-        }}
+        class={`flex min-w-0 flex-1 flex-col transition-[margin] duration-200 ease-in-out ${shell.mainMargin()}`}
       >
-        <header class="erp-surface sticky top-0 z-30 border-b border-stroke px-6 py-4 shadow-sm">
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0 flex-1">
-              <Show
-                when={activeModule()}
-                fallback={
-                  <>
-                    <SetupBreadcrumbHint />
-                    <p class="text-xs font-medium text-text-secondary">{appTitle()}</p>
-                    <h1 class="text-xl font-semibold text-text-primary">Home</h1>
-                  </>
-                }
-              >
-                {(mod) => {
-                  const breadcrumbDept = () => {
-                    if (isFinanceUnderSalesReportPath(loc.pathname)) {
-                      return navGroupForModuleId("finance")?.label;
-                    }
-                    return navGroupForModuleId(mod().id)?.label;
-                  };
-                  const crumbSep = () => (
-                    <span class="mx-1.5 text-text-secondary/50" aria-hidden="true">
-                      ›
-                    </span>
-                  );
-                  return (
-                  <>
-                    <p class="text-xs font-medium text-text-secondary">
-                      <Show
-                        when={activeSubBranch()}
-                        fallback={
-                          <>
-                            <SetupBreadcrumbHint />
-                            <Show when={breadcrumbDept()}>
-                              {(dept) => (
-                                <>
-                                  <span>{dept()}</span>
-                                  {crumbSep()}
-                                </>
-                              )}
-                            </Show>
-                            <span>{moduleLabel(mod())}</span>
-                            <Show when={activeFeature()}>
-                              {(feat) => (
-                                <>
-                                  {crumbSep()}
-                                  <span>{featureLabel(mod().id, feat())}</span>
-                                </>
-                              )}
-                            </Show>
-                          </>
-                        }
-                      >
-                        {(branch) => (
-                          <>
-                            <Show when={breadcrumbDept()}>
-                              {(dept) => (
-                                <>
-                                  <span>{dept()}</span>
-                                  {crumbSep()}
-                                </>
-                              )}
-                            </Show>
-                            <span>{moduleLabel(mod())}</span>
-                            {crumbSep()}
-                            <span>{featureLabel(mod().id, branch())}</span>
-                          </>
-                        )}
-                      </Show>
-                    </p>
-                    <h1 class="truncate text-xl font-semibold text-text-primary">
-                      {isReviewPurchasesPath(loc.pathname)
-                        ? reviewPurchasesHeaderTitle(loc.pathname)
-                        : activeSubBranch()
-                          ? subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix)
-                          : activeFeature()
-                            ? (() => {
-                                const f = activeFeature()!;
-                                const base = featureLabel(mod().id, f);
-                                return loc.pathname === f.settingsHref && f.settingsHref !== f.href
-                                  ? `${base} settings`
-                                  : base;
-                              })()
-                            : moduleLabel(mod())}
-                    </h1>
-                  </>
-                  );
-                }}
+        <header class="erp-surface sticky top-0 z-30 border-b border-stroke px-4 py-3 shadow-sm sm:px-6 sm:py-4">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex min-w-0 flex-1 items-center gap-2">
+              <Show when={shell.viewport.useDrawer()}>
+                <button
+                  type="button"
+                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-stroke text-text-secondary hover:bg-slate-50"
+                  aria-label="Open menu"
+                  aria-expanded={shell.drawerOpen()}
+                  onClick={() => shell.toggleDrawer()}
+                >
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16" />
+                  </svg>
+                </button>
               </Show>
+              <div class="min-w-0 flex-1">
+                <Show when={!hideBreadcrumbs()}>
+                  <Show
+                    when={activeModule()}
+                    fallback={
+                      <>
+                        <SetupBreadcrumbHint />
+                        <p class="text-xs font-medium text-text-secondary">{appTitle()}</p>
+                      </>
+                    }
+                  >
+                    {(mod) => {
+                      const breadcrumbDept = () => {
+                        if (isFinanceUnderSalesReportPath(loc.pathname)) {
+                          return navGroupForModuleId("finance")?.label;
+                        }
+                        return navGroupForModuleId(mod().id)?.label;
+                      };
+                      const crumbSep = () => (
+                        <span class="mx-1.5 text-text-secondary/50" aria-hidden="true">
+                          ›
+                        </span>
+                      );
+                      return (
+                        <p class="text-xs font-medium text-text-secondary">
+                          <Show
+                            when={activeSubBranch()}
+                            fallback={
+                              <>
+                                <SetupBreadcrumbHint />
+                                <Show when={breadcrumbDept()}>
+                                  {(dept) => (
+                                    <>
+                                      <span>{dept()}</span>
+                                      {crumbSep()}
+                                    </>
+                                  )}
+                                </Show>
+                                <span>{moduleLabel(mod())}</span>
+                                <Show when={activeFeature()}>
+                                  {(feat) => (
+                                    <>
+                                      {crumbSep()}
+                                      <span>{featureLabel(mod().id, feat())}</span>
+                                    </>
+                                  )}
+                                </Show>
+                              </>
+                            }
+                          >
+                            {(branch) => (
+                              <>
+                                <Show when={breadcrumbDept()}>
+                                  {(dept) => (
+                                    <>
+                                      <span>{dept()}</span>
+                                      {crumbSep()}
+                                    </>
+                                  )}
+                                </Show>
+                                <span>{moduleLabel(mod())}</span>
+                                {crumbSep()}
+                                <span>{featureLabel(mod().id, branch())}</span>
+                              </>
+                            )}
+                          </Show>
+                        </p>
+                      );
+                    }}
+                  </Show>
+                </Show>
+                <h1 class="truncate text-lg font-semibold text-text-primary sm:text-xl">{pageTitle()}</h1>
+              </div>
             </div>
-            <div class="flex shrink-0 items-center gap-2">
-              <WorkflowGuideHeaderControl />
+            <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <Show when={!shell.viewport.isStandalone()}>
+                <WorkflowGuideHeaderControl />
+              </Show>
               <button
                 type="button"
-                class="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary transition hover:bg-slate-50 hover:text-text-primary md:min-w-[7.5rem]"
+                class="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm text-text-secondary transition hover:bg-slate-50 hover:text-text-primary md:min-w-[7.5rem] md:px-3"
                 title="Search (Ctrl+K)"
                 onClick={() => setPaletteOpen(true)}
               >
@@ -418,15 +464,17 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               </button>
               <PresenceHeartbeat />
               <IdleLogoutGuard />
-              <A
-                href="/app/documentation"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
-                title="Help & guides"
-              >
-                <span class="hidden sm:inline">Help &amp; guides</span>
-                <span class="sm:hidden">Help</span>
-              </A>
-              <PresenceAvatars />
+              <Show when={!shell.viewport.isStandalone()}>
+                <A
+                  href="/app/documentation"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
+                  title="Help & guides"
+                >
+                  <span class="hidden sm:inline">Help &amp; guides</span>
+                  <span class="sm:hidden">Help</span>
+                </A>
+              </Show>
+              <PresenceAvatars compact={shell.viewport.isNarrow() || shell.viewport.isStandalone()} />
               <CrmNotificationPoller
                 enabled={canViewCrmNotifications(auth.me)}
                 userId={auth.me?.user?.id ?? null}
@@ -436,7 +484,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           </div>
           <SetupReminderBar />
           <CommercialPaywallHost />
-          <Show when={featureNavModule()}>
+          <Show when={!shell.viewport.isStandalone() ? featureNavModule() : undefined}>
             {(mod) => (
               <HeaderFeatureTabs
                 modId={mod().id}
@@ -445,20 +493,24 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               />
             )}
           </Show>
-          <TaxMngtHeaderNav />
-          <CollectiveInvoicingHeaderNav />
-          <SerialLotHeaderNav />
-          <WmsHeaderNav />
-          <ReviewPurchasesHeaderNav />
-          <AcctIHeaderNav />
-          <AcctIIHeaderNav />
+          <Show when={!shell.viewport.isStandalone()}>
+            <TaxMngtHeaderNav />
+            <CollectiveInvoicingHeaderNav />
+            <SerialLotHeaderNav />
+            <WmsHeaderNav />
+            <ReviewPurchasesHeaderNav />
+            <AcctIHeaderNav />
+            <AcctIIHeaderNav />
+          </Show>
         </header>
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 sm:p-6">
           <DemoTenantBanner />
           <EntitlementBanner />
+          <DesktopPreferredHint />
           <ModuleAccessGate>{props.children}</ModuleAccessGate>
         </main>
       </div>
+      <FloorBottomNav />
     </div>
   );
 

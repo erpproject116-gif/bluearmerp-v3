@@ -25,14 +25,14 @@ export function WideEntityModal(props: {
   return (
     <Show when={props.open}>
       <Portal>
-        <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6" role="presentation">
+        <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-3 sm:p-6" style={{ "padding-bottom": "max(1rem, env(safe-area-inset-bottom))" }} role="presentation">
           <div
-            class="my-4 w-full max-w-6xl rounded-2xl border border-stroke bg-surface p-6 shadow-xl"
+            class="my-2 flex max-h-[min(100dvh,100svh)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-stroke bg-surface shadow-xl sm:my-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="wide-entity-modal-title"
           >
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex shrink-0 items-center justify-between gap-3 border-b border-stroke px-4 py-4 sm:px-6">
               <div class="flex min-w-0 items-center gap-2">
                 <Show when={props.icon}>
                   <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
@@ -48,12 +48,12 @@ export function WideEntityModal(props: {
               </Show>
             </div>
             <Show when={props.tabs && props.tabs.length > 0}>
-              <div class="mt-4 flex gap-1 border-b border-stroke">
+              <div class="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke px-4 sm:px-6">
                 <For each={props.tabs}>
                   {(tab) => (
                     <button
                       type="button"
-                      class={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+                      class={`-mb-px shrink-0 border-b-2 px-4 py-2 text-sm font-medium ${
                         props.activeTab === tab.id
                           ? "border-brand-600 text-brand-700"
                           : "border-transparent text-text-secondary hover:text-text-primary"
@@ -66,8 +66,10 @@ export function WideEntityModal(props: {
                 </For>
               </div>
             </Show>
-            <div class="mt-5 w-full min-w-0 space-y-4">{props.children}</div>
-            <div class="mt-6 flex justify-end gap-3 border-t border-stroke pt-4">
+            <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+              <div class="w-full min-w-0 space-y-4">{props.children}</div>
+            </div>
+            <div class="flex shrink-0 justify-end gap-3 border-t border-stroke px-4 py-4 sm:px-6" style={{ "padding-bottom": "max(1rem, env(safe-area-inset-bottom))" }}>
               <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => props.onClose()}>
                 {props.readOnly ? "Close" : "Cancel"}
               </button>

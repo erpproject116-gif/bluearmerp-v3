@@ -12,9 +12,28 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
+
+// customerAccessFlags labels product owners / platform superadmins and the BLUEARM operator workspace.
+func customerAccessFlags(email string, companyCode string) map[string]any {
+	email = strings.ToLower(strings.TrimSpace(email))
+	isPO := auth.IsPlatformConsoleEmail(email)
+	out := map[string]any{
+		"is_product_owner":       isPO,
+		"is_platform_superadmin": isPO,
+		"is_operator_workspace":  auth.IsOperatorCompanyCode(companyCode),
+	}
+	if isPO {
+		out["access_label"] = "Product owner / superadmin"
+	}
+	if auth.IsOperatorCompanyCode(companyCode) {
+		out["workspace_label"] = "Operator (BLUEARM)"
+	}
+	return out
+}
 
 func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -105,6 +124,13 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 			"plan_kind": planKind, "subscription_status": subStatus, "ends_at": endsAt,
 			"crm_lead_id": leadID, "created_at": createdAt, "likely_misjoin": likelyMisjoin,
 		}
+		code := ""
+		if companyCode != nil {
+			code = *companyCode
+		}
+		for k, v := range customerAccessFlags(email, code) {
+			row[k] = v
+		}
 		if endsAt != nil {
 			days := int(time.Until(*endsAt).Hours() / 24)
 			row["days_remaining"] = days
@@ -182,16 +208,21 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 		where s.customer_id = $1 order by i.due_date desc`, id)
 	invoices := scanInvoices(invRows)
 
+	cust := map[string]any{
+		"id": id, "email": email, "full_name": fullName, "company_name": company,
+		"mobile": mobile, "entry_source": entrySource, "urgency_label": urgency,
+		"tenant_id": tenantID, "auth_user_id": authUserID,
+		"tenant_status": tenantStatus, "company_code": companyCode,
+		"crm_lead_id": leadID, "crm_lead_tenant_id": leadTenantID,
+		"onboarding_progress": json.RawMessage(onboarding), "created_at": createdAt,
+		"likely_misjoin": likelyMisjoin,
+	}
+	for k, v := range customerAccessFlags(email, companyCode) {
+		cust[k] = v
+	}
+
 	response.OK(w, map[string]any{
-		"customer": map[string]any{
-			"id": id, "email": email, "full_name": fullName, "company_name": company,
-			"mobile": mobile, "entry_source": entrySource, "urgency_label": urgency,
-			"tenant_id": tenantID, "auth_user_id": authUserID,
-			"tenant_status": tenantStatus, "company_code": companyCode,
-			"crm_lead_id": leadID, "crm_lead_tenant_id": leadTenantID,
-			"onboarding_progress": json.RawMessage(onboarding), "created_at": createdAt,
-			"likely_misjoin": likelyMisjoin,
-		},
+		"customer":      cust,
 		"subscriptions": subs,
 		"invoices":      invoices,
 	}, "OK")
@@ -262,4 +293,136 @@ func (s *service) patchCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, map[string]any{"id": id}, "Updated.")
+}
+
+// deleteCustomer removes the Platform Command contact. If a workspace is still linked,
+// wipe it first (same rules as wipeCustomer) then delete the contact row.
+func (s *service) deleteCustomer(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		response.Validation(w, map[string]string{"id": "Invalid customer id."})
+		return
+	}
+	var body struct {
+		ConfirmEmail            string `json:"confirm_email"`
+		AcknowledgeIrreversible bool   `json:"acknowledge_irreversible"`
+		WipeIfLinked            bool   `json:"wipe_if_linked"`
+		ConfirmCompanyCode      string `json:"confirm_company_code"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if !body.AcknowledgeIrreversible {
+		response.Validation(w, map[string]string{"acknowledge_irreversible": "Confirm irreversible remove."})
+		return
+	}
+
+	var email string
+	var tenantID *int64
+	var companyCode, tenantStatus string
+	err = s.pool.QueryRow(r.Context(), `
+		select pc.email, pc.tenant_id, coalesce(t.company_code,''), coalesce(t.status,'')
+		from public.platform_customers pc
+		left join public.tenants t on t.id = pc.tenant_id
+		where pc.id = $1`, id).Scan(&email, &tenantID, &companyCode, &tenantStatus)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			response.Err(w, http.StatusNotFound, "Customer not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.Err(w, http.StatusInternalServerError, "Failed to load customer.", "ERR_INTERNAL")
+		return
+	}
+	if auth.IsPlatformConsoleEmail(email) {
+		response.Err(w, http.StatusConflict,
+			"Cannot remove a product owner / platform superadmin contact ("+email+").",
+			"ERR_FORBIDDEN")
+		return
+	}
+	if strings.ToLower(strings.TrimSpace(body.ConfirmEmail)) != strings.ToLower(strings.TrimSpace(email)) {
+		response.Validation(w, map[string]string{"confirm_email": "Type the exact customer email (" + email + ") to confirm remove."})
+		return
+	}
+	if auth.IsOperatorCompanyCode(companyCode) {
+		response.Err(w, http.StatusConflict,
+			"Cannot remove a contact still linked to BLUEARM (operator company). Unlink or wipe a customer company instead.",
+			"ERR_FORBIDDEN")
+		return
+	}
+
+	wiped := false
+	if tenantID != nil && *tenantID > 0 {
+		if !body.WipeIfLinked {
+			response.Err(w, http.StatusConflict,
+				"This contact still has workspace "+companyCode+". Wipe the company first, or set wipe_if_linked and confirm the company code.",
+				"ERR_CONFLICT")
+			return
+		}
+		if strings.TrimSpace(body.ConfirmCompanyCode) != companyCode {
+			response.Validation(w, map[string]string{"confirm_company_code": "Type company code " + companyCode + " to wipe before remove."})
+			return
+		}
+		if tenantStatus != "active" && tenantStatus != "suspended" && tenantStatus != "cancelled" && tenantStatus != "pending_approval" {
+			response.Err(w, http.StatusBadRequest, "Cannot wipe workspace in status "+tenantStatus+".", "ERR_BAD_REQUEST")
+			return
+		}
+		tx, err := s.pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove customer.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		if _, err := tx.Exec(r.Context(), `
+			update public.platform_subscriptions
+			set status = 'cancelled', updated_at = now(),
+			    notes = coalesce(notes,'') || E'\n[remove] Workspace wiped with contact delete.'
+			where customer_id = $1`, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to cancel subscriptions: "+err.Error(), "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `
+			update public.platform_customers set tenant_id = null, updated_at = now() where id = $1`, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to unlink customer.", "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `delete from public.users where tenant_id = $1`, *tenantID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to delete workspace users: "+err.Error(), "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `delete from public.tenants where id = $1`, *tenantID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Could not wipe company "+companyCode+": "+err.Error(), "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `delete from public.platform_customers where id = $1`, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Workspace wiped but contact delete failed: "+err.Error(), "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove customer.", "ERR_INTERNAL")
+			return
+		}
+		wiped = true
+	} else {
+		tag, err := s.pool.Exec(r.Context(), `delete from public.platform_customers where id = $1`, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to delete contact: "+err.Error(), "ERR_INTERNAL")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Customer not found.", "ERR_NOT_FOUND")
+			return
+		}
+	}
+
+	tu, _ := auth.FromContext(r.Context())
+	logPlatformAudit(r.Context(), s.pool, tu, platformAuditEntry{
+		ActionCode: "platform.customer.delete", EventKind: "change",
+		HTTPMethod: "DELETE", RoutePath: r.URL.Path,
+		PlatformCustomerID: &id, TenantID: tenantID,
+		TargetType: "platform_customers", TargetID: &id,
+		Summary: "Removed customer contact " + email,
+	})
+	msg := "Contact " + email + " removed from Platform Command."
+	if wiped {
+		msg = "Company " + companyCode + " wiped and contact " + email + " removed from Platform Command."
+	}
+	response.OK(w, map[string]any{"deleted": true, "wiped": wiped, "email": email}, msg)
 }

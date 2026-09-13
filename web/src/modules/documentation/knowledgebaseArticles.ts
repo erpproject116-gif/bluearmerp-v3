@@ -5,6 +5,32 @@ import { moduleKbArticles } from "./moduleKbArticles";
 
 export const knowledgebaseArticles: KbArticle[] = [
   {
+    id: "install-on-phone",
+    title: "Install Bluearm on your phone",
+    scenario: "You want a home-screen icon for floor work without the browser chrome.",
+    intro:
+      "Bluearm installs as an online-only web app. Production opens first after install; you still need internet to save or post stock.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Android Chrome: open Home or Production, tap Install Bluearm when prompted (or browser menu → Install app).",
+          "iPhone/iPad Safari: Share → Add to Home Screen (there is no install prompt API on iOS).",
+          "Open the icon — you get drawer + bottom nav for Home, Production, Stock, Chat, and Bell.",
+          "Sell and buy screens still work from Search or the menu, but are easier on a laptop.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Install from app.bluearmerp.com so sign-in cookies match the standalone window. Offline posting is not supported in this release.",
+      },
+    ],
+    primaryHref: "/app/production",
+    primaryLabel: "Open Production",
+    relatedGuideIds: ["getting-started", "session-or-signin-issues"],
+    questions: ["add to home screen", "install app", "PWA", "phone install"],
+  },
+  {
     id: "add-another-business",
     title: "How do I add another business?",
     scenario: "You need a second company workspace on BluearmERP.",
