@@ -366,6 +366,15 @@ export default function ChartOfAccountsPage() {
   });
   const [ensuringPurchaseCogs, setEnsuringPurchaseCogs] = createSignal(false);
 
+  const grniOptions = createMemo(() => accountsForSlot(["liability"]));
+  const grniHas2115 = createMemo(() => accountsForSlot(["liability"]).some((a) => a.account_code === "2115"));
+  const grniNeedsEnsure = createMemo(() => {
+    const id = defaultsForm().grni_account_id;
+    if (!id) return true;
+    return !grniOptions().some((a) => a.id === id);
+  });
+  const [ensuringGrni, setEnsuringGrni] = createSignal(false);
+
   const defaultsMappedCount = createMemo(() => {
     const d = defaultsForm();
     return DEFAULT_SLOTS.filter((s) => {
@@ -373,6 +382,48 @@ export default function ChartOfAccountsPage() {
       return v != null && v > 0;
     }).length;
   });
+
+  const applyEnsuredDefaults = (
+    d: FinanceDefaults | undefined,
+    acct: AccountRow | undefined,
+    slotKey: DefaultAccountSlotKey,
+  ) => {
+    if (d) {
+      setDefaultsForm({
+        cash_account_id: d.cash_account_id ?? null,
+        receivable_account_id: d.receivable_account_id ?? null,
+        payable_account_id: d.payable_account_id ?? null,
+        sales_account_id: d.sales_account_id ?? null,
+        purchase_account_id: d.purchase_account_id ?? null,
+        inventory_account_id: d.inventory_account_id ?? null,
+        grni_account_id: d.grni_account_id ?? null,
+        cogs_account_id: d.cogs_account_id ?? null,
+        input_vat_account_id: d.input_vat_account_id ?? null,
+        output_vat_account_id: d.output_vat_account_id ?? null,
+        commission_expense_account_id: d.commission_expense_account_id ?? null,
+        commission_payable_account_id: d.commission_payable_account_id ?? null,
+        ewt_payable_account_id: d.ewt_payable_account_id ?? null,
+        fwt_payable_account_id: d.fwt_payable_account_id ?? null,
+        compensation_wht_payable_account_id: d.compensation_wht_payable_account_id ?? null,
+        ewt_receivable_account_id: d.ewt_receivable_account_id ?? null,
+        disabled_account_types: d.disabled_account_types ?? [],
+      });
+    } else if (acct?.id) {
+      setDefaultsForm((v) => ({ ...v, [slotKey]: acct.id }));
+    }
+    if (acct) {
+      setMapLabels((m) => ({ ...m, [slotKey]: accountLabel(acct) }));
+    }
+  };
+
+  const mergeEnsuredAccount = (acct: AccountRow | undefined) => (rows: AccountRow[] | undefined) => {
+    const list = rows ?? [];
+    if (!acct?.id) return list;
+    if (list.some((a) => a.id === acct.id)) {
+      return list.map((a) => (a.id === acct.id ? { ...a, ...acct } : a));
+    }
+    return [...list, acct].sort((a, b) => a.account_code.localeCompare(b.account_code));
+  };
 
   const ensurePurchaseCogs = async () => {
     setEnsuringPurchaseCogs(true);
@@ -390,38 +441,11 @@ export default function ChartOfAccountsPage() {
     }
 
     const acct = res.data?.account;
-    const mergeAccount = (rows: AccountRow[] | undefined) => {
-      const list = rows ?? [];
-      if (!acct?.id) return list;
-      if (list.some((a) => a.id === acct.id)) {
-        return list.map((a) => (a.id === acct.id ? { ...a, ...acct } : a));
-      }
-      return [...list, acct].sort((a, b) => a.account_code.localeCompare(b.account_code));
-    };
-
-    // Apply mapping in the form first so the combo shows the new expense account.
-    if (res.data?.defaults) {
-      setDefaultsForm({
-        cash_account_id: res.data.defaults.cash_account_id ?? null,
-        receivable_account_id: res.data.defaults.receivable_account_id ?? null,
-        payable_account_id: res.data.defaults.payable_account_id ?? null,
-        sales_account_id: res.data.defaults.sales_account_id ?? null,
-        purchase_account_id: res.data.defaults.purchase_account_id ?? acct?.id ?? null,
-        input_vat_account_id: res.data.defaults.input_vat_account_id ?? null,
-        output_vat_account_id: res.data.defaults.output_vat_account_id ?? null,
-        commission_expense_account_id: res.data.defaults.commission_expense_account_id ?? null,
-        commission_payable_account_id: res.data.defaults.commission_payable_account_id ?? null,
-      });
-    } else if (acct?.id) {
-      setDefaultsForm((v) => ({ ...v, purchase_account_id: acct.id }));
-    }
-    if (acct) {
-      setMapLabels((m) => ({ ...m, purchase_account_id: accountLabel(acct) }));
-    }
+    applyEnsuredDefaults(res.data?.defaults, acct, "purchase_account_id");
+    const mergeAccount = mergeEnsuredAccount(acct);
 
     client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], mergeAccount);
     await client.invalidateQueries({ queryKey: ["finance-accounts"] });
-    // Refetch mapping options, then re-merge so a truncated refetch cannot drop 5010.
     await client.refetchQueries({ queryKey: ["finance-accounts-parent-options"] });
     client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], mergeAccount);
     await client.invalidateQueries({ queryKey: ["finance-account-defaults"] });
@@ -431,6 +455,39 @@ export default function ChartOfAccountsPage() {
       res.data?.created
         ? `Created ${acct?.account_code ?? "5010"} and mapped Purchases / COGS.`
         : `Mapped Purchases / COGS to ${acct?.account_code ?? "expense account"}.`,
+    );
+  };
+
+  const ensureGrni = async () => {
+    setEnsuringGrni(true);
+    const res = await apiFetch<{
+      account: AccountRow;
+      created: boolean;
+      mapped: boolean;
+      defaults: FinanceDefaults;
+    }>("/api/v1/finance/accounts/ensure-grni", { method: "POST" }, { silent: true });
+    setEnsuringGrni(false);
+    if (!res.success) {
+      const detail = res.errors ? Object.values(res.errors).filter(Boolean).join(" · ") : "";
+      toast.warning(detail || res.message || "Could not create GRNI account.");
+      return;
+    }
+
+    const acct = res.data?.account;
+    applyEnsuredDefaults(res.data?.defaults, acct, "grni_account_id");
+    const mergeAccount = mergeEnsuredAccount(acct);
+
+    client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], mergeAccount);
+    await client.invalidateQueries({ queryKey: ["finance-accounts"] });
+    await client.refetchQueries({ queryKey: ["finance-accounts-parent-options"] });
+    client.setQueryData<AccountRow[]>(["finance-accounts-parent-options"], mergeAccount);
+    await client.invalidateQueries({ queryKey: ["finance-account-defaults"] });
+
+    setMappingsDirty(false);
+    toast.success(
+      res.data?.created
+        ? `Created ${acct?.account_code ?? "2115"} and mapped GRNI.`
+        : `Mapped GRNI to ${acct?.account_code ?? "liability account"}.`,
     );
   };
 
@@ -863,6 +920,41 @@ export default function ChartOfAccountsPage() {
         </div>
       </Show>
 
+      <Show when={!showSetupBanner() && grniNeedsEnsure()}>
+        <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p class="font-medium">GRNI clearing needs a liability account</p>
+          <p class="mt-1 text-amber-900/80">
+            Click <span class="font-medium">Create GRNI (2115)</span> to add and map Goods Received Not Invoiced.
+            {!grniHas2115() ? " Account 2115 is not in your chart yet." : ""}
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg bg-amber-700 px-3 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+              disabled={ensuringGrni()}
+              onClick={() => {
+                setDefaultsOpen(true);
+                void ensureGrni();
+              }}
+            >
+              {ensuringGrni() ? "Creating…" : "Create GRNI (2115)"}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100"
+              onClick={() => {
+                setDefaultsOpen(true);
+                queueMicrotask(() =>
+                  document.getElementById("default-slot-grni_account_id")?.scrollIntoView({ behavior: "smooth", block: "center" }),
+                );
+              }}
+            >
+              Jump to GRNI mapping
+            </button>
+          </div>
+        </div>
+      </Show>
+
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div class="flex flex-wrap items-center gap-2">
           <div class="inline-flex rounded-lg border border-stroke p-0.5 text-sm">
@@ -1163,8 +1255,9 @@ export default function ChartOfAccountsPage() {
                       class="block rounded-lg p-1 text-sm"
                       classList={{
                         "bg-amber-50":
-                          slot.key === "purchase_account_id" &&
-                          (purchaseNeedsEnsure() || String(searchParams.focus ?? "") === "purchase"),
+                          (slot.key === "purchase_account_id" &&
+                            (purchaseNeedsEnsure() || String(searchParams.focus ?? "") === "purchase")) ||
+                          (slot.key === "grni_account_id" && grniNeedsEnsure()),
                       }}
                     >
                       <LookupCombo
@@ -1206,6 +1299,29 @@ export default function ChartOfAccountsPage() {
                               onClick={() => void ensurePurchaseCogs()}
                             >
                               {ensuringPurchaseCogs() ? "Creating…" : "Create Purchases / COGS (5010)"}
+                            </button>
+                          </div>
+                        </div>
+                      </Show>
+                      <Show when={slot.key === "grni_account_id" && grniNeedsEnsure()}>
+                        <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                          <p class="font-medium">
+                            {!grniHas2115()
+                              ? "No GRNI liability account (2115) available"
+                              : "GRNI clearing is not mapped to a liability account"}
+                          </p>
+                          <p class="mt-0.5 text-amber-900/80">
+                            Click Create to add <span class="font-medium">2115</span> (or the next free 21xx) and map it,
+                            or pick an existing liability above.
+                          </p>
+                          <div class="mt-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              class="rounded-md bg-amber-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+                              disabled={ensuringGrni()}
+                              onClick={() => void ensureGrni()}
+                            >
+                              {ensuringGrni() ? "Creating…" : "Create GRNI (2115)"}
                             </button>
                           </div>
                         </div>

@@ -46,7 +46,8 @@ func TestTierForPath(t *testing.T) {
 		{"POST", "/api/v1/copilot/actions/approve", TierExpensive},
 		{"POST", "/api/v1/quotation/rfq-import/run", TierExpensive},
 		{"POST", "/api/v1/inventory/serial-units/resolve-scan", TierExpensive},
-		{"GET", "/api/v1/sales/sales", TierAuthenticated},
+		{"GET", "/api/v1/sales/sales", TierExempt},
+		{"POST", "/api/v1/sales/sales", TierAuthenticated},
 		{"POST", "/api/v1/presence/heartbeat", TierExempt},
 		{"GET", "/api/v1/presence/online", TierExempt},
 	}

@@ -116,6 +116,11 @@ func TierForPath(method, path string) Tier {
 		strings.Contains(p, "/copilot/tools/run") {
 		return TierExpensive
 	}
+	// Authenticated list/lookup GETs are high-frequency in ERP UIs (LookupCombo, grids).
+	// Rate-limit mutations and expensive paths only so typing searches do not starve saves.
+	if (method == http.MethodGet || method == http.MethodHead) && strings.HasPrefix(p, "/api/v1/") {
+		return TierExempt
+	}
 	if strings.HasPrefix(p, "/api/v1/") {
 		return TierAuthenticated
 	}

@@ -19,8 +19,8 @@ import { jobsHref } from "../production/mfgProductionMode";
 import { submitBusyLabel } from "../../shared/submitCopy";
 import NewAssemblyOrderWizard from "./NewAssemblyOrderWizard";
 import NewRecipeOrderWizard from "./NewRecipeOrderWizard";
+import { searchBomsForOrderType } from "./mfgBomLookup";
 
-type BomOption = { id: number; bom_code: string; bom_name: string; finished_item_name?: string };
 type WorkOrder = {
   id: number;
   work_order_no: string;
@@ -55,15 +55,7 @@ type JournalPreview = {
   costs: { material_cost: number; total_cost: number };
 };
 
-const searchCuttingBoms = async (q: string): Promise<LookupOption[]> => {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", bom_type: "disassembly" });
-  if (q.trim()) qs.set("q", q.trim());
-  const res = await apiFetch<BomOption[]>(`/api/v1/manufacturing/boms?${qs}`, undefined, { silent: true });
-  return (res.data ?? []).map((b) => ({
-    id: b.id,
-    label: [b.bom_code, b.bom_name, b.finished_item_name].filter(Boolean).join(" — "),
-  }));
-};
+const searchCuttingBoms = (q: string) => searchBomsForOrderType("disassembly", q);
 
 const searchLocations = async (q: string): Promise<LookupOption[]> => {
   const qs = new URLSearchParams({ page: "1", pageSize: "20" });

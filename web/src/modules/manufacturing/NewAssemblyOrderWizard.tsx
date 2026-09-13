@@ -17,8 +17,8 @@ import { recipeAssemblyStepGuidance } from "../production/mfgWizardStepGuidance"
 import { mfgStationHandoff, mfgSuccess, mfgWarn } from "../production/mfgToast";
 import { jobsHref } from "../production/mfgProductionMode";
 import { submitBusyLabel } from "../../shared/submitCopy";
+import { searchBomsForOrderType } from "./mfgBomLookup";
 
-type BomOption = { id: number; bom_code: string; bom_name: string; finished_item_name?: string };
 type WorkOrder = {
   id: number;
   work_order_no: string;
@@ -52,15 +52,7 @@ type JournalPreview = {
   costs: { material_cost: number };
 };
 
-const searchBoms = async (q: string): Promise<LookupOption[]> => {
-  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", bom_type: "assembly" });
-  if (q.trim()) qs.set("q", q.trim());
-  const res = await apiFetch<BomOption[]>(`/api/v1/manufacturing/boms?${qs}`, undefined, { silent: true });
-  return (res.data ?? []).map((b) => ({
-    id: b.id,
-    label: [b.bom_code, b.bom_name, b.finished_item_name].filter(Boolean).join(" — "),
-  }));
-};
+const searchBoms = (q: string) => searchBomsForOrderType("assembly", q);
 
 const searchLocations = async (q: string): Promise<LookupOption[]> => {
   const qs = new URLSearchParams({ page: "1", pageSize: "20" });
@@ -347,10 +339,11 @@ export default function NewAssemblyOrderWizard() {
       <Show when={step() === 1}>
         <section class="grid gap-4 rounded-xl border border-stroke bg-white p-4 md:grid-cols-2">
           <div class="space-y-3">
-            <Field label="Finished product / recipe" required>
+            <Field label="Finished product / assembly BOM" required>
               <LookupCombo
-                label="Recipe"
+                label="Assembly BOM"
                 required
+                description="Assembly BOMs only (codes A…). Recipe BOMs (R…) use New Recipe Order."
                 value={bomLabel}
                 selectedId={bomId}
                 onInput={setBomLabel}
@@ -363,7 +356,7 @@ export default function NewAssemblyOrderWizard() {
                   setBomLabel("");
                 }}
                 fetchOptions={searchBoms}
-                placeholder="Search assembly recipes…"
+                placeholder="Search assembly BOM / product…"
               />
             </Field>
             <Field label="Quantity to produce" required>
