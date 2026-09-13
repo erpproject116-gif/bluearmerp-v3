@@ -484,7 +484,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           </div>
           <SetupReminderBar />
           <CommercialPaywallHost />
-          <Show when={featureNavModule() && !shell.viewport.isStandalone()}>
+          <Show when={!shell.viewport.isStandalone() ? featureNavModule() : undefined}>
             {(mod) => (
               <HeaderFeatureTabs
                 modId={mod().id}
