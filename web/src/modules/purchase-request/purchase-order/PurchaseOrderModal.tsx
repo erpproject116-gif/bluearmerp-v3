@@ -643,12 +643,22 @@ export function PurchaseOrderModal(props: Props) {
         }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, isCreate() ? "Purchase order created." : "Purchase order updated.", {
+      handleSaveResult(
+        res,
+        toast,
+        isCreate()
+          ? "Purchase order created. Confirm it, then receive goods under Purchase Receive."
+          : "Purchase order saved. Confirm when ready, then receive under Purchase Receive.",
+        {
         onFieldErrors: setFieldErrors,
       });
       return;
     }
-    toast.success(isCreate() ? "Purchase order created." : "Purchase order updated.");
+    toast.success(
+      isCreate()
+        ? "Purchase order created. Confirm it, then receive goods under Purchase Receive."
+        : "Purchase order saved. Confirm when ready, then receive under Purchase Receive.",
+    );
     await draft.clearOnSave();
     applyDetail(res.data);
     props.onSaved();

@@ -434,7 +434,7 @@ var errWoNotReleased = errors.New("work order not released")
 
 func respondReleasedWOLoadError(w http.ResponseWriter, err error, notReleasedMsg string) {
 	if errors.Is(err, errWoNotReleased) {
-		response.Validation(w, map[string]string{"status": notReleasedMsg})
+		response.ValidationSmart(w, map[string]string{"status": notReleasedMsg})
 		return
 	}
 	if errors.Is(err, pgx.ErrNoRows) {

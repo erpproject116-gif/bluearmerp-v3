@@ -58,6 +58,7 @@ export default function CrmNotificationsPage() {
     pageSize,
     unreadOnly: unreadOnly(),
     source: source(),
+    excludeActivityInfo: source() !== "activity",
   }));
 
   const totalPages = () => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize));
@@ -92,7 +93,7 @@ export default function CrmNotificationsPage() {
     <CrmLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-text-secondary">
-          Inbox for alert rules, support updates, and important activity events.
+          Inbox for alerts, support, and high-value activity. Routine activity info is hidden unless you filter Activity.
         </p>
         <div class="flex flex-wrap items-center gap-2">
           <label class="flex items-center gap-2 text-sm text-text-secondary">

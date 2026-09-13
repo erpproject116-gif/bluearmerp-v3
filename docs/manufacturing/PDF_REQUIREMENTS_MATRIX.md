@@ -15,20 +15,20 @@ Update this file in any PR that touches manufacturing. Status: `done` | `partial
 | S08–S16 | Assembly | BOM, version snapshot, 3-step UI, shortage, partial, QC, serials | 1 | partial | wizard + BOM + stations; partial/QC later | wizard + `mfgRules.test.ts` |
 | S17–S21 | Cutting / yield / waste class | Templates, 3-step UI, waste class no sellable stock | 2 | done | `disassembly` BOM + `NewCuttingOrderWizard` + `output_classification` | `posting_rules_test.go` |
 | S22–S25 | Waste reasons / normal vs abnormal | Reasons master; excess/abnormal requires reason | 2 | partial | `mfg_waste_reasons`, `ValidateWasteLine`; GL deferred | posting_rules + mfgRules tests |
-| S26–S30 | Costs | Expense lines, summary, valuation, cutting alloc | 4 | deferred | BOM cost estimates only (no WO expense / alloc) | — |
-| S31–S33 | Recipe + accounting | Recipe master + batch/yield wizard; journals later | 3–4 | partial | `bom_type=recipe`, `NewRecipeOrderWizard`; journals Phase 4 | normalizeBomType tests |
+| S26–S30 | Costs | Expense lines, summary, valuation, cutting alloc | 4 | partial | immutable WO material/labor/overhead/other cost snapshot + FG capitalization; cutting stores aggregate input value, not per-output allocation | `accounting_test.go` |
+| S31–S33 | Recipe + accounting | Recipe master + batch/yield wizard; journals later | 3–4 | done | `bom_type=recipe`, wizard journal preview, completion JE when Inventory GL is enabled | `accounting_test.go`, normalizeBomType tests |
 | S34–S35 | Waste/yield reports | Yield bands + waste variance | 2 | done | `reports.go`, Cutting yield + Waste & variance tabs | — |
-| S36 | Profit readiness | Store costs for later | 4 | deferred | BOM estimate fields only | — |
+| S36 | Profit readiness | Store costs for later | 4 | done | `mfg_work_order_cost_postings` immutable cost snapshot | `accounting_test.go` |
 | S37 | Production setup | BOM / yield / recipes hub | 1–2 | partial | setup + waste reasons link | — |
-| S38–S39 | QC screens / hold | Pending/passed/failed; QC Hold inventory | 4 | partial | `inspection_status` + policy | — |
+| S38–S39 | QC screens / hold | Pending/passed/failed; QC Hold inventory | 4 | done | Quality WO inspection + `manufacturing_require_fg_qc` enforced before atomic stock post | `posting_rules_test.go` |
 | S40 | Production history | Unified list + filters | 1 | partial | All Production → jobs list | — |
-| S41 | Numbering | ASM-/CUT-/REC- prefixes | 2 | deferred | `work_order_no` today | — |
-| S42–S44 | Reversal / cancel | Reverse after post; cancel before | 1/4 | partial | cancel draft; revert-draft; reverse deferred | `posting_rules_test.go` |
+| S41 | Numbering | ASM-/CUT-/REC- prefixes | 2 | done | `allocateWorkOrderNo` ASM/CUT/REC | posting_rules_test |
+| S42–S44 | Reversal / cancel | Reverse after post; cancel before | 1/4 | done | immutable `mfg_work_order_reversals`; inverse stock/trace + reversing JE; completed WO retained | `accounting_test.go` |
 | S45 | Approval | Optional production approval | 4 | deferred | submit perms only | — |
 | S46 | Reservation | Reserve on confirm | 4 | deferred | staging ≠ reservation | — |
 | S47 | Negative inventory | Default OFF; block post | 1 | done | `ApplyStockDelta` + shortage gate | `mfgRules.test.ts` |
 | S48 | Shortage policy | Dashboard shortage drill-down | 1 | done | `dashboard.go` shortages | — |
-| S49–S50 | Expense vs waste | Structured costs; waste separate | 2 | partial | waste lines separate from expenses | — |
+| S49–S50 | Expense vs waste | Structured costs; waste separate | 2/4 | done | labor/overhead/other cost snapshot separate from waste lines | `accounting_test.go` |
 | S51 | Audit trail | Create/edit/post/… | 1 | partial | `audit.Log` on release/complete/revert | — |
 | S52 | Permissions | Granular mfg perms | 1 | partial | existing manufacturing.* | — |
 | S53 | Edit policy | Draft editable; completed read-only | 1 | done | `canEditWorkOrder` | `mfgRules.test.ts` |
@@ -47,4 +47,4 @@ Update this file in any PR that touches manufacturing. Status: `done` | `partial
 - Floor words primary: **Save draft**, **Assemble & Post**, **Post Production**, **Process & Post**.
 - Cutting card → Cutting wizard; Recipe card → Recipe wizard.
 - Waste-classified BOM lines do not increase sellable stock.
-- Apply migrations `290_mfg_cutting_waste.sql` and `291_mfg_recipe_type.sql` before using those features in prod.
+- Apply migrations `290_mfg_cutting_waste.sql`, `291_mfg_recipe_type.sql`, `292_mfg_recipe_bom_code.sql`, and `293_mfg_phase4_posting.sql` before using those features in prod.

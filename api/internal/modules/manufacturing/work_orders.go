@@ -43,6 +43,7 @@ type WorkOrder struct {
 	CreatedAt              *string  `json:"created_at,omitempty"`
 	ReleasedAt             *string  `json:"released_at,omitempty"`
 	CompletedAt            *string  `json:"completed_at,omitempty"`
+	ReversedAt             *string  `json:"reversed_at,omitempty"`
 	TransactedAt           *string  `json:"transacted_at,omitempty"`
 	ActualInputQty         *float64 `json:"actual_input_qty,omitempty"`
 	InputLotBatchID        *int64   `json:"input_lot_batch_id,omitempty"`
@@ -109,15 +110,18 @@ type workOrderCompleteBody struct {
 	InputLotBatchID *int64          `json:"input_lot_batch_id"`
 	OutputWeighs    []woOutputWeigh `json:"output_weighs"`
 	WasteLines      []woWasteLine   `json:"waste_lines"`
+	LaborCost       *float64        `json:"labor_cost"`
+	OverheadCost    *float64        `json:"overhead_cost"`
+	OtherCost       *float64        `json:"other_cost"`
 }
 
 type woWasteLine struct {
-	ComponentItemID *int64   `json:"component_item_id"`
-	Classification  string   `json:"classification"`
-	Qty             float64  `json:"qty"`
-	ExpectedQty     float64  `json:"expected_qty"`
-	WasteReasonID   *int64   `json:"waste_reason_id"`
-	Notes           *string  `json:"notes"`
+	ComponentItemID *int64  `json:"component_item_id"`
+	Classification  string  `json:"classification"`
+	Qty             float64 `json:"qty"`
+	ExpectedQty     float64 `json:"expected_qty"`
+	WasteReasonID   *int64  `json:"waste_reason_id"`
+	Notes           *string `json:"notes"`
 }
 
 // woOutputWeigh is a weighed cut/output lot on disassembly complete (overrides scaled BOM qty).
@@ -194,6 +198,11 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			    where bl.bom_id = wo.bom_id
 			      and (coalesce(ci.track_serial, false) or coalesce(ci.track_lot, false))
 			  ),
+			  (
+			    select max(wor.created_at)::text
+			    from public.mfg_work_order_reversals wor
+			    where wor.tenant_id=wo.tenant_id and wor.work_order_id=wo.id
+			  ),
 			  count(*) over()
 			from public.mfg_work_orders wo
 			join public.mfg_boms b on b.id = wo.bom_id
@@ -219,7 +228,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row WorkOrder
 			var notes *string
-			var created, released, completed, transacted, inspectedAt *string
+			var created, released, completed, reversed, transacted, inspectedAt *string
 			var inspectionNotes *string
 			var soNo *string
 			if err := rows.Scan(
@@ -232,6 +241,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.InspectionStatus, &inspectionNotes, &inspectedAt,
 				&row.SourceSalesOrderID, &row.SourceSalesOrderLineID, &soNo,
 				&row.FinishedTrackSerial, &row.FinishedTrackLot, &row.ComponentsTracked,
+				&reversed,
 				&total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read work order.", "ERR_INTERNAL")
@@ -241,6 +251,7 @@ func listWorkOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			row.CreatedAt = created
 			row.ReleasedAt = released
 			row.CompletedAt = completed
+			row.ReversedAt = reversed
 			row.TransactedAt = transacted
 			row.InspectionNotes = inspectionNotes
 			row.InspectedAt = inspectedAt
@@ -312,7 +323,7 @@ func createWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			orderDate = d
 		}
 
-		woNo := fmt.Sprintf("WO-%s-%04d", orderDate.Format("20060102"), time.Now().Unix()%10000)
+		woNo := allocateWorkOrderNo(bom.BomType, orderDate, time.Now().Unix())
 		var sourceSalesOrderID *int64
 		if body.SourceSalesOrderLineID != nil && *body.SourceSalesOrderLineID > 0 {
 			var soID int64
@@ -445,7 +456,7 @@ func releaseWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			set status = 'released', released_at = now(), updated_at = now()
 			where id = $1 and tenant_id = $2 and status = 'draft'`, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
-			response.Validation(w, map[string]string{"status": "Only draft work orders can be released."})
+			response.ValidationSmart(w, map[string]string{"status": "Only draft work orders can be released."})
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.work_order_release", "mfg_work_order", &id, nil, nil)
@@ -543,12 +554,13 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		var status, inspectionStatus string
 		err = tx.QueryRow(r.Context(), `
 			select wo.id, wo.work_order_no, wo.bom_id, wo.finished_item_id, wo.location_id,
-			  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status, wo.inspection_status
+			  wo.qty_to_produce::float8, wo.qty_produced::float8, wo.status, wo.inspection_status,
+			  wo.order_date::text
 			from public.mfg_work_orders wo
 			where wo.id = $1 and wo.tenant_id = $2
 			for update`, id, tu.TenantID).Scan(
 			&wo.ID, &wo.WorkOrderNo, &wo.BomID, &wo.FinishedItemID, &wo.LocationID,
-			&wo.QtyToProduce, &wo.QtyProduced, &status, &inspectionStatus)
+			&wo.QtyToProduce, &wo.QtyProduced, &status, &inspectionStatus, &wo.OrderDate)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
@@ -557,12 +569,19 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load work order.", "ERR_INTERNAL")
 			return
 		}
-		if ok, reason := CanCompleteWorkOrder(status, inspectionStatus); !ok {
+		policy, err := processpolicy.LoadTx(r.Context(), tx, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load process policy.", "ERR_INTERNAL")
+			return
+		}
+		if ok, reason := CanCompleteWorkOrderWithPolicy(
+			status, inspectionStatus, policy.ManufacturingRequireFgQc,
+		); !ok {
 			field := "status"
 			if status == WOStatusReleased {
 				field = "inspection_status"
 			}
-			response.Validation(w, map[string]string{field: reason})
+			response.ValidationSmart(w, map[string]string{field: reason})
 			return
 		}
 
@@ -615,7 +634,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 				if lotQty+0.0001 < actualInputQty {
-					response.Validation(w, map[string]string{"actual_input_qty": "Insufficient qty on input lot batch."})
+					response.ValidationSmart(w, map[string]string{"actual_input_qty": "Insufficient qty on input lot batch."})
 					return
 				}
 				tag, err := tx.Exec(r.Context(), `
@@ -685,7 +704,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					}
 					if !clientCovers {
 						if msg := ValidateWasteLine(wasteQty, plannedRecv, false, reasonID, true); msg != "" {
-							response.Validation(w, map[string]string{"waste_lines": msg})
+							response.ValidationSmart(w, map[string]string{"waste_lines": msg})
 							return
 						}
 						if _, err := tx.Exec(r.Context(), `
@@ -772,7 +791,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 			if err := persistCompleteWasteLines(r.Context(), tx, tu.TenantID, id, completeBody.WasteLines); err != nil {
-				response.Validation(w, map[string]string{"waste_lines": err.Error()})
+				response.ValidationSmart(w, map[string]string{"waste_lines": err.Error()})
 				return
 			}
 			if cutPostedTotal > 0 {
@@ -809,7 +828,7 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 						if label == "" {
 							label = fmt.Sprintf("item %d", ln.ComponentItemID)
 						}
-						response.Validation(w, map[string]string{"stock": fmt.Sprintf("Take materials first: staged issue for %s: %s", label, err.Error())})
+						response.ValidationSmart(w, map[string]string{"stock": fmt.Sprintf("Take materials first: staged issue for %s: %s", label, err.Error())})
 						return
 					}
 				} else if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, ln.ComponentItemID, wo.LocationID, -issueQty, tu.AppUserID, "mfg_work_order", id, "wo_backflush_issue"); err != nil {
@@ -821,13 +840,13 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					if strings.Contains(msg, "insufficient") || strings.Contains(msg, "no balance") {
 						msg = fmt.Sprintf("insufficient stock for %s: need %.4f %s at location", label, issueQty, unitCode)
 					}
-					response.Validation(w, map[string]string{"stock": msg})
+					response.ValidationSmart(w, map[string]string{"stock": msg})
 					return
 				}
 			}
 			if fgSettings.TrackSerial || fgSettings.TrackLot {
 				if err := postWoOutputTrace(r.Context(), tx, tu.TenantID, id, wo.LocationID, wo.FinishedItemID, qtyProduced, tu.AppUserID, bom.FinishedItemCode, fgSettings.DefaultShelfLifeDays); err != nil {
-					response.Validation(w, map[string]string{"stock": fmt.Sprintf("Record finished product first: %s", err.Error())})
+					response.ValidationSmart(w, map[string]string{"stock": fmt.Sprintf("Record finished product first: %s", err.Error())})
 					return
 				}
 			} else if err := inventory.ApplyStockDelta(r.Context(), tx, tu.TenantID, wo.FinishedItemID, wo.LocationID, qtyProduced, tu.AppUserID, "mfg_work_order", id, "wo_backflush_receipt"); err != nil {
@@ -835,6 +854,59 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			actualInputQty = qtyProduced
+		}
+
+		materialCost, err := estimateManufacturingMaterialCost(
+			r.Context(), tx, tu.TenantID, bom, qtyProduced, actualInputQty,
+		)
+		if err != nil {
+			response.Validation(w, map[string]string{"cost": err.Error()})
+			return
+		}
+		var laborCost, overheadCost, otherCost float64
+		_ = tx.QueryRow(r.Context(), `
+			select labor_cost::float8, overhead_cost::float8, other_cost::float8
+			from public.mfg_work_order_cost_inputs
+			where tenant_id=$1 and work_order_id=$2`,
+			tu.TenantID, id).Scan(&laborCost, &overheadCost, &otherCost)
+		if completeBody.LaborCost != nil {
+			laborCost = *completeBody.LaborCost
+		}
+		if completeBody.OverheadCost != nil {
+			overheadCost = *completeBody.OverheadCost
+		}
+		if completeBody.OtherCost != nil {
+			otherCost = *completeBody.OtherCost
+		}
+		costs, err := normalizeManufacturingCosts(materialCost, laborCost, overheadCost, otherCost)
+		if err != nil {
+			response.Validation(w, map[string]string{"cost": err.Error()})
+			return
+		}
+		entryDate, err := parseDate(wo.OrderDate)
+		if err != nil {
+			entryDate = time.Now().UTC().Truncate(24 * time.Hour)
+		}
+		journalID, err := postManufacturingCompletionJournal(
+			r.Context(), tx, tu.TenantID, tu.AppUserID, id, entryDate, wo.WorkOrderNo, costs,
+		)
+		if err != nil {
+			response.Validation(w, map[string]string{"journal": err.Error()})
+			return
+		}
+		var journalArg any
+		if journalID > 0 {
+			journalArg = journalID
+		}
+		if _, err := tx.Exec(r.Context(), `
+			insert into public.mfg_work_order_cost_postings
+			  (tenant_id, work_order_id, material_cost, labor_cost, overhead_cost, other_cost,
+			   total_cost, journal_entry_id, created_by_user_id)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			tu.TenantID, id, costs.Material, costs.Labor, costs.Overhead, costs.Other,
+			costs.Total, journalArg, tu.AppUserID); err != nil {
+			response.Err(w, http.StatusConflict, "Work order cost posting already exists.", "ERR_CONFLICT")
+			return
 		}
 
 		tag, err := tx.Exec(r.Context(), `
@@ -981,7 +1053,7 @@ func buildMaterialNeeds(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (WorkOrder, error) {
 	var row WorkOrder
 	var notes *string
-	var created, released, completed, inspectedAt *string
+	var created, released, completed, reversed, inspectedAt *string
 	var inspectionNotes *string
 	var soNo *string
 	err := pool.QueryRow(ctx, `
@@ -1002,6 +1074,11 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		    join public.inv_items ci on ci.id = bl.component_item_id
 		    where bl.bom_id = wo.bom_id
 		      and (coalesce(ci.track_serial, false) or coalesce(ci.track_lot, false))
+		  ),
+		  (
+		    select max(wor.created_at)::text
+		    from public.mfg_work_order_reversals wor
+		    where wor.tenant_id=wo.tenant_id and wor.work_order_id=wo.id
 		  )
 		from public.mfg_work_orders wo
 		join public.mfg_boms b on b.id = wo.bom_id
@@ -1017,7 +1094,7 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 		&row.OrderDate, &notes, &created, &released, &completed, &row.ActualInputQty, &row.InputLotBatchID,
 		&row.InspectionStatus, &inspectionNotes, &inspectedAt,
 		&row.SourceSalesOrderID, &row.SourceSalesOrderLineID, &soNo,
-		&row.FinishedTrackSerial, &row.FinishedTrackLot, &row.ComponentsTracked)
+		&row.FinishedTrackSerial, &row.FinishedTrackLot, &row.ComponentsTracked, &reversed)
 	if err != nil {
 		return WorkOrder{}, err
 	}
@@ -1025,6 +1102,7 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 	row.CreatedAt = created
 	row.ReleasedAt = released
 	row.CompletedAt = completed
+	row.ReversedAt = reversed
 	if completed != nil {
 		row.TransactedAt = completed
 	} else if released != nil {

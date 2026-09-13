@@ -46,6 +46,9 @@ export type WorkItem = {
   reminder_offset_minutes?: number | null;
   reminder_at?: string | null;
   reminder_sent_at?: string | null;
+  item_kind?: "task" | "meeting";
+  all_hands?: boolean;
+  meeting_place?: string | null;
   blocked_by_item_id?: number | null;
   blocked_by_title?: string;
   quotation_id?: number | null;
@@ -566,6 +569,23 @@ export async function createWorkItem(body: {
   custom_values?: Record<string, unknown>;
 }) {
   return apiFetch<WorkItem>("/api/v1/operations/work-items", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createAllHandsMeeting(body: {
+  workspace_id: number;
+  column_id: number;
+  title: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  place: string;
+  note?: string;
+}) {
+  return apiFetch<WorkItem>("/api/v1/operations/meetings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

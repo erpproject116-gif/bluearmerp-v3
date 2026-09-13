@@ -1,9 +1,11 @@
+import { useSearchParams } from "@solidjs/router";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useToast } from "../../shared/toast";
 import {
   createWorkItem,
+  createAllHandsMeeting,
   patchWorkItem,
   useInvalidateWorkItems,
   useOperationsBoardWorkItems,
@@ -99,15 +101,54 @@ function isTimedItem(item: WorkItem): boolean {
   return !item.all_day && !!item.start_time;
 }
 
+function escapeIcs(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
+function downloadMeetingIcs(meeting: {
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  place: string;
+  note: string;
+}) {
+  const stamp = (time: string) => `${meeting.date.replace(/-/g, "")}T${time.replace(":", "")}00`;
+  const uid = `meeting-${Date.now()}@bluearmerp`;
+  const content = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Bluearm ERP//Operations Meeting//EN",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTART:${stamp(meeting.startTime)}`,
+    `DTEND:${stamp(meeting.endTime)}`,
+    `SUMMARY:${escapeIcs(meeting.title)}`,
+    `LOCATION:${escapeIcs(meeting.place)}`,
+    `DESCRIPTION:${escapeIcs(meeting.note)}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+    "",
+  ].join("\r\n");
+  const url = URL.createObjectURL(new Blob([content], { type: "text/calendar;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${meeting.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "meeting"}.ics`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function OperationsCalendarPage() {
+  const [searchParams] = useSearchParams();
   const auth = useAuth();
   const toast = useToast();
   const invalidate = useInvalidateWorkItems();
   const { workspaceId } = useOperationsWorkspace();
   const canCreate = () => hasPermission(auth.me, "operations.work_items_new", "write");
   const canEdit = () => hasPermission(auth.me, "operations.work_items", "write");
+  const isTenantOwner = () => Boolean(auth.me?.user.is_tenant_owner);
 
   const [view, setView] = createSignal<CalView>("month");
   const [cursor, setCursor] = createSignal(new Date());
@@ -122,6 +163,15 @@ export default function OperationsCalendarPage() {
   const [allDay, setAllDay] = createSignal(true);
   const [columnId, setColumnId] = createSignal<number | null>(null);
   const [saving, setSaving] = createSignal(false);
+  const [meetingOpen, setMeetingOpen] = createSignal(false);
+  const [meetingTitle, setMeetingTitle] = createSignal("");
+  const [meetingDate, setMeetingDate] = createSignal(toISODate(new Date()));
+  const [meetingStart, setMeetingStart] = createSignal("09:00");
+  const [meetingEnd, setMeetingEnd] = createSignal("10:00");
+  const [meetingPlace, setMeetingPlace] = createSignal("");
+  const [meetingNote, setMeetingNote] = createSignal("");
+  const [meetingSaving, setMeetingSaving] = createSignal(false);
+  const [meetingDownloadIcs, setMeetingDownloadIcs] = createSignal(false);
   const [remindOpt, setRemindOpt] = createSignal("none");
   const [nowFraction, setNowFraction] = createSignal(0);
   let dayScrollEl: HTMLDivElement | undefined;
@@ -131,6 +181,15 @@ export default function OperationsCalendarPage() {
 
   const todayISO = () => toISODate(new Date());
   const rows = () => items.data?.rows ?? [];
+
+  createEffect(() => {
+    const date = String(searchParams.date ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const parsed = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return;
+    setCursor(parsed);
+    setView("day");
+  });
 
   createEffect(() => {
     const tick = () => {
@@ -219,6 +278,65 @@ export default function OperationsCalendarPage() {
   const goToday = () => {
     setCursor(new Date());
     setView("day");
+  };
+
+  const openMeeting = () => {
+    if (!isTenantOwner()) return;
+    setMeetingTitle("");
+    setMeetingDate(toISODate(cursor()));
+    setMeetingStart("09:00");
+    setMeetingEnd("10:00");
+    setMeetingPlace("");
+    setMeetingNote("");
+    setMeetingDownloadIcs(false);
+    setMeetingOpen(true);
+  };
+
+  const saveMeeting = async () => {
+    const wsId = workspaceId();
+    const colId = columns.data?.[0]?.id;
+    if (!isTenantOwner() || !wsId || !colId) {
+      toast.warning("Only the tenant owner can schedule a meeting in a selected workspace.");
+      return;
+    }
+    if (!meetingTitle().trim() || !meetingDate() || !meetingStart() || !meetingEnd() || !meetingPlace().trim()) {
+      toast.warning("Title, date, times, and place or video link are required.");
+      return;
+    }
+    if (meetingEnd() <= meetingStart()) {
+      toast.warning("End time must be after start time.");
+      return;
+    }
+    const details = {
+      title: meetingTitle().trim(),
+      date: meetingDate(),
+      startTime: meetingStart(),
+      endTime: meetingEnd(),
+      place: meetingPlace().trim(),
+      note: meetingNote().trim(),
+    };
+    setMeetingSaving(true);
+    const res = await createAllHandsMeeting({
+      workspace_id: wsId,
+      column_id: colId,
+      title: details.title,
+      date: details.date,
+      start_time: details.startTime,
+      end_time: details.endTime,
+      place: details.place,
+      note: details.note || undefined,
+    });
+    setMeetingSaving(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not schedule meeting.");
+      return;
+    }
+    if (meetingDownloadIcs()) downloadMeetingIcs(details);
+    setMeetingOpen(false);
+    setCursor(new Date(`${details.date}T00:00:00`));
+    setView("day");
+    invalidate();
+    toast.success("Meeting scheduled. Every active member was notified and #general was updated.");
   };
 
   const openCreate = (iso: string, opts?: { hour?: number; allDay?: boolean }) => {
@@ -378,7 +496,7 @@ export default function OperationsCalendarPage() {
                 <Show when={item.start_time && !item.all_day}>
                   <span class="opacity-90">{item.start_time} </span>
                 </Show>
-                {item.title}
+                {item.item_kind === "meeting" ? "📅 " : ""}{item.title}
               </button>
             )}
           </For>
@@ -432,6 +550,15 @@ export default function OperationsCalendarPage() {
               onClick={() => openCreate(toISODate(cursor()), view() === "day" ? { hour: new Date().getHours() } : { allDay: true })}
             >
               + Task
+            </button>
+          </Show>
+          <Show when={isTenantOwner() && workspaceId()}>
+            <button
+              type="button"
+              class="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700"
+              onClick={openMeeting}
+            >
+              Set meeting
             </button>
           </Show>
         </div>
@@ -496,7 +623,7 @@ export default function OperationsCalendarPage() {
                       style={{ "background-color": "#2563eb" }}
                       onClick={() => openEdit(item)}
                     >
-                      {item.title}
+                      {item.item_kind === "meeting" ? "📅 " : ""}{item.title}
                     </button>
                   )}
                 </For>
@@ -677,6 +804,46 @@ export default function OperationsCalendarPage() {
         <p class="mb-2 text-xs text-text-secondary">
           Reminders fire as an in-app toast while Operations Calendar is open. Allow browser notifications for a desktop alert.
         </p>
+      </EntityModal>
+
+      <EntityModal
+        open={meetingOpen()}
+        title="Set all-hands meeting"
+        onClose={() => setMeetingOpen(false)}
+        onSave={() => void saveMeeting()}
+        saving={meetingSaving()}
+      >
+        <p class="mb-3 rounded-md bg-violet-50 px-3 py-2 text-xs text-violet-800">
+          Saving sends an in-app bell to every active member and posts one system message in #general. No email is sent.
+        </p>
+        <Field label="Title">
+          <input class={inputClass} value={meetingTitle()} onInput={(e) => setMeetingTitle(e.currentTarget.value)} />
+        </Field>
+        <Field label="Date">
+          <input type="date" class={inputClass} value={meetingDate()} onInput={(e) => setMeetingDate(e.currentTarget.value)} />
+        </Field>
+        <div class="grid grid-cols-2 gap-3">
+          <Field label="Start time">
+            <input type="time" class={inputClass} value={meetingStart()} onInput={(e) => setMeetingStart(e.currentTarget.value)} />
+          </Field>
+          <Field label="End time">
+            <input type="time" class={inputClass} value={meetingEnd()} onInput={(e) => setMeetingEnd(e.currentTarget.value)} />
+          </Field>
+        </div>
+        <Field label="Place or video link">
+          <input class={inputClass} value={meetingPlace()} onInput={(e) => setMeetingPlace(e.currentTarget.value)} />
+        </Field>
+        <Field label="Optional note">
+          <textarea class={inputClass} rows={3} value={meetingNote()} onInput={(e) => setMeetingNote(e.currentTarget.value)} />
+        </Field>
+        <label class="mb-2 flex items-center gap-2 text-sm text-text-primary">
+          <input
+            type="checkbox"
+            checked={meetingDownloadIcs()}
+            onChange={(e) => setMeetingDownloadIcs(e.currentTarget.checked)}
+          />
+          Download .ics after saving
+        </label>
       </EntityModal>
     </OperationsLayout>
   );

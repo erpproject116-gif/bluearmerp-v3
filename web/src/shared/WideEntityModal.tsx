@@ -1,6 +1,7 @@
 import type { JSX } from "solid-js";
 import { For, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { submitBusyLabel } from "./submitCopy";
 
 export type ModalTab = { id: string; label: string };
 
@@ -72,7 +73,7 @@ export function WideEntityModal(props: {
               </button>
               <Show when={!props.readOnly && props.onSave}>
                 <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" disabled={props.saving} onClick={() => props.onSave!()}>
-                  Save changes
+                  {submitBusyLabel("save", !!props.saving, "Save changes")}
                 </button>
               </Show>
             </div>

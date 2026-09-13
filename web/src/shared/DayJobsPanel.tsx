@@ -31,6 +31,20 @@ export function DayJobsPanel() {
     const list: DayJob[] = [];
 
     if (
+      isTenantModuleEnabled(m, "production") &&
+      (hasModuleAccess(m, "manufacturing") ||
+        hasPermission(m, "manufacturing.work_orders", "read") ||
+        hasPermission(m, "manufacturing.boms", "read"))
+    ) {
+      list.push({
+        id: "manufacturing",
+        title: "Manufacturing floor",
+        blurb: "Open jobs, issue materials, and post finished goods.",
+        href: "/app/production",
+      });
+    }
+
+    if (
       isTenantModuleEnabled(m, "sales") &&
       (hasModuleAccess(m, "sales") || hasPermission(m, "sales.sales", "write") || hasPermission(m, "sales", "read"))
     ) {

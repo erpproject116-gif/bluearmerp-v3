@@ -76,7 +76,7 @@ export function SetupReminderBar() {
             </p>
             <p class="text-xs text-slate-600">
               {auth.me?.commercial?.status === "awaiting_payment"
-                ? "Pay via GCash and wait for Bluearm to confirm before buying or selling."
+                ? "Pay via GCash → Bluearm confirms manually in Platform Command → then buying and selling unlock (not instant)."
                 : "Open Stocks — add places, products, and opening stock."}
             </p>
           </div>

@@ -134,7 +134,7 @@ func (s *service) postIntake(w http.ResponseWriter, r *http.Request) {
 		Mobile:        strings.TrimSpace(body.Mobile),
 		EntrySource:   customerregistry.EntrySelfSignup,
 		CRMLeadSource: "self_signup",
-		LeadNote:      "Self-service signup. Awaiting workspace provisioning.",
+		LeadNote:      "Self-service signup. User can start trial from /welcome (instant workspace).",
 	})
 	if err != nil {
 		response.Err(w, http.StatusInternalServerError, "Failed to record signup.", "ERR_INTERNAL")
@@ -205,7 +205,7 @@ func (s *service) postTrialProvision(w http.ResponseWriter, r *http.Request) {
 			"company_code":      code,
 			"pending_approval":  true,
 			"already_provisioned": true,
-		}, "Workspace is waiting for product owner approval.")
+		}, "This workspace is pending product owner approval (exception path — default trials are active immediately).")
 		return
 	}
 

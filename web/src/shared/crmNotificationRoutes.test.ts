@@ -12,32 +12,72 @@ import type { CrmNotification } from "./useCrmNotifications";
 const SHARED = __dirname;
 const read = (file: string) => fs.readFileSync(path.resolve(SHARED, file), "utf8");
 
+function row(partial: Partial<CrmNotification> & Pick<CrmNotification, "id">): CrmNotification {
+  return {
+    severity: "info",
+    title: "t",
+    body: "",
+    created_at: "2026-01-01T00:00:00Z",
+    ...partial,
+  };
+}
+
 describe("crmNotificationHref", () => {
   it("prefers API href when present", () => {
-    const n: CrmNotification = {
+    const n = row({
       id: 1,
-      severity: "info",
-      title: "t",
-      body: "",
-      created_at: "2026-01-01T00:00:00Z",
       href: "/app/sales/sales?openId=5",
       entity_type: "sa_sales",
       entity_id: 5,
-    };
+    });
     expect(crmNotificationHref(n)).toBe("/app/sales/sales?openId=5");
   });
 
   it("falls back to entity mapping for quotations", () => {
-    const n: CrmNotification = {
-      id: 1,
-      severity: "warning",
-      title: "t",
-      body: "",
-      created_at: "2026-01-01T00:00:00Z",
-      entity_type: "quo_quotation",
-      entity_id: 12,
-    };
+    const n = row({ id: 1, entity_type: "quo_quotation", entity_id: 12 });
     expect(crmNotificationHref(n)).toBe("/app/quotation/quotations?openId=12");
+  });
+
+  it("uses purchase-order list for PO without id", () => {
+    const n = row({ id: 1, entity_type: "po_purchase_order" });
+    expect(crmNotificationHref(n)).toBe("/app/purchase-order/purchase-orders");
+  });
+
+  it("maps purchase order, PR, RFQ, GR, WO, and recipe BOM", () => {
+    expect(crmNotificationHref(row({ id: 1, entity_type: "po_purchase_order", entity_id: 3 }))).toBe(
+      "/app/purchase-order/purchase-orders?openId=3",
+    );
+    expect(crmNotificationHref(row({ id: 1, entity_type: "pr_purchase_request", entity_id: 4 }))).toBe(
+      "/app/purchase-request/purchase-requests?openId=4",
+    );
+    expect(crmNotificationHref(row({ id: 1, entity_type: "rfq_request", entity_id: 5 }))).toBe(
+      "/app/purchase-order/rfq/5",
+    );
+    expect(crmNotificationHref(row({ id: 1, entity_type: "gr_goods_receipt", entity_id: 6 }))).toBe(
+      "/app/purchases/purchase-receive?openId=6",
+    );
+    expect(crmNotificationHref(row({ id: 1, entity_type: "mfg_work_order", entity_id: 7 }))).toBe(
+      "/app/production/assembly/jobs?openId=7",
+    );
+    expect(crmNotificationHref(row({ id: 1, entity_type: "mfg_bom", entity_id: 8 }))).toBe(
+      "/app/production/recipe/recipes?openId=8",
+    );
+  });
+
+  it("never loops to notifications inbox when entity_id is set", () => {
+    const n = row({ id: 1, entity_type: "unknown_thing", entity_id: 99 });
+    expect(crmNotificationHref(n)).toBe("/app/activity-logs/changes?target_type=unknown_thing&target_id=99");
+    expect(crmNotificationHref(n)).not.toContain("/app/crm/notifications");
+  });
+
+  it("maps chat_message entity", () => {
+    const n = row({ id: 1, entity_type: "chat_message", entity_id: 42 });
+    expect(crmNotificationHref(n)).toBe("/app/comms/chat?messageId=42");
+  });
+
+  it("maps meeting entity to Operations calendar", () => {
+    const n = row({ id: 1, entity_type: "meeting", entity_id: 42 });
+    expect(crmNotificationHref(n)).toBe("/app/operations/calendar");
   });
 });
 
@@ -55,19 +95,6 @@ describe("crmNotificationSourceLabel", () => {
     expect(crmNotificationSourceLabel("support")).toBe("Support");
     expect(crmNotificationSourceLabel("chat")).toBe("Chat");
     expect(crmNotificationSourceLabel("activity")).toBe("Activity");
-  });
-
-  it("maps chat_message entity", () => {
-    const n: CrmNotification = {
-      id: 1,
-      severity: "info",
-      title: "t",
-      body: "",
-      created_at: "2026-01-01T00:00:00Z",
-      entity_type: "chat_message",
-      entity_id: 42,
-    };
-    expect(crmNotificationHref(n)).toBe("/app/comms/chat?messageId=42");
   });
 });
 

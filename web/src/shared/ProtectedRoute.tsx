@@ -52,9 +52,10 @@ export const ProtectedRoute: ParentComponent = (props) => {
             >
               <div class="flex min-h-screen items-center justify-center bg-body p-6">
                 <div class="max-w-lg rounded-xl border border-stroke bg-white p-6 shadow-sm">
-                  <p class="text-sm font-medium text-text-primary">Account not provisioned yet</p>
+                  <p class="text-sm font-medium text-text-primary">No company workspace yet</p>
                   <p class="mt-2 text-sm text-text-secondary">
-                    Your sign-in worked, but this email is not linked to a company workspace yet. You can:
+                    Your sign-in worked, but this email is not linked to a company yet. Bluearm does not need to
+                    manually provision a default trial — you can:
                   </p>
                   <ul class="mt-3 list-inside list-disc space-y-1 text-sm text-text-secondary">
                     <li>

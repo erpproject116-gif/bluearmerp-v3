@@ -28,7 +28,7 @@ export function PurchaseRequestApprovalPanel(props: Props) {
       showBlockerResult(res, toast, { fallbackTitle: "Couldn't submit for approval. Try again." });
       return;
     }
-    toast.success("Submitted for approval.");
+    toast.success("Submitted for approval. Approvers will see it in Approvals.");
     props.onChanged();
   };
 
@@ -38,7 +38,7 @@ export function PurchaseRequestApprovalPanel(props: Props) {
       showBlockerResult(res, toast, { fallbackTitle: "Couldn't approve. Refresh and try again." });
       return;
     }
-    toast.success("Purchase request approved.");
+    toast.success("Purchase request approved. Create a Purchase Order next.");
     props.onChanged();
   };
 

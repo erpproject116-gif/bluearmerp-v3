@@ -629,7 +629,13 @@ export function QuotationModal(props: Props) {
       : apiFetch<QuotationDetail>("/api/v1/quotation/quotations", { method: "POST", body: JSON.stringify(body) }, { silent: true }));
     setSaving(false);
     if (!res.success || !res.data) {
-      handleSaveResult(res, toast, props.editing ? "Quotation updated." : "Quotation created.", {
+      handleSaveResult(
+        res,
+        toast,
+        props.editing
+          ? "Quotation saved. Convert to Sales Order when the customer confirms."
+          : "Quotation created. Send it, then convert to Sales Order when confirmed.",
+        {
         onFieldErrors: setFieldErrors,
       });
       return;

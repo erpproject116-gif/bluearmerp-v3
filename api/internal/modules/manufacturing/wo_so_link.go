@@ -337,10 +337,11 @@ func CreateWorkOrdersFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu 
 	inspectionStatus := initialWorkOrderInspectionStatus(ctx, pool, tu.TenantID)
 	for _, ln := range lines {
 		var bomID int64
+		var bomType string
 		err := tx.QueryRow(ctx, `
-			select id from public.mfg_boms
+			select id, coalesce(bom_type, 'assembly') from public.mfg_boms
 			where tenant_id = $1 and finished_item_id = $2 and is_active = true
-			order by id desc limit 1`, tu.TenantID, *ln.itemID).Scan(&bomID)
+			order by id desc limit 1`, tu.TenantID, *ln.itemID).Scan(&bomID, &bomType)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				label := strings.TrimSpace(ln.itemCode)
@@ -352,7 +353,7 @@ func CreateWorkOrdersFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu 
 			}
 			return 0, err
 		}
-		woNo := fmt.Sprintf("WO-%s-%04d", orderDate.Format("20060102"), time.Now().UnixNano()%10000+int64(created))
+		woNo := allocateWorkOrderNo(bomType, orderDate, time.Now().UnixNano()+int64(created))
 		lineID := ln.lineID
 		var id int64
 		err = tx.QueryRow(ctx, `

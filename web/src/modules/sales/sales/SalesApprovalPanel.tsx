@@ -22,7 +22,7 @@ export function SalesApprovalPanel(props: Props) {
       showBlockerResult(res, toast, { fallbackTitle: "Couldn't submit for approval. Try again." });
       return;
     }
-    toast.success("Submitted for approval.");
+    toast.success("Submitted for approval. Approvers will see it in Approvals.");
     props.onChanged();
   };
 
@@ -32,7 +32,7 @@ export function SalesApprovalPanel(props: Props) {
       showBlockerResult(res, toast, { fallbackTitle: "Couldn't approve. Refresh and try again." });
       return;
     }
-    toast.success("Sale approved.");
+    toast.success("Sale approved. Use the Invoice tab to print or collect payment.");
     props.onChanged();
   };
 

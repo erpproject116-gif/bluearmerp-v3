@@ -33,5 +33,5 @@ Setup: create processing recipes under **Recipe / Processing → recipes** (batc
 ## Rules operators should remember
 
 - A draft or started job is **not** a stock change.
-- Stock changes only when Finish / Assemble & Post / Post Production succeeds.
+- Stock changes only when Finish / Assemble & Post / Post Production / Process & Post succeeds.
 - If Finish fails after Start, use **Revert to draft** only when nothing was taken or recorded yet.

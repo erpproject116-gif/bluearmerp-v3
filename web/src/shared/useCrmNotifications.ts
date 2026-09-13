@@ -22,6 +22,8 @@ export type CrmNotificationListParams = {
   pageSize: number;
   unreadOnly?: boolean;
   source?: CrmNotificationSource | "";
+  /** When true (default on inbox), omit routine activity info rows unless source=activity. */
+  excludeActivityInfo?: boolean;
   enabled?: boolean;
 };
 
@@ -34,6 +36,7 @@ export function useCrmNotifications(params: () => CrmNotificationListParams) {
     });
     if (p.unreadOnly) qs.set("unread_only", "true");
     if (p.source) qs.set("source", p.source);
+    else if (p.excludeActivityInfo !== false) qs.set("exclude_activity_info", "true");
     return {
       queryKey: ["crm-notifications", p],
       enabled: p.enabled !== false,

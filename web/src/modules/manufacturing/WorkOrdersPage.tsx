@@ -48,6 +48,7 @@ type WorkOrder = {
   created_at?: string | null;
   released_at?: string | null;
   completed_at?: string | null;
+  reversed_at?: string | null;
   transacted_at?: string | null;
 };
 
@@ -378,6 +379,24 @@ export default function WorkOrdersPage() {
     invalidate();
   };
 
+  const reverseCompleted = async (row: WorkOrder) => {
+    const reason = window.prompt("Reason for reversing this completed work order?");
+    if (!reason?.trim()) return;
+    setActionId(row.id);
+    const res = await apiFetch(
+      `/api/v1/manufacturing/work-orders/${row.id}/reverse`,
+      { method: "POST", body: JSON.stringify({ reason: reason.trim() }) },
+      { silent: true },
+    );
+    setActionId(null);
+    if (!res.success) {
+      mfgWarn(res.message, "Could not reverse this job. Its output may already have been used.");
+      return;
+    }
+    mfgSuccess("Reversal posted. The completed job remains in history.");
+    invalidate();
+  };
+
   const patchInspection = async (row: WorkOrder, status: "held" | "released") => {
     if (row.status !== "released") return;
     setInspectingId(row.id);
@@ -686,13 +705,31 @@ export default function WorkOrdersPage() {
               </button>
             </Show>
             <Show when={r.status === "completed"}>
-              <A
-                href="/app/inventory/serial-lot/pack-station"
-                class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
-                onClick={(e) => e.stopPropagation()}
-              >
-                Next: Pack
-              </A>
+              <Show when={!r.reversed_at}>
+                <A
+                  href="/app/inventory/serial-lot/pack-station"
+                  class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Next: Pack
+                </A>
+              </Show>
+              <Show when={!r.reversed_at && canComplete()}>
+                <button
+                  type="button"
+                  class="text-[11px] text-red-700 hover:underline disabled:opacity-50"
+                  disabled={actionId() === r.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void reverseCompleted(r);
+                  }}
+                >
+                  Reverse posting
+                </button>
+              </Show>
+              <Show when={r.reversed_at}>
+                <span class="text-[11px] font-medium text-text-secondary">Reversed</span>
+              </Show>
             </Show>
           </div>
         ),
@@ -819,13 +856,31 @@ export default function WorkOrdersPage() {
               </button>
             </Show>
             <Show when={r.status === "completed"}>
-              <A
-                href="/app/inventory/serial-lot/pack-station"
-                class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
-                onClick={(e) => e.stopPropagation()}
-              >
-                Next: Pack
-              </A>
+              <Show when={!r.reversed_at}>
+                <A
+                  href="/app/inventory/serial-lot/pack-station"
+                  class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Next: Pack
+                </A>
+              </Show>
+              <Show when={!r.reversed_at && canComplete()}>
+                <button
+                  type="button"
+                  class="text-[11px] text-red-700 hover:underline disabled:opacity-50"
+                  disabled={actionId() === r.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void reverseCompleted(r);
+                  }}
+                >
+                  Reverse posting
+                </button>
+              </Show>
+              <Show when={r.reversed_at}>
+                <span class="text-[11px] font-medium text-text-secondary">Reversed</span>
+              </Show>
             </Show>
           </div>
         ),

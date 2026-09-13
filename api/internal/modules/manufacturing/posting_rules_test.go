@@ -57,6 +57,14 @@ func TestCanCompleteWorkOrder(t *testing.T) {
 	if ok {
 		t.Fatal("pending QC should block")
 	}
+	ok, _ = CanCompleteWorkOrderWithPolicy(WOStatusReleased, InspectionPending, false)
+	if !ok {
+		t.Fatal("pending QC should not block when the tenant QC gate is disabled")
+	}
+	ok, _ = CanCompleteWorkOrderWithPolicy(WOStatusReleased, InspectionPending, true)
+	if ok {
+		t.Fatal("pending QC should block when the tenant QC gate is enabled")
+	}
 }
 
 func TestCanPostAssemblyWithShortage(t *testing.T) {
@@ -120,6 +128,9 @@ func TestNormalizeBomTypeRecipe(t *testing.T) {
 	}
 	if IsAssemblyLikeBomType("disassembly") {
 		t.Fatal("disassembly not assembly-like")
+	}
+	if workOrderNoPrefix("assembly") != "ASM" || workOrderNoPrefix("disassembly") != "CUT" || workOrderNoPrefix("recipe") != "REC" {
+		t.Fatal("prefixes")
 	}
 	if parseBomTypeListFilter("recipe") != "recipe" {
 		t.Fatal("list filter")

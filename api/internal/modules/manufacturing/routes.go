@@ -29,6 +29,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders", listWorkOrders(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/{id}", getWorkOrder(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/{id}/material-needs", getWorkOrderMaterialNeeds(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/{id}/journal-preview", previewWorkOrderJournal(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Put("/work-orders/{id}/cost-input", saveWorkOrderCostInput(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/{id}/scan-context", getWorkOrderScanContext(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders", createWorkOrder(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Patch("/work-orders/{id}", updateWorkOrder(pool))
@@ -39,6 +41,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequireSubmit("manufacturing.work_orders_release")).Post("/work-orders/{id}/release", releaseWorkOrder(pool))
 		mr.With(auth.RequireSubmit("manufacturing.work_orders_release")).Post("/work-orders/{id}/revert-draft", revertWorkOrderToDraft(pool))
 		mr.With(auth.RequireSubmit("manufacturing.work_orders_complete")).Post("/work-orders/{id}/complete", completeWorkOrder(pool))
+		mr.With(auth.RequireSubmit("manufacturing.work_orders_complete")).Post("/work-orders/{id}/reverse", reverseWorkOrder(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders_bulk", auth.AccessWrite)).Post("/work-orders/actions/bulk-cancel", bulkCancelWorkOrders(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders_bulk", auth.AccessWrite)).Post("/work-orders/actions/bulk-release", bulkReleaseWorkOrders(pool))
 

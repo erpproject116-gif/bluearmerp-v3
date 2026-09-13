@@ -166,6 +166,11 @@ export default function WelcomePage() {
         navigate("/pending-approval", { replace: true });
         return;
       }
+      if (auth.me) {
+        const href = await resolveAppEntryPath(auth.me);
+        navigate(href, { replace: true });
+        return;
+      }
       navigate("/app/setup", { replace: true });
     } catch {
       setError("Network error. Check your connection and try again.");
@@ -199,9 +204,9 @@ export default function WelcomePage() {
               "Own business needs a different Google email",
             ]
           : [
+              "Own business: start trial — workspace is created immediately, no waiting on Bluearm",
+              "Next: setup wizard → Day 1 stock → onboarding playbook",
               "Invited members: use the exact Google email your admin invited",
-              "Own business: start trial or demo only with an unused email",
-              "Your data stays in an isolated, tenant-scoped workspace",
             ]
       }
     >
@@ -244,8 +249,9 @@ export default function WelcomePage() {
               {loading() ? "Setting up your workspace…" : "Start 14-day free trial"}
             </button>
             <p class="text-xs text-text-secondary">
-              Empty workspace for real data. No credit card required. Do not use an email that already belongs to
-              another Bluearm company.
+              Creates your company workspace right away — then setup wizard, Day 1 stock, and the playbook. No credit
+              card for the trial. Buying and selling unlock after Day 1 plus GCash payment confirmed by Bluearm (not
+              instant). Use an email not already on another Bluearm company.
             </p>
 
             <button

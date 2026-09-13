@@ -55,9 +55,19 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 			where += fmt.Sprintf(" and n.source = $%d", n)
 			args = append(args, src)
 			n++
+		default:
+			// Inbox default: hide routine activity info (bell still surfaces warnings/critical).
+			if strings.TrimSpace(r.URL.Query().Get("exclude_activity_info")) != "false" {
+				where += " and not (coalesce(n.source, 'activity') = 'activity' and n.severity = 'info')"
+			}
 		}
 		q := fmt.Sprintf(`select n.id, n.rule_id, n.severity, n.title, n.body,
-		  n.entity_type, n.entity_id, coalesce(n.source, 'activity'), n.read_at, n.created_at, count(*) over()
+		  n.entity_type, n.entity_id, coalesce(n.source, 'activity'), n.read_at, n.created_at,
+		  case when n.entity_type = 'meeting' then (
+		    select wi.start_date::text from public.wm_work_items wi
+		    where wi.id = n.entity_id and wi.tenant_id = n.tenant_id
+		  ) end,
+		  count(*) over()
 		  from public.crm_notifications n
 		  where %s
 		  order by (n.read_at is null) desc, n.created_at %s
@@ -76,16 +86,17 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 			var row Notification
 			var readAt *time.Time
 			var createdAt time.Time
+			var entityDate *string
 			if err := rows.Scan(
 				&row.ID, &row.RuleID, &row.Severity, &row.Title, &row.Body,
-				&row.EntityType, &row.EntityID, &row.Source, &readAt, &createdAt, &total,
+				&row.EntityType, &row.EntityID, &row.Source, &readAt, &createdAt, &entityDate, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read notifications.", "ERR_INTERNAL")
 				return
 			}
 			row.ReadAt = datePtrToStr(readAt)
 			row.CreatedAt = createdAt.Format(time.RFC3339)
-			row.Href = NotificationHref(row.EntityType, row.EntityID)
+			row.Href = NotificationHrefForDate(row.EntityType, row.EntityID, entityDate)
 			out = append(out, row)
 		}
 		if out == nil {

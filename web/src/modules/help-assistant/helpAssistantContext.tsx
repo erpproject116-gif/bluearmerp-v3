@@ -15,6 +15,7 @@ import { FloatingActionDock } from "../../shared/FloatingActionDock";
 import { NewSupportTicketModal } from "../support/NewSupportTicketModal";
 import { canViewCrm, hasPermission, useAuth } from "../../shared/auth-context";
 import { isTenantModuleEnabled } from "../../shared/moduleAccess";
+import { registerToastHelpOpener } from "../../shared/toastHelpBridge";
 
 type Assistant = ReturnType<typeof useHelpAssistant>;
 
@@ -78,6 +79,7 @@ export function HelpAssistantProvider(props: ParentProps) {
   });
 
   onMount(() => {
+    registerToastHelpOpener(openWithQuery);
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.key.toLowerCase() !== "h") return;
       const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
@@ -86,7 +88,10 @@ export function HelpAssistantProvider(props: ParentProps) {
       toggle();
     };
     window.addEventListener("keydown", onKey);
-    onCleanup(() => window.removeEventListener("keydown", onKey));
+    onCleanup(() => {
+      window.removeEventListener("keydown", onKey);
+      registerToastHelpOpener(null);
+    });
   });
 
   const value: HelpAssistantUi = { open, toggle, openWithQuery, assistant };

@@ -69,10 +69,18 @@ export function CommercialPaywallHost() {
         <div class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
           <h2 class="text-lg font-semibold text-slate-900">Activate buying &amp; selling</h2>
           <p class="mt-1 text-sm text-slate-600">
-            Day 1 setup is complete. Pay{" "}
-            <span class="font-semibold text-slate-900">{formatPeso(amount())}</span> via GCash. A Bluearm product
-            owner will confirm your payment, then you can trade.
+            Day 1 setup is complete. Follow these steps — trade does <strong class="font-medium">not</strong> unlock
+            the moment GCash sends.
           </p>
+          <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-slate-700">
+            <li>
+              Pay{" "}
+              <span class="font-semibold text-slate-900">{formatPeso(amount())}</span> via GCash using the QR below.
+            </li>
+            <li>Keep your reference number handy if support asks.</li>
+            <li>A Bluearm product owner confirms your payment in Platform Command (manual step).</li>
+            <li>After confirmation, buying and selling unlock — this page will update automatically.</li>
+          </ol>
           <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-[#007DFE]">
             <img
               src="/billing/gcash-day1-qr.svg"
@@ -81,7 +89,8 @@ export function CommercialPaywallHost() {
             />
           </div>
           <p class="mt-3 text-xs text-slate-500">
-            Transfer fees may apply. Keep this page open — we check every 30 seconds after you pay.
+            Transfer fees may apply. We refresh status every 30 seconds; unlocking still requires human payment
+            confirmation — not instant GCash auto-verify.
           </p>
           <div class="mt-4 flex flex-wrap gap-2">
             <button

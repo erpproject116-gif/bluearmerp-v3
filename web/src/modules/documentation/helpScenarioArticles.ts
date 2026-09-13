@@ -868,6 +868,72 @@ export const helpScenarioArticles: KbArticle[] = [
 
   // ─── P2: Module depth ───────────────────────────────────────────────────
   {
+    id: "mfg-recipe-assembly-shortage",
+    title: "Recipe or Assembly: component shortage on a new job",
+    scenario: "The wizard shows components short on hand and Process & Post or Assemble & Post is blocked.",
+    intro:
+      "Draft jobs do not move stock. Shortage means the warehouse at the job location does not have enough converted component qty for the BOM lines.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "On step 2, read which components are insufficient (red status chips).",
+          "Save draft if you need to plan ahead — stock is not deducted until you post.",
+          "Receive or transfer stock at the job warehouse, or lower qty to produce.",
+          "Use Refresh availability on step 2, then post on step 3 when all lines are in stock.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Check base UoM conversions and scrap % on the BOM — required qty is converted to each component’s stock unit.",
+      },
+    ],
+    primaryHref: "/app/production/recipe/jobs/new?type=recipe",
+    primaryLabel: "New Recipe order",
+    relatedGuideIds: ["manufacturing-wo-issue-complete", "manufacturing-bom"],
+  },
+  {
+    id: "mfg-cutting-shortage",
+    title: "Cutting: raw material shortage",
+    scenario: "Cutting wizard shows raw material short and Post Production is blocked.",
+    intro:
+      "Cutting consumes one input item (the whole or a lot). Shortage means on-hand at the location is below the input qty on the template.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Confirm warehouse on step 1 matches where stock lives.",
+          "Receive or transfer the raw material, or reduce input quantity.",
+          "Refresh material needs by saving draft and re-opening step 2.",
+          "Post Production only when on-hand covers the input qty.",
+        ],
+      },
+    ],
+    primaryHref: "/app/production/cutting/jobs/new?type=cutting",
+    primaryLabel: "New Cutting order",
+    relatedGuideIds: ["manufacturing-bom"],
+  },
+  {
+    id: "mfg-waste-reason-required",
+    title: "Cutting: waste reason required",
+    scenario: "Post Production asks for a waste reason on excess or abnormal scrap.",
+    intro:
+      "Waste lines do not become sellable stock. Extra qty over the template, abnormal reasons, or optional extra waste qty require an active waste reason.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open Manufacturing → Waste reasons and add codes your floor uses (normal vs abnormal).",
+          "On Cutting step 2, pick a waste reason before extra waste qty or excess on waste-classified outputs.",
+          "If validation mentions abnormal or excess waste, select the matching reason and post again.",
+        ],
+      },
+    ],
+    primaryHref: "/app/production/waste-reasons",
+    primaryLabel: "Waste reasons",
+    relatedGuideIds: ["manufacturing-bom"],
+  },
+  {
     id: "manufacturing-wo-issue-complete",
     title: "Manufacturing: issue components and complete a work order",
     scenario: "You assemble finished goods and need to issue BOM components then complete the work order into stock.",

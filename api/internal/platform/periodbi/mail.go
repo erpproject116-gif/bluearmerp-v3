@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inviteemail"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/notify"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -45,52 +46,6 @@ func pluralS(n int) string {
 		return ""
 	}
 	return "s"
-}
-
-func opsAdminEmails(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]string, error) {
-	if raw := strings.TrimSpace(os.Getenv("CHANGE_ALERT_DIGEST_TO")); raw != "" && !strings.EqualFold(raw, "owner") {
-		parts := strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || r == ';' || r == ' ' })
-		var out []string
-		seen := map[string]bool{}
-		for _, p := range parts {
-			p = strings.ToLower(strings.TrimSpace(p))
-			if p == "" || seen[p] || p == "owner" {
-				continue
-			}
-			seen[p] = true
-			out = append(out, p)
-		}
-		if len(out) > 0 {
-			return out, nil
-		}
-	}
-	rows, err := pool.Query(ctx, `
-		select distinct lower(trim(u.email))
-		from public.users u
-		left join public.tenants t on t.id = u.tenant_id
-		where u.tenant_id = $1
-		  and u.status = 'active'
-		  and coalesce(trim(u.email), '') <> ''
-		  and (u.tenant_role = 'store_admin' or u.id = t.owner_user_id)`, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	seen := map[string]bool{}
-	for rows.Next() {
-		var e string
-		if rows.Scan(&e) != nil {
-			continue
-		}
-		e = strings.TrimSpace(e)
-		if e == "" || seen[e] {
-			continue
-		}
-		seen[e] = true
-		out = append(out, e)
-	}
-	return out, rows.Err()
 }
 
 func Format(company string, rep Report, baseURL string) (subject, htmlBody, textBody string) {
@@ -226,9 +181,9 @@ func Format(company string, rep Report, baseURL string) (subject, htmlBody, text
 	}
 	closeSec()
 
-	b.WriteString(`<tr><td style="padding:12px 28px 24px;font-size:12px;color:#94a3b8;line-height:1.55;">Sent to the tenant owner and store admins. One email per period — not per transaction.</td></tr>`)
+	b.WriteString(`<tr><td style="padding:12px 28px 24px;font-size:12px;color:#94a3b8;line-height:1.55;">Sent to business owners only. One email per period — not per transaction.</td></tr>`)
 	b.WriteString(`</table></td></tr></table></body></html>`)
-	text = append(text, "Sent to the tenant owner and store admins.", "", "— BluearmERP")
+	text = append(text, "Sent to business owners only.", "", "— BluearmERP")
 	return subject, b.String(), strings.Join(text, "\n")
 }
 
@@ -247,7 +202,7 @@ func Drain(ctx context.Context, pool *pgxpool.Pool, kind Kind) (tenants, sent in
 		select p.tenant_id
 		from public.owner_change_alert_prefs p
 		join public.tenants t on t.id = p.tenant_id
-		where t.status = 'active' and coalesce(p.%s, true)
+		where t.status = 'active' and coalesce(p.%s, false)
 		  and (p.%s is null or p.%s < date_trunc('%s', now() at time zone 'utc'))
 		order by p.tenant_id limit 100`, enabledCol, lastCol, lastCol, trunc)
 	rows, err := pool.Query(ctx, q)
@@ -273,7 +228,7 @@ func Drain(ctx context.Context, pool *pgxpool.Pool, kind Kind) (tenants, sent in
 
 	for _, tid := range ids {
 		tenants++
-		emails, eErr := opsAdminEmails(ctx, pool, tid)
+		emails, eErr := notify.BusinessOwnerEmails(ctx, pool, tid)
 		if eErr != nil || len(emails) == 0 {
 			details = append(details, map[string]any{"tenant_id": tid, "delivered": false, "reason": "no_recipients"})
 			continue

@@ -1,5 +1,5 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
@@ -12,8 +12,11 @@ import {
   receivesStockForClassification,
   validateWasteLine,
 } from "../production/mfgRules";
-import { mfgSuccess, mfgWarn } from "../production/mfgToast";
+import { MfgWizardStickyAlerts } from "../production/MfgWizardStickyAlerts";
+import { cuttingStepGuidance } from "../production/mfgWizardStepGuidance";
+import { mfgStationHandoff, mfgSuccess, mfgWarn } from "../production/mfgToast";
 import { jobsHref } from "../production/mfgProductionMode";
+import { submitBusyLabel } from "../../shared/submitCopy";
 import NewAssemblyOrderWizard from "./NewAssemblyOrderWizard";
 import NewRecipeOrderWizard from "./NewRecipeOrderWizard";
 
@@ -47,6 +50,10 @@ type MaterialNeeds = {
 };
 
 type WasteReason = { id: number; code: string; name: string; is_abnormal: boolean };
+type JournalPreview = {
+  accounting_enabled: boolean;
+  costs: { material_cost: number; total_cost: number };
+};
 
 const searchCuttingBoms = async (q: string): Promise<LookupOption[]> => {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", bom_type: "disassembly" });
@@ -95,12 +102,56 @@ function NewCuttingOrderWizard() {
   const [posting, setPosting] = createSignal(false);
   const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
   const [inputTracked, setInputTracked] = createSignal(false);
+  const [journalPreview, setJournalPreview] = createSignal<JournalPreview | null>(null);
 
   const hasInputShortage = () => {
     const input = needs()?.input_line;
     if (!input) return false;
     return (input.shortage ?? 0) > 0.0001;
   };
+
+  const buildWasteLinesPreview = () => {
+    const lines: {
+      component_item_id?: number;
+      classification: string;
+      qty: number;
+      expected_qty: number;
+      waste_reason_id?: number;
+    }[] = [];
+    for (const ln of needs()?.lines ?? []) {
+      if (normalizeOutputClassification(ln.output_classification) !== "waste") continue;
+      const q = Number(actualByItem()[ln.component_item_id] ?? ln.stock_to_issue);
+      if (!(q > 0)) continue;
+      lines.push({
+        component_item_id: ln.component_item_id,
+        classification: "waste",
+        qty: q,
+        expected_qty: ln.stock_to_issue,
+        waste_reason_id: wasteReasonId() ?? undefined,
+      });
+    }
+    const extra = Number(wasteQty());
+    if (extra > 0) {
+      lines.push({
+        classification: "waste",
+        qty: extra,
+        expected_qty: 0,
+        waste_reason_id: wasteReasonId() ?? undefined,
+      });
+    }
+    return lines;
+  };
+
+  const stepGuidance = createMemo(() =>
+    cuttingStepGuidance(step(), {
+      hasInputShortage: hasInputShortage(),
+      inputTracked: inputTracked(),
+      wasteReasonId: wasteReasonId(),
+      wasteQty: Number(wasteQty()) || 0,
+      wasteLines: buildWasteLinesPreview(),
+      reasons: reasons(),
+    }),
+  );
 
   const loadNeeds = async (id: number) => {
     const res = await apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${id}/material-needs`, undefined, {
@@ -236,6 +287,18 @@ function NewCuttingOrderWizard() {
     return lines;
   };
 
+  const handleReviewAndPost = async () => {
+    const row = await persistDraft();
+    if (!row) return;
+    const preview = await apiFetch<JournalPreview>(
+      `/api/v1/manufacturing/work-orders/${row.id}/journal-preview`,
+      undefined,
+      { silent: true },
+    );
+    setJournalPreview(preview.success && preview.data ? preview.data : null);
+    setStep(3);
+  };
+
   const handlePost = async () => {
     if (!canPostWithShortage(hasInputShortage(), false)) {
       setFieldErrors({ stock: "Not enough raw material on hand. Restock, then Post Production." });
@@ -265,8 +328,9 @@ function NewCuttingOrderWizard() {
     }
     if (inputTracked()) {
       setPosting(false);
-      mfgWarn(null, "Take the whole from stock (serial/lot), record cut weights if needed, then Finish from Jobs.");
-      navigate(`/app/production/issue-station?woId=${id}&mode=disassembly`);
+      const next = `/app/production/issue-station?woId=${id}&mode=disassembly`;
+      mfgStationHandoff("disassembly_issue", next);
+      navigate(next);
       return;
     }
     const complete = await apiFetch(
@@ -352,7 +416,10 @@ function NewCuttingOrderWizard() {
         </For>
       </nav>
 
-      <FormErrorSummary errors={fieldErrors} />
+      <Show when={step() === 1}>
+        <FormErrorSummary errors={fieldErrors} />
+      </Show>
+      <MfgWizardStickyAlerts step={step} validationErrors={fieldErrors} stepGuidance={stepGuidance} />
 
       <Show when={step() === 1}>
         <section class="grid gap-4 rounded-xl border border-stroke bg-white p-4 md:grid-cols-2">
@@ -522,7 +589,7 @@ function NewCuttingOrderWizard() {
           <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm" onClick={() => setStep(1)}>
             ← Back
           </button>
-          <button type="button" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" onClick={() => setStep(3)}>
+          <button type="button" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" onClick={() => void handleReviewAndPost()}>
             Review &amp; post →
           </button>
         </div>
@@ -536,6 +603,22 @@ function NewCuttingOrderWizard() {
           <p>By-products: {summary().byproduct.toFixed(4)}</p>
           <p>Waste: {summary().waste.toFixed(4)}</p>
           <p class="text-xs text-text-secondary">Waste-classified lines do not increase sellable stock.</p>
+          <div class="mt-3 border-t border-stroke pt-3">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Journal preview</h3>
+            <Show when={journalPreview()} fallback={<p class="mt-1 text-xs text-text-secondary">Cost preview unavailable.</p>}>
+              <div class="mt-1 flex justify-between gap-3 text-xs">
+                <span>Dr Cut outputs inventory</span>
+                <span>₱{(journalPreview()?.costs.total_cost ?? 0).toLocaleString()}</span>
+              </div>
+              <div class="flex justify-between gap-3 text-xs">
+                <span>Cr Raw material inventory</span>
+                <span>₱{(journalPreview()?.costs.material_cost ?? 0).toLocaleString()}</span>
+              </div>
+              <Show when={!journalPreview()?.accounting_enabled}>
+                <p class="mt-1 text-[11px] text-amber-700">Preview only: Inventory GL is disabled.</p>
+              </Show>
+            </Show>
+          </div>
         </section>
         <div class="flex justify-between">
           <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm" onClick={() => setStep(2)}>
@@ -547,7 +630,7 @@ function NewCuttingOrderWizard() {
             disabled={posting() || saving()}
             onClick={() => void handlePost()}
           >
-            {posting() ? "Posting…" : "Post Production"}
+            {submitBusyLabel("post", posting(), "Post Production")}
           </button>
         </div>
       </Show>

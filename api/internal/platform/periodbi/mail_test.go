@@ -27,4 +27,10 @@ func TestFormatWeeklySubjectAndLinks(t *testing.T) {
 	if !strings.Contains(textBody, "Acme Co") {
 		t.Fatal("text missing company")
 	}
+	if !strings.Contains(htmlBody, "business owners only") {
+		t.Fatal("html should state business-owner recipients")
+	}
+	if strings.Contains(htmlBody, "store admin") {
+		t.Fatal("html must not mention store admins as recipients")
+	}
 }

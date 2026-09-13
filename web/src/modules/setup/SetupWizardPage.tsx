@@ -9,6 +9,7 @@ import {
   wizardFoundationPercent,
   wizardFoundationSteps,
 } from "../../shared/setupProgress";
+import { PageCoachMark } from "../../shared/PageCoachMark";
 
 const STEP_COPY: Record<string, { title: string; why: string; action: string; link?: string; ackStep?: string }> = {
   company: {
@@ -155,6 +156,12 @@ export default function SetupWizardPage() {
 
   return (
     <div class="mx-auto max-w-2xl p-6">
+      <PageCoachMark
+        storageKey="bluearm:coach:setup-wizard"
+        message="Finish foundation here first — then use Home → Onboarding for the self-paced module playbook at your own speed."
+        actionHref="/app/dashboard/onboarding"
+        actionLabel="Open playbook"
+      />
       <div class="mb-6">
         <p class="text-xs font-medium uppercase tracking-wide text-brand-600">Workspace setup</p>
         <h1 class="mt-1 text-xl font-semibold text-text-primary">{copy().title}</h1>

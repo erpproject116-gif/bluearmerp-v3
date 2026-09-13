@@ -1,7 +1,10 @@
+import { useNavigate } from "@solidjs/router";
 import { createSignal, For, Show } from "solid-js";
+import { createOrGetDM } from "../modules/comms/chatApi";
 import { presenceActivityLabel } from "./presenceLabels";
-import { useAuth } from "./auth-context";
+import { hasPermission, useAuth } from "./auth-context";
 import { UserAvatar } from "./UserAvatar";
+import { useToast } from "./toast";
 import { useOnlinePresence, type PresenceUser } from "./usePresence";
 
 const MAX_STACK = 4;
@@ -22,61 +25,115 @@ function activitySummary(user: PresenceUser): string {
 
 export function PresenceAvatars() {
   const auth = useAuth();
+  const navigate = useNavigate();
+  const toast = useToast();
   const online = useOnlinePresence(() => Boolean(auth.me));
   const [open, setOpen] = createSignal(false);
+  const [messagingId, setMessagingId] = createSignal<number | null>(null);
 
   const users = () => online.data ?? [];
   const others = () => users().filter((u) => !u.is_self);
   const stack = () => others().slice(0, MAX_STACK);
   const overflow = () => Math.max(0, others().length - MAX_STACK);
+  const canMessage = () => hasPermission(auth.me, "comms.chat", "write");
+
+  const messageUser = async (user: PresenceUser, e?: MouseEvent) => {
+    e?.stopPropagation();
+    if (user.is_self || !canMessage() || messagingId() !== null) return;
+    setMessagingId(user.user_id);
+    try {
+      const res = await createOrGetDM(user.user_id);
+      if (!res.success || !res.data) {
+        toast.error(res.message || "Failed to open DM.");
+        return;
+      }
+      setOpen(false);
+      navigate(`/app/comms/chat?channelId=${res.data.id}`);
+    } finally {
+      setMessagingId(null);
+    }
+  };
+
+  const onlineIndicator = (className?: string) => (
+    <span
+      class={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 ${className ?? ""}`}
+      aria-hidden="true"
+    />
+  );
+
+  const avatarStackFace = (user: PresenceUser) => (
+    <>
+      <UserAvatar name={user.full_name} avatarUrl={user.avatar_url} size="sm" class="ring-2 ring-white" />
+      {onlineIndicator()}
+    </>
+  );
 
   return (
     <div class="relative">
-      <button
-        type="button"
-        class="flex items-center gap-1 rounded-lg border border-stroke px-2 py-1.5 transition hover:bg-slate-50"
-        aria-expanded={open()}
-        aria-haspopup="true"
-        title="Who's online"
-        onClick={() => setOpen((v) => !v)}
-      >
+      <div class="flex items-center gap-1 rounded-lg border border-stroke px-2 py-1.5">
         <Show
           when={others().length > 0}
           fallback={
-            <span class="flex items-center gap-2 px-1 text-xs text-text-secondary">
+            <button
+              type="button"
+              class="flex items-center gap-2 px-1 text-xs text-text-secondary transition hover:text-text-primary"
+              aria-expanded={open()}
+              aria-haspopup="true"
+              title="Who's online"
+              onClick={() => setOpen((v) => !v)}
+            >
               <span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
               Only you
-            </span>
+            </button>
           }
         >
           <div class="flex items-center -space-x-2 pl-1">
             <For each={stack()}>
               {(user) => (
-                <span class="relative inline-block">
-                  <UserAvatar
-                    name={user.full_name}
-                    avatarUrl={user.avatar_url}
-                    size="sm"
-                    class="ring-2 ring-white"
-                  />
-                  <span
-                    class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500"
-                    aria-hidden="true"
-                  />
-                </span>
+                <Show
+                  when={canMessage()}
+                  fallback={
+                    <span class="relative inline-block">{avatarStackFace(user)}</span>
+                  }
+                >
+                  <button
+                    type="button"
+                    class="relative inline-block rounded-full transition hover:ring-2 hover:ring-brand/40 disabled:opacity-60"
+                    title={`Message ${user.full_name}`}
+                    aria-label={`Message ${user.full_name}`}
+                    disabled={messagingId() === user.user_id}
+                    onClick={(e) => void messageUser(user, e)}
+                  >
+                    {avatarStackFace(user)}
+                  </button>
+                </Show>
               )}
             </For>
             <Show when={overflow() > 0}>
-              <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 ring-2 ring-white">
+              <button
+                type="button"
+                class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 ring-2 ring-white transition hover:bg-slate-300"
+                title="Who's online"
+                aria-expanded={open()}
+                aria-haspopup="true"
+                onClick={() => setOpen((v) => !v)}
+              >
                 +{overflow()}
-              </span>
+              </button>
             </Show>
           </div>
-          <span class="hidden text-xs font-medium text-text-secondary sm:inline">
+          <button
+            type="button"
+            class="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-text-secondary transition hover:bg-slate-50"
+            aria-expanded={open()}
+            aria-haspopup="true"
+            title="Who's online"
+            onClick={() => setOpen((v) => !v)}
+          >
             {others().length + 1} online
-          </span>
+          </button>
         </Show>
-      </button>
+      </div>
 
       <Show when={open()}>
         <div
@@ -91,24 +148,46 @@ export function PresenceAvatars() {
           <ul class="max-h-72 overflow-y-auto py-1">
             <For each={users()}>
               {(user) => (
-                <li class="flex items-start gap-3 px-4 py-2.5 hover:bg-slate-50">
-                  <span class="relative mt-0.5">
-                    <UserAvatar name={user.full_name} avatarUrl={user.avatar_url} size="sm" />
-                    <span
-                      class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium text-text-primary">
-                      {user.full_name}
-                      <Show when={user.is_self}>
-                        <span class="ml-1 text-xs font-normal text-text-secondary">(you)</span>
-                      </Show>
-                    </p>
-                    <p class="truncate text-xs text-text-secondary">{activitySummary(user)}</p>
-                    <p class="text-[11px] text-text-secondary/80">{formatSeen(user.last_seen_at)}</p>
-                  </div>
+                <li>
+                  <Show
+                    when={!user.is_self && canMessage()}
+                    fallback={
+                      <div class="flex items-start gap-3 px-4 py-2.5">
+                        <span class="relative mt-0.5">
+                          <UserAvatar name={user.full_name} avatarUrl={user.avatar_url} size="sm" />
+                          {onlineIndicator()}
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-medium text-text-primary">
+                            {user.full_name}
+                            <Show when={user.is_self}>
+                              <span class="ml-1 text-xs font-normal text-text-secondary">(you)</span>
+                            </Show>
+                          </p>
+                          <p class="truncate text-xs text-text-secondary">{activitySummary(user)}</p>
+                          <p class="text-[11px] text-text-secondary/80">{formatSeen(user.last_seen_at)}</p>
+                        </div>
+                      </div>
+                    }
+                  >
+                    <button
+                      type="button"
+                      class="flex w-full items-start gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 disabled:opacity-60"
+                      title={`Message ${user.full_name}`}
+                      disabled={messagingId() === user.user_id}
+                      onClick={(e) => void messageUser(user, e)}
+                    >
+                      <span class="relative mt-0.5">
+                        <UserAvatar name={user.full_name} avatarUrl={user.avatar_url} size="sm" />
+                        {onlineIndicator()}
+                      </span>
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-text-primary">{user.full_name}</p>
+                        <p class="truncate text-xs text-text-secondary">{activitySummary(user)}</p>
+                        <p class="text-[11px] text-text-secondary/80">{formatSeen(user.last_seen_at)}</p>
+                      </div>
+                    </button>
+                  </Show>
                 </li>
               )}
             </For>

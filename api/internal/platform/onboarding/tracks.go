@@ -156,6 +156,18 @@ var onboardingTracks = []trackDef{
 			{ID: "report_catalog", Label: "Browse report catalog", Href: "/app/reports", Description: "Module analytics and saved filter views.", Required: false},
 		},
 	},
+	{
+		ID:          "manufacturing",
+		Title:       "Production & recipe",
+		Description: "Processing recipes and batch jobs from the Manufacturing hub.",
+		ModuleCode:  "manufacturing",
+		Steps: []trackStepDef{
+			{ID: "mfg_hub", Label: "Open Manufacturing hub", Href: "/app/production", Description: "Pick Assembly, Cutting, or Recipe / Processing — drafts do not move stock.", Required: false},
+			{ID: "recipe_bom", Label: "Create a processing recipe", Href: "/app/production/recipe/recipes", Description: "Define batch size, ingredients, and yield before you run a batch.", Required: false},
+			{ID: "recipe_job", Label: "Start a processing order", Href: "/app/production/orders/new?type=recipe", Description: "Pick recipe, batch qty, and warehouse — Save draft does not move stock.", Required: false},
+			{ID: "recipe_post", Label: "Process & Post a batch", Href: "/app/production/recipe/jobs", Description: "When ingredients are enough, Process & Post moves stock.", Required: false},
+		},
+	},
 }
 
 type extendedAck struct {
@@ -206,6 +218,9 @@ type detectionSnapshot struct {
 	OperationsWorkspace bool
 	OperationsWorkItem  bool
 	CommsSent           bool
+	RecipeBom           bool
+	RecipeWorkOrder     bool
+	RecipePosted        bool
 }
 
 func buildTracks(ctx context.Context, pool *pgxpool.Pool, tenantID int64, readiness setupreadiness.Payload) ([]map[string]any, int, map[string]any) {
@@ -387,6 +402,14 @@ func stepDone(trackID, stepID string, readiness setupreadiness.Payload, ack exte
 		return ack.StockReconAck
 	case "report_catalog":
 		return ack.ReportCatalogAck
+	case "mfg_hub":
+		return snap.RecipeBom || snap.RecipeWorkOrder || snap.RecipePosted
+	case "recipe_bom":
+		return snap.RecipeBom
+	case "recipe_job":
+		return snap.RecipeWorkOrder
+	case "recipe_post":
+		return snap.RecipePosted
 	default:
 		return false
 	}
@@ -553,6 +576,18 @@ func detectSnapshot(ctx context.Context, pool *pgxpool.Pool, tenantID int64) det
 		where tenant_id=$1 and status='active'`, tenantID) > 1
 	s.CutoverImport = exists(`select count(*)::int from public.mig_import_keys where tenant_id=$1`, tenantID) ||
 		exists(`select count(*)::int from public.mig_import_profiles where tenant_id=$1`, tenantID)
+
+	s.RecipeBom = exists(`
+		select count(*)::int from public.mfg_boms
+		where tenant_id=$1 and bom_type = 'recipe'`, tenantID)
+	s.RecipeWorkOrder = exists(`
+		select count(*)::int from public.mfg_work_orders wo
+		join public.mfg_boms b on b.id = wo.bom_id and b.tenant_id = wo.tenant_id
+		where wo.tenant_id=$1 and b.bom_type = 'recipe'`, tenantID)
+	s.RecipePosted = exists(`
+		select count(*)::int from public.mfg_work_orders wo
+		join public.mfg_boms b on b.id = wo.bom_id and b.tenant_id = wo.tenant_id
+		where wo.tenant_id=$1 and b.bom_type = 'recipe' and wo.status = 'completed'`, tenantID)
 
 	return s
 }
