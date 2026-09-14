@@ -32,17 +32,23 @@ export function SupportSessionBanner() {
   const [now, setNow] = createSignal(Date.now());
   const [busy, setBusy] = createSignal(false);
 
+  const sess = (): SupportSession | null =>
+    (auth.me?.support_session as SupportSession | undefined) ?? null;
+
+  const visibleSession = (): SupportSession | undefined => {
+    const s = sess();
+    if (!s || !hasPlatformPermission(auth.me, "platform.support.access")) return undefined;
+    return s;
+  };
+
   createEffect(() => {
-    if (!auth.me?.support_session) return;
+    if (!visibleSession()) return;
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     onCleanup(() => window.clearInterval(t));
   });
 
-  const sess = (): SupportSession | null =>
-    (auth.me?.support_session as SupportSession | undefined) ?? null;
-
   const endsAtMs = () => {
-    const s = sess();
+    const s = visibleSession();
     return s ? Date.parse(s.ends_at) : 0;
   };
 
@@ -88,12 +94,12 @@ export function SupportSessionBanner() {
 
   // Keep X-Tenant-ID aligned with the support tenant.
   createEffect(() => {
-    const s = sess();
+    const s = visibleSession();
     if (s?.tenant_id) setActiveTenantId(s.tenant_id);
   });
 
   return (
-    <Show when={sess() && hasPlatformPermission(auth.me, "platform.support.access")}>
+    <Show when={visibleSession()}>
       {(s) => (
         <div
           class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
