@@ -92,7 +92,7 @@ export function BusinessBranchSwitcher() {
             Active business
           </label>
           <Show
-            when={hasMultipleBusinesses()}
+            when={hasMultipleBusinesses() && !auth.me?.support_session}
             fallback={<p class="truncate text-sm font-medium text-text-primary">{currentBusinessName()}</p>}
           >
             <select

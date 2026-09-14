@@ -50,6 +50,13 @@ func switchTenantHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if tu.SupportSessionID > 0 && body.TenantID != tu.TenantID {
+			response.Err(w, http.StatusForbidden,
+				"Cannot switch businesses during a support session. End support first.",
+				"ERR_SUPPORT_SESSION_ACTIVE")
+			return
+		}
+
 		var isMember bool
 		err := pool.QueryRow(r.Context(), `
 			select exists (

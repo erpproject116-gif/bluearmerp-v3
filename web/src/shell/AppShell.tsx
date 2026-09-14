@@ -38,6 +38,7 @@ import { brandingLabel } from "../shared/branding/brandingStore";
 import { navFeatureLabelKey, navModuleLabelKey } from "../shared/branding/navLabels";
 import { UserAccountMenu } from "./UserAccountMenu";
 import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
+import { SupportSessionBanner } from "./SupportSessionBanner";
 import { SidebarNav } from "./SidebarNav";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { DemoTenantBanner } from "../shared/DemoTenantBanner";
@@ -504,6 +505,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           </Show>
         </header>
         <main class="flex-1 p-4 sm:p-6">
+          <SupportSessionBanner />
           <DemoTenantBanner />
           <EntitlementBanner />
           <DesktopPreferredHint />

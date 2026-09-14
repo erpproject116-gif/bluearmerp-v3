@@ -26,6 +26,11 @@ func RequireCommercialUnlocked(pool *pgxpool.Pool) func(http.Handler) http.Handl
 				next.ServeHTTP(w, r)
 				return
 			}
+			// Support ghost may diagnose buy/sell without permanently unlocking the customer.
+			if tu.SupportSessionID > 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
 			// Opportunistic Day 1 evaluation while still in setup.
 			_, _, _ = day1commercial.EvaluateAndTransition(r.Context(), pool, tu.TenantID)
 

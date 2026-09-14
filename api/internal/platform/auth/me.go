@@ -11,6 +11,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/entitlement"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/supportaccess"
 )
 
 type ModuleRow struct {
@@ -36,6 +37,7 @@ type MePayload struct {
 	Modules            []ModuleRow           `json:"modules"`
 	Entitlement        *entitlement.Snapshot `json:"entitlement,omitempty"`
 	Commercial         *day1commercial.Commercial `json:"commercial,omitempty"`
+	SupportSession     map[string]any        `json:"support_session,omitempty"`
 }
 
 func fullModuleAccess(tu TenantUser) bool {
@@ -179,6 +181,13 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 	ent, _ := entitlement.LoadForTenant(ctx, pool, tu.TenantID, tu.IsPlatformSuperadmin, cfg.EntitlementGraceDays)
 	commercial, _ := day1commercial.LoadForTenant(ctx, pool, tu.TenantID, tu.IsPlatformSuperadmin)
 
+	var supportMap map[string]any
+	if tu.SupportSessionID > 0 {
+		if sess, err := supportaccess.GetByID(ctx, pool, tu.SupportSessionID); err == nil && sess != nil && sess.EndedAt == nil {
+			supportMap = supportaccess.PublicMap(sess)
+		}
+	}
+
 	return MePayload{
 		User: user,
 		Tenant: map[string]any{
@@ -195,6 +204,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 		Modules:            modules,
 		Entitlement:        ent,
 		Commercial:         commercial,
+		SupportSession:     supportMap,
 	}, nil
 }
 

@@ -64,6 +64,13 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 		cr.With(requirePlatformPermission("platform.analytics.read")).Get("/platform/console/customers/{id}/engagement", svc.customerEngagement)
 		cr.With(requirePlatformPermission("platform.analytics.read")).Get("/platform/console/customers/{id}/sessions/{sessionId}", svc.customerSessionDetail)
 
+		// Support remote workspace access
+		cr.With(requirePlatformPermission("platform.support.access")).Post("/platform/console/customers/{id}/support-sessions", svc.startSupportSession)
+		cr.With(requirePlatformPermission("platform.support.access")).Get("/platform/console/customers/{id}/support-sessions", svc.listSupportSessions)
+		cr.With(requirePlatformPermission("platform.support.access")).Post("/platform/console/support-sessions/{sessionId}/extend", svc.extendSupportSession)
+		cr.With(requirePlatformPermission("platform.support.access")).Post("/platform/console/support-sessions/{sessionId}/end", svc.endSupportSession)
+		cr.With(requirePlatformPermission("platform.support.access")).Get("/platform/console/support-sessions/mine", svc.getMineSupportSession)
+
 		// Tickets / onboarding / follow-ups
 		cr.With(requirePlatformPermission("platform.tickets.read")).Get("/platform/console/tickets", svc.listTickets)
 		cr.With(requirePlatformPermission("platform.tickets.read")).Get("/platform/console/tickets/export", svc.exportTickets)
