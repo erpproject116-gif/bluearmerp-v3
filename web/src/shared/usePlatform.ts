@@ -582,10 +582,39 @@ export function usePlatformCustomerEngagement(id: () => number | undefined) {
           end_exact?: boolean;
         }>;
       }>(`/api/v1/platform/console/customers/${id()}/engagement`);
-      if (!res.ok) throw new Error(res.message ?? "Failed to load engagement");
+      if (!res.ok) throw new Error(res.message || "Failed");
       return res.data!;
     },
-    staleTime: 15_000,
+  }));
+}
+
+export type PlatformSupportSessionRow = {
+  id: number;
+  tenant_id: number;
+  customer_id: number;
+  company_code?: string;
+  company_name?: string;
+  access_mode: string;
+  reason?: string;
+  started_at: string;
+  ends_at: string;
+  ended_at?: string | null;
+  ended_by?: string | null;
+  extends_used?: number;
+  support_email?: string;
+};
+
+export function usePlatformCustomerSupportSessions(id: () => number | undefined) {
+  return createQuery(() => ({
+    queryKey: ["platform-customer-support-sessions", id()],
+    enabled: Boolean(id() && id()! > 0),
+    queryFn: async () => {
+      const res = await apiFetch<PlatformSupportSessionRow[]>(
+        `/api/v1/platform/console/customers/${id()}/support-sessions`,
+      );
+      if (!res.ok) throw new Error(res.message || "Failed");
+      return res.data ?? [];
+    },
   }));
 }
 

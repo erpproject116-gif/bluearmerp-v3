@@ -67,6 +67,19 @@ export type MeData = {
     write_blocked?: boolean;
     payment_requested_at?: string;
   };
+  support_session?: {
+    id: number;
+    tenant_id: number;
+    customer_id: number;
+    company_code?: string;
+    company_name?: string;
+    ends_at: string;
+    started_at?: string;
+    access_mode: string;
+    reason?: string;
+    extends_used?: number;
+    can_extend?: boolean;
+  } | null;
 };
 
 /** Platform superadmins — same Command Center + unrestricted ERP as itsjohnranel.

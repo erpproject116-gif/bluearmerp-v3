@@ -2,13 +2,15 @@ import { A, useNavigate, useParams } from "@solidjs/router";
 import { formatPeso } from "../../shared/money";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
-import { PLATFORM_CONSOLE_EMAILS, useAuth } from "../../shared/auth-context";
+import { PLATFORM_CONSOLE_EMAILS, hasPlatformPermission, useAuth } from "../../shared/auth-context";
+import { setActiveTenantId } from "../../shared/activeContext";
 import {
   usePlatformCustomer,
   usePlatformCustomerEngagement,
   usePlatformCustomerOverview,
   usePlatformCustomerSession,
   usePlatformPlansAdmin,
+  usePlatformCustomerSupportSessions,
   type PlatformPlan,
 } from "../../shared/usePlatform";
 import { LoadingText } from "../../shared/LoadingText";
@@ -136,6 +138,47 @@ export default function PlatformCustomerDetailPage() {
   const [wipeWarningsOnly, setWipeWarningsOnly] = createSignal(false);
   const [wipeSnap, setWipeSnap] = createSignal<WipePreflight | null>(null);
   const sessionDetail = usePlatformCustomerSession(id, openSessionId);
+  const supportSessions = usePlatformCustomerSupportSessions(id);
+  const [openWs, setOpenWs] = createSignal(false);
+  const [wsReason, setWsReason] = createSignal("");
+  const [wsMode, setWsMode] = createSignal<"read_only" | "read_write">("read_only");
+
+  const canOpenWorkspace = () => hasPlatformPermission(auth.me, "platform.support.access");
+
+  const startSupportWorkspace = async () => {
+    const reason = wsReason().trim();
+    if (reason.length < 5) {
+      toast.error("Reason must be at least 5 characters.");
+      return;
+    }
+    setBusy(true);
+    const res = await apiFetch<{
+      id: number;
+      tenant_id: number;
+      customer_id: number;
+      ends_at: string;
+      access_mode: string;
+    }>(
+      `/api/v1/platform/console/customers/${id()}/support-sessions`,
+      {
+        method: "POST",
+        body: JSON.stringify({ reason, access_mode: wsMode() }),
+      },
+      { silent: true },
+    );
+    setBusy(false);
+    if (!res.ok || !res.data) {
+      toast.error(res.message ?? "Could not open workspace.");
+      return;
+    }
+    setActiveTenantId(res.data.tenant_id);
+    setOpenWs(false);
+    setWsReason("");
+    setWsMode("read_only");
+    await auth.refresh();
+    toast.success("Support workspace opened.");
+    navigate("/app/dashboard", { replace: true });
+  };
 
   const paidPlans = () =>
     (plansQ.data ?? []).filter((p) => p.is_active && !p.plan_code.includes("trial") && !p.plan_code.includes("demo"));
@@ -355,6 +398,148 @@ export default function PlatformCustomerDetailPage() {
                     </Show>
                   </div>
                 </div>
+
+                <Show when={Boolean(c().tenant_id) && canOpenWorkspace()}>
+                  <div class="space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 class="font-semibold">Support cockpit</h2>
+                        <p class="mt-1 text-xs text-sky-900/80">
+                          Trade: <strong>{String(c().commercial_status || "unlocked").replace(/_/g, " ")}</strong>
+                          <Show when={eg()?.summary?.last_activity_at}>
+                            {" "}· Last activity {fmtWhen(eg()!.summary.last_activity_at)}
+                          </Show>
+                        </p>
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        <Show when={String(c().tenant_status) === "active"}>
+                          <button
+                            type="button"
+                            class="rounded-lg bg-sky-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-900 disabled:opacity-50"
+                            disabled={busy()}
+                            onClick={() => setOpenWs(true)}
+                          >
+                            Open workspace
+                          </button>
+                        </Show>
+                        <Show when={String(c().commercial_status ?? "unlocked") !== "unlocked"}>
+                          <button
+                            type="button"
+                            class="rounded-lg border border-emerald-600 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 disabled:opacity-50"
+                            disabled={busy()}
+                            onClick={() =>
+                              void act(`/api/v1/platform/console/customers/${id()}/confirm-day1-payment`, {
+                                note: "Manual payment confirmed by product owner",
+                              })
+                            }
+                          >
+                            Unlock buy/sell
+                          </button>
+                        </Show>
+                        <A
+                          href="#engagement"
+                          class="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-900"
+                        >
+                          Analytics
+                        </A>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 class="text-xs font-semibold uppercase tracking-wide text-sky-900/70">Past support sessions</h3>
+                      <Show when={supportSessions.isPending}>
+                        <p class="mt-1 text-xs text-sky-800/70">Loading…</p>
+                      </Show>
+                      <Show when={!supportSessions.isPending && (supportSessions.data?.length ?? 0) === 0}>
+                        <p class="mt-1 text-xs text-sky-800/70">No support sessions yet.</p>
+                      </Show>
+                      <Show when={(supportSessions.data?.length ?? 0) > 0}>
+                        <div class="mt-2 overflow-x-auto">
+                          <table class="min-w-full text-left text-xs">
+                            <thead>
+                              <tr class="border-b border-sky-200 text-sky-900/70">
+                                <th class="py-1 pr-3 font-medium">When</th>
+                                <th class="py-1 pr-3 font-medium">Mode</th>
+                                <th class="py-1 pr-3 font-medium">Reason</th>
+                                <th class="py-1 font-medium">Ended</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <For each={supportSessions.data ?? []}>
+                                {(row) => (
+                                  <tr class="border-b border-sky-100">
+                                    <td class="py-1.5 pr-3 whitespace-nowrap">{fmtWhen(row.started_at)}</td>
+                                    <td class="py-1.5 pr-3">{row.access_mode === "read_write" ? "Write" : "Read only"}</td>
+                                    <td class="py-1.5 pr-3 max-w-[14rem] truncate" title={row.reason}>{row.reason || "—"}</td>
+                                    <td class="py-1.5 whitespace-nowrap">{row.ended_at ? fmtWhen(row.ended_at) : "Open"}</td>
+                                  </tr>
+                                )}
+                              </For>
+                            </tbody>
+                          </table>
+                        </div>
+                      </Show>
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={openWs()}>
+                  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div class="w-full max-w-md space-y-4 rounded-xl border border-stroke bg-white p-5 shadow-xl">
+                      <h2 class="text-base font-semibold">Open customer workspace</h2>
+                      <p class="text-xs text-text-secondary">
+                        Creates an audited support session (60 min, optional +30). The company owner gets a soft bell notice.
+                      </p>
+                      <label class="block text-xs font-medium text-text-secondary">
+                        Reason
+                        <textarea
+                          class="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm"
+                          rows={3}
+                          value={wsReason()}
+                          onInput={(e) => setWsReason(e.currentTarget.value)}
+                          placeholder="e.g. Investigating missing GR posting"
+                        />
+                      </label>
+                      <fieldset class="space-y-2 text-sm">
+                        <legend class="text-xs font-medium text-text-secondary">Access mode</legend>
+                        <label class="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="ws-mode"
+                            checked={wsMode() === "read_only"}
+                            onChange={() => setWsMode("read_only")}
+                          />
+                          Read only (default)
+                        </label>
+                        <label class="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="ws-mode"
+                            checked={wsMode() === "read_write"}
+                            onChange={() => setWsMode("read_write")}
+                          />
+                          Read &amp; write
+                        </label>
+                      </fieldset>
+                      <div class="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
+                          onClick={() => setOpenWs(false)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          class="rounded-lg bg-sky-800 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                          disabled={busy()}
+                          onClick={() => void startSupportWorkspace()}
+                        >
+                          Open workspace
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </Show>
 
                 <Show when={Boolean(c().likely_misjoin)}>
                   <div class="rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950">
@@ -609,7 +794,7 @@ export default function PlatformCustomerDetailPage() {
 
                 <section class="rounded-xl border border-stroke bg-white p-4">
                   <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h2 class="text-sm font-semibold">Engagement</h2>
+                    <h2 id="engagement" class="text-sm font-semibold">Engagement</h2>
                     <A
                       href={`/app/platform-command/customers/${id()}/analytics`}
                       class="text-xs text-brand-600 hover:underline"

@@ -16,6 +16,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/supportaccess"
 )
 
 type contextKey string
@@ -56,6 +57,9 @@ type TenantUser struct {
 	PlatformRole        string
 	PlatformPermissions map[string]bool
 	PlatformOnly        bool
+	// Support remote workspace access (ghost membership).
+	SupportSessionID   int64
+	SupportAccessMode  string
 }
 
 type Claims struct {
@@ -167,6 +171,34 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 				user.ActiveBranchID = resolveActiveBranchID(r.Context(), pool, user, parseActiveBranchHeader(r))
 			}
 
+			// Support session: expire / read-only / destructive rails on every request.
+			if user.SupportSessionID > 0 {
+				chk := supportaccess.Check(r.Context(), pool, user.SupportSessionID, user.AuthUserID, r.Method, r.URL.Path)
+				if chk.Session != nil {
+					user.SupportSessionID = chk.Session.ID
+					user.SupportAccessMode = chk.Session.AccessMode
+				}
+				if chk.Expired {
+					InvalidateUser(claims.Sub)
+					response.Err(w, http.StatusUnauthorized,
+						"Support session expired. Return to Platform Command.",
+						"ERR_SUPPORT_SESSION_EXPIRED")
+					return
+				}
+				if chk.Destructive {
+					response.Err(w, http.StatusForbidden,
+						"This action is blocked during a support session.",
+						"ERR_SUPPORT_FORBIDDEN")
+					return
+				}
+				if chk.ReadOnly {
+					response.Err(w, http.StatusForbidden,
+						"Support session is read-only. Re-open with write access if needed.",
+						"ERR_SUPPORT_READ_ONLY")
+					return
+				}
+			}
+
 			ctx := context.WithValue(r.Context(), UserContextKey, user)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -250,7 +282,8 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		  coalesce(tr.can_view_crm_analytics, false),
 		  coalesce(tr.apply_user_scopes, false),
 		  t.auto_enable_all_modules,
-		  u.auth_revision
+		  u.auth_revision,
+		  coalesce(u.support_session_id, 0)
 		from public.users u
 		join public.tenants t on t.id = u.tenant_id
 		left join public.tenant_roles tr
@@ -288,6 +321,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		&applyUserScopes,
 		&tu.AutoEnableAllModules,
 		&tu.AuthRevision,
+		&tu.SupportSessionID,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {

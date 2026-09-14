@@ -188,6 +188,16 @@ export async function apiFetch<T>(
   if (body.code === "ERR_COMMERCIAL_LOCKED") {
     window.dispatchEvent(new CustomEvent("bluearm:commercial-locked", { detail: { code: body.code } }));
   }
+  if (body.code === "ERR_SUPPORT_SESSION_EXPIRED" && !options?.background) {
+    getGlobalToast()?.error(body.message || "Support session expired.");
+    window.dispatchEvent(new CustomEvent("bluearm:support-session-expired"));
+  }
+  if (body.code === "ERR_SUPPORT_READ_ONLY" && !options?.silent) {
+    getGlobalToast()?.error(body.message || "Support session is read-only.");
+  }
+  if (body.code === "ERR_SUPPORT_FORBIDDEN" && !options?.silent) {
+    getGlobalToast()?.error(body.message || "Blocked during support session.");
+  }
   if (body.success && shouldAutoSuccessToast(path, init.method, options)) {
     getGlobalToast()?.success(
       defaultSuccessMessage(init.method, body.message, options?.successMessage),
