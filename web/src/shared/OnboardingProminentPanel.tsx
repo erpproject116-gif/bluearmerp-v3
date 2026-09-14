@@ -7,6 +7,7 @@ import { useOnboarding, useSetupReadiness } from "./usePlatform";
 import { canManageWorkspaceSetup } from "./resolveAppEntryPath";
 import { resolvePrimaryNudge } from "./resolvePrimaryNudge";
 import { GETTING_STARTED_COPY, resolveGettingStarted } from "./setupProgress";
+import { useShell } from "../shell/shell-context";
 
 const MINIMIZED_KEY = "erp.onboardingPanel.minimized";
 
@@ -37,7 +38,18 @@ function saveMinimized(userId: number, tenantId: number, minimized: boolean) {
 export function OnboardingProminentPanel() {
   const loc = useLocation();
   const auth = useAuth();
+  const shell = useShell();
   const qc = useQueryClient();
+
+  // Sit in the main column (clear of the fixed sidebar) and above its z-50 stacking.
+  const panelLeft = () => {
+    if (shell.viewport.useDrawer()) return "1.25rem";
+    return `calc(${shell.sidebarWidth()} + 1.25rem)`;
+  };
+  const panelMaxWidth = () => {
+    if (shell.viewport.useDrawer()) return "min(22rem, calc(100vw - 2.5rem))";
+    return `min(22rem, calc(100vw - ${shell.sidebarWidth()} - 2.5rem))`;
+  };
   const onboarding = useOnboarding();
   const setup = useSetupReadiness();
   const [minimized, setMinimized] = createSignal(false);
@@ -183,7 +195,8 @@ export function OnboardingProminentPanel() {
   return (
     <Show when={visible() && hydrated()}>
       <div
-        class="pointer-events-none fixed bottom-5 left-5 z-40 max-w-[calc(100vw-2.5rem)]"
+        class="pointer-events-none fixed bottom-5 z-[60]"
+        style={{ left: panelLeft(), "max-width": panelMaxWidth() }}
         aria-live="polite"
       >
         <Show
@@ -203,7 +216,7 @@ export function OnboardingProminentPanel() {
             </button>
           }
         >
-          <div class="pointer-events-auto w-[min(100vw-2.5rem,22rem)] overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-2xl ring-1 ring-brand-100">
+          <div class="pointer-events-auto w-full overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-2xl ring-1 ring-brand-100">
             <div class="bg-gradient-to-br from-brand-600 to-brand-700 px-4 py-3 text-white">
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
