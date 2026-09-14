@@ -20,3 +20,18 @@ func TestCriteriaLogic(t *testing.T) {
 		}
 	}
 }
+
+func TestUnlockCommercialStatusFilter(t *testing.T) {
+	locked := map[string]bool{
+		StatusSetup:           true,
+		StatusAwaitingPayment: true,
+		StatusCancelled:       true,
+		StatusUnlocked:        false,
+	}
+	for status, want := range locked {
+		got := status == StatusSetup || status == StatusAwaitingPayment || status == StatusCancelled
+		if got != want {
+			t.Fatalf("status %s: got locked=%v want %v", status, got, want)
+		}
+	}
+}

@@ -117,17 +117,19 @@ func (s *service) confirmDay1Payment(w http.ResponseWriter, r *http.Request) {
 		confirmedBy = &uid
 	}
 
-	tenantID, err := day1commercial.ConfirmPayment(r.Context(), s.pool, id, confirmedBy, note)
+	tenantID, alreadyUnlocked, err := day1commercial.UnlockCommercial(r.Context(), s.pool, id, confirmedBy, note)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			response.Err(w, http.StatusBadRequest, "Customer is not awaiting Day 1 payment.", "ERR_BAD_REQUEST")
+			response.Err(w, http.StatusBadRequest, "Customer has no locked commercial status to unlock (or customer not found).", "ERR_BAD_REQUEST")
 			return
 		}
 		response.Err(w, http.StatusInternalServerError, "Failed to confirm payment.", "ERR_INTERNAL")
 		return
 	}
-	customerregistry.AppendCRMLeadNote(r.Context(), s.pool, id,
-		"[day1] Platform confirmed GCash Day 1 payment. Commercial unlocked.")
+	if !alreadyUnlocked {
+		customerregistry.AppendCRMLeadNote(r.Context(), s.pool, id,
+			"[day1] Platform confirmed manual payment. Commercial unlocked.")
+	}
 	_, _ = customerregistry.UpdateCustomerUrgency(r.Context(), s.pool, id, time.Now())
 	tid := tenantID
 	logPlatformAudit(r.Context(), s.pool, tu, platformAuditEntry{
@@ -135,13 +137,18 @@ func (s *service) confirmDay1Payment(w http.ResponseWriter, r *http.Request) {
 		HTTPMethod: "POST", RoutePath: r.URL.Path,
 		PlatformCustomerID: &id, TenantID: &tid,
 		TargetType: "platform_customers", TargetID: &id,
-		Summary: "Confirmed Day 1 GCash payment; commercial unlocked",
+		Summary: "Confirmed manual payment; commercial unlocked",
 	})
+	msg := "Payment confirmed. Workspace unlocked for trading."
+	if alreadyUnlocked {
+		msg = "Already unlocked for trading."
+	}
 	response.OK(w, map[string]any{
 		"customer_id":       id,
 		"tenant_id":         tenantID,
 		"commercial_status": day1commercial.StatusUnlocked,
-	}, "Payment confirmed. Workspace unlocked for trading.")
+		"already_unlocked":  alreadyUnlocked,
+	}, msg)
 }
 
 func (s *service) rejectDay1Payment(w http.ResponseWriter, r *http.Request) {

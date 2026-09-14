@@ -54,8 +54,14 @@ const actionCopy = (path: string): { ok: string; fail: string } => {
   }
   if (path.endsWith("/subscriptions")) {
     return {
-      ok: "Paid plan activated for this company.",
+      ok: "Paid plan activated — buy/sell unlocked for this company.",
       fail: "Could not activate that plan.",
+    };
+  }
+  if (path.endsWith("/confirm-day1-payment")) {
+    return {
+      ok: "Buy/sell unlocked. The QR paywall will clear after they refresh.",
+      fail: "Could not unlock buy/sell for this company.",
     };
   }
   if (path.endsWith("/extend-trial")) {
@@ -304,7 +310,38 @@ export default function PlatformCustomerDetailPage() {
                       {" "}· Workspace: <strong>{String(c().tenant_status).replace(/_/g, " ")}</strong>
                       <Show when={c().company_code}> ({String(c().company_code)})</Show>
                     </Show>
+                    {" "}· Trade:{" "}
+                    <strong
+                      classList={{
+                        "text-emerald-700": String(c().commercial_status ?? "") === "unlocked",
+                        "text-amber-800": String(c().commercial_status ?? "") !== "unlocked",
+                      }}
+                    >
+                      {String(c().commercial_status || "unlocked").replace(/_/g, " ")}
+                    </strong>
                   </p>
+                  <Show when={String(c().commercial_status ?? "unlocked") !== "unlocked" && Boolean(c().tenant_id)}>
+                    <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                      <p class="font-medium">Buy/sell still locked (QR paywall)</p>
+                      <p class="mt-1 text-xs text-amber-900/80">
+                        Day 1 list only shows <span class="font-medium">awaiting payment</span> by default. If they paid
+                        but Day 1 stock setup is incomplete, confirm here or activate a paid plan below — both unlock
+                        trading for manual checkout.
+                      </p>
+                      <button
+                        type="button"
+                        class="mt-2 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+                        disabled={busy()}
+                        onClick={() =>
+                          void act(`/api/v1/platform/console/customers/${id()}/confirm-day1-payment`, {
+                            note: "Manual payment confirmed by product owner",
+                          })
+                        }
+                      >
+                        Unlock buy/sell (payment confirmed)
+                      </button>
+                    </div>
+                  </Show>
                   <div class="mt-2 flex flex-wrap gap-1">
                     <Show when={Boolean(c().is_product_owner) || Boolean(c().is_platform_superadmin) || c().access_label}>
                       <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-900">
@@ -680,6 +717,9 @@ export default function PlatformCustomerDetailPage() {
 
                 <div>
                   <p class="mb-2 text-xs font-medium uppercase text-text-secondary">Activate paid plan</p>
+                  <p class="mb-2 text-xs text-text-secondary">
+                    Manual checkout: activating a plan also unlocks buy/sell and clears the QR paywall.
+                  </p>
                   <div class="flex flex-wrap gap-2">
                     <For each={paidPlans()}>
                       {(p) => (

@@ -14,6 +14,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/billing"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customerregistry"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/plans"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -82,14 +83,47 @@ func (s *service) createSubscription(w http.ResponseWriter, r *http.Request) {
 		response.Err(w, http.StatusInternalServerError, "Failed to create subscription.", "ERR_INTERNAL")
 		return
 	}
+
+	// Manual checkout: paid plan activation also clears the Day 1 QR / trade lock.
+	tu, _ := auth.FromContext(r.Context())
+	var confirmedBy *int64
+	if tu.AppUserID > 0 {
+		uid := tu.AppUserID
+		confirmedBy = &uid
+	} else if tu.PlatformUserID > 0 {
+		uid := tu.PlatformUserID
+		confirmedBy = &uid
+	}
+	unlockNote := strings.TrimSpace(notes)
+	if unlockNote == "" {
+		unlockNote = "Paid plan activated in Platform Command (" + plan.PlanCode + ")"
+	} else {
+		unlockNote = "Paid plan " + plan.PlanCode + ": " + unlockNote
+	}
+	_, alreadyUnlocked, unlockErr := day1commercial.UnlockCommercial(r.Context(), s.pool, customerID, confirmedBy, unlockNote)
+	if unlockErr != nil && unlockErr != pgx.ErrNoRows {
+		response.Err(w, http.StatusInternalServerError, "Subscription created but failed to unlock buy/sell.", "ERR_INTERNAL")
+		return
+	}
+	if unlockErr == nil && !alreadyUnlocked {
+		customerregistry.AppendCRMLeadNote(r.Context(), s.pool, customerID,
+			"[billing] Paid plan "+plan.PlanCode+" activated — commercial unlocked (manual checkout).")
+	}
+
 	_, _ = customerregistry.UpdateCustomerUrgency(r.Context(), s.pool, customerID, time.Now())
+	msg := "Subscription activated. Buy/sell unlocked."
+	if alreadyUnlocked {
+		msg = "Subscription activated."
+	}
 	response.OK(w, map[string]any{
-		"subscription_id": subID,
-		"plan_code":       plan.PlanCode,
-		"monthly_amount":  monthly,
-		"total_amount":    total,
-		"promo_applied":   ep.PromoActive,
-	}, "Subscription activated.")
+		"subscription_id":     subID,
+		"plan_code":           plan.PlanCode,
+		"monthly_amount":      monthly,
+		"total_amount":        total,
+		"promo_applied":       ep.PromoActive,
+		"commercial_unlocked": unlockErr == nil,
+		"already_unlocked":    alreadyUnlocked,
+	}, msg)
 }
 
 type extendTrialBody struct {

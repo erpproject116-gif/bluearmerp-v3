@@ -154,13 +154,18 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 		onboarding                                    []byte
 		createdAt                                     time.Time
 	)
+	var commercialStatus string
+	var day1CompletedAt, paymentRequestedAt, paymentConfirmedAt *time.Time
 	err = s.pool.QueryRow(r.Context(), `
 		select email, full_name, company_name, coalesce(mobile,''), entry_source, urgency_label,
 		       tenant_id, auth_user_id::text, crm_lead_id, crm_lead_tenant_id,
-		       onboarding_progress, created_at
+		       onboarding_progress, created_at,
+		       coalesce(commercial_status, 'unlocked'),
+		       day1_completed_at, payment_requested_at, payment_confirmed_at
 		from public.platform_customers where id = $1`, id).Scan(
 		&email, &fullName, &company, &mobile, &entrySource, &urgency,
-		&tenantID, &authUserID, &leadID, &leadTenantID, &onboarding, &createdAt)
+		&tenantID, &authUserID, &leadID, &leadTenantID, &onboarding, &createdAt,
+		&commercialStatus, &day1CompletedAt, &paymentRequestedAt, &paymentConfirmedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			response.Err(w, http.StatusNotFound, "Customer not found.", "ERR_NOT_FOUND")
@@ -215,7 +220,11 @@ func (s *service) getCustomer(w http.ResponseWriter, r *http.Request) {
 		"tenant_status": tenantStatus, "company_code": companyCode,
 		"crm_lead_id": leadID, "crm_lead_tenant_id": leadTenantID,
 		"onboarding_progress": json.RawMessage(onboarding), "created_at": createdAt,
-		"likely_misjoin": likelyMisjoin,
+		"likely_misjoin":       likelyMisjoin,
+		"commercial_status":    commercialStatus,
+		"day1_completed_at":    day1CompletedAt,
+		"payment_requested_at": paymentRequestedAt,
+		"payment_confirmed_at": paymentConfirmedAt,
 	}
 	for k, v := range customerAccessFlags(email, companyCode) {
 		cust[k] = v

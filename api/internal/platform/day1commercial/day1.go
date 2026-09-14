@@ -219,23 +219,49 @@ func EvaluateAndTransition(ctx context.Context, pool *pgxpool.Pool, tenantID int
 	return StatusAwaitingPayment, true, nil
 }
 
-// ConfirmPayment unlocks trading after platform owner confirms payment.
-func ConfirmPayment(ctx context.Context, pool *pgxpool.Pool, customerID int64, confirmedByUserID *int64, note string) (tenantID int64, err error) {
+// UnlockCommercial clears the Day 1 / GCash trade lock from any locked status.
+// Used for manual checkout: confirm Day 1 payment, or activate a paid subscription in Platform Command.
+// Idempotent when already unlocked (returns tenant id, alreadyUnlocked=true, err=nil).
+func UnlockCommercial(ctx context.Context, pool *pgxpool.Pool, customerID int64, confirmedByUserID *int64, note string) (tenantID int64, alreadyUnlocked bool, err error) {
+	var status string
+	err = pool.QueryRow(ctx, `
+		select coalesce(tenant_id, 0), coalesce(commercial_status, 'unlocked')
+		from public.platform_customers where id = $1`, customerID).Scan(&tenantID, &status)
+	if err != nil {
+		return 0, false, err
+	}
+	if status == StatusUnlocked {
+		InvalidateTenant(tenantID)
+		return tenantID, true, nil
+	}
+	if status != StatusSetup && status != StatusAwaitingPayment && status != StatusCancelled {
+		return tenantID, false, pgx.ErrNoRows
+	}
+
 	err = pool.QueryRow(ctx, `
 		update public.platform_customers
 		set commercial_status = $2,
 		    payment_confirmed_at = now(),
 		    payment_confirmed_by_user_id = $3,
 		    payment_note = nullif($4, ''),
+		    day1_completed_at = coalesce(day1_completed_at, now()),
+		    payment_requested_at = coalesce(payment_requested_at, now()),
 		    updated_at = now()
-		where id = $1 and commercial_status = $5
-		returning tenant_id`,
-		customerID, StatusUnlocked, confirmedByUserID, note, StatusAwaitingPayment).Scan(&tenantID)
+		where id = $1 and commercial_status in ($5, $6, $7)
+		returning coalesce(tenant_id, 0)`,
+		customerID, StatusUnlocked, confirmedByUserID, note,
+		StatusSetup, StatusAwaitingPayment, StatusCancelled).Scan(&tenantID)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	InvalidateTenant(tenantID)
-	return tenantID, nil
+	return tenantID, false, nil
+}
+
+// ConfirmPayment unlocks trading after platform owner confirms payment (any locked status).
+func ConfirmPayment(ctx context.Context, pool *pgxpool.Pool, customerID int64, confirmedByUserID *int64, note string) (tenantID int64, err error) {
+	tenantID, _, err = UnlockCommercial(ctx, pool, customerID, confirmedByUserID, note)
+	return tenantID, err
 }
 
 // RejectPayment marks commercial cancelled (does not wipe tenant).
