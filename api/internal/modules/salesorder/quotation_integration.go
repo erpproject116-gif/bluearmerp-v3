@@ -56,8 +56,10 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 
 		// Load Slip lists every open quotation residual by default (no partner/date).
 		// Free-text lines still need an inventory item_id for conversion.
+		// Progress may be unconfirmed, in_progress, or completed — no status gate.
 		where := `q.tenant_id = $1 and q.deleted_at is null
 			and ln.item_id is not null
+			and q.progress_status in ('unconfirmed', 'in_progress', 'completed')
 			and (ln.qty - coalesce(slip.qty_fulfilled, 0)) > 0.0001`
 		args := []any{tu.TenantID}
 		argN := 2
@@ -161,12 +163,13 @@ func quotationLineBalance(ctx context.Context, tx pgx.Tx, tenantID, quotationLin
 func validateQuotationConversion(ctx context.Context, pool *pgxpool.Pool, tenantID int64, lines []computedLine) map[string]string {
 	errs := map[string]string{}
 	for i, ln := range lines {
-		if ln.SourceQuotationLineID == nil {
+		if ln.SourceQuotationLineID == nil || *ln.SourceQuotationLineID <= 0 {
 			continue
 		}
 		var balance float64
+		var progressStatus string
 		err := pool.QueryRow(ctx, `
-			select (ln.qty - coalesce(slip.fulfilled, 0))::float8
+			select (ln.qty - coalesce(slip.fulfilled, 0))::float8, q.progress_status
 			from public.quo_quotation_lines ln
 			join public.quo_quotations q on q.id = ln.quotation_id
 			left join (
@@ -175,11 +178,18 @@ func validateQuotationConversion(ctx context.Context, pool *pgxpool.Pool, tenant
 			  group by quotation_line_id
 			) slip on slip.quotation_line_id = ln.id
 			where ln.id = $1 and q.tenant_id = $2 and q.deleted_at is null`,
-			*ln.SourceQuotationLineID, tenantID).Scan(&balance)
+			*ln.SourceQuotationLineID, tenantID).Scan(&balance, &progressStatus)
 		if err != nil {
-			errs[fmt.Sprintf("lines[%d].source_quotation_line_id", i)] = "Quotation line not found."
+			if errors.Is(err, pgx.ErrNoRows) {
+				errs[fmt.Sprintf("lines[%d].source_quotation_line_id", i)] =
+					"Quotation line was not found. Use Load Slip again and pick open quotation lines (any progress status is allowed)."
+			} else {
+				errs[fmt.Sprintf("lines[%d].source_quotation_line_id", i)] =
+					"Could not verify quotation line. Try Load Slip again."
+			}
 			continue
 		}
+		_ = progressStatus // unconfirmed / in_progress / completed are all convertible
 		if ln.Qty > balance+0.0001 {
 			errs[fmt.Sprintf("lines[%d].qty", i)] = fmt.Sprintf("Exceeds quotation balance (%.4f available).", balance)
 		}

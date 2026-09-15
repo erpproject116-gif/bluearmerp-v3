@@ -12,6 +12,8 @@ export type PolicyActionHint = {
 const FIELD_HINTS: Record<string, PolicyActionHint> = {
   // Do not map bare "lines" — many docs use that key for line-item errors that are not SO-related.
   source_quotation_id: { href: "/app/quotation/quotations", label: "Open Quotations" },
+  source_quotation_line_id: { href: "/app/sales-order/sales-orders", label: "Load Slip from Quotation" },
+  "lines[0].source_quotation_line_id": { href: "/app/sales-order/sales-orders", label: "Load Slip from Quotation" },
   purchase_request_id: { href: "/app/purchase-request/purchase-requests", label: "Open Purchase Requests" },
   goods_receipt_line_id: { href: "/app/purchase-order/goods-receipt", label: "Open Purchase Receive" },
   sales_order_id: { href: "/app/dashboard/approvals", label: "Open Approvals" },
@@ -21,6 +23,7 @@ const FIELD_HINTS: Record<string, PolicyActionHint> = {
   source_sales_order_id: { href: "/app/sales-order/sales-orders", label: "Pick items on Sales Order" },
   source_sales_order_line_id: { href: "/app/sales-order/sales-orders", label: "Pick items on Sales Order" },
   progress_status: { href: "/app/sales-order/sales-orders", label: "Complete the Sales Order" },
+  conversion: { href: "/app/sales-order/sales-orders", label: "Load Slip from Quotation" },
 };
 
 const MESSAGE_HINTS: Array<{ match: RegExp; hint: PolicyActionHint }> = [
@@ -58,9 +61,12 @@ export function resolvePolicyActionHint(errors?: Record<string, string> | null):
   if (!errors) return null;
   for (const key of Object.keys(errors)) {
     if (FIELD_HINTS[key]) return FIELD_HINTS[key];
+    if (/source_quotation_line_id/i.test(key)) return FIELD_HINTS.source_quotation_line_id;
   }
   for (const msg of Object.values(errors)) {
     if (!msg) continue;
+    // Prefer Load Slip recovery over generic "Open Quotations" for line-link failures.
+    if (/quotation line/i.test(msg)) return FIELD_HINTS.source_quotation_line_id;
     for (const row of MESSAGE_HINTS) {
       if (row.match.test(msg)) return row.hint;
     }

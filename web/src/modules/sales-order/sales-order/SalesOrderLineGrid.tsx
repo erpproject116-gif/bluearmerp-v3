@@ -309,6 +309,7 @@ export function SalesOrderLineGrid(props: Props) {
       track_serial: Boolean(first.track_serial),
       serial_policy: first.serial_policy ?? "required",
       planned_serial_nos: [],
+      source_quotation_line_id: null,
     };
     for (let i = 1; i < items.length; i++) {
       const it = items[i];

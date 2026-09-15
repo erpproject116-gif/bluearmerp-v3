@@ -46,16 +46,16 @@ export const recoveryHintFromError = (fieldError: string): string => {
 
   if (!t) return NOTIFICATION_FALLBACK_HOW_TO_FIX;
 
-  if (/pick list|release/i.test(t)) {
-
-    return "Open the sales order, use Pick List to release qty and scan the serial, then Load Slip on this sale.";
-
+  if (/quotation line/i.test(t)) {
+    return "Open Load Slip on the sales order, pick the open quotation lines again (Unconfirmed quotes are allowed), then save.";
   }
 
-  if (/completed|progress/i.test(t)) {
+  if (/pick list|release/i.test(t)) {
+    return "Open the sales order, use Pick List to release qty and scan the serial, then Load Slip on this sale.";
+  }
 
+  if (/set.*progress.*completed|progress.*must be completed|not ready to invoice/i.test(t)) {
     return "Set the sales order progress to Completed, then try again.";
-
   }
 
   if (/confirm.*purchase|unconfirmed/i.test(t)) {

@@ -109,7 +109,15 @@ export function QuotationLinePickerModal(props: Props) {
     const list = data()?.rows ?? [];
     const picked = list
       .filter((r) => selected().has(r.quotation_line_id))
-      .map((r) => ({ ...r, source_quotation_line_id: r.quotation_line_id }));
+      .map((r) => {
+        const lineId = Number(r.quotation_line_id);
+        return {
+          ...r,
+          quotation_line_id: lineId,
+          source_quotation_line_id: lineId,
+        };
+      })
+      .filter((r) => r.source_quotation_line_id > 0);
     if (picked.length === 0) return;
     props.onConfirm(picked);
     props.onClose();

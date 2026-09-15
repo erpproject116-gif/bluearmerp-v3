@@ -638,7 +638,7 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Load Slip â†’ Save: copy quotation attachments (header and/or lines).
+		// Load Slip → Save: copy quotation attachments (header and/or lines).
 		quoIDs := map[int64]struct{}{}
 		if body.SourceQuotationID != nil && *body.SourceQuotationID > 0 {
 			quoIDs[*body.SourceQuotationID] = struct{}{}
@@ -654,8 +654,10 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				quoIDs[qid] = struct{}{}
 			}
 		}
+		copiedAtt := 0
+		copiedMsg := ""
 		for qid := range quoIDs {
-			_, _ = attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
+			n, err := attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
 				SrcBaseDir: attachmentx.Dir("quotation"),
 				DstBaseDir: attachmentx.Dir("sales_order"),
 				SrcTable:   "public.quo_quotation_attachments",
@@ -666,11 +668,22 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				DstID:      id,
 				TenantID:   tu.TenantID,
 			})
+			if err != nil && copiedMsg == "" {
+				copiedMsg = " (quotation attachments could not be copied fully)"
+			} else if n > 0 {
+				copiedAtt += n
+			}
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.create", "so_sales_order", &id, nil, body)
 		so, _ := loadSalesOrder(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, so, "Created.")
+		msg := "Created."
+		if copiedAtt > 0 {
+			msg = fmt.Sprintf("Created. Copied %d quotation attachment(s).", copiedAtt)
+		} else if copiedMsg != "" {
+			msg = "Created." + copiedMsg
+		}
+		response.OK(w, so, msg)
 	}
 }
 

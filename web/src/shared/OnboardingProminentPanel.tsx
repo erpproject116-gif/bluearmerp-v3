@@ -66,6 +66,9 @@ export function OnboardingProminentPanel() {
   const showPlaybook = () => onboarding.data?.show_playbook ?? false;
   const foundationIncomplete = () => setup.data && !setup.data.required_complete;
 
+  const setupSnoozedToBreadcrumb = () =>
+    Boolean(setup.data && !setup.data.show_setup_banner && setup.data.show_breadcrumb_hint);
+
   const visible = () => {
     if (!me() || !loc.pathname.startsWith("/app") || onOnboardingRoute()) return false;
     const nudge = resolvePrimaryNudge({
@@ -77,6 +80,8 @@ export function OnboardingProminentPanel() {
     if (nudge === "playbook") return true;
     if (nudge === "setup" && showSetupChecklist() && canManage()) {
       if (loc.pathname.startsWith("/app/dashboard")) return false;
+      // After "Remind me later", only the breadcrumb "Setup incomplete · Resume setup" remains.
+      if (setupSnoozedToBreadcrumb()) return false;
       return true;
     }
     return false;
@@ -189,7 +194,12 @@ export function OnboardingProminentPanel() {
     }
     await qc.invalidateQueries({ queryKey: ["setup-readiness"] });
     await qc.invalidateQueries({ queryKey: ["onboarding"] });
-    minimize();
+    // Do not show the minimized floating pill — breadcrumb Resume setup is enough.
+    const m = me();
+    if (m) {
+      setMinimized(true);
+      saveMinimized(m.user.id, m.tenant.id, true);
+    }
   };
 
   return (

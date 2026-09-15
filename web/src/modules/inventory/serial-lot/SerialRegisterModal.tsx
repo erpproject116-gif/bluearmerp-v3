@@ -84,29 +84,33 @@ export function SerialRegisterModal(props: Props) {
       return;
     }
     setSaving(true);
-    const ok = await submitEntity(
-      () =>
-        apiFetch<SerialUnitRow>("/api/v1/inventory/serial-units/register", {
-          method: "POST",
-          body: JSON.stringify({
-            register_date: registerDate(),
-            slip_type: slipType(),
-            location_id: locationId(),
-            item_id: itemId(),
-            qty: qtyNum,
-            serial_no: serialNo().trim(),
-            remark: remark().trim(),
-            project_id: projectId() ?? undefined,
-          }),
-        }, { silent: true }),
-      toast,
-      "Serial registered.",
-    );
-    setSaving(false);
-    if (!ok) return;
-    reset();
-    props.onSaved();
-    props.onClose();
+    try {
+      const ok = await submitEntity(
+        () =>
+          apiFetch<SerialUnitRow>("/api/v1/inventory/serial-units/register", {
+            method: "POST",
+            body: JSON.stringify({
+              register_date: registerDate(),
+              slip_type: slipType(),
+              location_id: locationId(),
+              item_id: itemId(),
+              qty: qtyNum,
+              serial_no: serialNo().trim(),
+              remark: remark().trim(),
+              project_id: projectId() ?? undefined,
+            }),
+          }, { silent: true }),
+        toast,
+        "Serial registered.",
+      );
+      if (!ok) return;
+      // Close first so a list refresh cannot leave the dialog stuck open.
+      reset();
+      props.onClose();
+      props.onSaved();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

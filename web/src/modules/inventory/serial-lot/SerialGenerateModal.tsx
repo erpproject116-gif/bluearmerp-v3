@@ -94,28 +94,35 @@ export function SerialGenerateModal(props: Props) {
       return;
     }
     setSaving(true);
-    const res = await apiFetch<{ serials: Generated[]; count: number }>("/api/v1/inventory/serial-units/generate", {
-      method: "POST",
-      body: JSON.stringify({
-        register_date: registerDate(),
-        slip_type: DEFAULT_SERIAL_SLIP_TYPE,
-        location_id: locationId(),
-        item_id: itemId(),
-        qty: qtyNum,
-        prefix: normalizePrefix(prefix()),
-        remark: remark().trim(),
-      }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const fieldErr = res.errors ? Object.values(res.errors)[0] : undefined;
-      toast.error(fieldErr || res.message || "Failed to generate serials.");
-      return;
+    try {
+      const res = await apiFetch<{ serials: Generated[]; count: number }>(
+        "/api/v1/inventory/serial-units/generate",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            register_date: registerDate(),
+            slip_type: DEFAULT_SERIAL_SLIP_TYPE,
+            location_id: locationId(),
+            item_id: itemId(),
+            qty: qtyNum,
+            prefix: normalizePrefix(prefix()),
+            remark: remark().trim(),
+          }),
+        },
+        { silent: true },
+      );
+      if (!res.success) {
+        const fieldErr = res.errors ? Object.values(res.errors)[0] : undefined;
+        toast.error(fieldErr || res.message || "Failed to generate serials.");
+        return;
+      }
+      const serials = res.data?.serials ?? [];
+      setLastGenerated(serials);
+      toast.success(`Generated ${serials.length} unique serial number(s).`);
+      props.onGenerated(serials);
+    } finally {
+      setSaving(false);
     }
-    const serials = res.data?.serials ?? [];
-    setLastGenerated(serials);
-    toast.success(`Generated ${serials.length} unique serial number(s).`);
-    props.onGenerated(serials);
   };
 
   const printLabels = () => {

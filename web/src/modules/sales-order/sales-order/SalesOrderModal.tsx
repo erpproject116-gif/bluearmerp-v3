@@ -455,7 +455,7 @@ export function SalesOrderModal(props: Props) {
       unit_code: row.unit_code ?? "",
       unit_price: String(row.unit_vat_inc),
       remark: row.remark ?? "",
-      source_quotation_line_id: row.source_quotation_line_id,
+      source_quotation_line_id: Number(row.quotation_line_id || row.source_quotation_line_id) || null,
     }));
     if (meta && first.tax_type_id) {
       const recalc = await recalculateSalesOrderLines(newLines, first.tax_type_id, meta);
@@ -568,23 +568,26 @@ export function SalesOrderModal(props: Props) {
       delivery_remarks: deliveryRemarks() || null,
       notes: notes() || null,
       progress_status: status,
-      source_quotation_id: sourceQuotationId(),
-      lines: lines().map((ln, i) => ({
-        id: ln.id || null,
-        line_no: i + 1,
-        item_id: ln.item_id || null,
-        item_code: ln.item_code,
-        item_name: ln.item_name,
-        description: ln.description || null,
-        qty: ln.qty === "" ? 0 : Number(ln.qty),
-        unit_id: ln.unit_id || null,
-        unit_code: ln.unit_code || null,
-        unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
-        input_basis: ln.input_basis,
-        remark: ln.remark || null,
-        source_quotation_line_id: ln.source_quotation_line_id || null,
-        planned_serial_nos: ln.planned_serial_nos ?? [],
-      })),
+      source_quotation_id: sourceQuotationId() && sourceQuotationId()! > 0 ? sourceQuotationId() : null,
+      lines: lines().map((ln, i) => {
+        const srcLine = Number(ln.source_quotation_line_id);
+        return {
+          id: ln.id || null,
+          line_no: i + 1,
+          item_id: ln.item_id || null,
+          item_code: ln.item_code,
+          item_name: ln.item_name,
+          description: ln.description || null,
+          qty: ln.qty === "" ? 0 : Number(ln.qty),
+          unit_id: ln.unit_id || null,
+          unit_code: ln.unit_code || null,
+          unit_price: ln.unit_price === "" ? 0 : Number(ln.unit_price),
+          input_basis: ln.input_basis,
+          remark: ln.remark || null,
+          source_quotation_line_id: Number.isFinite(srcLine) && srcLine > 0 ? srcLine : null,
+          planned_serial_nos: ln.planned_serial_nos ?? [],
+        };
+      }),
     };
 
     setSaving(true);
@@ -605,7 +608,12 @@ export function SalesOrderModal(props: Props) {
       });
       return;
     }
-    toast.success(props.editing ? "Sales order updated." : "Sales order created.");
+    toast.success(
+      res.message?.trim() ||
+        (props.editing
+          ? "Sales order updated."
+          : "Sales order created."),
+    );
     await draft.clearOnSave();
     props.onSaved();
     props.onClose();
