@@ -317,6 +317,10 @@ func recordRetainerPayment(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to link official receipt.", "ERR_INTERNAL")
 			return
 		}
+		if err := postRetainerFundJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+			response.Err(w, http.StatusBadRequest, "Retainer journal failed: "+err.Error(), "ERR_BAD_REQUEST")
+			return
+		}
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to commit.", "ERR_INTERNAL")
 			return
@@ -416,6 +420,16 @@ func applyRetainer(pool *pgxpool.Pool) http.HandlerFunc {
 			where id = $1 and tenant_id = $2`, id, tu.TenantID, newRem, newStatus)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update retainer.", "ERR_INTERNAL")
+			return
+		}
+		var partnerID *int64
+		var salesNo string
+		_ = tx.QueryRow(r.Context(), `
+			select partner_id from public.fin_retainer_invoices where id = $1`, id).Scan(&partnerID)
+		_ = tx.QueryRow(r.Context(), `
+			select sales_no from public.sa_sales where id = $1`, body.SalesID).Scan(&salesNo)
+		if err := postRetainerApplyJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, id, partnerID, body.AppliedAmount, salesNo); err != nil {
+			response.Err(w, http.StatusBadRequest, "Retainer apply journal failed: "+err.Error(), "ERR_BAD_REQUEST")
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {

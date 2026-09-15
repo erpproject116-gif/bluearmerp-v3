@@ -12,6 +12,9 @@ import {
 
 export type ApplyAppLine = {
   doc_id: number;
+  doc_type?: string;
+  expense_id?: number;
+  supplier_invoice_id?: number;
   applied_amount: number;
   discount_amount?: number;
   label: string;
@@ -189,11 +192,25 @@ export function PaymentApplyJournalModal(props: Props) {
             reference_no: ref,
             notes,
             allow_multi_partner: props.allowMultiPartner,
-            applications: props.lines.map((l) => ({
-              supplier_invoice_id: l.doc_id,
-              applied_amount: l.applied_amount,
-              discount_amount: l.discount_amount ?? 0,
-            })),
+            applications: props.lines.map((l) => {
+              const isExpense = l.doc_type === "expense" || (l.expense_id ?? 0) > 0;
+              if (isExpense) {
+                return {
+                  doc_type: "expense",
+                  expense_id: l.expense_id ?? l.doc_id,
+                  doc_id: l.expense_id ?? l.doc_id,
+                  applied_amount: l.applied_amount,
+                  discount_amount: l.discount_amount ?? 0,
+                };
+              }
+              return {
+                doc_type: "supplier_invoice",
+                supplier_invoice_id: l.supplier_invoice_id ?? l.doc_id,
+                doc_id: l.supplier_invoice_id ?? l.doc_id,
+                applied_amount: l.applied_amount,
+                discount_amount: l.discount_amount ?? 0,
+              };
+            }),
           }),
         },
         { silent: true },

@@ -93,6 +93,7 @@ func listCustomerCreditBalance(pool *pgxpool.Pool) http.HandlerFunc {
 			        from public.fin_retainer_invoices ri
 			        where ri.tenant_id = p.tenant_id and ri.partner_id = p.id and ri.deleted_at is null
 			          and ri.status in ('open', 'applied') and ri.remaining_amount > 0
+			          and ri.official_receipt_id is not null
 			      ), 0)
 			    )::float8 as credit_on_account
 			  ) coa on true

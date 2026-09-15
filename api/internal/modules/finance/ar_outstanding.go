@@ -108,7 +108,8 @@ func partnerOpenCreditOnAccount(ctx context.Context, q Querier, tenantID, partne
 		select coalesce(sum(remaining_amount), 0)::float8
 		from public.fin_retainer_invoices
 		where tenant_id = $1 and partner_id = $2 and deleted_at is null
-		  and status in ('open', 'applied') and remaining_amount > 0`,
+		  and status in ('open', 'applied') and remaining_amount > 0
+		  and official_receipt_id is not null`,
 		tenantID, partnerID).Scan(&retainer)
 	if err != nil {
 		return 0, err

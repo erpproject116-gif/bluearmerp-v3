@@ -58,20 +58,49 @@ func arApStatusSQL(tenantID int64, asOf time.Time, statusType string, partnerID 
 	}
 	q := fmt.Sprintf(`
 		with ar as (
-		  select s.partner_id,
-		    coalesce(sum(s.grand_total), 0)::float8 - coalesce(sum(recv.received), 0)::float8 as balance
-		  from public.sa_sales s
-		  ` + saleAppliedLateralSQLAsOf("s", "$2::date") + `
-		  where s.tenant_id = $1 and s.deleted_at is null and s.order_date <= $2::date
-		  group by s.partner_id
+		  select partner_id, sum(balance)::float8 as balance
+		  from (
+		    select s.partner_id,
+		      (s.grand_total - coalesce(recv.received, 0))::float8 as balance
+		    from public.sa_sales s
+		    ` + saleAppliedLateralSQLAsOf("s", "$2::date") + `
+		    where s.tenant_id = $1 and s.deleted_at is null and s.order_date <= $2::date
+		      and s.progress_status = 'completed'
+		    union all
+		    select cn.partner_id, -cn.remaining_amount::float8
+		    from public.fin_credit_notes cn
+		    where cn.tenant_id = $1 and cn.deleted_at is null
+		      and cn.status in ('open', 'applied')
+		      and cn.remaining_amount > 0.0001
+		      and cn.credit_date <= $2::date
+		      and cn.partner_id is not null
+		    union all
+		    select ri.partner_id, -ri.remaining_amount::float8
+		    from public.fin_retainer_invoices ri
+		    where ri.tenant_id = $1 and ri.deleted_at is null
+		      and ri.status in ('open', 'applied')
+		      and ri.remaining_amount > 0.0001
+		      and ri.official_receipt_id is not null
+		      and ri.retainer_date <= $2::date
+		      and ri.partner_id is not null
+		  ) ar_rows
+		  group by partner_id
 		),
 		ap as (
-		  select si.partner_id,
-		    coalesce(sum(si.grand_total), 0)::float8 - coalesce(sum(paid.paid), 0)::float8 as balance
-		  from public.fin_supplier_invoices si
-		  ` + supplierInvoiceAppliedLateralSQLAsOf("si", "$2::date") + `
-		  where si.tenant_id = $1 and si.deleted_at is null and si.invoice_date <= $2::date
-		  group by si.partner_id
+		  select partner_id, sum(balance)::float8 as balance
+		  from (
+		    select si.partner_id,
+		      (si.grand_total - coalesce(paid.paid, 0))::float8 as balance
+		    from public.fin_supplier_invoices si
+		    ` + supplierInvoiceAppliedLateralSQLAsOf("si", "$2::date") + `
+		    where si.tenant_id = $1 and si.deleted_at is null and si.invoice_date <= $2::date
+		    union all
+		    select e.partner_id, (e.amount + e.tax_amount)::float8
+		    from public.fin_expenses e
+		    where e.tenant_id = $1 and e.deleted_at is null and e.payment_status = 'unpaid'
+		      and e.partner_id is not null and e.expense_date <= $2::date
+		  ) ap_rows
+		  group by partner_id
 		)
 		select p.id as partner_id, p.company_name as partner_name, p.partner_kind,
 		  coalesce(ar.balance, 0)::float8 as ar_balance,

@@ -351,6 +351,11 @@ func generateRecurringExpenseInTx(ctx context.Context, tx pgx.Tx, tenantID, user
 	if err != nil {
 		return 0, "", "", false, err
 	}
+	if partnerID != nil && *partnerID > 0 {
+		if err := postExpenseAccrualJournal(ctx, tx, tenantID, userID, expenseID); err != nil {
+			return 0, "", "", false, err
+		}
+	}
 
 	baseDue := expenseDate
 	if nextDueStr != nil && strings.TrimSpace(*nextDueStr) != "" {

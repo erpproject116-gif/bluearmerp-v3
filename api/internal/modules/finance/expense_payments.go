@@ -16,9 +16,10 @@ type expensePayOpts struct {
 	PaymentMethod string
 	BankAccountID *int64
 	ReferenceNo   *string
+	PaymentDate   *time.Time
 }
 
-func buildExpensePaymentPostingEvent(tenantID, paymentID, partnerID int64, amountTotal float64, paymentMethod, expenseAccountCode string) ledger.PostingEvent {
+func buildExpensePaymentPostingEvent(tenantID, paymentID, partnerID int64, amountTotal float64, paymentMethod, payableAccountCode string) ledger.PostingEvent {
 	creditAcct := "1020"
 	switch strings.TrimSpace(paymentMethod) {
 	case "bank_transfer":
@@ -26,9 +27,9 @@ func buildExpensePaymentPostingEvent(tenantID, paymentID, partnerID int64, amoun
 	case "check":
 		creditAcct = "1029"
 	}
-	debitAcct := strings.TrimSpace(expenseAccountCode)
+	debitAcct := strings.TrimSpace(payableAccountCode)
 	if debitAcct == "" {
-		debitAcct = "5010"
+		debitAcct = "2010"
 	}
 	partner := partnerID
 	return ledger.PostingEvent{
@@ -40,6 +41,20 @@ func buildExpensePaymentPostingEvent(tenantID, paymentID, partnerID int64, amoun
 			{AccountCode: creditAcct, Credit: amountTotal, PartyID: &partner},
 		},
 	}
+}
+
+func resolvePayableAccountCode(ctx context.Context, tx pgx.Tx, tenantID int64) string {
+	accountID, err := financedefaults.ResolveByRole(ctx, tx, tenantID, financedefaults.RolePayable)
+	if err != nil {
+		return "2010"
+	}
+	var code string
+	if err := tx.QueryRow(ctx, `
+		select account_code from public.fin_accounts
+		where id = $1 and tenant_id = $2 and deleted_at is null`, accountID, tenantID).Scan(&code); err != nil || strings.TrimSpace(code) == "" {
+		return "2010"
+	}
+	return code
 }
 
 func resolveExpenseAccountCode(ctx context.Context, tx pgx.Tx, tenantID int64) (string, error) {
@@ -147,6 +162,9 @@ func payExpenseInTx(ctx context.Context, tx pgx.Tx, tenantID, userID, expenseID 
 	}
 
 	paymentDate := expenseDate
+	if opts.PaymentDate != nil && !opts.PaymentDate.IsZero() {
+		paymentDate = *opts.PaymentDate
+	}
 	if paymentDate.IsZero() {
 		paymentDate = time.Now()
 	}
@@ -201,7 +219,9 @@ func payExpenseInTx(ctx context.Context, tx pgx.Tx, tenantID, userID, expenseID 
 	}
 
 	expenseAcct, _ := resolveExpenseAccountCode(ctx, tx, tenantID)
-	ev := withEntryDate(buildExpensePaymentPostingEvent(tenantID, newPVID, *partnerID, total, pm, expenseAcct), paymentDate)
+	_ = expenseAcct // accrual already posted expense; payment settles A/P
+	payableCode := resolvePayableAccountCode(ctx, tx, tenantID)
+	ev := withEntryDate(buildExpensePaymentPostingEvent(tenantID, newPVID, *partnerID, total, pm, payableCode), paymentDate)
 	if _, err := postWithJournalPoster(ctx, tx, tenantID, ev); err != nil {
 		return 0, err
 	}

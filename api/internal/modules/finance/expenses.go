@@ -187,6 +187,10 @@ func createExpense(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var paymentVoucherID *int64
 		if payNow {
+			if err := postExpenseAccrualJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.Err(w, http.StatusBadRequest, "Expense journal failed: "+err.Error(), "ERR_BAD_REQUEST")
+				return
+			}
 			pvID, payErr := payExpenseInTx(r.Context(), tx, tu.TenantID, tu.AppUserID, id, expensePayOpts{
 				PaymentMethod: body.PaymentMethod,
 				BankAccountID: body.BankAccountID,
@@ -197,6 +201,11 @@ func createExpense(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			paymentVoucherID = &pvID
+		} else if body.PartnerID != nil && *body.PartnerID > 0 {
+			if err := postExpenseAccrualJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.Err(w, http.StatusBadRequest, "Expense journal failed: "+err.Error(), "ERR_BAD_REQUEST")
+				return
+			}
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
@@ -242,7 +251,14 @@ func updateExpense(pool *pgxpool.Pool) http.HandlerFunc {
 		if category == "" {
 			category = "general"
 		}
-		tag, err := pool.Exec(r.Context(), `
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update expense.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		tag, err := tx.Exec(r.Context(), `
 			update public.fin_expenses set
 			  partner_id = $1, vendor_name = $2, category = $3, description = $4,
 			  amount = $5, tax_amount = $6, reference = $7, notes = $8, updated_at = now()
@@ -251,6 +267,16 @@ func updateExpense(pool *pgxpool.Pool) http.HandlerFunc {
 			body.Amount, body.TaxAmount, body.Reference, body.Notes, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusInternalServerError, "Failed to update expense.", "ERR_INTERNAL")
+			return
+		}
+		if body.PartnerID != nil && *body.PartnerID > 0 {
+			if err := postExpenseAccrualJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.Err(w, http.StatusBadRequest, "Expense journal failed: "+err.Error(), "ERR_BAD_REQUEST")
+				return
+			}
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save expense.", "ERR_INTERNAL")
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.expense_update", "fin_expense", &id, nil, nil)
@@ -295,6 +321,11 @@ func markExpensePaid(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if v := validateExpenseAmountApproval(r.Context(), tx, tu, id, amount); v != nil {
 			response.Validation(w, v)
+			return
+		}
+
+		if err := postExpenseAccrualJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+			response.Err(w, http.StatusBadRequest, "Expense journal failed: "+err.Error(), "ERR_BAD_REQUEST")
 			return
 		}
 

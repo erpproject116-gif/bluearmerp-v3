@@ -166,12 +166,7 @@ func loadBooksHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64, as
 	_ = pool.QueryRow(ctx, `
 		select count(*)
 		from public.fin_supplier_invoices si
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as paid
-		  from public.fin_payment_applications a
-		  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		  where a.supplier_invoice_id = si.id and pv.deleted_at is null
-		) paid on true
+		`+supplierInvoiceAppliedLateralSQLAsOf("si", "")+`
 		where si.tenant_id = $1
 		  and si.deleted_at is null
 		  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001`, tenantID).Scan(&out.UnpaidSupplierInvoices)

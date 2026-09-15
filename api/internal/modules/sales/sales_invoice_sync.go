@@ -12,6 +12,13 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 )
 
+// SyncSalesInvoiceJournalFromDefaultsTx creates/refreshes the sales A/R journal when
+// Chart of Accounts defaults (Sales + Receivable) are mapped. Soft-skips when defaults
+// are missing or a journal already exists. Auto-post follows accounts_auto_post_sales.
+func SyncSalesInvoiceJournalFromDefaultsTx(ctx context.Context, tx pgx.Tx, tenantID, userID, salesID int64) error {
+	return syncSalesInvoiceJournalFromDefaultsTx(ctx, tx, tenantID, userID, salesID)
+}
+
 // syncSalesInvoiceJournalFromDefaultsTx creates/refreshes the sales A/R journal when
 // Chart of Accounts defaults (Sales + Receivable) are mapped. Soft-skips when defaults
 // are missing or a journal already exists. Auto-post follows accounts_auto_post_sales.

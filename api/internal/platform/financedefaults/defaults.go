@@ -29,6 +29,7 @@ const (
 	RoleInventory                 Role = "inventory"
 	RoleGRNI                      Role = "grni"
 	RoleCOGS                      Role = "cogs"
+	RoleCustomerAdvance           Role = "customer_advance"
 )
 
 // Defaults holds tenant finance default account ids.
@@ -79,6 +80,7 @@ var fallbackCodes = map[Role]string{
 	RoleInventory:              "1469",
 	RoleGRNI:                   "2519",
 	RoleCOGS:                   "310",
+	RoleCustomerAdvance:        "2639",
 }
 
 var phCodes = map[Role]string{
@@ -98,6 +100,7 @@ var phCodes = map[Role]string{
 	RoleInventory:              "1200",
 	RoleGRNI:                   "2115",
 	RoleCOGS:                   "5010",
+	RoleCustomerAdvance:        "2639",
 }
 
 func roleID(d Defaults, role Role) *int64 {

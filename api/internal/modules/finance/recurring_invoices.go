@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -586,7 +587,7 @@ func executeRecurringGenerate(ctx context.Context, tx pgx.Tx, tenantID int64, us
 		insert into public.sa_sales (
 		  tenant_id, order_date, date_seq, sales_no, tax_type_id, currency_id, partner_id,
 		  location_id, notes, progress_status, subtotal, tax_total, grand_total, created_by_user_id
-		) values ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, 'unconfirmed', $10, 0, $10, $11)
+		) values ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, 0, $10, $11)
 		returning id`,
 		tenantID, orderDate.Format("2006-01-02"), dateSeq, salesNo, taxTypeID, currencyID, *partnerID,
 		locationID, fmt.Sprintf("Generated from recurring invoice: %s", name), amount, userID,
@@ -637,6 +638,14 @@ func executeRecurringGenerate(ctx context.Context, tx pgx.Tx, tenantID int64, us
 		if err != nil {
 			return result, fmt.Errorf("failed to create sales line: %w", err)
 		}
+	}
+
+	uid := int64(0)
+	if userID != nil {
+		uid = *userID
+	}
+	if err := sales.SyncSalesInvoiceJournalFromDefaultsTx(ctx, tx, tenantID, uid, salesID); err != nil {
+		return result, fmt.Errorf("sales invoice journal: %w", err)
 	}
 
 	nextRun, _ := time.Parse("2006-01-02", nextRunStr)

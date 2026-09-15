@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
@@ -39,7 +40,9 @@ type OpenReceivable struct {
 
 // OpenPayable is an open AP document for the New Payable Payment worklist.
 type OpenPayable struct {
-	SupplierInvoiceID int64   `json:"supplier_invoice_id"`
+	DocType           string  `json:"doc_type"` // supplier_invoice | expense
+	SupplierInvoiceID int64   `json:"supplier_invoice_id,omitempty"`
+	ExpenseID         int64   `json:"expense_id,omitempty"`
 	InvoiceNo         string  `json:"invoice_no"`
 	DateNoDisplay     string  `json:"date_no_display"`
 	OccurrenceDate    string  `json:"occurrence_date"`
@@ -59,8 +62,10 @@ type OpenPayable struct {
 
 type openPaymentApplyApp struct {
 	DocID          int64   `json:"doc_id"`
+	DocType        string  `json:"doc_type"` // supplier_invoice | expense (AP)
 	SalesID        int64   `json:"sales_id"`
 	InvoiceID      int64   `json:"supplier_invoice_id"`
+	ExpenseID      int64   `json:"expense_id"`
 	AppliedAmount  float64 `json:"applied_amount"`
 	DiscountAmount float64 `json:"discount_amount"`
 }
@@ -170,6 +175,7 @@ func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
 			left join public.inv_departments dept on dept.id = s.department_id
 			%s
 			where s.tenant_id = $1 and s.deleted_at is null
+			  and s.progress_status = 'completed'
 			  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001`,
 			saleAppliedOpenLateral(excludeParam))
 
@@ -268,54 +274,76 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 		dueFrom := strings.TrimSpace(r.URL.Query().Get("due_from"))
 		dueTo := strings.TrimSpace(r.URL.Query().Get("due_to"))
 		p := httputil.ParseListParams(r, "occurrence_date", map[string]string{
-			"occurrence_date": "si.invoice_date",
-			"due_date":        "si.due_date",
+			"occurrence_date": "occ_date",
+			"due_date":        "due_date",
 			"balance":         "balance",
-			"partner_name":    "p.company_name",
+			"partner_name":    "partner_name",
 		})
 
 		args := []any{tu.TenantID}
 		argN := 2
-		sql := `
-			select si.id, coalesce(si.invoice_no, ''), si.invoice_date, coalesce(si.date_seq, 1), si.due_date,
-			  (si.grand_total - coalesce(paid.paid, 0))::float8 as balance,
-			  si.partner_id, coalesce(p.partner_code, ''), coalesce(p.company_name, ''),
-			  coalesce(si.currency_id, 0), coalesce(cur.currency_code, ''),
-			  coalesce(loc.location_name, ''), coalesce(si.project_name, proj.project_name), null::text,
-			  coalesce(si.notes, '')
-			from public.fin_supplier_invoices si
-			join public.inv_partners p on p.id = si.partner_id and p.tenant_id = si.tenant_id
-			left join public.quo_currencies cur on cur.id = si.currency_id
-			left join public.inv_locations loc on loc.id = si.location_id
-			left join public.inv_projects proj on proj.id = si.project_id
-			` + supplierInvoiceAppliedLateralSQLAsOf("si", "") + `
-			where si.tenant_id = $1 and si.deleted_at is null
+		siWhere := `si.tenant_id = $1 and si.deleted_at is null
 			  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001`
-
+		exWhere := `e.tenant_id = $1 and e.deleted_at is null and e.payment_status = 'unpaid'
+			  and e.partner_id is not null and (e.amount + e.tax_amount) > 0.0001`
 		if partnerID != nil {
-			sql += fmt.Sprintf(` and si.partner_id = $%d`, argN)
+			siWhere += fmt.Sprintf(` and si.partner_id = $%d`, argN)
+			exWhere += fmt.Sprintf(` and e.partner_id = $%d`, argN)
 			args = append(args, *partnerID)
 			argN++
 		}
 		if qText != "" {
-			sql += fmt.Sprintf(` and (coalesce(si.invoice_no,'') ilike $%d or p.company_name ilike $%d or p.partner_code ilike $%d)`, argN, argN, argN)
+			siWhere += fmt.Sprintf(` and (coalesce(si.invoice_no,'') ilike $%d or p.company_name ilike $%d or p.partner_code ilike $%d)`, argN, argN, argN)
+			exWhere += fmt.Sprintf(` and (e.expense_no ilike $%d or coalesce(p.company_name,e.vendor_name) ilike $%d or p.partner_code ilike $%d)`, argN, argN, argN)
 			args = append(args, "%"+qText+"%")
 			argN++
 		}
 		if dueFrom != "" {
 			if _, err := time.Parse("2006-01-02", dueFrom); err == nil {
-				sql += fmt.Sprintf(` and si.due_date >= $%d::date`, argN)
+				siWhere += fmt.Sprintf(` and si.due_date >= $%d::date`, argN)
+				exWhere += fmt.Sprintf(` and e.expense_date >= $%d::date`, argN)
 				args = append(args, dueFrom)
 				argN++
 			}
 		}
 		if dueTo != "" {
 			if _, err := time.Parse("2006-01-02", dueTo); err == nil {
-				sql += fmt.Sprintf(` and si.due_date <= $%d::date`, argN)
+				siWhere += fmt.Sprintf(` and si.due_date <= $%d::date`, argN)
+				exWhere += fmt.Sprintf(` and e.expense_date <= $%d::date`, argN)
 				args = append(args, dueTo)
 				argN++
 			}
 		}
+
+		sql := fmt.Sprintf(`
+			select doc_type, doc_id, doc_no, occ_date, date_seq, due_date, balance,
+			  partner_id, partner_code, partner_name, currency_id, currency_code,
+			  location_name, project_name, department_name, remark
+			from (
+			  select 'supplier_invoice' as doc_type, si.id as doc_id, coalesce(si.invoice_no, '') as doc_no,
+			    si.invoice_date as occ_date, coalesce(si.date_seq, 1) as date_seq, si.due_date,
+			    (si.grand_total - coalesce(paid.paid, 0))::float8 as balance,
+			    si.partner_id, coalesce(p.partner_code, '') as partner_code, coalesce(p.company_name, '') as partner_name,
+			    coalesce(si.currency_id, 0) as currency_id, coalesce(cur.currency_code, '') as currency_code,
+			    coalesce(loc.location_name, '') as location_name,
+			    coalesce(si.project_name, proj.project_name) as project_name, null::text as department_name,
+			    coalesce(si.notes, '') as remark
+			  from public.fin_supplier_invoices si
+			  join public.inv_partners p on p.id = si.partner_id and p.tenant_id = si.tenant_id
+			  left join public.quo_currencies cur on cur.id = si.currency_id
+			  left join public.inv_locations loc on loc.id = si.location_id
+			  left join public.inv_projects proj on proj.id = si.project_id
+			  %s
+			  where %s
+			  union all
+			  select 'expense', e.id, e.expense_no, e.expense_date, coalesce(e.date_seq, 1), e.expense_date,
+			    (e.amount + e.tax_amount)::float8, e.partner_id, coalesce(p.partner_code, ''),
+			    coalesce(nullif(p.company_name, ''), e.vendor_name),
+			    0, '', '', null::text, null::text, coalesce(e.description, '')
+			  from public.fin_expenses e
+			  join public.inv_partners p on p.id = e.partner_id and p.tenant_id = e.tenant_id
+			  where %s
+			) open_ap`, supplierInvoiceAppliedLateralSQLAsOf("si", ""), siWhere, exWhere)
 
 		countSQL := "select count(*) from (" + sql + ") c"
 		var total int64
@@ -324,12 +352,12 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		orderCol := "si.invoice_date"
+		orderCol := "occ_date"
 		if col, ok := map[string]string{
-			"occurrence_date": "si.invoice_date",
-			"due_date":        "si.due_date",
+			"occurrence_date": "occ_date",
+			"due_date":        "due_date",
 			"balance":         "balance",
-			"partner_name":    "p.company_name",
+			"partner_name":    "partner_name",
 		}[p.Sort]; ok {
 			orderCol = col
 		}
@@ -338,7 +366,7 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 			orderDir = "asc"
 		}
 		offset := httputil.Offset(p)
-		sql += fmt.Sprintf(` order by %s %s, si.id desc limit $%d offset $%d`, orderCol, orderDir, argN, argN+1)
+		sql += fmt.Sprintf(` order by %s %s, doc_id desc limit $%d offset $%d`, orderCol, orderDir, argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), sql, args...)
@@ -350,11 +378,13 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 		var out []OpenPayable
 		for rows.Next() {
 			var row OpenPayable
+			var docType string
+			var docID int64
 			var invDate time.Time
 			var dateSeq int
 			var dueDate *time.Time
 			if err := rows.Scan(
-				&row.SupplierInvoiceID, &row.InvoiceNo, &invDate, &dateSeq, &dueDate, &row.Balance,
+				&docType, &docID, &row.InvoiceNo, &invDate, &dateSeq, &dueDate, &row.Balance,
 				&row.PartnerID, &row.PartnerCode, &row.PartnerName,
 				&row.CurrencyID, &row.CurrencyCode,
 				&row.LocationName, &row.ProjectName, &row.DepartmentName, &row.Remark,
@@ -362,9 +392,16 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to read payables.", "ERR_INTERNAL")
 				return
 			}
+			row.DocType = docType
+			if docType == "expense" {
+				row.ExpenseID = docID
+				row.AccountName = "Accounts Payable (Expense)"
+			} else {
+				row.SupplierInvoiceID = docID
+				row.AccountName = "Accounts Payable"
+			}
 			row.DateNoDisplay = formatDateNoDisplay(invDate, dateSeq)
 			row.OccurrenceDate = dateToStr(invDate)
-			row.AccountName = "Accounts Payable"
 			if dueDate != nil {
 				d := dateToStr(*dueDate)
 				row.DueDate = &d
@@ -472,18 +509,9 @@ func applyOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		apps := normalizeAPApps(body.Applications)
-		if len(apps) == 0 {
+		siApps, expenseApps := splitAPApps(body.Applications)
+		if len(siApps) == 0 && len(expenseApps) == 0 {
 			response.Validation(w, map[string]string{"applications": "Add at least one decrease amount."})
-			return
-		}
-		groups, errs := groupAPAppsByPartner(r.Context(), pool, tu.TenantID, apps)
-		if errs != nil {
-			response.ValidationSmart(w, errs)
-			return
-		}
-		if len(groups) > 1 && !body.AllowMultiPartner {
-			response.Validation(w, map[string]string{"applications": "Selected rows must belong to one vendor. Clear other vendors or enable multi-partner apply."})
 			return
 		}
 		paymentMethod := strings.TrimSpace(body.PaymentMethod)
@@ -498,51 +526,120 @@ func applyOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 			notes = body.Remark
 		}
 
+		partnerSet := map[int64]struct{}{}
 		var created []PaymentVoucher
-		for partnerID, partnerApps := range groups {
-			currencyID := int64(0)
-			if body.CurrencyID != nil && *body.CurrencyID > 0 {
-				currencyID = *body.CurrencyID
-			} else {
-				_ = pool.QueryRow(r.Context(), `
-					select coalesce(currency_id, 0) from public.fin_supplier_invoices
-					where id = $1 and tenant_id = $2`, partnerApps[0].SupplierInvoiceID, tu.TenantID).Scan(&currencyID)
-				if currencyID == 0 {
-					_ = pool.QueryRow(r.Context(), `
-						select id from public.quo_currencies
-						where tenant_id = $1 and is_default = true
-						limit 1`, tu.TenantID).Scan(&currencyID)
-				}
-			}
-			if currencyID == 0 {
-				response.Validation(w, map[string]string{"currency_id": "Currency is required."})
+
+		if len(siApps) > 0 {
+			groups, errs := groupAPAppsByPartner(r.Context(), pool, tu.TenantID, siApps)
+			if errs != nil {
+				response.ValidationSmart(w, errs)
 				return
 			}
-			pvBody := paymentVoucherBody{
-				PaymentDate:   body.PaymentDate,
-				PartnerID:     partnerID,
-				CurrencyID:    currencyID,
-				PaymentMethod: paymentMethod,
-				ReferenceNo:   body.ReferenceNo,
-				BankAccountID: body.BankAccountID,
-				Notes:         notes,
-				Applications:  partnerApps,
+			for pid := range groups {
+				partnerSet[pid] = struct{}{}
 			}
-			pv, msg, status, errCode := createPaymentVoucherFromBody(r.Context(), pool, tu, pvBody)
-			if errCode != "" {
-				if status == http.StatusConflict {
+			if len(partnerSet) > 1 && !body.AllowMultiPartner {
+				response.Validation(w, map[string]string{"applications": "Selected rows must belong to one vendor. Clear other vendors or enable multi-partner apply."})
+				return
+			}
+			for partnerID, partnerApps := range groups {
+				currencyID := int64(0)
+				if body.CurrencyID != nil && *body.CurrencyID > 0 {
+					currencyID = *body.CurrencyID
+				} else {
+					_ = pool.QueryRow(r.Context(), `
+						select coalesce(currency_id, 0) from public.fin_supplier_invoices
+						where id = $1 and tenant_id = $2`, partnerApps[0].SupplierInvoiceID, tu.TenantID).Scan(&currencyID)
+					if currencyID == 0 {
+						_ = pool.QueryRow(r.Context(), `
+							select id from public.quo_currencies
+							where tenant_id = $1 and is_default = true
+							limit 1`, tu.TenantID).Scan(&currencyID)
+					}
+				}
+				if currencyID == 0 {
+					response.Validation(w, map[string]string{"currency_id": "Currency is required."})
+					return
+				}
+				pvBody := paymentVoucherBody{
+					PaymentDate:   body.PaymentDate,
+					PartnerID:     partnerID,
+					CurrencyID:    currencyID,
+					PaymentMethod: paymentMethod,
+					ReferenceNo:   body.ReferenceNo,
+					BankAccountID: body.BankAccountID,
+					Notes:         notes,
+					Applications:  partnerApps,
+				}
+				pv, msg, status, errCode := createPaymentVoucherFromBody(r.Context(), pool, tu, pvBody)
+				if errCode != "" {
+					if status == http.StatusConflict {
+						response.Err(w, status, msg, errCode)
+						return
+					}
+					if errCode == "ERR_VALIDATION" {
+						response.ValidationSmart(w, map[string]string{"applications": msg})
+						return
+					}
 					response.Err(w, status, msg, errCode)
 					return
 				}
-				if errCode == "ERR_VALIDATION" {
-					response.ValidationSmart(w, map[string]string{"applications": msg})
-					return
-				}
-				response.Err(w, status, msg, errCode)
+				created = append(created, pv)
+			}
+		}
+
+		if len(expenseApps) > 0 {
+			expGroups, expErrs := groupExpenseAppsByPartner(r.Context(), pool, tu.TenantID, expenseApps)
+			if expErrs != nil {
+				response.ValidationSmart(w, expErrs)
 				return
 			}
-			created = append(created, pv)
+			for pid := range expGroups {
+				partnerSet[pid] = struct{}{}
+			}
+			if len(partnerSet) > 1 && !body.AllowMultiPartner {
+				response.Validation(w, map[string]string{"applications": "Selected rows must belong to one vendor. Clear other vendors or enable multi-partner apply."})
+				return
+			}
+			var payDate *time.Time
+			if d, err := time.Parse("2006-01-02", strings.TrimSpace(body.PaymentDate)); err == nil {
+				payDate = &d
+			}
+			tx, err := pool.Begin(r.Context())
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to pay expenses.", "ERR_INTERNAL")
+				return
+			}
+			defer tx.Rollback(r.Context())
+			for _, apps := range expGroups {
+				for _, app := range apps {
+					if err := validateExpenseApplyAmount(r.Context(), tx, tu.TenantID, app.ExpenseID, app.AppliedAmount, app.DiscountAmount); err != nil {
+						response.Validation(w, map[string]string{"applications": err.Error()})
+						return
+					}
+					if err := postExpenseAccrualJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, app.ExpenseID); err != nil {
+						response.Err(w, http.StatusBadRequest, "Expense journal failed: "+err.Error(), "ERR_BAD_REQUEST")
+						return
+					}
+					pvID, payErr := payExpenseInTx(r.Context(), tx, tu.TenantID, tu.AppUserID, app.ExpenseID, expensePayOpts{
+						PaymentMethod: paymentMethod,
+						BankAccountID: body.BankAccountID,
+						ReferenceNo:   body.ReferenceNo,
+						PaymentDate:   payDate,
+					})
+					if payErr != nil {
+						response.Validation(w, map[string]string{"applications": payErr.Error()})
+						return
+					}
+					created = append(created, PaymentVoucher{ID: pvID})
+				}
+			}
+			if err := tx.Commit(r.Context()); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to save expense payments.", "ERR_INTERNAL")
+				return
+			}
 		}
+
 		if len(created) == 1 {
 			response.OK(w, created[0], "Created.")
 			return
@@ -571,22 +668,82 @@ func normalizeARApps(in []openPaymentApplyApp) []applicationBody {
 }
 
 func normalizeAPApps(in []openPaymentApplyApp) []paymentApplicationBody {
-	var out []paymentApplicationBody
+	si, _ := splitAPApps(in)
+	return si
+}
+
+func splitAPApps(in []openPaymentApplyApp) (si []paymentApplicationBody, expenses []openPaymentApplyApp) {
 	for _, a := range in {
+		if applicationTotalReduction(a.AppliedAmount, a.DiscountAmount) <= 0 {
+			continue
+		}
+		docType := strings.ToLower(strings.TrimSpace(a.DocType))
+		expID := a.ExpenseID
+		if expID <= 0 && docType == "expense" {
+			expID = a.DocID
+		}
+		if expID > 0 || docType == "expense" {
+			if expID <= 0 {
+				continue
+			}
+			expenses = append(expenses, openPaymentApplyApp{
+				ExpenseID:      expID,
+				DocType:        "expense",
+				AppliedAmount:  a.AppliedAmount,
+				DiscountAmount: a.DiscountAmount,
+			})
+			continue
+		}
 		invID := a.InvoiceID
 		if invID <= 0 {
 			invID = a.DocID
 		}
-		if invID <= 0 || applicationTotalReduction(a.AppliedAmount, a.DiscountAmount) <= 0 {
+		if invID <= 0 {
 			continue
 		}
-		out = append(out, paymentApplicationBody{
+		si = append(si, paymentApplicationBody{
 			SupplierInvoiceID: invID,
 			AppliedAmount:     a.AppliedAmount,
 			DiscountAmount:    a.DiscountAmount,
 		})
 	}
-	return out
+	return si, expenses
+}
+
+func groupExpenseAppsByPartner(ctx context.Context, pool *pgxpool.Pool, tenantID int64, apps []openPaymentApplyApp) (map[int64][]openPaymentApplyApp, map[string]string) {
+	groups := map[int64][]openPaymentApplyApp{}
+	for i, app := range apps {
+		var partnerID int64
+		err := pool.QueryRow(ctx, `
+			select partner_id from public.fin_expenses
+			where id = $1 and tenant_id = $2 and deleted_at is null and partner_id is not null`,
+			app.ExpenseID, tenantID).Scan(&partnerID)
+		if err != nil {
+			return nil, map[string]string{fmt.Sprintf("applications[%d].expense_id", i): "Expense not found."}
+		}
+		groups[partnerID] = append(groups[partnerID], app)
+	}
+	return groups, nil
+}
+
+func validateExpenseApplyAmount(ctx context.Context, tx pgx.Tx, tenantID, expenseID int64, applied, discount float64) error {
+	var balance float64
+	err := tx.QueryRow(ctx, `
+		select (amount + tax_amount)::float8
+		from public.fin_expenses
+		where id = $1 and tenant_id = $2 and deleted_at is null and payment_status = 'unpaid'`,
+		expenseID, tenantID).Scan(&balance)
+	if err != nil {
+		return fmt.Errorf("expense not found or already paid")
+	}
+	total := applicationTotalReduction(applied, discount)
+	if total+0.0001 < balance {
+		return fmt.Errorf("expenses must be paid in full (balance %.2f)", balance)
+	}
+	if total > balance+0.01 {
+		return fmt.Errorf("applied amount exceeds expense balance")
+	}
+	return nil
 }
 
 func groupARAppsByPartner(ctx context.Context, pool *pgxpool.Pool, tenantID int64, apps []applicationBody) (map[int64][]applicationBody, map[string]string) {
@@ -678,6 +835,34 @@ func listPayableTransactions(pool *pgxpool.Pool) http.HandlerFunc {
 		invoiceID, err := strconv.ParseInt(chi.URLParam(r, "invoiceId"), 10, 64)
 		if err != nil || invoiceID <= 0 {
 			response.Validation(w, map[string]string{"invoiceId": "Invalid invoice id."})
+			return
+		}
+		if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("doc_type")), "expense") {
+			rows, err := pool.Query(r.Context(), `
+				select 'payment_voucher', coalesce(pv.payment_no, ''), pv.payment_date::text,
+				  (e.amount + e.tax_amount)::float8, pv.id
+				from public.fin_expenses e
+				join public.fin_payment_vouchers pv on pv.id = e.payment_voucher_id
+				where e.id = $1 and e.tenant_id = $2 and e.deleted_at is null and pv.deleted_at is null
+				order by pv.payment_date desc, pv.id desc`, invoiceID, tu.TenantID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load transactions.", "ERR_INTERNAL")
+				return
+			}
+			defer rows.Close()
+			var out []openTxnRow
+			for rows.Next() {
+				var row openTxnRow
+				if err := rows.Scan(&row.TxnType, &row.DocNo, &row.DocDate, &row.AppliedAmount, &row.RefID); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to read transactions.", "ERR_INTERNAL")
+					return
+				}
+				out = append(out, row)
+			}
+			if out == nil {
+				out = []openTxnRow{}
+			}
+			response.OK(w, out, "OK")
 			return
 		}
 		rows, err := pool.Query(r.Context(), `

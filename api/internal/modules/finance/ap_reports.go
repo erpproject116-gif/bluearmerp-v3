@@ -48,14 +48,18 @@ func apByVendorBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID, l
 	args := []any{tenantID}
 	argN := 2
 	dateFilter := ""
+	exDateFilter := ""
 	if dateFrom != nil && dateTo != nil {
 		dateFilter = fmt.Sprintf(" and si.invoice_date >= $%d::date and si.invoice_date <= $%d::date", argN, argN+1)
+		exDateFilter = fmt.Sprintf(" and e.expense_date >= $%d::date and e.expense_date <= $%d::date", argN, argN+1)
 		args = append(args, *dateFrom, *dateTo)
 		argN += 2
 	}
 	invFilter := ""
+	exPartnerFilter := ""
 	if partnerID != nil {
 		invFilter = fmt.Sprintf(" and si.partner_id = $%d", argN)
+		exPartnerFilter = fmt.Sprintf(" and e.partner_id = $%d", argN)
 		args = append(args, *partnerID)
 		argN++
 	}
@@ -83,13 +87,43 @@ func apByVendorBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID, l
 		    max(si.invoice_date) as last_txn_date
 		  from public.fin_supplier_invoices si
 		  left join lateral (
-		    select coalesce(sum(a.applied_amount), 0)::float8 as paid
-		    from public.fin_payment_applications a
-		    join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		    where a.supplier_invoice_id = si.id and pv.deleted_at is null
+		    select coalesce(sum(x.paid), 0)::float8 as paid
+		    from (
+		      select a.applied_amount as paid
+		      from public.fin_payment_applications a
+		      join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
+		      where a.supplier_invoice_id = si.id and pv.deleted_at is null
+		      union all
+		      select a.applied_amount
+		      from public.fin_vendor_credit_applications a
+		      join public.fin_vendor_credits vc on vc.id = a.vendor_credit_id
+		      where a.supplier_invoice_id = si.id and vc.deleted_at is null
+		        and vc.status in ('open', 'applied', 'refunded')
+		    ) x
 		  ) paid on true
 		  where si.tenant_id = $1 and si.deleted_at is null%s%s
 		  group by si.partner_id
+		),
+		expense_purchases as (
+		  select e.partner_id,
+		    coalesce(sum(e.amount + e.tax_amount), 0)::float8 as inv_purchases,
+		    coalesce(sum(case when e.payment_status = 'paid' then e.amount + e.tax_amount else 0 end), 0)::float8 as total_paid,
+		    max(e.expense_date) as last_txn_date
+		  from public.fin_expenses e
+		  where e.tenant_id = $1 and e.deleted_at is null and e.partner_id is not null%s%s
+		  group by e.partner_id
+		),
+		merged_inv as (
+		  select partner_id,
+		    sum(inv_purchases)::float8 as inv_purchases,
+		    sum(total_paid)::float8 as total_paid,
+		    max(last_txn_date) as last_txn_date
+		  from (
+		    select partner_id, inv_purchases, total_paid, last_txn_date from inv_purchases
+		    union all
+		    select partner_id, inv_purchases, total_paid, last_txn_date from expense_purchases
+		  ) u
+		  group by partner_id
 		),
 		acct_purchases as (
 		  select jel.party_id as partner_id,
@@ -117,10 +151,10 @@ func apByVendorBaseSQL(tenantID int64, dateFrom, dateTo *time.Time, partnerID, l
 		  coalesce(i.inv_purchases, 0)::float8 + coalesce(a.acct_purchases, 0)::float8 - coalesce(i.total_paid, 0)::float8,
 		  i.last_txn_date
 		from partners p
-		left join inv_purchases i on i.partner_id = p.partner_id
+		left join merged_inv i on i.partner_id = p.partner_id
 		left join acct_purchases a on a.partner_id = p.partner_id
 		where coalesce(i.inv_purchases, 0) + coalesce(a.acct_purchases, 0) > 0`,
-		dateFilter, invFilter)
+		dateFilter, invFilter, exDateFilter, exPartnerFilter)
 	return q, args
 }
 
@@ -251,10 +285,19 @@ func supplierPaymentStatusSQL(tenantID int64, dateFrom, dateTo *time.Time, partn
 		from public.fin_supplier_invoices si
 		join public.inv_partners p on p.id = si.partner_id
 		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as paid
-		  from public.fin_payment_applications a
-		  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		  where a.supplier_invoice_id = si.id and pv.deleted_at is null
+		  select coalesce(sum(x.paid), 0)::float8 as paid
+		  from (
+		    select a.applied_amount as paid
+		    from public.fin_payment_applications a
+		    join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
+		    where a.supplier_invoice_id = si.id and pv.deleted_at is null
+		    union all
+		    select a.applied_amount
+		    from public.fin_vendor_credit_applications a
+		    join public.fin_vendor_credits vc on vc.id = a.vendor_credit_id
+		    where a.supplier_invoice_id = si.id and vc.deleted_at is null
+		      and vc.status in ('open', 'applied', 'refunded')
+		  ) x
 		) paid on true
 		where si.tenant_id = $1 and si.deleted_at is null%s`,
 		filters)

@@ -30,13 +30,21 @@ func TestNormalizeAPApps(t *testing.T) {
 		{InvoiceID: 10, AppliedAmount: 200},
 		{DocID: 11, AppliedAmount: 25},
 		{InvoiceID: 12, AppliedAmount: -1},
+		{DocType: "expense", ExpenseID: 99, AppliedAmount: 50},
+		{DocType: "expense", DocID: 88, AppliedAmount: 10},
 	}
-	out := normalizeAPApps(in)
-	if len(out) != 2 {
-		t.Fatalf("want 2 apps, got %d", len(out))
+	si, expenses := splitAPApps(in)
+	if len(si) != 2 {
+		t.Fatalf("want 2 SI apps, got %d", len(si))
 	}
-	if out[0].SupplierInvoiceID != 10 || out[1].SupplierInvoiceID != 11 {
-		t.Fatalf("unexpected ids: %+v %+v", out[0], out[1])
+	if si[0].SupplierInvoiceID != 10 || si[1].SupplierInvoiceID != 11 {
+		t.Fatalf("unexpected SI ids: %+v %+v", si[0], si[1])
+	}
+	if len(expenses) != 2 {
+		t.Fatalf("want 2 expense apps, got %d", len(expenses))
+	}
+	if expenses[0].ExpenseID != 99 || expenses[1].ExpenseID != 88 {
+		t.Fatalf("unexpected expense ids: %+v %+v", expenses[0], expenses[1])
 	}
 }
 

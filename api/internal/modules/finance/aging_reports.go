@@ -93,32 +93,60 @@ func arAgingSQL(extraWhere string) string {
 		where s.tenant_id = $1
 		  and s.deleted_at is null
 		  and s.order_date <= $2::date
+		  and s.progress_status = 'completed'
 		  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001` + extraWhere
 }
 
 func apAgingSQL(extraWhere string) string {
 	return `
 		select
-		  si.id as supplier_invoice_id,
-		  si.invoice_no,
-		  p.company_name as vendor_name,
-		  si.invoice_date::date::text as due_date,
-		  (si.grand_total - coalesce(paid.paid, 0))::float8 as balance,
-		  greatest(($2::date - si.invoice_date::date), 0)::int as age_days,
-		  case
-		    when ($2::date - si.invoice_date::date) <= 0 then 'current'
-		    when ($2::date - si.invoice_date::date) <= 30 then '1-30'
-		    when ($2::date - si.invoice_date::date) <= 60 then '31-60'
-		    when ($2::date - si.invoice_date::date) <= 90 then '61-90'
-		    else '90+'
-		  end as age_bucket
-		from public.fin_supplier_invoices si
-		join public.inv_partners p on p.id = si.partner_id
-		` + supplierInvoiceAppliedLateralSQLAsOf("si", "$2::date") + `
-		where si.tenant_id = $1
-		  and si.deleted_at is null
-		  and si.invoice_date <= $2::date
-		  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001` + extraWhere
+		  supplier_invoice_id, invoice_no, vendor_name, due_date, balance, age_days, age_bucket
+		from (
+		  select
+		    si.id as supplier_invoice_id,
+		    si.invoice_no,
+		    p.company_name as vendor_name,
+		    si.invoice_date::date::text as due_date,
+		    (si.grand_total - coalesce(paid.paid, 0))::float8 as balance,
+		    greatest(($2::date - si.invoice_date::date), 0)::int as age_days,
+		    case
+		      when ($2::date - si.invoice_date::date) <= 0 then 'current'
+		      when ($2::date - si.invoice_date::date) <= 30 then '1-30'
+		      when ($2::date - si.invoice_date::date) <= 60 then '31-60'
+		      when ($2::date - si.invoice_date::date) <= 90 then '61-90'
+		      else '90+'
+		    end as age_bucket
+		  from public.fin_supplier_invoices si
+		  join public.inv_partners p on p.id = si.partner_id
+		  ` + supplierInvoiceAppliedLateralSQLAsOf("si", "$2::date") + `
+		  where si.tenant_id = $1
+		    and si.deleted_at is null
+		    and si.invoice_date <= $2::date
+		    and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001` + extraWhere + `
+		  union all
+		  select
+		    e.id,
+		    e.expense_no,
+		    coalesce(nullif(p.company_name, ''), e.vendor_name),
+		    e.expense_date::date::text,
+		    (e.amount + e.tax_amount)::float8,
+		    greatest(($2::date - e.expense_date::date), 0)::int,
+		    case
+		      when ($2::date - e.expense_date::date) <= 0 then 'current'
+		      when ($2::date - e.expense_date::date) <= 30 then '1-30'
+		      when ($2::date - e.expense_date::date) <= 60 then '31-60'
+		      when ($2::date - e.expense_date::date) <= 90 then '61-90'
+		      else '90+'
+		    end
+		  from public.fin_expenses e
+		  join public.inv_partners p on p.id = e.partner_id
+		  where e.tenant_id = $1
+		    and e.deleted_at is null
+		    and e.payment_status = 'unpaid'
+		    and e.partner_id is not null
+		    and e.expense_date <= $2::date
+		    and (e.amount + e.tax_amount) > 0.0001` + strings.ReplaceAll(extraWhere, "si.", "e.") + `
+		) ap_open`
 }
 
 func appendAgingSummary(summary *agingSummary, bucket string, balance float64) {

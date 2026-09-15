@@ -9,8 +9,10 @@ import { useToast } from "../../../shared/toast";
 import { PaymentApplyJournalModal, type ApplyAppLine } from "./PaymentApplyJournalModal";
 
 export type OpenBalanceRow = {
+  doc_type?: string;
   sales_id?: number;
   supplier_invoice_id?: number;
+  expense_id?: number;
   sales_no?: string;
   invoice_no?: string;
   date_no_display: string;
@@ -39,8 +41,17 @@ type TxnRow = {
 
 type Props = { side: "ar" | "ap" };
 
+function rowKey(r: OpenBalanceRow) {
+  if (r.doc_type === "expense" || (r.expense_id ?? 0) > 0) {
+    return `expense:${r.expense_id ?? 0}`;
+  }
+  if ((r.sales_id ?? 0) > 0) {
+    return `sales:${r.sales_id}`;
+  }
+  return `si:${r.supplier_invoice_id ?? 0}`;
+}
 function docId(r: OpenBalanceRow) {
-  return r.sales_id ?? r.supplier_invoice_id ?? 0;
+  return r.sales_id ?? r.expense_id ?? r.supplier_invoice_id ?? 0;
 }
 function docNo(r: OpenBalanceRow) {
   return r.date_no_display || r.sales_no || r.invoice_no || String(docId(r));
@@ -52,9 +63,9 @@ export function OpenBalancePaymentPage(props: Props) {
   const [dueFrom, setDueFrom] = createSignal("");
   const [dueTo, setDueTo] = createSignal("");
   const [page, setPage] = createSignal(1);
-  const [selected, setSelected] = createSignal<Record<number, boolean>>({});
-  const [decrease, setDecrease] = createSignal<Record<number, string>>({});
-  const [discount, setDiscount] = createSignal<Record<number, string>>({});
+  const [selected, setSelected] = createSignal<Record<string, boolean>>({});
+  const [decrease, setDecrease] = createSignal<Record<string, string>>({});
+  const [discount, setDiscount] = createSignal<Record<string, string>>({});
   const [journalOpen, setJournalOpen] = createSignal(false);
   const [allowMulti, setAllowMulti] = createSignal(false);
   const [txnTarget, setTxnTarget] = createSignal<OpenBalanceRow | null>(null);
@@ -85,7 +96,7 @@ export function OpenBalancePaymentPage(props: Props) {
   const rows = createMemo(() => list.data?.rows ?? []);
   const totalPages = createMemo(() => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize)));
 
-  const selectedRows = createMemo(() => rows().filter((r) => selected()[docId(r)]));
+  const selectedRows = createMemo(() => rows().filter((r) => selected()[rowKey(r)]));
 
   const partnerIds = createMemo(() => {
     const ids = new Set(selectedRows().map((r) => r.partner_id));
@@ -95,12 +106,16 @@ export function OpenBalancePaymentPage(props: Props) {
   const applyLines = createMemo((): ApplyAppLine[] => {
     const lines: ApplyAppLine[] = [];
     for (const r of selectedRows()) {
-      const id = docId(r);
-      const amt = Number(decrease()[id] ?? "");
-      const disc = Number(discount()[id] ?? "") || 0;
+      const key = rowKey(r);
+      const amt = Number(decrease()[key] ?? "");
+      const disc = Number(discount()[key] ?? "") || 0;
       if (!(amt > 0) && !(disc > 0)) continue;
+      const isExpense = r.doc_type === "expense" || (r.expense_id ?? 0) > 0;
       lines.push({
-        doc_id: id,
+        doc_id: docId(r),
+        doc_type: isExpense ? "expense" : props.side === "ap" ? "supplier_invoice" : undefined,
+        expense_id: isExpense ? r.expense_id ?? docId(r) : undefined,
+        supplier_invoice_id: !isExpense && props.side === "ap" ? r.supplier_invoice_id ?? docId(r) : undefined,
         applied_amount: amt > 0 ? amt : 0,
         discount_amount: disc > 0 ? disc : 0,
         label: docNo(r),
@@ -110,10 +125,10 @@ export function OpenBalancePaymentPage(props: Props) {
   });
 
   const toggle = (r: OpenBalanceRow, on: boolean) => {
-    const id = docId(r);
-    setSelected((prev) => ({ ...prev, [id]: on }));
+    const key = rowKey(r);
+    setSelected((prev) => ({ ...prev, [key]: on }));
     if (on) {
-      setDecrease((prev) => ({ ...prev, [id]: prev[id] ?? String(r.balance) }));
+      setDecrease((prev) => ({ ...prev, [key]: prev[key] ?? String(r.balance) }));
     }
   };
 
@@ -226,13 +241,13 @@ export function OpenBalancePaymentPage(props: Props) {
             </Show>
             <For each={rows()}>
               {(r) => {
-                const id = () => docId(r);
+                const key = () => rowKey(r);
                 return (
-                  <tr class={`border-t border-stroke/60 ${selected()[id()] ? "bg-brand-50/60" : ""}`}>
+                  <tr class={`border-t border-stroke/60 ${selected()[key()] ? "bg-brand-50/60" : ""}`}>
                     <td class="px-2 py-1.5">
                       <input
                         type="checkbox"
-                        checked={Boolean(selected()[id()])}
+                        checked={Boolean(selected()[key()])}
                         onChange={(e) => toggle(r, e.currentTarget.checked)}
                       />
                     </td>
@@ -255,17 +270,17 @@ export function OpenBalancePaymentPage(props: Props) {
                     <td class="px-2 py-1.5">
                       <DecimalInput
                         class={`${inputClass} text-right`}
-                        value={decrease()[id()] ?? ""}
-                        onValue={(v) => setDecrease((prev) => ({ ...prev, [id()]: v }))}
-                        disabled={!selected()[id()]}
+                        value={decrease()[key()] ?? ""}
+                        onValue={(v) => setDecrease((prev) => ({ ...prev, [key()]: v }))}
+                        disabled={!selected()[key()]}
                       />
                     </td>
                     <td class="px-2 py-1.5">
                       <DecimalInput
                         class={`${inputClass} text-right`}
-                        value={discount()[id()] ?? ""}
-                        onValue={(v) => setDiscount((prev) => ({ ...prev, [id()]: v }))}
-                        disabled={!selected()[id()]}
+                        value={discount()[key()] ?? ""}
+                        onValue={(v) => setDiscount((prev) => ({ ...prev, [key()]: v }))}
+                        disabled={!selected()[key()]}
                       />
                     </td>
                     <td class="px-2 py-1.5 max-w-[10rem] truncate">{r.remark ?? ""}</td>
@@ -344,13 +359,16 @@ export function OpenBalancePaymentPage(props: Props) {
 
 function TransactionDetailsModal(props: { side: "ar" | "ap"; row: OpenBalanceRow; onClose: () => void }) {
   const detail = createQuery(() => ({
-    queryKey: ["open-txn", props.side, docId(props.row)],
+    queryKey: ["open-txn", props.side, rowKey(props.row)],
     queryFn: async () => {
       const id = docId(props.row);
+      const isExpense = props.row.doc_type === "expense" || (props.row.expense_id ?? 0) > 0;
       const path =
         props.side === "ar"
           ? `/api/v1/finance/receivables/${id}/transactions`
-          : `/api/v1/finance/payables/${id}/transactions`;
+          : isExpense
+            ? `/api/v1/finance/payables/${id}/transactions?doc_type=expense`
+            : `/api/v1/finance/payables/${id}/transactions`;
       const res = await apiFetch<TxnRow[]>(path);
       return res.data ?? [];
     },
