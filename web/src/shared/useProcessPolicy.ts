@@ -1,4 +1,4 @@
-import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 import { getActiveTenantId } from "./activeContext";
 import { useAuth } from "./auth-context";
