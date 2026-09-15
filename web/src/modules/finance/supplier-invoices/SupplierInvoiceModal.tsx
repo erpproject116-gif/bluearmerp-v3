@@ -21,7 +21,7 @@ import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
-import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired } from "../../../shared/useProcessPolicy";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired, isConfirmingProgress } from "../../../shared/useProcessPolicy";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openPurchaseInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
@@ -779,7 +779,7 @@ export function SupplierInvoiceModal(props: Props) {
         <ModalFormGuide guideId="supplier_invoice" />
         <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/50 px-3 py-2 text-xs text-slate-700">
           <p class="font-medium text-text-primary">
-            <TermHint term="supplier_invoice" />
+            <TermHint term="supplier_invoice" asHeading />
           </p>
           <Show
             when={
@@ -1016,7 +1016,10 @@ export function SupplierInvoiceModal(props: Props) {
               formOpen={props.open}
               docId={effectiveEditing()?.id}
               label={`${uiLabel("purchasing.attachments_invoice")} (DR / vendor SI)`}
-              required={policyRequiresAttachment(processPolicy.data, "supplier_invoice")}
+              required={
+                policyRequiresAttachment(processPolicy.data, "supplier_invoice") &&
+                isConfirmingProgress("supplier_invoice", progressStatus())
+              }
               onCountChange={setAttachmentCount}
             />
             <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
@@ -1132,6 +1135,7 @@ export function SupplierInvoiceModal(props: Props) {
             hidePartnerColumns
             showWarrantyColumns
             serialCaptureMode="bill"
+            docKind="purchase_receive"
             lineViewKey={`${PURCHASES_ENTITY.purchases}.lines`}
           />
           <Show when={!props.readOnly}>

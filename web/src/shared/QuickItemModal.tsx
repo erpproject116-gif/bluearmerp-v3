@@ -4,6 +4,7 @@ import { Field, inputClass } from "./SpreadsheetGrid";
 import { DecimalInput } from "./DecimalInput";
 import { apiFetch } from "./api";
 import { useToast } from "./toast";
+import { UnitLookupCombo, formatUnitLabel } from "./UnitLookupCombo";
 
 export type CreatedItem = {
   id: number;
@@ -12,6 +13,7 @@ export type CreatedItem = {
   sales_price: number;
   purchase_price?: number;
   status: string;
+  base_unit_id?: number | null;
 };
 
 type Props = {
@@ -25,7 +27,9 @@ type Props = {
 export function QuickItemModal(props: Props) {
   const toast = useToast();
   const [itemName, setItemName] = createSignal("");
-  const [unit, setUnit] = createSignal("pc");
+  const [baseUnitId, setBaseUnitId] = createSignal<number | null>(null);
+  const [unitLabel, setUnitLabel] = createSignal("");
+  const [unitCode, setUnitCode] = createSignal("");
   const [salesPrice, setSalesPrice] = createSignal("0");
   const [purchasePrice, setPurchasePrice] = createSignal("0");
   const [saving, setSaving] = createSignal(false);
@@ -34,7 +38,9 @@ export function QuickItemModal(props: Props) {
   createEffect(() => {
     if (props.open) {
       setItemName(props.initialName ?? "");
-      setUnit("pc");
+      setBaseUnitId(null);
+      setUnitLabel("");
+      setUnitCode("");
       setSalesPrice("0");
       setPurchasePrice("0");
       setError("");
@@ -48,12 +54,18 @@ export function QuickItemModal(props: Props) {
       setError("Item name is required.");
       return;
     }
+    const unitId = baseUnitId();
+    if (!unitId || unitId <= 0) {
+      setError("Base unit is required.");
+      return;
+    }
     setSaving(true);
     const res = await apiFetch<CreatedItem>("/api/v1/inventory/items", {
       method: "POST",
       body: JSON.stringify({
         item_name: name,
-        unit: unit().trim() || "pc",
+        unit: unitCode().trim() || undefined,
+        base_unit_id: unitId,
         item_category: "merchandise",
         item_type: "item",
         sales_price: Number(salesPrice()) || 0,
@@ -64,7 +76,8 @@ export function QuickItemModal(props: Props) {
     });
     setSaving(false);
     if (!res.success || !res.data) {
-      const msg = res.errors?.item_name ?? res.message ?? "Failed to create item.";
+      const msg =
+        res.errors?.base_unit_id ?? res.errors?.item_name ?? res.message ?? "Failed to create item.";
       setError(msg);
       toast.warning(msg);
       return;
@@ -85,10 +98,24 @@ export function QuickItemModal(props: Props) {
             autofocus
           />
         </Field>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label="Unit">
-            <input class={inputClass} value={unit()} onInput={(e) => setUnit(e.currentTarget.value)} />
-          </Field>
+        <UnitLookupCombo
+          label="Base unit"
+          required
+          selectedId={baseUnitId}
+          value={unitLabel}
+          onInput={setUnitLabel}
+          onSelect={(u) => {
+            setBaseUnitId(u.id);
+            setUnitCode(u.code);
+            setUnitLabel(formatUnitLabel(u));
+          }}
+          onClear={() => {
+            setBaseUnitId(null);
+            setUnitCode("");
+            setUnitLabel("");
+          }}
+        />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Sales price">
             <DecimalInput class={inputClass} value={salesPrice()} onValue={setSalesPrice} />
           </Field>
@@ -111,7 +138,7 @@ export function QuickItemModal(props: Props) {
         <button
           type="button"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          disabled={saving() || itemName().trim() === ""}
+          disabled={saving() || itemName().trim() === "" || !baseUnitId()}
           onClick={() => void save()}
         >
           {saving() ? "Creating…" : "Create item"}

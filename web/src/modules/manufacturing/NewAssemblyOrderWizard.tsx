@@ -86,7 +86,10 @@ export default function NewAssemblyOrderWizard() {
   const [overhead, setOverhead] = createSignal("");
   const [otherCost, setOtherCost] = createSignal("");
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
+  const [needsError, setNeedsError] = createSignal("");
   const [journalPreview, setJournalPreview] = createSignal<JournalPreview | null>(null);
+  const [journalError, setJournalError] = createSignal("");
+  const [bomSearchEmpty, setBomSearchEmpty] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [posting, setPosting] = createSignal(false);
   const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
@@ -113,8 +116,17 @@ export default function NewAssemblyOrderWizard() {
     const res = await apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${id}/material-needs`, undefined, {
       silent: true,
     });
-    if (res.success && res.data) setNeeds(res.data);
-    else setNeeds(null);
+    if (res.success && res.data) {
+      setNeeds(res.data);
+      setNeedsError("");
+    } else {
+      setNeeds(null);
+      setNeedsError(
+        res.errors?.lines ??
+          res.message ??
+          "Could not load components. Check that each BOM line item has a base unit.",
+      );
+    }
   };
 
   const loadJournalPreview = async (id: number) => {
@@ -123,15 +135,22 @@ export default function NewAssemblyOrderWizard() {
       undefined,
       { silent: true },
     );
-    setJournalPreview(res.success && res.data ? res.data : null);
+    if (res.success && res.data) {
+      setJournalPreview(res.data);
+      setJournalError("");
+    } else {
+      setJournalPreview(null);
+      setJournalError(res.errors?.cost ?? res.message ?? "Cost preview unavailable.");
+    }
   };
 
   const persistDraft = async (): Promise<WorkOrder | null> => {
     const errs = collectRequiredFieldErrors(
-      { bom_id: bomId(), qty_to_produce: qty() },
+      { bom_id: bomId(), qty_to_produce: qty(), location_id: locationId() },
       [
-        { key: "bom_id", label: "Recipe / finished product" },
+        { key: "bom_id", label: "Assembly BOM / finished product" },
         { key: "qty_to_produce", label: "Quantity to produce" },
+        { key: "location_id", label: "Warehouse" },
       ],
     );
     if (Object.keys(errs).length > 0) {
@@ -350,14 +369,28 @@ export default function NewAssemblyOrderWizard() {
                 onSelect={(o) => {
                   setBomId(o.id);
                   setBomLabel(o.label);
+                  setBomSearchEmpty(false);
                 }}
                 onClear={() => {
                   setBomId(null);
                   setBomLabel("");
                 }}
-                fetchOptions={searchBoms}
+                fetchOptions={async (q) => {
+                  const opts = await searchBoms(q);
+                  setBomSearchEmpty(opts.length === 0);
+                  return opts;
+                }}
                 placeholder="Search assembly BOM / product…"
               />
+              <Show when={bomSearchEmpty()}>
+                <p class="mt-2 text-xs text-amber-800">
+                  No Assembly BOMs (codes A…) found. Create one under{" "}
+                  <A href="/app/production/setup" class="font-medium text-brand-700 hover:underline">
+                    Manufacturing → Setup
+                  </A>
+                  , or use New Recipe Order for Recipe BOMs (R…).
+                </p>
+              </Show>
             </Field>
             <Field label="Quantity to produce" required>
               <input
@@ -370,9 +403,10 @@ export default function NewAssemblyOrderWizard() {
                 aria-label="Quantity to produce"
               />
             </Field>
-            <Field label="Warehouse">
+            <Field label="Warehouse" required>
               <LookupCombo
                 label="Warehouse"
+                required
                 value={locationLabel}
                 selectedId={locationId}
                 onInput={setLocationLabel}
@@ -385,7 +419,7 @@ export default function NewAssemblyOrderWizard() {
                   setLocationLabel("");
                 }}
                 fetchOptions={searchLocations}
-                placeholder="Optional — defaults from recipe"
+                placeholder="Required unless the BOM has a default warehouse"
               />
             </Field>
             <Field label="Reference / notes">
@@ -472,6 +506,14 @@ export default function NewAssemblyOrderWizard() {
                 </For>
               </tbody>
             </table>
+            <Show when={needsError()}>
+              <p class="mt-3 text-sm text-amber-800">{needsError()}</p>
+            </Show>
+            <Show when={!needsError() && (needs()?.lines?.length ?? 0) === 0}>
+              <p class="mt-3 text-sm text-text-secondary">
+                No component lines for this assembly BOM. Check Setup and ensure each component has a base unit.
+              </p>
+            </Show>
           </div>
         </section>
         <div class="flex justify-between">
@@ -515,7 +557,14 @@ export default function NewAssemblyOrderWizard() {
             </p>
             <div class="mt-4 border-t border-stroke pt-3">
               <h3 class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Journal preview</h3>
-              <Show when={journalPreview()} fallback={<p class="mt-2 text-xs text-text-secondary">Cost preview unavailable.</p>}>
+              <Show
+                when={journalPreview()}
+                fallback={
+                  <p class="mt-2 text-xs text-text-secondary">
+                    {journalError() || "Cost preview unavailable."}
+                  </p>
+                }
+              >
                 <div class="mt-2 space-y-1 text-xs">
                   <div class="flex justify-between gap-3"><span>Dr Finished goods inventory</span><span>₱{estimatedTotalCost().toLocaleString()}</span></div>
                   <div class="flex justify-between gap-3"><span>Cr Materials inventory</span><span>₱{(journalPreview()?.costs.material_cost ?? 0).toLocaleString()}</span></div>

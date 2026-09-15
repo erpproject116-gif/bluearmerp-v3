@@ -8,6 +8,11 @@ type Props = {
   label?: string;
   hint?: string;
   class?: string;
+  /**
+   * When true, render the label as a heading without a visible "?" badge.
+   * Hint remains available via title/aria-label on the label itself.
+   */
+  asHeading?: boolean;
 };
 
 /**
@@ -20,8 +25,10 @@ export function TermHint(props: Props) {
 
   return (
     <span class={`inline-flex items-center gap-1 ${props.class ?? ""}`}>
-      <span>{label()}</span>
-      <Show when={hint()}>
+      <span title={hint() || undefined} aria-label={hint() ? `${label()}. ${hint()}` : undefined}>
+        {label()}
+      </span>
+      <Show when={hint() && !props.asHeading}>
         <span
           class="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-stroke text-[10px] leading-none text-text-secondary"
           title={hint()}

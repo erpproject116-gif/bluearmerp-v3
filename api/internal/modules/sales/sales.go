@@ -668,13 +668,16 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
-			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
-			return
-		}
-		if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
-			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
-			return
+		progress := defaultProgress(body.ProgressStatus)
+		if processpolicy.IsConfirmingProgress(processpolicy.DocSales, progress) {
+			if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
+				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
+				return
+			}
+			if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
+				return
+			}
 		}
 
 		if _, err := crm.SyncWarrantyAssetsFromSale(r.Context(), tx, tu.TenantID, id); err != nil {
@@ -687,7 +690,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if defaultProgress(body.ProgressStatus) == "completed" {
+		if progress == "completed" {
 			if err := accrueCommissionForSale(r.Context(), tx, tu.TenantID, id); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to accrue commission.", "ERR_INTERNAL")
 				return
@@ -879,20 +882,22 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
-		if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
-			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
-			return
-		}
-		if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
-			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
-			return
+		newStatus := defaultProgress(body.ProgressStatus)
+		if processpolicy.IsConfirmingProgress(processpolicy.DocSales, newStatus) {
+			if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
+				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
+				return
+			}
+			if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
+				return
+			}
 		}
 		if _, err := crm.SyncWarrantyAssetsFromSale(r.Context(), tx, tu.TenantID, id); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to sync warranty assets.", "ERR_INTERNAL")
 			return
 		}
 
-		newStatus := defaultProgress(body.ProgressStatus)
 		if newStatus == "completed" && before.ProgressStatus != "completed" {
 			if err := accrueCommissionForSale(r.Context(), tx, tu.TenantID, id); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to accrue commission.", "ERR_INTERNAL")

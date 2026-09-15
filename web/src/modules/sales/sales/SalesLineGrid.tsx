@@ -230,7 +230,13 @@ export function SalesLineGrid(props: Props) {
 
   const previewLine = async (line: SalesLineRow): Promise<Partial<SalesLineRow>> => {
     const taxId = props.taxTypeId();
-    if (!taxId) return {};
+    if (!taxId) {
+      const qty = Number(line.qty) || 0;
+      const unit = Number(line.unit_vat_inc) || Number(line.unit_non_vat) || Number(line.unit_price) || 0;
+      const provisional = qty * unit;
+      if (provisional <= 0) return {};
+      return { line_total: String(provisional) };
+    }
     return previewLineWithDiscount(taxId, line, props.templateCode());
   };
 

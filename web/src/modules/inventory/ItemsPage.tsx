@@ -313,6 +313,10 @@ export default function ItemsPage() {
       toast.warning(clientError);
       return;
     }
+    if (!form().base_unit_id) {
+      toast.warning("Base unit is required.");
+      return;
+    }
 
     setSaving(true);
     const f = form();

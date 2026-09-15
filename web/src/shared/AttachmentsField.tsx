@@ -241,7 +241,9 @@ export function AttachmentsField(props: Props) {
         <p class="mt-2 text-sm text-amber-800">{loadError()}</p>
       </Show>
       <Show when={showRequiredWarning()}>
-        <p class="mt-2 text-sm text-amber-800">Add at least one file before confirming this document.</p>
+        <p class="mt-2 text-sm text-amber-800">
+          Add at least one file before confirming this document (not required while saving as draft/unconfirmed).
+        </p>
       </Show>
     </div>
   );

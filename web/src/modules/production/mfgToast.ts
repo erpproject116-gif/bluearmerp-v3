@@ -54,6 +54,12 @@ export function friendlyMfgMessage(raw: string | undefined | null, fallback: str
   if (lower.includes("production location is required") || lower.includes("location is required")) {
     return "Choose a location for this job, then save.";
   }
+  if (lower.includes("has no base unit") || lower.includes("no base unit")) {
+    return "A component item is missing its base unit. Set base unit under Inventory → Items, then refresh.";
+  }
+  if (lower.includes("failed to load scan context")) {
+    return "Couldn’t open Take materials. Check component base units and try again from Jobs.";
+  }
   if (lower.includes("quantity must be greater") || lower.includes("qty must")) {
     return "Enter a quantity greater than zero.";
   }

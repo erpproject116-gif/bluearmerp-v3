@@ -247,6 +247,7 @@ export function ItemMasterModal(props: Props) {
         <div>
           <UnitLookupCombo
             label="Base unit"
+            required
             selectedId={() => props.form().base_unit_id}
             value={unitLabel}
             onInput={setUnitLabel}

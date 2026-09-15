@@ -28,6 +28,8 @@ func IsConfirmingProgress(kind DocKind, status string) bool {
 		return status == "in_progress" || status == "completed"
 	case DocSales:
 		return status == "completed" || status == "e_approval"
+	case DocPurchaseOrder:
+		return status != "" && status != "draft" && status != "unconfirmed"
 	case DocSupplierInvoice:
 		return status == "completed" || status == "e_approval"
 	default:

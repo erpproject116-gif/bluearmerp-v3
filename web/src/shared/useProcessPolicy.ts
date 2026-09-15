@@ -51,6 +51,8 @@ export function isConfirmingProgress(kind: AttachmentDocKind, status: string): b
       return s === "completed" || s === "e_approval";
     case "supplier_invoice":
       return s === "completed" || s === "e_approval";
+    case "purchase_order":
+      return s !== "" && s !== "draft" && s !== "unconfirmed";
     default:
       return false;
   }

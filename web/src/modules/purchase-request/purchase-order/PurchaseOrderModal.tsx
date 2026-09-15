@@ -35,7 +35,7 @@ import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
-import { useProcessPolicy, policyRequiresAttachment } from "../../../shared/useProcessPolicy";
+import { useProcessPolicy, policyRequiresAttachment, isConfirmingProgress } from "../../../shared/useProcessPolicy";
 import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
@@ -1019,6 +1019,7 @@ export function PurchaseOrderModal(props: Props) {
                 locationId={locationId}
                 hidePartnerColumns
                 showWarrantyColumns
+                docKind="purchase_order"
                 lineViewKey={`${PURCHASE_REQUEST_ENTITY.purchaseOrder}.lines`}
               />
             </Show>
@@ -1029,7 +1030,10 @@ export function PurchaseOrderModal(props: Props) {
         formOpen={props.open}
         docId={effectivePoId() ?? undefined}
         label={uiLabel("purchasing.attachments_po")}
-        required={policyRequiresAttachment(processPolicy.data, "purchase_order")}
+        required={
+          policyRequiresAttachment(processPolicy.data, "purchase_order") &&
+          isConfirmingProgress("purchase_order", detail()?.status ?? "draft")
+        }
         onCountChange={setAttachmentCount}
       />
       <EmailHistoryPanel docType="purchase_order" docId={effectivePoId()} />

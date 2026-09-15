@@ -170,12 +170,49 @@ func patchSalesProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		var priorStatus string
-		_ = pool.QueryRow(r.Context(), `
-			select progress_status from public.sa_sales
-			where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID).Scan(&priorStatus)
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
 
-		tag, err := pool.Exec(r.Context(), `
+		var priorStatus string
+		var locationID int64
+		err = tx.QueryRow(r.Context(), `
+			select progress_status, location_id from public.sa_sales
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			for update`, id, tu.TenantID).Scan(&priorStatus, &locationID)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Sales not found.", "ERR_NOT_FOUND")
+			return
+		}
+
+		priorConfirming := processpolicy.IsConfirmingProgress(processpolicy.DocSales, priorStatus)
+		nextConfirming := processpolicy.IsConfirmingProgress(processpolicy.DocSales, status)
+
+		if priorConfirming && !nextConfirming {
+			if err := reverseSaleStock(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to reverse stock.", "ERR_INTERNAL")
+				return
+			}
+			if err := reverseSaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to reverse lot stock.", "ERR_INTERNAL")
+				return
+			}
+		}
+		if !priorConfirming && nextConfirming {
+			if err := applySaleStock(r.Context(), tx, tu.TenantID, id, locationID, tu.AppUserID); err != nil {
+				response.Validation(w, map[string]string{"lines": err.Error()})
+				return
+			}
+			if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Validation(w, map[string]string{"lines": err.Error()})
+				return
+			}
+		}
+
+		tag, err := tx.Exec(r.Context(), `
 			update public.sa_sales
 			set progress_status = $1, updated_at = now()
 			where id = $2 and tenant_id = $3 and deleted_at is null`,
@@ -186,7 +223,15 @@ func patchSalesProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		if status == "completed" && priorStatus != "completed" {
-			_ = accrueCommissionForSalePool(r.Context(), pool, tu.TenantID, id)
+			if err := accrueCommissionForSale(r.Context(), tx, tu.TenantID, id); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to accrue commission.", "ERR_INTERNAL")
+				return
+			}
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")
+			return
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.progress_status", "sa_sales", &id, nil, body)

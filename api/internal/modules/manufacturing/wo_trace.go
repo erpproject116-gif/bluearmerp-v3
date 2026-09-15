@@ -423,6 +423,13 @@ func getWorkOrderScanContext(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
 				return
 			}
+			msg := err.Error()
+			if strings.Contains(strings.ToLower(msg), "base unit") ||
+				strings.Contains(strings.ToLower(msg), "location") ||
+				strings.Contains(strings.ToLower(msg), "component") {
+				response.Validation(w, map[string]string{"scan_context": msg})
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to load scan context.", "ERR_INTERNAL")
 			return
 		}

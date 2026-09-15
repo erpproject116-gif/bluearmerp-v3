@@ -30,7 +30,7 @@ import {
   type AttachmentScope,
 } from "../../../shared/attachments";
 import { uiLabel } from "../../../shared/branding/uiLabel";
-import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired } from "../../../shared/useProcessPolicy";
+import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired, isConfirmingProgress } from "../../../shared/useProcessPolicy";
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
@@ -391,7 +391,7 @@ export function SalesModal(props: Props) {
     setTaxTypeLabel(ed.tax_type_name ?? "");
     setCurrencyId(ed.currency_id);
     setPartnerId(ed.partner_id);
-    setCustomerLabel(ed.customer_name);
+    setCustomerLabel(ed.customer_name ?? "");
     setPicUserId(ed.pic_user_id ?? null);
     setPicName(ed.pic_name);
     setLocationId(ed.location_id);
@@ -1093,7 +1093,7 @@ export function SalesModal(props: Props) {
         <FormErrorSummary errors={fieldErrors} />
         <div class="mb-3 rounded-lg border border-brand-100 bg-brand-50/50 px-3 py-2 text-xs text-slate-700">
           <p class="font-medium text-text-primary">
-            <TermHint term="sales" />
+            <TermHint term="sales" asHeading />
           </p>
           <Show
             when={
@@ -1103,7 +1103,8 @@ export function SalesModal(props: Props) {
             }
             fallback={
               <p class="mt-1">
-                Save the sale, then set Progress to <span class="font-medium">Completed</span> when ready. Next:{" "}
+                Save as <span class="font-medium">Unconfirmed</span> without deducting stock. Inventory moves only when
+                Progress is <span class="font-medium">Completed</span> (or submitted for approval). Next:{" "}
                 <A href="/app/finance/official-receipts" class="font-medium text-brand-700 hover:underline">
                   Cash In / Official Receipt
                 </A>{" "}
@@ -1194,10 +1195,10 @@ export function SalesModal(props: Props) {
             <select
               class={inputClass}
               value={currencyId() ?? ""}
-              disabled={m.disabled}
+              disabled={m.disabled || currenciesQuery.isLoading}
               onChange={(e) => setCurrencyId(Number(e.currentTarget.value) || null)}
             >
-              <option value="">Select…</option>
+              <option value="">{currenciesQuery.isLoading ? "Loading currencies…" : "Select…"}</option>
               <For each={currencies()}>{(c) => <option value={c.id}>{c.currency_code} — {c.name}</option>}</For>
             </select>
           )}
@@ -1288,6 +1289,14 @@ export function SalesModal(props: Props) {
             <option value="">Select…</option>
             <For each={salesCategories()}>{(c) => <option value={c.code}>{c.name}</option>}</For>
           </select>
+          <Show when={salesCategories().length === 0}>
+            <p class="mt-1 text-xs text-text-secondary">
+              No active categories.{" "}
+              <A href="/app/sales/sales-categories" class="font-medium text-brand-700 hover:underline">
+                Manage sales categories
+              </A>
+            </p>
+          </Show>
         </Field>
         <ModalField settings={byKey} fieldKey="si_dr_no" fallbackLabel="SI/DR No.">
           {(m) => (
@@ -1349,7 +1358,10 @@ export function SalesModal(props: Props) {
           formOpen={props.open}
           docId={effectiveEditing()?.id}
           label={uiLabel("selling.attachments_sales")}
-          required={policyRequiresAttachment(processPolicy.data, "sales")}
+          required={
+            policyRequiresAttachment(processPolicy.data, "sales") &&
+            isConfirmingProgress("sales", progressStatus())
+          }
           onCountChange={setAttachmentCount}
         />
         <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
@@ -1450,7 +1462,15 @@ export function SalesModal(props: Props) {
         <SalesCommissionPanel
           rows={commissions}
           onChange={setCommissions}
-          grandTotal={() => lines().reduce((s, ln) => s + (Number(ln.line_total) || 0), 0)}
+          grandTotal={() =>
+            lines().reduce((s, ln) => {
+              const total = Number(ln.line_total) || 0;
+              if (total > 0) return s + total;
+              const qty = Number(ln.qty) || 0;
+              const price = Number(ln.unit_vat_inc || ln.unit_non_vat || ln.unit_price) || 0;
+              return s + qty * price;
+            }, 0)
+          }
           saleLines={() =>
             lines()
               .filter((ln) => ln.item_id || ln.item_code)

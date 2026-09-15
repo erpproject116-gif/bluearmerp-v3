@@ -43,6 +43,7 @@ type itemSearchResult struct {
 	ItemName            string   `json:"item_name"`
 	SpecName            *string  `json:"spec_name,omitempty"`
 	SalesPrice          float64  `json:"sales_price"`
+	PurchasePrice       float64  `json:"purchase_price"`
 	Status              string   `json:"status"`
 	TrackInventoryQty   bool     `json:"track_inventory_qty"`
 	TrackSerial         bool     `json:"track_serial"`
@@ -241,7 +242,7 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 		args = append(args, f.PageSize, offset)
 
 		q := fmt.Sprintf(`
-			select i.id, i.item_code, i.item_name, i.spec_name, i.sales_price::float8, i.status,
+			select i.id, i.item_code, i.item_name, i.spec_name, i.sales_price::float8, coalesce(i.purchase_price, 0)::float8, i.status,
 			       i.track_inventory_qty, coalesce(i.track_serial, false), coalesce(i.track_lot, false),
 			       coalesce(i.serial_policy, 'required'), coalesce(i.lot_policy, 'required'),
 			       i.base_unit_id,
@@ -286,7 +287,7 @@ func searchItems(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row itemSearchResult
 			var defQty, totQty *float64
-			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.SalesPrice, &row.Status,
+			if err := rows.Scan(&row.ID, &row.ItemCode, &row.ItemName, &row.SpecName, &row.SalesPrice, &row.PurchasePrice, &row.Status,
 				&row.TrackInventoryQty, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy,
 				&row.BaseUnitID, &row.BaseUnitCode, &defQty, &totQty, &row.WarrantyDurationMonths, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read items.", "ERR_INTERNAL")

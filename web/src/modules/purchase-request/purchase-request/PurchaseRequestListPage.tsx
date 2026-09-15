@@ -165,6 +165,16 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
 
   return (
     <PurchaseRequestLayout>
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 class="text-lg font-semibold text-text-primary">Purchase Requests</h1>
+        <button
+          type="button"
+          class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          onClick={openNew}
+        >
+          + New Purchase Request
+        </button>
+      </div>
       <PurchaseRequestListFilter value={draftFilters} onChange={setDraftFilters} onSearch={search} onReset={reset} />
 
       <Show when={submittedFilters()}>

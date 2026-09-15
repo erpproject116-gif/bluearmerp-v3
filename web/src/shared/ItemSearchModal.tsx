@@ -17,6 +17,7 @@ export type ItemSearchRow = {
   item_name: string;
   spec_name?: string | null;
   sales_price: number;
+  purchase_price?: number;
   status: string;
   track_inventory_qty?: boolean;
   track_serial?: boolean;
@@ -379,7 +380,9 @@ export function ItemSearchModal(props: Props) {
             item_code: item.item_code,
             item_name: item.item_name,
             sales_price: item.sales_price ?? 0,
+            purchase_price: item.purchase_price ?? 0,
             status: item.status ?? "active",
+            base_unit_id: item.base_unit_id ?? null,
           };
           props.onSelect(row);
           props.onClose();

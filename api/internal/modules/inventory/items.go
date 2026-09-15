@@ -191,6 +191,10 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"item_name": "Item name is required."})
 			return
 		}
+		if body.BaseUnitID == nil || *body.BaseUnitID <= 0 {
+			response.Validation(w, map[string]string{"base_unit_id": "Base unit is required."})
+			return
+		}
 		id, row, err := createWithCode(r.Context(), pool, tu, "item", func(ctx context.Context, tx pgxpoolConn, code string) (int64, Item, error) {
 			var row Item
 			priceLevels := sanitizePriceLevels(body.PriceLevels)
@@ -240,17 +244,16 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			specName, unit, itemCategory, itemType, productionProcess, oePrice, standardCosts := itemBodyScalars(body)
 			standardJSON, _ := marshalJSONMap(standardCosts)
 			baseUnitID := body.BaseUnitID
-			if baseUnitID != nil && *baseUnitID > 0 {
-				var ok bool
-				_ = tx.QueryRow(ctx, `select exists(select 1 from public.inv_units where id=$1 and tenant_id=$2 and is_active)`, *baseUnitID, tu.TenantID).Scan(&ok)
-				if !ok {
-					return 0, Item{}, fmt.Errorf("invalid base unit")
-				}
-				if unit == "" {
-					_ = tx.QueryRow(ctx, `select code from public.inv_units where id=$1`, *baseUnitID).Scan(&unit)
-				}
-			} else {
-				baseUnitID = nil
+			if baseUnitID == nil || *baseUnitID <= 0 {
+				return 0, Item{}, fmt.Errorf("base unit required")
+			}
+			var ok bool
+			_ = tx.QueryRow(ctx, `select exists(select 1 from public.inv_units where id=$1 and tenant_id=$2 and is_active)`, *baseUnitID, tu.TenantID).Scan(&ok)
+			if !ok {
+				return 0, Item{}, fmt.Errorf("invalid base unit")
+			}
+			if unit == "" {
+				_ = tx.QueryRow(ctx, `select code from public.inv_units where id=$1`, *baseUnitID).Scan(&unit)
 			}
 			err := tx.QueryRow(ctx, `insert into public.inv_items (tenant_id, item_code, item_name, spec_name, unit, base_unit_id, item_category, item_type, production_process, purchase_price, sales_price, vip_price, price_levels, safety_stock_by_doc, oe_price, standard_costs, warranty_duration_months, reorder_level, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, catch_weight, default_shelf_life_days, lot_allocation_method, price_basis, status, item_category_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
 				returning id, item_code, item_name, coalesce(spec_name,''), coalesce(unit,''), base_unit_id, coalesce(item_category,'merchandise'), coalesce(item_type,'item'), production_process, purchase_price::float8, sales_price::float8, vip_price::float8, price_levels, safety_stock_by_doc, oe_price::float8, standard_costs, warranty_duration_months, reorder_level::float8, track_serial, track_lot, serial_policy, lot_policy, track_inventory_qty, catch_weight, default_shelf_life_days, lot_allocation_method, price_basis, status, item_category_id`,
@@ -266,6 +269,10 @@ func createItem(pool *pgxpool.Pool) http.HandlerFunc {
 			return row.ID, row, err
 		})
 		if err != nil {
+			if strings.Contains(err.Error(), "base unit required") {
+				response.Validation(w, map[string]string{"base_unit_id": "Base unit is required."})
+				return
+			}
 			if strings.Contains(err.Error(), "invalid base unit") {
 				response.Validation(w, map[string]string{"base_unit_id": "Base unit must belong to this business."})
 				return
@@ -391,16 +398,18 @@ func updateItem(pool *pgxpool.Pool) http.HandlerFunc {
 		standardJSON, _ := marshalJSONMap(standardCosts)
 
 		baseUnitID := body.BaseUnitID
-		if baseUnitID != nil && *baseUnitID > 0 {
-			var ok bool
-			_ = tx.QueryRow(r.Context(), `select exists(select 1 from public.inv_units where id=$1 and tenant_id=$2)`, *baseUnitID, tu.TenantID).Scan(&ok)
-			if !ok {
-				response.Validation(w, map[string]string{"base_unit_id": "Base unit must belong to this business."})
-				return
-			}
-			if unit == "" {
-				_ = tx.QueryRow(r.Context(), `select code from public.inv_units where id=$1`, *baseUnitID).Scan(&unit)
-			}
+		if baseUnitID == nil || *baseUnitID <= 0 {
+			response.Validation(w, map[string]string{"base_unit_id": "Base unit is required."})
+			return
+		}
+		var ok bool
+		_ = tx.QueryRow(r.Context(), `select exists(select 1 from public.inv_units where id=$1 and tenant_id=$2)`, *baseUnitID, tu.TenantID).Scan(&ok)
+		if !ok {
+			response.Validation(w, map[string]string{"base_unit_id": "Base unit must belong to this business."})
+			return
+		}
+		if unit == "" {
+			_ = tx.QueryRow(r.Context(), `select code from public.inv_units where id=$1`, *baseUnitID).Scan(&unit)
 		}
 
 		tag, err := tx.Exec(r.Context(), `update public.inv_items set item_name=$1, spec_name=$2, unit=$3, base_unit_id=$4, item_category=$5, item_type=$6, production_process=$7, purchase_price=$8, sales_price=$9, vip_price=$10, price_levels=$11, safety_stock_by_doc=$12, oe_price=$13, standard_costs=$14, warranty_duration_months=$15, reorder_level=$16, track_serial=$17, track_lot=$18, serial_policy=$19, lot_policy=$20, track_inventory_qty=$21, catch_weight=$22, default_shelf_life_days=$23, lot_allocation_method=$24, price_basis=$25, status=$26, item_category_id=$29, updated_at=now()

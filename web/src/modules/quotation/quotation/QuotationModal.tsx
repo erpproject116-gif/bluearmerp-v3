@@ -451,7 +451,7 @@ export function QuotationModal(props: Props) {
       setTaxTypeLabel(ed.tax_type_name ?? "");
       setCurrencyId(ed.currency_id);
       setPartnerId(ed.partner_id);
-      setCustomerLabel(ed.customer_name);
+      setCustomerLabel(ed.customer_name ?? "");
       setPicUserId(ed.pic_user_id ?? null);
       setPicName(ed.pic_name);
       setLocationId(ed.location_id);

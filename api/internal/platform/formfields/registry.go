@@ -36,6 +36,7 @@ var standardRegistry = map[string][]StandardField{
 	},
 	"inv_item": {
 		{FieldKey: "item_name", Label: "Item name", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "base_unit_id", Label: "Base unit", FieldType: "select", DefaultRequired: true, SortOrder: 15},
 		{FieldKey: "purchase_price", Label: "Purchase price", FieldType: "number", SortOrder: 20},
 		{FieldKey: "sales_price", Label: "Sales price", FieldType: "number", SortOrder: 30},
 		{FieldKey: "vip_price", Label: "VIP price", FieldType: "number", SortOrder: 40},

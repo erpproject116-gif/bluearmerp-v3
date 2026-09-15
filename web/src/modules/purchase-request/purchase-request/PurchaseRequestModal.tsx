@@ -822,6 +822,7 @@ export function PurchaseRequestModal(props: Props) {
           return t ? { tax_mode: t.tax_mode, rate_percent: t.rate_percent } : null;
         }}
         locationId={locationId}
+        docKind="purchase_request"
       />
       <ChangeLogPanel targetType="pr_purchase_request" targetId={props.editing?.id} />
       </LifecycleReadOnlyShell>

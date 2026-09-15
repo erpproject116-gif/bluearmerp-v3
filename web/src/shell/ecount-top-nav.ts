@@ -57,7 +57,7 @@ export const ECOUNT_TOP_MODULES: EcountTopModule[] = [
   {
     id: "setup",
     label: "Setup",
-    hint: "Users, branding, help",
+    hint: "Users, branding, billing, help",
     href: "/app/user-management",
     navGroupIds: ["misc"],
   },
@@ -129,7 +129,8 @@ export function resolveEcountTopFromPath(pathname: string): EcountTopId {
     pathname.startsWith("/app/user-management") ||
     pathname.startsWith("/app/activity-logs") ||
     pathname.startsWith("/app/documentation") ||
-    pathname.startsWith("/app/settings/branding")
+    pathname.startsWith("/app/settings/branding") ||
+    pathname.startsWith("/app/settings/billing")
   ) {
     return "setup";
   }
@@ -268,15 +269,6 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         moduleId: "production",
       },
       {
-        id: "production_recipe",
-        label: "Recipe",
-        href: "/app/production/recipe/jobs",
-        iconId: "production_wo",
-        topId: "inv1",
-        expandGroupId: "production_process",
-        moduleId: "production",
-      },
-      {
         id: "production_reports",
         label: "Reports",
         href: "/app/production/reports",
@@ -392,7 +384,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   {
     id: "buy",
     label: "Purchase",
-    href: "/app/purchases/purchase-receive",
+    href: "/app/purchase-order/purchase-orders",
     iconId: "buying",
     topId: "inv1",
     expandGroupId: "procurement_process",
@@ -415,6 +407,15 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         topId: "inv1",
         expandGroupId: "procurement_process",
         moduleId: "purchase_request",
+      },
+      {
+        id: "purchase_rfq",
+        label: "RFQ",
+        href: "/app/purchase-order/rfq",
+        iconId: "purchase_order",
+        topId: "inv1",
+        expandGroupId: "procurement_process",
+        moduleId: "purchase_order",
       },
       {
         id: "purchase_order",

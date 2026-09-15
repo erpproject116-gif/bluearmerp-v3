@@ -186,6 +186,8 @@ type Props = {
    * Defaults hidden via column-label DefaultHidden for PO / Purchase Receive.
    */
   showWarrantyColumns?: boolean;
+  /** Controls help tip copy for PR vs PO vs Purchase Receive. */
+  docKind?: "purchase_request" | "purchase_order" | "purchase_receive";
 };
 
 export function PurchaseRequestLineGrid(props: Props) {
@@ -194,6 +196,17 @@ export function PurchaseRequestLineGrid(props: Props) {
   const [itemSearchLineIdx, setItemSearchLineIdx] = createSignal<number | null>(null);
   const [partnerSearchOpen, setPartnerSearchOpen] = createSignal(false);
   const [partnerSearchLineIdx, setPartnerSearchLineIdx] = createSignal<number | null>(null);
+
+  const lineHelpTip = () => {
+    switch (props.docKind ?? "purchase_request") {
+      case "purchase_order":
+        return "Registered products only on purchase orders — type a code and press Tab/Enter to auto-fill, or double-click Item Code to search.";
+      case "purchase_receive":
+        return "Registered products only on purchase receive — type a code and press Tab/Enter to auto-fill, or double-click Item Code to search.";
+      default:
+        return "Unregistered products are allowed on purchase requests — type a registered code and press Tab/Enter to auto-fill, or double-click Item Code to search. Registration is required from Purchase Order onward.";
+    }
+  };
 
   const previewLine = async (line: PurchaseRequestLineRow): Promise<Partial<PurchaseRequestLineRow>> => {
     const taxId = props.taxTypeId();
@@ -272,7 +285,7 @@ export function PurchaseRequestLineGrid(props: Props) {
             description: itemSpecAsLineDescription(item),
             unit_id: item.base_unit_id ?? null,
             unit_code: item.base_unit_code ?? "",
-            unit_price: String(item.sales_price ?? 0),
+            unit_price: String(item.purchase_price ?? item.sales_price ?? 0),
             input_basis: basis,
             track_serial: Boolean(item.track_serial),
             serial_policy: item.serial_policy ?? "required",
@@ -465,9 +478,7 @@ export function PurchaseRequestLineGrid(props: Props) {
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 class="text-sm font-semibold text-text-primary">{uiLabel("lines.heading")}</h3>
-          <p class="text-xs text-text-secondary">
-            Unregistered products are allowed on purchase requests — type a registered code and press Tab/Enter to auto-fill, or double-click Item Code to search. Registration is required from Purchase Order onward.
-          </p>
+          <p class="text-xs text-text-secondary">{lineHelpTip()}</p>
         </div>
         <button type="button" class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50" onClick={addLine}>
           {uiLabel("lines.add_button")}

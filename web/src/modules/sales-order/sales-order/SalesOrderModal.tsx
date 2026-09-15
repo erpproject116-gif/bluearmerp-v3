@@ -333,7 +333,7 @@ export function SalesOrderModal(props: Props) {
       setTaxTypeLabel(ed.tax_type_name ?? "");
       setCurrencyId(ed.currency_id);
       setPartnerId(ed.partner_id);
-      setCustomerLabel(ed.customer_name);
+      setCustomerLabel(ed.customer_name ?? "");
       setPicUserId(ed.pic_user_id ?? null);
       setPicName(ed.pic_name);
       setSalesPersonId(ed.sales_person_id ?? null);

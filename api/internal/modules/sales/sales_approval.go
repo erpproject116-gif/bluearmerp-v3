@@ -191,6 +191,14 @@ func applySaleApprovalTransition(ctx context.Context, pool *pgxpool.Pool, tu aut
 	}
 	defer tx.Rollback(ctx)
 
+	var locationID int64
+	if err := tx.QueryRow(ctx, `
+		select location_id from public.sa_sales
+		where id = $1 and tenant_id = $2 and deleted_at is null
+		for update`, id, tu.TenantID).Scan(&locationID); err != nil {
+		return fmt.Errorf("sales not found")
+	}
+
 	entityType := "sa_sales"
 	switch action {
 	case "submit":
@@ -207,6 +215,25 @@ func applySaleApprovalTransition(ctx context.Context, pool *pgxpool.Pool, tu aut
 		}
 	default:
 		return fmt.Errorf("unknown action")
+	}
+
+	priorConfirming := processpolicy.IsConfirmingProgress(processpolicy.DocSales, fromStatus)
+	nextConfirming := processpolicy.IsConfirmingProgress(processpolicy.DocSales, toStatus)
+	if priorConfirming && !nextConfirming {
+		if err := reverseSaleStock(ctx, tx, tu.TenantID, id); err != nil {
+			return err
+		}
+		if err := reverseSaleLot(ctx, tx, tu.TenantID, id); err != nil {
+			return err
+		}
+	}
+	if !priorConfirming && nextConfirming {
+		if err := applySaleStock(ctx, tx, tu.TenantID, id, locationID, tu.AppUserID); err != nil {
+			return err
+		}
+		if err := applySaleLot(ctx, tx, tu.TenantID, id); err != nil {
+			return err
+		}
 	}
 
 	tag, err := tx.Exec(ctx, `
