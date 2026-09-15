@@ -234,7 +234,7 @@ export default function BrandingSettingsPage() {
       <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
         <h2 class="text-lg font-medium text-text-primary">Company logo &amp; print header</h2>
         <p class="mt-1 text-sm text-text-secondary">
-          Upload a company logo for sidebar and all printables (invoices, quotations, receipts, ledgers). If no logo is uploaded, printables show a lettermark from the company name. Company name prints once as the title — put only address/contact in Extra header text.
+          Upload a company logo for sidebar and all printables (invoices, quotations, receipts, ledgers). If no logo is uploaded, the Bluearm default mark is used until you add yours. Company name prints once as the title — put only address/contact in Extra header text.
         </p>
         <p class="mt-1 text-sm text-text-secondary">
           Logo and company details appear in the app sidebar and on printed reports. Report templates can override these per report.

@@ -48,6 +48,7 @@ export default defineConfig(({ mode }) => {
           "pwa-192.png",
           "pwa-512.png",
           "pwa-512-maskable.png",
+          "bluearmerp-logo.png",
           "bluearm-computer-logo.png",
         ],
         manifest: {
@@ -57,8 +58,8 @@ export default defineConfig(({ mode }) => {
           display: "standalone",
           start_url: "/app/production",
           scope: "/",
-          theme_color: "#000000",
-          background_color: "#000000",
+          theme_color: "#3c50e0",
+          background_color: "#ffffff",
           icons: [
             {
               src: "/pwa-192.png",

@@ -1,5 +1,8 @@
 import type { BrandingSettings } from "./types";
 
+/** Static fallback when the tenant has not uploaded a branding logo yet. */
+export const DEFAULT_BRAND_LOGO_URL = "/bluearmerp-logo.png";
+
 export const DEFAULT_BRANDING: BrandingSettings = {
   colors: {
     primary: "#3c50e0",
@@ -42,6 +45,7 @@ export const LABEL_PRESETS: { key: string; label: string; fallback: string }[] =
   { key: "app.sign_out", label: "Sign out button", fallback: "Sign out" },
   { key: "app.collapse_sidebar", label: "Collapse sidebar", fallback: "Collapse" },
   { key: "app.branding_link", label: "Branding settings link", fallback: "Branding" },
+  { key: "app.billing_link", label: "Billing settings link", fallback: "Billing & subscription" },
   { key: "progress.unconfirmed", label: "Stage: Unconfirmed", fallback: "Unconfirmed" },
   { key: "progress.completed", label: "Stage: Completed", fallback: "Completed" },
   { key: "progress.in_progress", label: "Stage: In progress", fallback: "In progress" },

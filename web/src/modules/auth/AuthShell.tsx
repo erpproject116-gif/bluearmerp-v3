@@ -1,5 +1,6 @@
 import type { ParentComponent, JSX } from "solid-js";
 import { For, Show } from "solid-js";
+import { DEFAULT_BRAND_LOGO_URL } from "../../shared/branding/defaults";
 
 const DEFAULT_HERO_TITLE = "One platform for how you run the business.";
 const DEFAULT_HERO_BODY =
@@ -43,9 +44,9 @@ export const AuthShell: ParentComponent<Props> = (props) => {
         <div>
           <div class="flex items-center gap-3">
             <img
-              src="/bluearm-computer-logo.png"
+              src={DEFAULT_BRAND_LOGO_URL}
               alt=""
-              class="h-12 w-12 rounded-xl bg-black object-contain p-1 shadow-sm"
+              class="h-12 w-12 rounded-xl bg-white/10 object-contain p-1 shadow-sm"
             />
             <div>
               <span class="text-2xl font-semibold tracking-tight">BluearmERP</span>
@@ -86,9 +87,9 @@ export const AuthShell: ParentComponent<Props> = (props) => {
           <div class="mb-8 lg:hidden">
             <div class="flex items-center gap-2.5">
               <img
-                src="/bluearm-computer-logo.png"
+                src={DEFAULT_BRAND_LOGO_URL}
                 alt=""
-                class="h-10 w-10 rounded-xl bg-black object-contain p-0.5"
+                class="h-10 w-10 rounded-xl object-contain"
               />
               <span class="text-lg font-semibold text-text-primary">BluearmERP</span>
             </div>
