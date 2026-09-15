@@ -44,10 +44,10 @@ export default defineConfig(({ mode }) => {
         registerType: "autoUpdate",
         includeAssets: [
           "favicon.png",
-          "apple-touch-icon.png",
-          "pwa-192.png",
-          "pwa-512.png",
-          "pwa-512-maskable.png",
+          "icons/apple-touch-icon.png",
+          "icons/pwa-192.png",
+          "icons/pwa-512.png",
+          "icons/pwa-512-maskable.png",
           "bluearmerp-logo.png",
           "bluearm-computer-logo.png",
         ],
@@ -62,19 +62,19 @@ export default defineConfig(({ mode }) => {
           background_color: "#ffffff",
           icons: [
             {
-              src: "/pwa-192.png",
+              src: "/icons/pwa-192.png",
               sizes: "192x192",
               type: "image/png",
               purpose: "any",
             },
             {
-              src: "/pwa-512.png",
+              src: "/icons/pwa-512.png",
               sizes: "512x512",
               type: "image/png",
               purpose: "any",
             },
             {
-              src: "/pwa-512-maskable.png",
+              src: "/icons/pwa-512-maskable.png",
               sizes: "512x512",
               type: "image/png",
               purpose: "maskable",

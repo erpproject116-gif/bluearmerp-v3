@@ -1,6 +1,7 @@
 import { Show, createEffect, type ParentComponent } from "solid-js";
 import { Navigate, useNavigate } from "@solidjs/router";
 import { useAuth } from "./auth-context";
+import { DEFAULT_BRAND_LOGO_URL } from "./branding/defaults";
 import { resolveAppEntryPath } from "./resolveAppEntryPath";
 
 export function needsSignInRedirect(auth: {
@@ -16,7 +17,13 @@ export function needsSignInRedirect(auth: {
 export const SessionLoading: ParentComponent = () => (
   <div class="flex min-h-screen items-center justify-center bg-body p-6">
     <div class="text-center">
-      <div class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+      <img
+        src={DEFAULT_BRAND_LOGO_URL}
+        alt=""
+        class="mx-auto mb-4 h-14 w-14 object-contain"
+        width="56"
+        height="56"
+      />
       <p class="text-sm text-text-secondary">Loading session…</p>
     </div>
   </div>

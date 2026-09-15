@@ -20,3 +20,9 @@ const updateSW = registerSW({
 });
 
 render(() => <App />, document.getElementById("root")!);
+
+const bootSplash = document.getElementById("boot-splash");
+if (bootSplash) {
+  bootSplash.classList.add("is-done");
+  window.setTimeout(() => bootSplash.remove(), 220);
+}

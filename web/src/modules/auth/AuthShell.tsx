@@ -46,7 +46,7 @@ export const AuthShell: ParentComponent<Props> = (props) => {
             <img
               src={DEFAULT_BRAND_LOGO_URL}
               alt=""
-              class="h-12 w-12 rounded-xl bg-white/10 object-contain p-1 shadow-sm"
+              class="h-12 w-12 object-contain"
             />
             <div>
               <span class="text-2xl font-semibold tracking-tight">BluearmERP</span>
@@ -89,7 +89,7 @@ export const AuthShell: ParentComponent<Props> = (props) => {
               <img
                 src={DEFAULT_BRAND_LOGO_URL}
                 alt=""
-                class="h-10 w-10 rounded-xl object-contain"
+                class="h-10 w-10 object-contain"
               />
               <span class="text-lg font-semibold text-text-primary">BluearmERP</span>
             </div>
