@@ -66,6 +66,7 @@ export function BusinessBranchSwitcher() {
     setSwitchingBusiness(true);
     try {
       await auth.setActiveTenant(nextId);
+      // setActiveTenantId already clears the query cache; navigate home for a clean shell.
       navigate("/app", { replace: true });
     } finally {
       setSwitchingBusiness(false);

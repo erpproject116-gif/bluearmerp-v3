@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal } from "solid-js";
+import { createEffect, createResource, createSignal, on } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
@@ -65,22 +65,27 @@ export function SalesOrderLinePickerModal(props: Props) {
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal(new Set<number>());
 
-  createEffect(() => {
-    if (!props.open) return;
-    setSelected(new Set<number>());
-    setPage(1);
-    setFilters({
-      q: "",
-      // Default to all open SO lines (not last-30-days only) so confirmed orders are visible.
-      dateFrom: "",
-      dateTo: "",
-      docNo: "",
-      // Default: all partners' open SO lines (Ecount-style). Users can still filter by partner.
-      partnerId: null,
-      partnerLocked: false,
-      partnerLabel: props.partnerLabel ?? "",
-    });
-  });
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (!open) return;
+        setSelected(new Set<number>());
+        setPage(1);
+        setFilters({
+          q: "",
+          // Default to all open SO lines (not last-30-days only) so confirmed orders are visible.
+          dateFrom: "",
+          dateTo: "",
+          docNo: "",
+          // Default: all partners' open SO lines (Ecount-style). Users can still filter by partner.
+          partnerId: null,
+          partnerLocked: false,
+          partnerLabel: props.partnerLabel ?? "",
+        });
+      },
+    ),
+  );
 
   const [data] = createResource(
     () => (props.open ? { filters: filters(), page: page() } : null),

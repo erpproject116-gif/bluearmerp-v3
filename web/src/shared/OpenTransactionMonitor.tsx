@@ -1,4 +1,4 @@
-import { For, Show, type JSX } from "solid-js";
+import { For, Show, createSignal, onCleanup, type JSX } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
 import { modalDismissClass } from "./Modal";
 import { LoadingText } from "./LoadingText";
@@ -80,6 +80,43 @@ export function OpenTransactionMonitor(props: Props) {
   const patch = (partial: Partial<OpenMonitorFilters>) =>
     props.onFiltersChange({ ...props.filters, ...partial });
 
+  // Local drafts so typing stays responsive; parent filter/query updates are debounced.
+  // (Immediate value={props.filters.q} + refetch was resetting the field after each key.)
+  // Show remounts on open, so drafts start empty — parents also clear filters on open.
+  const [draftQ, setDraftQ] = createSignal("");
+  const [draftDocNo, setDraftDocNo] = createSignal("");
+  let qTimer: ReturnType<typeof setTimeout> | undefined;
+  let docTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => {
+    if (qTimer) clearTimeout(qTimer);
+    if (docTimer) clearTimeout(docTimer);
+  });
+
+  const commitQ = (v: string) => {
+    setDraftQ(v);
+    if (qTimer) clearTimeout(qTimer);
+    qTimer = setTimeout(() => {
+      props.onFiltersChange({ ...props.filters, q: v });
+      props.onPageChange(1);
+    }, 300);
+  };
+
+  const commitDocNo = (v: string) => {
+    setDraftDocNo(v);
+    if (docTimer) clearTimeout(docTimer);
+    docTimer = setTimeout(() => {
+      props.onFiltersChange({ ...props.filters, docNo: v });
+      props.onPageChange(1);
+    }, 300);
+  };
+
+  const syncDraftsFromFilters = (next: OpenMonitorFilters) => {
+    if (qTimer) clearTimeout(qTimer);
+    if (docTimer) clearTimeout(docTimer);
+    setDraftQ(next.q);
+    setDraftDocNo(next.docNo);
+  };
+
   return (
     <Show when={props.open}>
       <div class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
@@ -106,11 +143,8 @@ export function OpenTransactionMonitor(props: Props) {
               <input
                 class={`${inputClass} mt-0.5 min-w-[12rem]`}
                 placeholder="Customer, partner code, SO no, item…"
-                value={props.filters.q}
-                onInput={(e) => {
-                  patch({ q: e.currentTarget.value });
-                  props.onPageChange(1);
-                }}
+                value={draftQ()}
+                onInput={(e) => commitQ(e.currentTarget.value)}
               />
             </label>
             <label class="text-xs text-text-secondary">
@@ -118,11 +152,8 @@ export function OpenTransactionMonitor(props: Props) {
               <input
                 class={`${inputClass} mt-0.5 w-36`}
                 placeholder="Slip / SO / PO…"
-                value={props.filters.docNo}
-                onInput={(e) => {
-                  patch({ docNo: e.currentTarget.value });
-                  props.onPageChange(1);
-                }}
+                value={draftDocNo()}
+                onInput={(e) => commitDocNo(e.currentTarget.value)}
               />
             </label>
             <label class="text-xs text-text-secondary">
@@ -173,7 +204,9 @@ export function OpenTransactionMonitor(props: Props) {
               class="rounded border border-stroke px-2 py-1.5 text-xs"
               onClick={() => {
                 const d = defaultMonitorDates(30);
-                patch({ dateFrom: d.dateFrom, dateTo: d.dateTo, q: "", docNo: "" });
+                const next = { ...props.filters, dateFrom: d.dateFrom, dateTo: d.dateTo, q: "", docNo: "" };
+                syncDraftsFromFilters(next);
+                props.onFiltersChange(next);
                 props.onPageChange(1);
               }}
             >
@@ -183,7 +216,9 @@ export function OpenTransactionMonitor(props: Props) {
               type="button"
               class="rounded border border-stroke px-2 py-1.5 text-xs"
               onClick={() => {
-                patch({ dateFrom: "", dateTo: "", q: "", docNo: "" });
+                const next = { ...props.filters, dateFrom: "", dateTo: "", q: "", docNo: "" };
+                syncDraftsFromFilters(next);
+                props.onFiltersChange(next);
                 props.onPageChange(1);
               }}
             >

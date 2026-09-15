@@ -1,5 +1,6 @@
 import { A, useLocation } from "@solidjs/router";
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
@@ -8,6 +9,8 @@ import {
   setupScopeFromPath,
   type ModuleSetupScope,
 } from "../../shared/moduleSetupScopes";
+import { getActiveTenantId } from "../../shared/activeContext";
+import { processPolicyQueryKey } from "../../shared/useProcessPolicy";
 
 type ProcessPolicy = {
   tenant_id: number;
@@ -153,6 +156,7 @@ export default function ModuleSetupHubPage() {
   const loc = useLocation();
   const toast = useToast();
   const auth = useAuth();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [canManage, setCanManage] = createSignal(false);
@@ -225,6 +229,10 @@ export default function ModuleSetupHubPage() {
     setSaving(false);
     if (res.success && res.data) {
       setPolicy(res.data);
+      const tid = auth.me?.tenant.id ?? getActiveTenantId() ?? 0;
+      if (tid > 0) {
+        void queryClient.invalidateQueries({ queryKey: processPolicyQueryKey(tid) });
+      }
       toast.success("Setup saved.");
     } else {
       toast.error(res.message || "Failed to save.");

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, For } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, on } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
@@ -43,21 +43,26 @@ export function OpenPOLinePickerModal(props: Props) {
   const [selected, setSelected] = createSignal(new Set<number>());
   const [statusChip, setStatusChip] = createSignal<StatusChip>("all");
 
-  createEffect(() => {
-    if (!props.open) return;
-    setSelected(new Set<number>());
-    setPage(1);
-    setStatusChip("all");
-    setFilters({
-      q: "",
-      dateFrom: "",
-      dateTo: "",
-      docNo: "",
-      partnerId: null,
-      partnerLocked: false,
-      partnerLabel: props.partnerLabel ?? "",
-    });
-  });
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (!open) return;
+        setSelected(new Set<number>());
+        setPage(1);
+        setStatusChip("all");
+        setFilters({
+          q: "",
+          dateFrom: "",
+          dateTo: "",
+          docNo: "",
+          partnerId: null,
+          partnerLocked: false,
+          partnerLabel: props.partnerLabel ?? "",
+        });
+      },
+    ),
+  );
 
   const [data] = createResource(
     () => (props.open ? { filters: filters(), page: page() } : null),

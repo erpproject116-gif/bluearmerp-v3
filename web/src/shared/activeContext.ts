@@ -1,6 +1,7 @@
 // Client-side "active business" and "active branch" selection, persisted in localStorage.
-// Kept dependency-free so the low-level apiFetch can read the active tenant without
-// importing the auth store (which would create an import cycle).
+// Avoid importing auth-context here (cycle with apiFetch). queryClient is safe.
+
+import { resetTenantScopedCache } from "./queryClient";
 
 const TENANT_KEY = "bluearm.activeTenantId";
 
@@ -27,8 +28,12 @@ export function getActiveTenantId(): number | null {
 export function setActiveTenantId(id: number | null): void {
   const ls = safeLocalStorage();
   if (!ls) return;
-  if (id && id > 0) ls.setItem(TENANT_KEY, String(id));
+  const prev = getActiveTenantId();
+  const next = id && id > 0 ? id : null;
+  if (next) ls.setItem(TENANT_KEY, String(next));
   else ls.removeItem(TENANT_KEY);
+  // Clear React Query so form fields / policies / lists cannot leak across workspaces.
+  if (prev !== next) resetTenantScopedCache();
 }
 
 export type ActiveBranch = { id: number; name: string };

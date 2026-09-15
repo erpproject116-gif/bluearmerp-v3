@@ -1,10 +1,13 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { useAuth } from "../../../shared/auth-context";
 import { isTenantModuleEnabled } from "../../../shared/moduleAccess";
+import { getActiveTenantId } from "../../../shared/activeContext";
+import { processPolicyQueryKey } from "../../../shared/useProcessPolicy";
 
 type ProcessPolicy = {
   tenant_id: number;
@@ -332,6 +335,7 @@ const PRESETS: { id: PresetId; label: string; help: string; apply: (p: ProcessPo
 export default function ProcessPoliciesPage() {
   const toast = useToast();
   const auth = useAuth();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [canManage, setCanManage] = createSignal(false);
@@ -403,6 +407,10 @@ export default function ProcessPoliciesPage() {
     setSaving(false);
     if (res.success && res.data) {
       setPolicy(res.data);
+      const tid = auth.me?.tenant.id ?? getActiveTenantId() ?? 0;
+      if (tid > 0) {
+        void queryClient.invalidateQueries({ queryKey: processPolicyQueryKey(tid) });
+      }
       toast.success("Process policies saved.");
     } else {
       toast.error(res.message || "Failed to save.");

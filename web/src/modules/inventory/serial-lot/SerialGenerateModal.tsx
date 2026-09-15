@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -56,7 +56,6 @@ export function SerialGenerateModal(props: Props) {
   const [qty, setQty] = createSignal("1");
   const [prefix, setPrefix] = createSignal(DEFAULT_SERIAL_PREFIX);
   const [remark, setRemark] = createSignal("");
-  const [lastGenerated, setLastGenerated] = createSignal<Generated[]>([]);
 
   const reset = () => {
     setRegisterDate(todayISO());
@@ -67,7 +66,6 @@ export function SerialGenerateModal(props: Props) {
     setQty("1");
     setPrefix(DEFAULT_SERIAL_PREFIX);
     setRemark("");
-    setLastGenerated([]);
   };
 
   createEffect(() => {
@@ -117,22 +115,32 @@ export function SerialGenerateModal(props: Props) {
         return;
       }
       const serials = res.data?.serials ?? [];
-      setLastGenerated(serials);
-      toast.success(`Generated ${serials.length} unique serial number(s).`);
+      // Close first so list refresh cannot leave the dialog stuck open (same as register).
+      reset();
+      props.onClose();
       props.onGenerated(serials);
+      if (serials.length > 0) {
+        toast.action({
+          type: "success",
+          title: `Generated ${serials.length} unique serial number(s).`,
+          message: "Already in stock — use Print labels for Code128 stickers, not Purchase Receive paste.",
+          actionLabel: "Print labels",
+          onAction: () => {
+            if (
+              !printCode128Labels({
+                title: "Serial labels",
+                rows: serials.map((s) => ({ code: s.serial_no })),
+              })
+            ) {
+              toast.warning("Allow pop-ups to print labels.");
+            }
+          },
+        });
+      } else {
+        toast.success("Generated serial numbers.");
+      }
     } finally {
       setSaving(false);
-    }
-  };
-
-  const printLabels = () => {
-    const rows = lastGenerated();
-    if (rows.length === 0) {
-      toast.warning("Generate serials first.");
-      return;
-    }
-    if (!printCode128Labels({ title: "Serial labels", rows: rows.map((s) => ({ code: s.serial_no })) })) {
-      toast.warning("Allow pop-ups to print labels.");
     }
   };
 
@@ -156,7 +164,7 @@ export function SerialGenerateModal(props: Props) {
         steps={[
           "Pick a serial-tracked item and stock location.",
           "Set company prefix (default BA) and quantity (1–200).",
-          "Generate, then Print labels (Code128).",
+          "Generate — the dialog closes; use Print labels on the success toast for Code128 stickers.",
           "Receiving a delivery? Open Purchase Receive and scan physical labels instead.",
         ]}
       />
@@ -209,20 +217,6 @@ export function SerialGenerateModal(props: Props) {
       <Field label="Remark">
         <input class={inputClass} value={remark()} onInput={(e) => setRemark(e.currentTarget.value)} />
       </Field>
-      <Show when={lastGenerated().length > 0}>
-        <div class="col-span-full mt-2 rounded-lg border border-stroke bg-brand-50/40 p-3">
-          <p class="mb-2 text-sm font-medium text-text-primary">Generated ({lastGenerated().length})</p>
-          <ul class="mb-3 max-h-32 overflow-y-auto font-mono text-xs text-text-secondary">
-            <For each={lastGenerated()}>{(s) => <li>{s.serial_no}</li>}</For>
-          </ul>
-          <button type="button" class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white" onClick={printLabels}>
-            Print labels
-          </button>
-          <p class="mt-2 text-[11px] text-text-secondary">
-            These serials are already in stock — use them for labels, not for Purchase Receive paste.
-          </p>
-        </div>
-      </Show>
     </EntityModal>
   );
 }

@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal } from "solid-js";
+import { createEffect, createResource, createSignal, on } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
@@ -59,22 +59,27 @@ export function QuotationLinePickerModal(props: Props) {
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set<number>());
 
-  createEffect(() => {
-    if (!props.open) return;
-    setSelected(new Set<number>());
-    setPage(1);
-    setFilters({
-      q: "",
-      // Default to all open quotation lines (not last-30-days only).
-      dateFrom: "",
-      dateTo: "",
-      docNo: "",
-      // Default: all partners (Ecount-style). Form partner is a hint label only.
-      partnerId: null,
-      partnerLocked: false,
-      partnerLabel: props.partnerLabel ?? "",
-    });
-  });
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (!open) return;
+        setSelected(new Set<number>());
+        setPage(1);
+        setFilters({
+          q: "",
+          // Default to all open quotation lines (not last-30-days only).
+          dateFrom: "",
+          dateTo: "",
+          docNo: "",
+          // Default: all partners (Ecount-style). Form partner is a hint label only.
+          partnerId: null,
+          partnerLocked: false,
+          partnerLabel: props.partnerLabel ?? "",
+        });
+      },
+    ),
+  );
 
   const [data] = createResource(
     () => (props.open ? { filters: filters(), page: page() } : null),

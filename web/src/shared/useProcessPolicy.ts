@@ -1,5 +1,7 @@
-import { createQuery } from "@tanstack/solid-query";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
+import { getActiveTenantId } from "./activeContext";
+import { useAuth } from "./auth-context";
 
 export type ProcessPolicy = {
   tenant_id: number;
@@ -145,10 +147,17 @@ export function validateAttachmentBeforeConfirm(
   return null;
 }
 
+export function processPolicyQueryKey(tenantId: number) {
+  return ["process-policy", tenantId] as const;
+}
+
 export function useProcessPolicy(enabled: () => boolean = () => true) {
+  const auth = useAuth();
+  const tenantId = () => auth.me?.tenant.id ?? getActiveTenantId() ?? 0;
+
   return createQuery(() => ({
-    queryKey: ["process-policy"],
-    enabled: enabled(),
+    queryKey: processPolicyQueryKey(tenantId()),
+    enabled: enabled() && tenantId() > 0,
     queryFn: async () => {
       const res = await apiFetch<{
         policy: ProcessPolicy;

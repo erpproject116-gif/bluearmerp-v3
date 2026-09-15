@@ -1,6 +1,8 @@
 import { createMemo } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
+import { getActiveTenantId } from "./activeContext";
+import { useAuth } from "./auth-context";
 
 export type FormFieldSetting = {
   id?: number;
@@ -34,8 +36,8 @@ export type CustomFieldDefinition = {
   is_active: boolean;
 };
 
-export function settingsQueryKey(entityType: string) {
-  return ["form-field-settings", entityType] as const;
+export function settingsQueryKey(tenantId: number, entityType: string) {
+  return ["form-field-settings", tenantId, entityType] as const;
 }
 
 async function fetchFormFieldSettings(entityType: string): Promise<SettingsResponse> {
@@ -66,11 +68,12 @@ export function definitionToFormField(def: CustomFieldDefinition): FormFieldSett
 
 export function upsertCustomFieldInCache(
   client: ReturnType<typeof useQueryClient>,
+  tenantId: number,
   entityType: string,
   def: CustomFieldDefinition,
 ) {
   const row = definitionToFormField(def);
-  client.setQueryData<SettingsResponse>(settingsQueryKey(entityType), (prev) => {
+  client.setQueryData<SettingsResponse>(settingsQueryKey(tenantId, entityType), (prev) => {
     const fields = prev?.fields ?? [];
     const idx = fields.findIndex((f) => f.kind === "custom" && (f.id === def.id || f.field_key === def.field_key));
     if (idx >= 0) {
@@ -84,10 +87,11 @@ export function upsertCustomFieldInCache(
 
 export function removeCustomFieldFromCache(
   client: ReturnType<typeof useQueryClient>,
+  tenantId: number,
   entityType: string,
   id: number,
 ) {
-  client.setQueryData<SettingsResponse>(settingsQueryKey(entityType), (prev) => {
+  client.setQueryData<SettingsResponse>(settingsQueryKey(tenantId, entityType), (prev) => {
     if (!prev) return prev;
     return {
       ...prev,
@@ -97,9 +101,13 @@ export function removeCustomFieldFromCache(
 }
 
 export function useFormFieldSettings(entityType: string) {
+  const auth = useAuth();
   const client = useQueryClient();
+  const tenantId = () => auth.me?.tenant.id ?? getActiveTenantId() ?? 0;
+
   const query = createQuery(() => ({
-    queryKey: settingsQueryKey(entityType),
+    queryKey: settingsQueryKey(tenantId(), entityType),
+    enabled: tenantId() > 0,
     queryFn: () => fetchFormFieldSettings(entityType),
     staleTime: 300_000,
     gcTime: 600_000,
@@ -125,11 +133,12 @@ export function useFormFieldSettings(entityType: string) {
     fields().filter((f) => f.kind === "standard" && f.is_visible && f.is_required && !f.is_disabled),
   );
 
-  const invalidate = () => void client.invalidateQueries({ queryKey: settingsQueryKey(entityType) });
+  const invalidate = () =>
+    void client.invalidateQueries({ queryKey: settingsQueryKey(tenantId(), entityType) });
 
   const reload = async () => {
     const data = await client.fetchQuery({
-      queryKey: settingsQueryKey(entityType),
+      queryKey: settingsQueryKey(tenantId(), entityType),
       queryFn: () => fetchFormFieldSettings(entityType),
       staleTime: 0,
     });
@@ -145,8 +154,9 @@ export function useFormFieldSettings(entityType: string) {
     requiredStandardFields,
     invalidate,
     reload,
-    upsertCustomField: (def: CustomFieldDefinition) => upsertCustomFieldInCache(client, entityType, def),
-    removeCustomFieldLocal: (id: number) => removeCustomFieldFromCache(client, entityType, id),
+    upsertCustomField: (def: CustomFieldDefinition) =>
+      upsertCustomFieldInCache(client, tenantId(), entityType, def),
+    removeCustomFieldLocal: (id: number) => removeCustomFieldFromCache(client, tenantId(), entityType, id),
   };
 }
 

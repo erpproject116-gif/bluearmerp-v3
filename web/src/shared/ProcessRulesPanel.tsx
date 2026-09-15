@@ -1,9 +1,13 @@
 import { A } from "@solidjs/router";
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 import { useToast } from "./toast";
 import { MODULE_SETUP_SCOPES } from "./moduleSetupScopes";
 import { PROCESS_POLICY_FIELD_META } from "./processPolicyFieldMeta";
+import { processPolicyQueryKey } from "./useProcessPolicy";
+import { getActiveTenantId } from "./activeContext";
+import { useAuth } from "./auth-context";
 
 type ProcessPolicy = {
   tenant_id: number;
@@ -25,12 +29,15 @@ type Props = {
  */
 export function ProcessRulesPanel(props: Props) {
   const toast = useToast();
+  const auth = useAuth();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [canManage, setCanManage] = createSignal(false);
   const [policy, setPolicy] = createSignal<ProcessPolicy | null>(null);
 
   const scope = () => MODULE_SETUP_SCOPES[props.scopeId] ?? null;
+  const tenantId = () => auth.me?.tenant.id ?? getActiveTenantId() ?? 0;
 
   const load = async () => {
     setLoading(true);
@@ -73,6 +80,10 @@ export function ProcessRulesPanel(props: Props) {
     setSaving(false);
     if (res.success && res.data) {
       setPolicy(res.data);
+      const tid = tenantId();
+      if (tid > 0) {
+        void queryClient.invalidateQueries({ queryKey: processPolicyQueryKey(tid) });
+      }
       toast.success("Process rules saved.");
     } else {
       toast.error(res.message || "Failed to save process rules.");

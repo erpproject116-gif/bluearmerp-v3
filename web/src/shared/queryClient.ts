@@ -18,3 +18,12 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+/**
+ * Drop all cached queries when the active business (tenant) changes.
+ * Many keys omit tenant_id; without a full clear, workspace A form/policy/list
+ * data can briefly (or longer) render for workspace B after a switch.
+ */
+export function resetTenantScopedCache(): void {
+  queryClient.clear();
+}
