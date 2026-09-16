@@ -51,11 +51,11 @@ export const recoveryHintFromError = (fieldError: string): string => {
   }
 
   if (/pick list|release/i.test(t)) {
-    return "Open the sales order, use Pick List to release qty and scan the serial, then Load Slip on this sale.";
+    return "Confirm the sales order, Load Slip on this sale, and scan serials here. Use Pick List only if process policies require split release.";
   }
 
-  if (/set.*progress.*completed|progress.*must be completed|not ready to invoice/i.test(t)) {
-    return "Set the sales order progress to Completed, then try again.";
+  if (/set.*progress.*completed|progress.*must be completed|not ready to invoice|isn.t ready to invoice/i.test(t)) {
+    return "Set the sales order Progress to In progress or Completed, then try again.";
   }
 
   if (/confirm.*purchase|unconfirmed/i.test(t)) {
