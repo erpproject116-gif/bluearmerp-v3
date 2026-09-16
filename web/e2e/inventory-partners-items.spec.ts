@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 import {
   openNewRow,
@@ -9,25 +9,70 @@ import {
   saveEntityModal,
   fillTextByLabel,
   selectFirstOption,
-  uniqueToken,
   softSkip,
   noteIncomplete,
 } from "./helpers/entityForm";
+import { mutationsAllowed, currentTier } from "./helpers/liveSafety";
+import { e2eMarker, ledgerAppend } from "./helpers/mutationLedger";
 
 test.describe("inventory partners & items interaction", () => {
-  test("partners: cancel New; create unique partner; edit save", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
-    test.setTimeout(120_000);
+  test("@read-only partners: cancel New; open first row without save", async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
 
-    const name = uniqueToken("Partner");
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/partners");
     await assertApiReachable(page);
-    await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
+    try {
+      await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
+    } catch {
+      softSkip(testInfo, "Partners table not visible");
+    }
 
     await openNewRow(page);
     await expectModalHeading(page, /New partner/i);
     await cancelEntityModal(page, /New partner/i);
+
+    const rows = page.locator("tbody tr").filter({ hasNotText: /Resize column/i });
+    if ((await rows.count()) > 0) {
+      await openFirstDataRow(page);
+      const editOpen = await page.getByRole("heading", { name: /Edit partner/i }).isVisible().catch(() => false);
+      if (editOpen) await cancelEntityModal(page, /Edit partner/i).catch(() => undefined);
+    }
+  });
+
+  test("@read-only items: cancel New; open first row without save", async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+
+    await ensureSignedIn(page);
+    await page.goto("/app/inventory/items");
+    await assertApiReachable(page);
+    try {
+      await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
+    } catch {
+      softSkip(testInfo, "Items table not visible");
+    }
+
+    await openNewRow(page);
+    await expectModalHeading(page, /New item/i);
+    await cancelEntityModal(page, /New item/i);
+
+    const rows = page.locator("tbody tr").filter({ hasNotText: /Resize column/i });
+    if ((await rows.count()) > 0) {
+      await openFirstDataRow(page);
+      const editOpen = await page.getByRole("heading", { name: /Edit item/i }).isVisible().catch(() => false);
+      if (editOpen) await cancelEntityModal(page, /Edit item/i).catch(() => undefined);
+    }
+  });
+
+  test("@mutating @reversible partners: create E2E partner only", async ({ page }, testInfo) => {
+    test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
+    test.setTimeout(120_000);
+
+    const name = e2eMarker("Partner");
+    await ensureSignedIn(page);
+    await page.goto("/app/inventory/partners");
+    await assertApiReachable(page);
+    await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
 
     await openNewRow(page);
     await expectModalHeading(page, /New partner/i);
@@ -44,33 +89,21 @@ test.describe("inventory partners & items interaction", () => {
       noteIncomplete(testInfo, "Partner create did not complete");
       return;
     }
-
-    // Edit first row if modal closed
-    if (!(await page.getByRole("heading", { name: /partner/i }).isVisible().catch(() => false))) {
-      await openFirstDataRow(page);
-      await expectModalHeading(page, /Edit partner/i);
-      await fillTextByLabel(page, /Company name/i, `${name}-edit`).catch(() => undefined);
-      await saveEntityModal(page, /Edit partner/i);
-    }
+    ledgerAppend({ kind: "partner", marker: name, path: "/app/inventory/partners", status: "created" });
   });
 
-  test("items: cancel New; create unique item; edit", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
+  test("@mutating @reversible items: create E2E item only", async ({ page }, testInfo) => {
+    test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
     test.setTimeout(120_000);
 
-    const name = uniqueToken("Item");
-    await demoSignIn(page);
+    const name = e2eMarker("Item");
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/items");
     await assertApiReachable(page);
     await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
 
     await openNewRow(page);
     await expectModalHeading(page, /New item/i);
-    await cancelEntityModal(page, /New item/i);
-
-    await openNewRow(page);
-    await expectModalHeading(page, /New item/i);
-    // Item code is often auto-generated (readonly) on create.
     await fillTextByLabel(page, /Item name/i, name);
     await selectFirstOption(page, /Status/i).catch(() => undefined);
     await saveEntityModal(page, /New item/i);
@@ -81,9 +114,6 @@ test.describe("inventory partners & items interaction", () => {
       noteIncomplete(testInfo, "Item create stayed open (validation / required fields)");
       return;
     }
-
-    await openFirstDataRow(page);
-    await expectModalHeading(page, /Edit item/i);
-    await cancelEntityModal(page, /Edit item/i);
+    ledgerAppend({ kind: "item", marker: name, path: "/app/inventory/items", status: "created" });
   });
 });

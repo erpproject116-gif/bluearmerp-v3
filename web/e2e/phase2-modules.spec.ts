@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 import {
   openNewRow,
@@ -9,21 +9,20 @@ import {
   saveEntityModal,
   fillTextByLabel,
   selectFirstOption,
-  uniqueToken,
   softSkip,
   noteIncomplete,
 } from "./helpers/entityForm";
+import { mutationsAllowed, currentTier } from "./helpers/liveSafety";
+import { e2eMarker, ledgerAppend } from "./helpers/mutationLedger";
 
-/** Phase 2: CRM, finance COA/JE, RFQ, payment vouchers — cancel / edit / create where possible. */
+/** Phase 2: CRM, finance COA/JE, RFQ, payment vouchers — cancel / gated create. */
 
 test.describe("Phase 2 CRM leads", () => {
-  test("leads: cancel New; create unique lead; edit", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
+  test("@read-only leads: cancel New; open first without save", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     page.setDefaultTimeout(12_000);
 
-    const name = uniqueToken("Lead");
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/crm/leads");
     await assertApiReachable(page);
     try {
@@ -35,6 +34,22 @@ test.describe("Phase 2 CRM leads", () => {
     await openNewRow(page);
     await expectModalHeading(page, /New lead/i);
     await cancelEntityModal(page, /New lead/i);
+  });
+
+  test("@mutating @reversible leads: create unique E2E lead", async ({ page }, testInfo) => {
+    test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
+    test.setTimeout(90_000);
+    page.setDefaultTimeout(12_000);
+
+    const name = e2eMarker("Lead");
+    await ensureSignedIn(page);
+    await page.goto("/app/crm/leads");
+    await assertApiReachable(page);
+    try {
+      await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
+    } catch {
+      softSkip(testInfo, "CRM leads table not visible");
+    }
 
     await openNewRow(page);
     await expectModalHeading(page, /New lead/i);
@@ -48,32 +63,16 @@ test.describe("Phase 2 CRM leads", () => {
       noteIncomplete(testInfo, "Lead create stayed open");
       return;
     }
-
-    // Prefer searching the created lead; otherwise open first row if any.
-    const search = page.getByPlaceholder(/Search leads/i);
-    if (await search.isVisible().catch(() => false)) {
-      await search.fill(name);
-      await page.waitForTimeout(800);
-    }
-    const rows = page.locator("tbody tr").filter({ hasNotText: /Resize column/i });
-    if ((await rows.count()) === 0) {
-      noteIncomplete(testInfo, "Lead created but list empty (refresh/search)");
-      return;
-    }
-    await openFirstDataRow(page);
-    await expectModalHeading(page, /Edit lead/i);
-    await cancelEntityModal(page, /Edit lead/i);
+    ledgerAppend({ kind: "lead", marker: name, path: "/app/crm/leads", status: "created" });
   });
 });
 
 test.describe("Phase 2 chart of accounts", () => {
-  test("COA: cancel New; create unique account", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
+  test("@read-only COA: cancel New without create", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     page.setDefaultTimeout(12_000);
 
-    const code = `E${String(Date.now()).slice(-6)}`;
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/finance/acct-i/chart-of-accounts");
     await assertApiReachable(page);
     try {
@@ -85,6 +84,22 @@ test.describe("Phase 2 chart of accounts", () => {
     await openNewRow(page);
     await expectModalHeading(page, /New account/i);
     await cancelEntityModal(page, /New account/i);
+  });
+
+  test("@mutating @reversible COA: create unique E2E account", async ({ page }, testInfo) => {
+    test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
+    test.setTimeout(90_000);
+    page.setDefaultTimeout(12_000);
+
+    const code = `E${String(Date.now()).slice(-6)}`;
+    await ensureSignedIn(page);
+    await page.goto("/app/finance/acct-i/chart-of-accounts");
+    await assertApiReachable(page);
+    try {
+      await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
+    } catch {
+      softSkip(testInfo, "COA table not visible");
+    }
 
     await openNewRow(page);
     await expectModalHeading(page, /New account/i);
@@ -96,17 +111,18 @@ test.describe("Phase 2 chart of accounts", () => {
     if (await page.getByRole("heading", { name: /New account/i }).isVisible().catch(() => false)) {
       await cancelEntityModal(page, /New account/i).catch(() => undefined);
       noteIncomplete(testInfo, "COA create stayed open");
+      return;
     }
+    ledgerAppend({ kind: "coa", marker: code, path: "/app/finance/acct-i/chart-of-accounts", status: "created" });
   });
 });
 
 test.describe("Phase 2 journal entries", () => {
-  test("JE: open New draft modal and cancel", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
+  test("@read-only JE: open New draft modal and cancel", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     page.setDefaultTimeout(12_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/finance/acct-i/journal-entries");
     await assertApiReachable(page);
 
@@ -118,19 +134,18 @@ test.describe("Phase 2 journal entries", () => {
     }
     await newBtn.click();
     await expectModalHeading(page, /New journal entry/i);
-    await fillTextByLabel(page, /Remarks/i, uniqueToken("JE")).catch(() => undefined);
+    await fillTextByLabel(page, /Remarks/i, e2eMarker("JE")).catch(() => undefined);
     await cancelEntityModal(page, /New journal entry/i);
     await expect(page.getByRole("heading", { name: /New journal entry/i })).toBeHidden({ timeout: 10000 });
   });
 });
 
 test.describe("Phase 2 payment vouchers", () => {
-  test("PV: cancel New; History when rows exist", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
+  test("@read-only PV: cancel New; History when rows exist", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     page.setDefaultTimeout(12_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/finance/payment-vouchers");
     await assertApiReachable(page);
     try {
@@ -155,12 +170,11 @@ test.describe("Phase 2 payment vouchers", () => {
 });
 
 test.describe("Phase 2 RFQ", () => {
-  test("RFQ: open New modal and close", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
+  test("@read-only RFQ: open New modal and close", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     page.setDefaultTimeout(12_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/purchase-order/rfq");
     await assertApiReachable(page);
 
@@ -184,12 +198,11 @@ test.describe("Phase 2 RFQ", () => {
 });
 
 test.describe("Phase 2 purchase request smoke", () => {
-  test("PR list has rows (or soft-skip) and History opens", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
+  test("@read-only PR list has rows (or soft-skip) and History opens", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     page.setDefaultTimeout(12_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/purchase-request/purchase-requests");
     await assertApiReachable(page);
     try {

@@ -34,18 +34,61 @@ if (!process.env.E2E_DEMO_PASSWORD && process.env.DEMO_USER_PASSWORD) {
   process.env.E2E_DEMO_PASSWORD = process.env.DEMO_USER_PASSWORD;
 }
 
+const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:5173";
+const externalBase =
+  /^https?:\/\//i.test(baseURL) && !/localhost|127\.0\.0\.1/i.test(baseURL);
+const storageStatePath = path.join(root, "e2e/.auth/user.json");
+const useStorageState =
+  process.env.E2E_USE_STORAGE_STATE !== "0" && fs.existsSync(storageStatePath);
+
+/** Do not start Vite when targeting a deployed URL or CI. */
+const skipWebServer = Boolean(process.env.CI) || externalBase || process.env.E2E_NO_WEBSERVER === "1";
+
 export default defineConfig({
   testDir: "./e2e",
   testIgnore: ["**/helpers/**", "**/scripts/**", "**/fixtures/**"],
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 1,
+  timeout: 120_000,
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",
+    baseURL,
     trace: "on-first-retry",
+    screenshot: "only-on-failure",
+    video: "off",
+    ...(useStorageState ? { storageState: storageStatePath } : {}),
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: process.env.CI
+  projects: [
+    {
+      name: "read-only",
+      grep: /@read-only|@smoke/,
+      grepInvert: /@mutating|@posting|@auth-save/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "reversible",
+      grep: /@mutating|@reversible/,
+      grepInvert: /@posting|@auth-save/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "posting",
+      grep: /@posting/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "auth-save",
+      grep: /@auth-save/,
+      use: { ...devices["Desktop Chrome"], storageState: undefined },
+    },
+    {
+      // Full suite (local/CI default when no project selected via CLI)
+      name: "chromium",
+      grepInvert: /@auth-save/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
+  webServer: skipWebServer
     ? undefined
     : {
         command: "npm run dev",

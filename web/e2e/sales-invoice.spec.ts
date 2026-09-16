@@ -1,11 +1,8 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
-
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 test.describe("Sales invoice tab", () => {
-  test("sale invoice tab shows item breakdown", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD for authenticated smoke");
-
-    await demoSignIn(page);
+  test("@smoke @read-only sale invoice tab shows item breakdown", async ({ page }) => {
+    await ensureSignedIn(page);
     await page.goto("/app/sales/sales");
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15000 });
 

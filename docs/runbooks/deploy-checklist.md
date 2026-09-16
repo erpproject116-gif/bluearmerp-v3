@@ -66,6 +66,24 @@ GOLDEN_CREATE_QUOTATION=true node scripts/golden-path-smoke.mjs
 
 Attachment endpoints are exercised automatically when demo PO/SI rows exist.
 
+### Live-tenant E2E (read-only first)
+
+See [`docs/qa/live-e2e-baseline.md`](../qa/live-e2e-baseline.md) and `web/e2e/README.md`.
+
+```bash
+cd web
+# Optional once: npm run test:e2e:auth:save
+set CI=true
+set E2E_BASE_URL=https://app.bluearmerp.com
+npm run test:e2e:live:read-only
+npm run e2e:tickets:draft
+npm run e2e:report
+```
+
+**Stop release / stop live E2E if:** schema unhealthy, unexpected mutation of non-`E2E-*` rows, repeated 429 after wait, unexplained 5xx burst, reconciliation mismatch, or wrong tenant.
+
+**Mutating live runs** require explicit `E2E_TIER` + `E2E_ALLOW_MUTATIONS=1` + `E2E_RUN_CONFIRM` — never default on production.
+
 ## Month-close
 
 Pilot month-end steps: [`month-close-checklist.md`](month-close-checklist.md).

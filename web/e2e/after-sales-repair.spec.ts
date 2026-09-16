@@ -1,29 +1,31 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 import {
   openNewRow,
   openFirstDataRow,
   expectModalHeading,
   cancelEntityModal,
-  saveEntityModal,
+  softSkip,
+} from "./helpers/entityForm";
+import { mutationsAllowed, currentTier } from "./helpers/liveSafety";
+import { loadTenantProfile } from "./helpers/tenantProfile";
+import { e2eMarker, ledgerAppend } from "./helpers/mutationLedger";
+import {
   fillLookup,
   fillDate,
   fillTextByLabel,
   setProgressStatus,
-  uniqueToken,
-  softSkip,
+  saveEntityModal,
   noteIncomplete,
 } from "./helpers/entityForm";
 
 test.describe("after-sales repair order interaction", () => {
-  test("list controls: New cancel; edit existing; create when lookups work", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
-    test.setTimeout(120_000);
+  test("@read-only list: New cancel; open existing without save", async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
     page.setDefaultTimeout(12_000);
 
-    const note = uniqueToken("RO");
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/after-sales/repair-orders");
     await assertApiReachable(page);
 
@@ -44,20 +46,25 @@ test.describe("after-sales repair order interaction", () => {
         .getByRole("heading", { name: /Edit Repair Order/i })
         .isVisible()
         .catch(() => false);
-      if (editOpen) {
-        const details = page.locator("label").filter({ hasText: /Repair details/i }).first();
-        if (await details.isVisible().catch(() => false)) {
-          await fillTextByLabel(page, /Repair details/i, note);
-          await saveEntityModal(page, /Edit Repair Order/i);
-          await page.waitForTimeout(1000);
-          // Ensure modal closed before continuing
-          if (await page.getByRole("heading", { name: /Edit Repair Order/i }).isVisible().catch(() => false)) {
-            await cancelEntityModal(page, /Edit Repair Order/i).catch(() => undefined);
-          }
-        } else {
-          await cancelEntityModal(page, /Edit Repair Order/i);
-        }
-      }
+      if (editOpen) await cancelEntityModal(page, /Edit Repair Order/i).catch(() => undefined);
+    }
+  });
+
+  test("@mutating @reversible create E2E repair order when lookups work", async ({ page }, testInfo) => {
+    test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
+    test.setTimeout(120_000);
+    page.setDefaultTimeout(12_000);
+
+    const profile = loadTenantProfile();
+    const note = e2eMarker("RO");
+    await ensureSignedIn(page);
+    await page.goto("/app/after-sales/repair-orders");
+    await assertApiReachable(page);
+
+    try {
+      await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
+    } catch {
+      softSkip(testInfo, "Repair order list table not visible");
     }
 
     await openNewRow(page);
@@ -66,8 +73,8 @@ test.describe("after-sales repair order interaction", () => {
       await Promise.race([
         (async () => {
           await fillDate(page, /^Date/i, new Date().toISOString().slice(0, 10));
-          await fillLookup(page, /Customer/i, "Seda");
-          await fillLookup(page, /Location/i, "Head");
+          await fillLookup(page, /Customer/i, profile.partnerQuery);
+          await fillLookup(page, /Location/i, profile.locationQuery);
           await setProgressStatus(page);
           await fillTextByLabel(page, /Repair details/i, note).catch(() => undefined);
           await saveEntityModal(page, /New Repair Order/i);
@@ -77,12 +84,21 @@ test.describe("after-sales repair order interaction", () => {
           setTimeout(() => reject(new Error("create path exceeded 35s")), 35_000),
         ),
       ]);
-      const stillOpen = await page.getByRole("heading", { name: /New Repair Order/i }).isVisible().catch(() => false);
+      const stillOpen = await page
+        .getByRole("heading", { name: /New Repair Order/i })
+        .isVisible()
+        .catch(() => false);
       if (stillOpen) {
         await cancelEntityModal(page, /New Repair Order/i).catch(() => undefined);
-        noteIncomplete(testInfo, "Repair create stayed open (validation / seed)");
+        noteIncomplete(testInfo, "Repair create stayed open");
         return;
       }
+      ledgerAppend({
+        kind: "repair-order",
+        marker: note,
+        path: "/app/after-sales/repair-orders",
+        status: "created",
+      });
     } catch (e) {
       await cancelEntityModal(page, /New Repair Order/i).catch(() => undefined);
       noteIncomplete(testInfo, `Repair create: ${e instanceof Error ? e.message : String(e)}`);

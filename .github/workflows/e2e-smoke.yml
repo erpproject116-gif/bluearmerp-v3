@@ -6,25 +6,52 @@ on:
     branches: [main, master]
     paths:
       - "web/**"
+      - "api/migrations/**"
+      - "scripts/check-migration-order.mjs"
+      - ".github/workflows/e2e-smoke.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "web/**"
+      - "api/migrations/**"
+      - "scripts/check-migration-order.mjs"
       - ".github/workflows/e2e-smoke.yml"
 
 jobs:
   unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      # A foreign key pointing at a table created by a later migration passes on
+      # an existing database and breaks every fresh bootstrap. Catch it here.
+      - name: Migration order guard
+        run: node scripts/check-migration-order.mjs
       - name: Install web deps
         working-directory: web
         run: npm ci
       - name: Vitest unit + link integrity
         working-directory: web
-        run: npm test
+        run: |
+          npm run e2e:routes:extract
+          npm run e2e:coverage:manifest
+          npm test
+      - name: Web performance budget
+        working-directory: web
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8080
+          VITE_SUPABASE_URL: http://127.0.0.1
+          VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used
+        run: |
+          npm run build
+          npm run e2e:perf:budget
 
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -42,10 +69,36 @@ jobs:
 
       - name: Build web
         working-directory: web
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8080
+          VITE_SUPABASE_URL: http://127.0.0.1
+          VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used-by-smoke
         run: npm run build
+
+      # Playwright skips its own webServer under CI, so serve the build here.
+      # Without this the smoke test loads nothing and can only ever fail.
+      - name: Start preview server
+        working-directory: web
+        run: npm run preview -- --host 127.0.0.1 --port 4173 &
+
+      - name: Wait for preview
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4173 >/dev/null && exit 0
+            sleep 2
+          done
+          echo "Preview server did not start" && exit 1
 
       - name: Sign-in page smoke
         working-directory: web
-        run: npx playwright test e2e/smoke.spec.ts -g "sign-in page loads"
+        run: npx playwright test e2e/smoke.spec.ts e2e/coverage-manifest.spec.ts --project=chromium -g "@smoke" --reporter=list,json
         env:
           CI: "true"
+          E2E_BASE_URL: http://127.0.0.1:4173
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
+
+      # A suite where every test skipped still exits 0. Refuse that.
+      - name: Enforce coverage floor
+        if: always()
+        working-directory: web
+        run: node e2e/scripts/assert-coverage-floor.mjs --report test-results/results.json --job smoke

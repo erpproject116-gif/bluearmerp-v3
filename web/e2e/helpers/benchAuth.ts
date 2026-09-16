@@ -1,9 +1,33 @@
 import type { Page } from "@playwright/test";
 
-/** Inject a Supabase-compatible session so the SPA can call the API with a minted bench JWT (CI). */
-export async function seedBenchSession(page: Page, accessToken: string, supabaseHost = "127.0.0.1") {
+/**
+ * Match @supabase/supabase-js storageKey derivation.
+ * For URL http://127.0.0.1 the client uses `sb-127-auth-token`, not
+ * `sb-127.0.0.1-auth-token`. Seeding the wrong key is why demo-smoke hung on
+ * /signin after a "successful" bench JWT mint.
+ */
+export function supabaseAuthStorageKey(supabaseUrl: string): string {
+  try {
+    const host = new URL(supabaseUrl).hostname;
+    const ref = host.split(".")[0] || host;
+    return `sb-${ref}-auth-token`;
+  } catch {
+    return "sb-127-auth-token";
+  }
+}
+
+/**
+ * Inject a Supabase-compatible session so the SPA can call the API with a minted
+ * bench JWT (CI). Value must be the session object itself — modern auth-js
+ * rejects the old `{ currentSession, expiresAt }` wrapper via `_isValidSession`.
+ */
+export async function seedBenchSession(
+  page: Page,
+  accessToken: string,
+  supabaseUrl = process.env.VITE_SUPABASE_URL || "http://127.0.0.1",
+) {
   const expiresAt = Math.floor(Date.now() / 1000) + 3600;
-  const storageKey = `sb-${supabaseHost}-auth-token`;
+  const storageKey = supabaseAuthStorageKey(supabaseUrl);
   await page.addInitScript(
     ({ key, token, exp }) => {
       const session = {
@@ -19,13 +43,7 @@ export async function seedBenchSession(page: Page, accessToken: string, supabase
           email: "demo@demo.bluearm.local",
         },
       };
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          currentSession: session,
-          expiresAt: exp * 1000,
-        }),
-      );
+      localStorage.setItem(key, JSON.stringify(session));
     },
     { key: storageKey, token: accessToken, exp: expiresAt },
   );

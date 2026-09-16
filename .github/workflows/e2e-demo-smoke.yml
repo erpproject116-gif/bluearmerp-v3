@@ -12,10 +12,22 @@ on:
       - "scripts/seed-demo-*.sql"
       - "supabase/seed.sql"
       - ".github/workflows/e2e-demo-smoke.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "web/**"
+      - "api/**"
+      - "scripts/mint-bench-jwt.mjs"
+      - "scripts/seed-ci-bench-auth.sql"
+      - "scripts/seed-demo-*.sql"
+      - "supabase/seed.sql"
+      - ".github/workflows/e2e-demo-smoke.yml"
 
 jobs:
   demo-smoke:
     runs-on: ubuntu-latest
+    # Without a cap a stuck Playwright step burns hours before anyone notices.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -37,21 +49,26 @@ jobs:
           sudo apt-get install -y postgresql-client
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
           for f in api/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
-          psql "$DATABASE_URL" -f supabase/seed.sql
-          psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
-          psql "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
-          psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
-          psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
-          psql "$DATABASE_URL" -f scripts/seed-demo-quotations.sql || true
-          psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql || true
-          psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql || true
+          # Align with production: record schema_migrations via migrate CLI
+          (cd api && go run ./cmd/migrate)
+          # Hard-fail catalog/demo identity seeds — silent FK errors previously left DEMO000 unusable.
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/seed.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-base-config.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-quotations.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-sales.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-finance-ap.sql || true
 
       - name: Build and start API
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
           SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
-          CORS_ORIGIN: http://localhost:4173
+          # Preview serves on 127.0.0.1:4173 (E2E_BASE_URL). localhost ≠ 127.0.0.1 for CORS.
+          CORS_ORIGIN: http://127.0.0.1:4173,http://localhost:4173
           PORT: "8080"
           MIGRATIONS_DIR: api/migrations
         run: |
@@ -60,9 +77,24 @@ jobs:
           /tmp/server &
           sleep 3
 
+      - name: Wait for API schema health
+        run: |
+          for i in $(seq 1 30); do
+            body=$(curl -sf http://127.0.0.1:8080/health/schema || true)
+            echo "$body" | grep -q '"healthy":true' && exit 0
+            sleep 2
+          done
+          echo "API schema health check failed"; curl -s http://127.0.0.1:8080/health/schema || true; exit 1
+
       - name: Install web deps
         working-directory: web
         run: npm ci
+
+      - name: Build coverage manifest
+        working-directory: web
+        run: |
+          npm run e2e:routes:extract
+          npm run e2e:coverage:manifest
 
       - name: Install Playwright
         working-directory: web
@@ -71,13 +103,18 @@ jobs:
       - name: Build web for preview
         working-directory: web
         env:
-          VITE_API_BASE_URL: http://localhost:8080
+          VITE_API_BASE_URL: http://127.0.0.1:8080
           VITE_SUPABASE_URL: http://127.0.0.1
           VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used-for-bench-jwt
         run: npm run build
 
       - name: Start preview server
         working-directory: web
+        # Bake-time VITE_* is already in the bundle; export here so preview's empty-env warning is silent.
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8080
+          VITE_SUPABASE_URL: http://127.0.0.1
+          VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used-for-bench-jwt
         run: npm run preview -- --host 127.0.0.1 --port 4173 &
 
       - name: Wait for preview
@@ -94,9 +131,15 @@ jobs:
           CI: "true"
           E2E_BASE_URL: http://127.0.0.1:4173
           SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
+          E2E_TIER: posting
+          E2E_ALLOW_MUTATIONS: "1"
+          E2E_RUN_CONFIRM: ci-${{ github.run_id }}
+          E2E_REQUIRE_AUTH: "1"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
         run: |
           export E2E_BENCH_TOKEN=$(node ../scripts/mint-bench-jwt.mjs)
-          npx playwright test \
+          npx playwright test --project=chromium --reporter=list,json \
+            e2e/coverage-manifest.spec.ts \
             e2e/route-smoke.spec.ts \
             e2e/core-interactions.spec.ts \
             e2e/sales-invoice.spec.ts \
@@ -107,4 +150,26 @@ jobs:
             e2e/purchase-order-crud.spec.ts \
             e2e/purchase-crud.spec.ts \
             e2e/official-receipt-crud.spec.ts \
-            e2e/inventory-partners-items.spec.ts
+            e2e/inventory-partners-items.spec.ts \
+            e2e/page-grid-form-contracts.spec.ts \
+            e2e/business-chains.spec.ts
+
+      # A run where everything skipped still exits 0. Refuse that.
+      - name: Enforce coverage floor
+        if: always()
+        working-directory: web
+        run: node e2e/scripts/assert-coverage-floor.mjs --report test-results/results.json --job demo-smoke
+
+      # e2e/.evidence is gitignored on purpose, so CI is the only place findings
+      # survive a run. Without this artifact a red build tells you nothing.
+      - name: Upload run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-smoke-evidence-${{ github.run_id }}
+          path: |
+            web/e2e/.evidence/
+            web/test-results/
+            web/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore

@@ -382,9 +382,31 @@ func RequireItemBaseUnit(ctx context.Context, q UnitQuerier, tenantID, itemID in
 		return 0, "", fmt.Errorf("item base unit lookup failed")
 	}
 	if unitID <= 0 {
-		return 0, "", fmt.Errorf("Set a base unit on the item under Inventory → Items")
+		return 0, "", fmt.Errorf(
+			"%s has no base unit, so this line cannot be saved. Open Stocks > Inventory > Items, set the base unit (for example piece or box), then save this document again",
+			itemLabelForMessage(ctx, q, tenantID, itemID),
+		)
 	}
 	return unitID, code, nil
+}
+
+// itemLabelForMessage names the offending item so the reader does not have to
+// work out which line is at fault. Best-effort: falls back to a generic phrase.
+func itemLabelForMessage(ctx context.Context, q UnitQuerier, tenantID, itemID int64) string {
+	var code, name string
+	err := q.QueryRow(ctx, `
+		select coalesce(item_code, ''), coalesce(item_name, '')
+		from public.inv_items where id=$1 and tenant_id=$2`, itemID, tenantID).Scan(&code, &name)
+	if err != nil || (code == "" && name == "") {
+		return "This item"
+	}
+	if code != "" && name != "" {
+		return fmt.Sprintf("Item %s (%s)", code, name)
+	}
+	if code != "" {
+		return fmt.Sprintf("Item %s", code)
+	}
+	return fmt.Sprintf("Item %s", name)
 }
 
 // PreferStockLineUnit resolves a document line unit for stock-posting buy docs.

@@ -6,11 +6,9 @@ defineDocCrudSpec({
   newHeading: /New Purchase Order/i,
   editHeading: /Purchase Order/i,
   partnerLabel: /Supplier/i,
-  partnerQuery: "Steel",
+  supplier: true,
   locationLabel: /Location/i,
-  locationQuery: "Head",
   dateLabel: /^Date|Order date|PO date/i,
   notesLabel: /^Notes/i,
   withLines: true,
-  itemQuery: "Steel",
 });
