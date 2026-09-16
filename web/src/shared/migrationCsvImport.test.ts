@@ -68,11 +68,11 @@ const GO_REQUIRED: Record<MigKind, string[]> = {
   boms: ["bom_code", "finished_item_code", "component_item_code", "qty"],
   open_si: ["source_doc_no", "partner", "date", "amount"],
   open_ap: ["source_doc_no", "partner", "date", "amount"],
-  open_po: ["source_doc_no", "partner", "date", "item", "quantity"],
-  open_quo: ["source_doc_no", "partner", "date", "item", "quantity"],
-  open_so: ["source_doc_no", "partner", "date", "item", "quantity"],
-  open_pr: ["source_doc_no", "date", "item", "quantity"],
-  open_rfq: ["source_doc_no", "date", "item", "quantity"],
+  open_po: ["source_doc_no", "partner", "date"],
+  open_quo: ["source_doc_no", "partner", "date"],
+  open_so: ["source_doc_no", "partner", "date"],
+  open_pr: ["source_doc_no", "date"],
+  open_rfq: ["source_doc_no", "date"],
   in_transit: ["quantity", "from_location", "to_location"],
 };
 
@@ -97,7 +97,7 @@ describe("migrationCsvImport", () => {
 
   it("requires an item mapping for stock and open documents", () => {
     expect(MIG_NEEDS_ITEM.opening_stock).toBe(true);
-    expect(MIG_NEEDS_ITEM.open_si).toBe(true);
+    expect(MIG_NEEDS_ITEM.open_si).toBe(false);
     expect(MIG_NEEDS_ITEM.in_transit).toBe(true);
     expect(MIG_NEEDS_ITEM.items).toBe(false);
   });

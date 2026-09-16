@@ -8,7 +8,7 @@ import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
-import { submitEntity, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { submitEntity, collectRequiredFieldErrors, showClientValidationBlocker } from "../../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
 import { mergeFormErrors } from "../../../shared/formValidation";
@@ -518,7 +518,7 @@ export function PurchaseRequestModal(props: Props) {
     );
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
-      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Fix the highlighted fields, then try again.");
+      showClientValidationBlocker(validationErrors, toast);
       return;
     }
 

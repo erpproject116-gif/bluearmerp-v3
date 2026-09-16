@@ -272,11 +272,11 @@ export function SidebarNav() {
       return norm === "/app/production";
     }
     if (area.id === "production_all") {
-      return pathStarts(p, ["/app/production/all"]);
+      return pathStarts(p, ["/app/production/all/jobs", "/app/production/all/recipes"]);
     }
     if (area.id === "production_recipe") {
       return (
-        pathStarts(p, ["/app/production/recipe"]) ||
+        pathStarts(p, ["/app/production/recipe/jobs", "/app/production/recipe/recipes"]) ||
         (pathStarts(p, ["/app/production/orders/new"]) &&
           new URLSearchParams(loc.search).get("type") === "recipe")
       );
@@ -284,7 +284,7 @@ export function SidebarNav() {
     if (area.id === "production_assembly") {
       const orderType = new URLSearchParams(loc.search).get("type");
       return (
-        pathStarts(p, ["/app/production/assembly"]) ||
+        pathStarts(p, ["/app/production/assembly/jobs", "/app/production/assembly/recipes"]) ||
         (pathStarts(p, ["/app/production/orders/new"]) &&
           (!orderType || orderType === "assembly")) ||
         (pathStarts(p, ["/app/production/issue-station", "/app/production/receive-station"]) &&
@@ -294,7 +294,7 @@ export function SidebarNav() {
     }
     if (area.id === "production_disassembly") {
       return (
-        pathStarts(p, ["/app/production/disassembly"]) ||
+        pathStarts(p, ["/app/production/disassembly/jobs", "/app/production/disassembly/recipes"]) ||
         pathStarts(p, ["/app/production/weigh-parts"]) ||
         (pathStarts(p, ["/app/production/orders/new"]) &&
           ["cutting", "disassembly"].includes(new URLSearchParams(loc.search).get("type") ?? "")) ||
@@ -435,7 +435,9 @@ export function SidebarNav() {
     if (area.id === "documentation") return pathStarts(p, ["/app/documentation"]);
     if (area.id === "user_management") {
       return (
-        (pathStarts(p, ["/app/user-management"]) || pathStarts(p, ["/app/settings/branding"])) &&
+        (pathStarts(p, ["/app/user-management"]) ||
+          pathStarts(p, ["/app/settings/branding"]) ||
+          pathStarts(p, ["/app/settings/billing"])) &&
         !p.startsWith("/app/user-management/process-policies")
       );
     }

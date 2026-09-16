@@ -1,14 +1,25 @@
 import type { Page, Locator } from "@playwright/test";
 import { expect } from "@playwright/test";
 
-/** Soft-skip when demo seed / UI cannot support the interaction (setup only). */
-export function softSkip(testInfo: { skip: (cond?: boolean, desc?: string) => void }, reason: string) {
-  testInfo.skip(true, reason);
+/**
+ * Setup could not run (missing grid / auth / seed). Fail honestly — never hide as a skip/pass.
+ * Annotation `needs-seed` lets CI triage without treating the run as green.
+ */
+export function softSkip(
+  testInfo: { annotations: { type: string; description?: string }[] },
+  reason: string,
+): never {
+  testInfo.annotations.push({ type: "needs-seed", description: reason });
+  throw new Error(`QA blocked (needs seed/setup): ${reason}`);
 }
 
-/** Create path optional — do not skip the whole test after Cancel/Edit already passed. */
-export function noteIncomplete(testInfo: { annotations: { type: string; description?: string }[] }, reason: string) {
-  testInfo.annotations.push({ type: "note", description: reason });
+/** Create path incomplete after Cancel/Edit already passed — still a finding, not a silent pass. */
+export function noteIncomplete(
+  testInfo: { annotations: { type: string; description?: string }[] },
+  reason: string,
+): never {
+  testInfo.annotations.push({ type: "incomplete-create", description: reason });
+  throw new Error(`QA incomplete create: ${reason}`);
 }
 
 export async function openNewRow(page: Page) {

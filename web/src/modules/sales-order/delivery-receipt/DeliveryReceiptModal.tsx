@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
-import { submitEntity } from "../../../shared/handleSaveResult";
+import { submitEntity, showClientValidationBlocker } from "../../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../../shared/entityTypes";
@@ -150,7 +150,7 @@ export function DeliveryReceiptModal(props: Props) {
     }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      toast.warning(Object.values(errors).find(Boolean) ?? "Check the highlighted fields.");
+      showClientValidationBlocker(errors, toast);
       return;
     }
 

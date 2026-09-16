@@ -65,7 +65,7 @@ type Props<T extends { id: number }> = {
   search?: string;
   onSearchChange?: (q: string) => void;
   searchPlaceholder?: string;
-  /** Delay before applying search to the list query. Default 2000ms. Enter commits immediately. */
+  /** Delay before applying search to the list query. Default 300ms. Enter commits immediately. */
   searchDebounceMs?: number;
   status?: string;
   onStatusChange?: (status: string) => void;
@@ -196,7 +196,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const onSearchInput = (value: string) => {
     setSearchDraft(value);
     if (searchTimer) clearTimeout(searchTimer);
-    const ms = props.searchDebounceMs ?? 2000;
+    const ms = props.searchDebounceMs ?? 300;
     searchTimer = setTimeout(() => commitSearch(value), ms);
   };
 

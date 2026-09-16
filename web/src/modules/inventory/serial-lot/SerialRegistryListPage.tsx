@@ -241,6 +241,7 @@ export default function SerialRegistryListPage() {
           onPageChange={setPage}
           onRefresh={invalidate}
           onNew={() => setRegisterOpen(true)}
+          newLabel="Register serial"
           onEdit={goTrace}
         />
       </div>

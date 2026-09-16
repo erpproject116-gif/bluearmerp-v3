@@ -288,7 +288,15 @@ export const helpArticleAliases: Record<string, HelpArticleAlias> = {
     questions: ["onboarding checklist", "first week playbook", "start here erp"],
   },
   "switch-between-businesses": {
-    questions: ["switch company", "change business workspace", "multiple tenants"],
+    questions: ["switch company", "change business workspace", "multiple tenants", "switch between businesses"],
+  },
+  "mypage-flow-chart": {
+    questions: [
+      "where do I start mypage flow chart",
+      "which screen for sales cash in",
+      "bluearmerp home navigation flow chart",
+      "home navigation flow",
+    ],
   },
   "goods-receipt-load-slip": {
     questions: ["invoice from goods receipt", "si from gr", "bill vendor after receive"],

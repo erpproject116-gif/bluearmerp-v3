@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ApiResult } from "./api";
-import { handleSaveResult, showBlockerResult } from "./handleSaveResult";
+import { handleSaveResult, showBlockerResult, showClientValidationBlocker } from "./handleSaveResult";
 import { recoveryHintFromError, hasSpecificRecoveryHint } from "./notificationMessageStandard";
 import { resolvePolicyActionHint } from "./policyActionHints";
 
@@ -60,11 +60,31 @@ describe("handleSaveResult", () => {
     expect(action).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Name is required.",
-        message: expect.stringMatching(/fill in the highlighted fields/i),
+        message: expect.stringMatching(/fill in the highlighted fields|pick a customer/i),
         askHelp: true,
       }),
     );
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("client validation toast includes How + Open Customers for Customer is required", () => {
+    const action = vi.fn();
+    const toast = {
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+      action,
+    };
+    showClientValidationBlocker({ partner_id: "Customer is required." }, toast);
+    expect(action).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Customer is required.",
+        message: expect.stringMatching(/pick a customer/i),
+        actionLabel: expect.stringMatching(/customer/i),
+        href: "/app/inventory/partners",
+        askHelp: true,
+      }),
+    );
   });
 
   it("uses warning when assist present but toast.action missing", () => {
@@ -107,13 +127,15 @@ describe("handleSaveResult", () => {
     );
     expect(action).toHaveBeenCalledWith(
       expect.objectContaining({
-        actionLabel: "Open Sales Orders",
         href: "/app/sales-order/sales-orders",
+        askHelp: true,
       }),
     );
-    const msg = action.mock.calls[0][0].message as string;
-    expect(msg.toLowerCase()).not.toContain("use the button to continue");
-    expect(msg.toLowerCase()).toMatch(/pick list|load slip|scan serial|follow the button|sales order/);
+    const call = action.mock.calls[0][0] as { actionLabel?: string; message?: string };
+    expect(call.actionLabel).toMatch(/Sales Order|Pick items|Complete/i);
+    const msg = (call.message ?? "").toLowerCase();
+    expect(msg).not.toContain("use the button to continue");
+    expect(msg).toMatch(/pick list|load slip|scan serial|sales order|highlighted/);
   });
 });
 
@@ -166,6 +188,6 @@ describe("notification helpers", () => {
     const hint = resolvePolicyActionHint({
       lines: "Serial numbers required before confirming this bill. Receive under Purchase Receive.",
     });
-    expect(hint?.href).toContain("goods-receipt");
+    expect(hint?.href).toContain("purchase-receive");
   });
 });

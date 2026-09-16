@@ -21,8 +21,7 @@
  */
 
 export const NOTIFICATION_FALLBACK_HOW_TO_FIX =
-
-  "Follow the button, finish that step, then come back here and try again.";
+  "Fill the highlighted fields on this form, or use Ask Help if you are stuck. Then try Save again.";
 
 
 
@@ -106,10 +105,16 @@ export const recoveryHintFromError = (fieldError: string): string => {
 
   }
 
+  if (/customer/i.test(t)) {
+    return "Pick a customer in the Customer field (search by name). Use + New on that lookup if they are not listed yet, then Save.";
+  }
+
+  if (/vendor|supplier/i.test(t) && /required|missing|pick/i.test(t)) {
+    return "Pick a vendor in the Vendor field (search by name), then Save.";
+  }
+
   if (/required|missing|is required/i.test(t)) {
-
-    return "Fill in the highlighted fields, then try again.";
-
+    return "Fill in the highlighted fields on this form, then try Save again.";
   }
 
   return NOTIFICATION_FALLBACK_HOW_TO_FIX;

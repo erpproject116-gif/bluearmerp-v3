@@ -148,7 +148,14 @@ export function ToastProvider(props: ParentProps) {
   const runAction = (toast: ToastItem) => {
     toast.onAction?.();
     if (toast.href) {
-      window.location.assign(toast.href);
+      // Prefer in-app navigation so half-filled modals are not wiped by a full reload.
+      const href = toast.href;
+      if (href.startsWith("/") && !href.startsWith("//")) {
+        window.history.pushState({}, "", href);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      } else {
+        window.location.assign(href);
+      }
     }
     dismiss(toast.id);
   };

@@ -56,10 +56,6 @@ type PeriodSummary = {
   overdue_alerts: NamedAmount[];
 };
 
-function money(n: number | undefined) {
-  return formatPeso(n ?? 0);
-}
-
 function int(n: number | undefined) {
   return (n ?? 0).toLocaleString("en-PH", { maximumFractionDigits: 0 });
 }
@@ -159,13 +155,13 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
         {(d) => (
           <>
             <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Kpi label="Sales in window" value={money(d().sales_in_window)} href="/app/sales/sales" />
-              <Kpi label="Sales MTD" value={money(d().sales_mtd)} href="/app/sales/sales" />
-              <Kpi label="Sales YTD" value={money(d().sales_ytd)} href="/app/sales/sales" />
-              <Kpi label="Cash net YTD" value={money(d().cash_net_ytd)} href="/app/finance/collections" />
+              <Kpi label="Sales in window" value={formatPeso(d().sales_in_window)} href="/app/sales/sales" />
+              <Kpi label="Sales MTD" value={formatPeso(d().sales_mtd)} href="/app/sales/sales" />
+              <Kpi label="Sales YTD" value={formatPeso(d().sales_ytd)} href="/app/sales/sales" />
+              <Kpi label="Cash net YTD" value={formatPeso(d().cash_net_ytd)} href="/app/finance/collections" />
               <Kpi
                 label="Cash in / out MTD"
-                value={`${money(d().cash_inflow_mtd)} / ${money(d().cash_outflow_mtd)}`}
+                value={`${formatPeso(d().cash_inflow_mtd)} / ${formatPeso(d().cash_outflow_mtd)}`}
                 href="/app/finance/disbursements"
               />
             </section>
@@ -173,13 +169,13 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
             <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Kpi
                 label="AR total / overdue"
-                value={`${money(d().ar_total)} / ${money(d().ar_overdue)}`}
+                value={`${formatPeso(d().ar_total)} / ${formatPeso(d().ar_overdue)}`}
                 href="/app/finance/collections"
                 warn={(d().ar_overdue ?? 0) > 0}
               />
               <Kpi
                 label="AP total / overdue"
-                value={`${money(d().ap_total)} / ${money(d().ap_overdue)}`}
+                value={`${formatPeso(d().ap_total)} / ${formatPeso(d().ap_overdue)}`}
                 href="/app/finance/disbursements"
                 warn={(d().ap_overdue ?? 0) > 0}
               />
@@ -200,9 +196,9 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
               <section>
                 <h3 class="mb-2 text-sm font-semibold text-text-primary">Profit &amp; loss (posted journals)</h3>
                 <div class="grid gap-3 sm:grid-cols-3">
-                  <Kpi label="Income" value={money(d().pnl_income)} href="/app/finance/acct-i/reports/profit-and-loss" />
-                  <Kpi label="Expense" value={money(d().pnl_expense)} href="/app/finance/acct-i/reports/profit-and-loss" />
-                  <Kpi label="Net" value={money(d().pnl_net)} href="/app/finance/acct-i/reports/profit-and-loss" warn={(d().pnl_net ?? 0) < 0} />
+                  <Kpi label="Income" value={formatPeso(d().pnl_income)} href="/app/finance/acct-i/reports/profit-and-loss" />
+                  <Kpi label="Expense" value={formatPeso(d().pnl_expense)} href="/app/finance/acct-i/reports/profit-and-loss" />
+                  <Kpi label="Net" value={formatPeso(d().pnl_net)} href="/app/finance/acct-i/reports/profit-and-loss" warn={(d().pnl_net ?? 0) < 0} />
                 </div>
               </section>
             </Show>
@@ -216,7 +212,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                       {(row) => (
                         <li class="flex items-center justify-between gap-2 text-sm">
                           <span class="truncate text-text-primary">{row.label}</span>
-                          <span class="font-semibold text-brand-600">{money(row.amount)}</span>
+                          <span class="font-semibold text-brand-600">{formatPeso(row.amount)}</span>
                         </li>
                       )}
                     </For>
@@ -270,7 +266,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                       <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
                         <span class="text-text-primary">{row.label}</span>
                         <span class="font-semibold text-amber-700">
-                          {money(row.amount)}
+                          {formatPeso(row.amount)}
                           <Show when={row.count}> · {row.count}d</Show>
                         </span>
                       </li>
@@ -288,7 +284,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                     {(row) => (
                       <li class="flex items-center justify-between gap-2 text-sm">
                         <span class="truncate">{row.label}</span>
-                        <span class="font-semibold text-brand-600">{money(row.amount)}</span>
+                        <span class="font-semibold text-brand-600">{formatPeso(row.amount)}</span>
                       </li>
                     )}
                   </For>

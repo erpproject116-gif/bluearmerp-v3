@@ -95,6 +95,7 @@ export function PaymentVoucherListPageInner(props: PageOptions = {}) {
         onSelect={setSelectedId}
         onEdit={() => {}}
         onNew={openNew}
+        newLabel="New payment voucher"
         codeKey="payment_no"
         nameKey="date_no_display"
         sortKey={sort()}

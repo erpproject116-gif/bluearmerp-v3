@@ -47,7 +47,7 @@ const (
 )
 
 const (
-	hrefGoodsReceipt     = "/app/purchase-order/goods-receipt"
+	hrefGoodsReceipt     = "/app/purchases/purchase-receive"
 	hrefFiscalYears      = "/app/finance/acct-i/fiscal-years"
 	hrefWithholding      = "/app/finance/acct-ii/withholding-codes"
 	hrefRetainers        = "/app/sales/retainer-invoices"
@@ -60,9 +60,9 @@ const (
 	hrefPOFormSettings   = "/app/purchase-order/purchase-orders/settings"
 	hrefSalesOrders      = "/app/sales-order/sales-orders"
 	hrefPurchaseRequests = "/app/purchase-request/purchase-requests"
-	hrefRFQ              = "/app/rfq/rfqs"
+	hrefRFQ              = "/app/purchase-order/rfq"
 	hrefInvPerBranch     = "/app/inventory/find-stock"
-	hrefSerials          = "/app/inventory/serial-lot/serials"
+	hrefSerials          = "/app/inventory/serial-lot/registry"
 	hrefProductionJobs   = "/app/production/all/jobs"
 	hrefProductionIssue  = "/app/production/issue-station"
 	hrefProductionReceive = "/app/production/receive-station"

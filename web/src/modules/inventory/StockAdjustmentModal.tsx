@@ -3,7 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
-import { submitEntity, collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
+import { submitEntity, collectRequiredFieldErrors, handleSaveResult, showClientValidationBlocker } from "../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
@@ -149,7 +149,7 @@ export function StockAdjustmentModal(props: Props) {
     }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      toast.warning(Object.values(errors).find(Boolean) ?? "Check the highlighted fields.");
+      showClientValidationBlocker(errors, toast);
       return false;
     }
     return true;

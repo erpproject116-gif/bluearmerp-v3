@@ -134,7 +134,7 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       description: "Ship or invoice the finished product.",
       detail: "Use Sales Order, shipping, or Sales as usual after stock is in.",
       href: "/app/sales/sales",
-      routePrefixes: ["/app/sales", "/app/shipping"],
+      routePrefixes: ["/app/sales", "/app/sales-order/shipping"],
       optional: true,
       advancedOnly: true,
     },

@@ -425,6 +425,31 @@
     "expectArticleId": "manufacturing-wo-issue-complete"
   },
   {
+    "query": "recipe component shortage process post blocked",
+    "path": "/app/production/orders/new",
+    "expectArticleId": "mfg-recipe-assembly-shortage"
+  },
+  {
+    "query": "assembly not enough parts on hand",
+    "path": "/app/production/orders/new",
+    "expectArticleId": "mfg-recipe-assembly-shortage"
+  },
+  {
+    "query": "cutting raw material short post production",
+    "path": "/app/production/orders/new",
+    "expectArticleId": "mfg-cutting-shortage"
+  },
+  {
+    "query": "abnormal or excess waste requires a waste reason",
+    "path": "/app/production/orders/new",
+    "expectArticleId": "mfg-waste-reason-required"
+  },
+  {
+    "query": "waste reason cutting manufacturing",
+    "path": "/app/production/waste-reasons",
+    "expectArticleId": "mfg-waste-reason-required"
+  },
+  {
     "query": "how to reconcile bank",
     "path": "/app/finance/acct-i/bank-reconciliation",
     "expectArticleId": "bank-reconciliation-weekly"

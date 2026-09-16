@@ -157,6 +157,7 @@ export default function TicketsPage() {
         onEdit={openDetail}
         onNew={openNew}
         showNew={canCreate()}
+        newLabel="New ticket"
         codeKey="ticket_no"
         nameKey="subject"
         sortKey={sort()}

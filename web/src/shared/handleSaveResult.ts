@@ -135,10 +135,17 @@ export function showBlockerResult(
     return false;
   }
   if (fieldErrors) {
-    if (hasSpecificRecoveryHint(fieldErrors)) {
-      pushHelpBlocker(toast, fieldErrors, recoveryHintFromError(fieldErrors));
+    // Always pair What (field error) with How — never toast the bare field message alone.
+    const how = recoveryHintFromError(fieldErrors);
+    if (toast.action) {
+      toast.action({
+        type: hasSpecificRecoveryHint(fieldErrors) ? "warning" : "error",
+        title: fieldErrors,
+        message: how,
+        askHelp: true,
+      });
     } else {
-      pushHelpBlocker(toast, fieldErrors, undefined, "error");
+      pushHelpBlocker(toast, fieldErrors, how, hasSpecificRecoveryHint(fieldErrors) ? "warning" : "error");
     }
     return false;
   }
@@ -197,4 +204,34 @@ export async function submitEntity(
     toast.error(NOTIFICATION_NETWORK_ERROR);
     return false;
   }
+}
+
+/**
+ * Client-side validation blockers (empty Save before API).
+ * Same What / Why / How + Ask Help as API field errors — never a bare field string.
+ */
+export function showClientValidationBlocker(
+  errors: FormErrors,
+  toast: ToastLike,
+): false {
+  const fieldErrors = formatApiErrors(errors);
+  if (!fieldErrors) {
+    pushHelpBlocker(toast, NOTIFICATION_DEFAULT_SAVE_ERROR, undefined, "error");
+    return false;
+  }
+  const how = recoveryHintFromError(fieldErrors);
+  const hint = resolvePolicyActionHint(errors);
+  if (toast.action) {
+    toast.action({
+      type: "warning",
+      title: fieldErrors,
+      message: how,
+      actionLabel: hint?.label,
+      href: hint?.href,
+      askHelp: true,
+    });
+    return false;
+  }
+  pushHelpBlocker(toast, fieldErrors, how);
+  return false;
 }

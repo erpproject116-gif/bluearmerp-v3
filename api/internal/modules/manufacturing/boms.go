@@ -109,7 +109,7 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 		args := []any{tu.TenantID}
 		argN := 2
 		if p.Q != "" {
-			where += fmt.Sprintf(" and (b.bom_code ilike $%d or b.bom_name ilike $%d or fi.item_name ilike $%d)", argN, argN, argN)
+			where += fmt.Sprintf(" and (b.bom_code ilike $%d or b.bom_name ilike $%d or fi.item_code ilike $%d or fi.item_name ilike $%d)", argN, argN, argN, argN)
 			args = append(args, "%"+p.Q+"%")
 			argN++
 		}

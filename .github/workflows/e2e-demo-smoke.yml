@@ -97,6 +97,14 @@ jobs:
         run: |
           export E2E_BENCH_TOKEN=$(node ../scripts/mint-bench-jwt.mjs)
           npx playwright test \
+            e2e/route-smoke.spec.ts \
             e2e/core-interactions.spec.ts \
             e2e/sales-invoice.spec.ts \
-            e2e/goods-receipt-receive.spec.ts
+            e2e/goods-receipt-receive.spec.ts \
+            e2e/quotation-crud.spec.ts \
+            e2e/sales-order-crud.spec.ts \
+            e2e/sale-crud.spec.ts \
+            e2e/purchase-order-crud.spec.ts \
+            e2e/purchase-crud.spec.ts \
+            e2e/official-receipt-crud.spec.ts \
+            e2e/inventory-partners-items.spec.ts

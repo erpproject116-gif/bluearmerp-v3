@@ -7,7 +7,7 @@ import { DateInput } from "../../../shared/DateInput";
 import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
-import { handleSaveResult, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { handleSaveResult, collectRequiredFieldErrors, showClientValidationBlocker } from "../../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
 import { mergeFormErrors } from "../../../shared/formValidation";
@@ -587,7 +587,7 @@ export function PurchaseOrderModal(props: Props) {
     );
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
-      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Fix the highlighted fields, then try again.");
+      showClientValidationBlocker(validationErrors, toast);
       return;
     }
 

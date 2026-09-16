@@ -54,6 +54,8 @@ export const appModules: AppModule[] = [
       { label: "Dashboard", href: "/app/dashboard", settingsHref: "/app/dashboard" },
       { label: "Onboarding", href: "/app/dashboard/onboarding", settingsHref: "/app/dashboard/onboarding" },
       { label: "Recent updates", href: "/app/dashboard/recent-updates", settingsHref: "/app/dashboard/recent-updates" },
+      { label: "Operations intel", href: "/app/dashboard?tab=intel", settingsHref: "/app/dashboard" },
+      { label: "Period summary", href: "/app/dashboard/period-summary", settingsHref: "/app/reports" },
     ],
   },
   {
@@ -698,6 +700,18 @@ export const appModules: AppModule[] = [
         href: "/app/user-management/help-feedback",
         settingsHref: "/app/user-management/help-feedback",
       },
+      {
+        label: "Billing & subscription",
+        href: "/app/settings/billing",
+        settingsHref: "/app/settings/billing",
+        headerPriority: "primary",
+      },
+      {
+        label: "Branding",
+        href: "/app/settings/branding",
+        settingsHref: "/app/settings/branding",
+        headerPriority: "overflow",
+      },
     ],
   },
 ];
@@ -722,6 +736,10 @@ export function resolveModule(pathname: string): AppModule | undefined {
 
   if (pathname === "/articles" || pathname.startsWith("/articles/") || pathname === "/app/articles" || pathname.startsWith("/app/articles/")) {
     return appModules.find((m) => m.id === "cms");
+  }
+
+  if (pathname.startsWith("/app/settings/billing") || pathname.startsWith("/app/settings/branding")) {
+    return appModules.find((m) => m.id === "user_management");
   }
 
   return appModules.find((m) => pathname === m.basePath || pathname.startsWith(`${m.basePath}/`));

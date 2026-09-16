@@ -3,7 +3,7 @@ import { formatPeso } from "../../../shared/money";
 import { DecimalInput } from "../../../shared/DecimalInput";
 import { apiFetch } from "../../../shared/api";
 import { FINANCE_ENTITY } from "../../../shared/entityTypes";
-import { submitEntity, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { submitEntity, collectRequiredFieldErrors, showClientValidationBlocker } from "../../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
@@ -231,7 +231,7 @@ export function OfficialReceiptModal(props: Props) {
     }
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
-      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
+      showClientValidationBlocker(validationErrors, toast);
       return;
     }
 

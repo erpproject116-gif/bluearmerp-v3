@@ -22,7 +22,7 @@ export const UI_COPY_GROUPS: UiCopyGroup[] = [
       { key: "common.status_inactive", label: "Status: Inactive", fallback: "Inactive" },
       { key: "common.status_all", label: "Status: All", fallback: "All" },
       { key: "common.refresh", label: "Refresh button", fallback: "Refresh" },
-      { key: "common.new_row", label: "New row button", fallback: "+ New row" },
+      { key: "common.new_row", label: "New row button", fallback: "+ New" },
       { key: "common.no_rows", label: "Empty grid", fallback: "No rows yet. Press F2 to create one." },
       { key: "common.no_results", label: "No search results", fallback: "No results" },
       { key: "common.previous", label: "Pagination: Previous", fallback: "Previous" },

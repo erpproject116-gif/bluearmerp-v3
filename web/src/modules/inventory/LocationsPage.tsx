@@ -139,6 +139,7 @@ export default function LocationsPage() {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={openEdit}
         onNew={() => void openNew()}
+        newLabel="New location"
         codeKey="location_code"
         nameKey="location_name"
         sortKey={sort()}

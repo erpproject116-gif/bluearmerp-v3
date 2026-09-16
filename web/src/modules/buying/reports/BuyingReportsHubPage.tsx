@@ -1,23 +1,41 @@
-import { DeptReportsHub } from "../../../shared/reports/DeptReportsHub";
+import { A } from "@solidjs/router";
+import { For } from "solid-js";
+import PurchaseStatusPage from "./PurchaseStatusPage";
 
-const links = [
-  { label: "Purchase status", href: "/app/buying/reports/purchase-status", blurb: "Where each purchase sits in the process." },
-  { label: "Payable status", href: "/app/buying/reports/payable-status", blurb: "What we still owe suppliers." },
-  { label: "Pre-invoicing", href: "/app/buying/reports/pre-invoicing", blurb: "Receipts ready to bill." },
-  { label: "PO analysis", href: "/app/purchase-order/reports/po-analysis", blurb: "Purchase order totals and trends." },
-  { label: "PO status", href: "/app/purchase-order/purchase-orders?view=status", blurb: "Open and closed purchase orders." },
-  { label: "Items to receive", href: "/app/purchase-order/reports/items-to-receive", blurb: "What is still outstanding to receive." },
-  { label: "A/P by vendor", href: "/app/purchases/purchase-receive/ap-by-vendor", blurb: "Balances owed per supplier." },
-  { label: "Payment status", href: "/app/purchases/purchase-receive/payment-status", blurb: "Supplier payment progress." },
-  { label: "Purchase invoice status", href: "/app/purchases/purchase-receive?view=status", blurb: "Invoice list status view." },
+const reportLinks = [
+  { label: "Purchase status", href: "/app/buying/reports/purchase-status" },
+  { label: "Payable status", href: "/app/buying/reports/payable-status" },
+  { label: "Pre-invoicing", href: "/app/buying/reports/pre-invoicing" },
+  { label: "PO analysis", href: "/app/purchase-order/reports/po-analysis" },
+  { label: "PO status", href: "/app/purchase-order/purchase-orders?view=status" },
+  { label: "Items to receive", href: "/app/purchase-order/reports/items-to-receive" },
+  { label: "A/P by vendor", href: "/app/purchases/purchase-receive/ap-by-vendor" },
+  { label: "Payment status", href: "/app/purchases/purchase-receive/payment-status" },
+  { label: "Purchase invoice status", href: "/app/purchases/purchase-receive?view=status" },
 ];
 
+/** Mirrors Selling reports: hub links + default Purchase Status table (TK-20260916-005). */
 export default function BuyingReportsHubPage() {
   return (
-    <DeptReportsHub
-      title="Purchasing reports"
-      description="Pick a report to see purchasing, receiving, and payables status. Use filters on each page, then run the report."
-      links={links}
-    />
+    <div class="space-y-6">
+      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+        <h2 class="text-lg font-semibold text-text-primary">Purchasing reports</h2>
+        <p class="mt-1 text-sm text-text-secondary">
+          Pick a report below, or use the Purchase Status table on this page (filters + Search / F8).
+        </p>
+        <ul class="mt-3 flex flex-wrap gap-3 text-sm">
+          <For each={reportLinks}>
+            {(link) => (
+              <li>
+                <A href={link.href} class="font-medium text-brand-600 hover:underline">
+                  {link.label}
+                </A>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
+      <PurchaseStatusPage />
+    </div>
   );
 }

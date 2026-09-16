@@ -668,12 +668,12 @@ export default function App() {
           <Route path="/purchase-order/rfq" component={RfqListPage} />
           <Route path="/purchase-order/rfq/:id" component={RfqDetailPage} />
           <Route path="/purchase-order/purchase-returns" component={PurchaseReturnsPage} />
-          <Route path="/purchase-order/goods-receipt" component={() => <Navigate href="/app/purchases/purchase-receive?view=history" />} />
+          <Route path="/purchase-order/goods-receipt" component={() => <Navigate href="/app/purchases/purchase-receive?view=history&from=goods-receipt" />} />
           <Route path="/purchase-order/goods-receipt/settings" component={GoodsReceiptSettingsPage} />
           <Route path="/purchase-order/purchase-orders/settings" component={PurchaseOrderSettingsPage} />
           <Route path="/purchase-request/setup" component={ModuleSetupHubPage} />
           <Route path="/purchase-request/purchase-orders" component={() => <Navigate href="/app/purchase-order/purchase-orders" />} />
-          <Route path="/purchase-request/goods-receipt" component={() => <Navigate href="/app/purchases/purchase-receive?view=history" />} />
+          <Route path="/purchase-request/goods-receipt" component={() => <Navigate href="/app/purchases/purchase-receive?view=history&from=goods-receipt" />} />
           <Route path="/purchase-request/purchase-requests/new" component={PurchaseRequestNewPage} />
           <Route path="/purchase-request/purchase-requests/status" component={PurchaseRequestStatusPage} />
           <Route path="/purchase-request/purchase-requests/settings" component={PurchaseRequestSettingsPage} />

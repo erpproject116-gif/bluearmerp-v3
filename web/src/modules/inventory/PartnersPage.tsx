@@ -293,6 +293,7 @@ export default function PartnersPage() {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={openEdit}
         onNew={() => void openNew()}
+        newLabel="New customer or vendor"
         codeKey="partner_code"
         nameKey="company_name"
         sortKey={sort()}

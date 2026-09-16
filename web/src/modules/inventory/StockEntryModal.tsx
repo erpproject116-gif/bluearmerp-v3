@@ -2,7 +2,7 @@ import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { modalDismissClass } from "../../shared/Modal";
-import { collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
+import { collectRequiredFieldErrors, handleSaveResult, showClientValidationBlocker } from "../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
@@ -111,7 +111,7 @@ export function StockEntryModal(props: {
     );
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
-      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
+      showClientValidationBlocker(validationErrors, toast);
       return;
     }
 

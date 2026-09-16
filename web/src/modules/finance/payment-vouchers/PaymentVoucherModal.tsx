@@ -6,7 +6,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
 import { formatMoney } from "../../../shared/money";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
-import { submitEntity, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { submitEntity, collectRequiredFieldErrors, showClientValidationBlocker } from "../../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../../shared/entityTypes";
@@ -203,7 +203,7 @@ export function PaymentVoucherModal(props: Props) {
     }
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
-      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
+      showClientValidationBlocker(validationErrors, toast);
       return;
     }
     const wht = withholdingLines()

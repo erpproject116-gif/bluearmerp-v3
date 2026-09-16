@@ -63,9 +63,9 @@ test.describe("Goods receipt receive", () => {
 
     await expect(page.getByText(/Goods receipt posted/i)).toBeVisible({ timeout: 15000 });
 
-    await page.goto("/app/purchase-order/goods-receipt");
+    await page.goto("/app/purchases/purchase-receive?view=history&from=goods-receipt");
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15000 });
-    await page.getByPlaceholder(/Search PO no/i).fill(used!.po);
+    await page.getByPlaceholder(/Search PO no|Search/i).fill(used!.po);
     await expect(page.getByRole("cell", { name: used!.po })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText("Posted").first()).toBeVisible({ timeout: 10000 });
   });

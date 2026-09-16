@@ -15,9 +15,10 @@ import {
 import { MfgWizardStickyAlerts } from "../production/MfgWizardStickyAlerts";
 import { recipeAssemblyStepGuidance } from "../production/mfgWizardStepGuidance";
 import { mfgStationHandoff, mfgSuccess, mfgWarn } from "../production/mfgToast";
-import { jobsHref } from "../production/mfgProductionMode";
+import { jobsHref, newRecipeOrderHref } from "../production/mfgProductionMode";
 import { submitBusyLabel } from "../../shared/submitCopy";
-import { searchBomsForOrderType } from "./mfgBomLookup";
+import { lookupBomsForOrderType, type BomMismatch } from "./mfgBomLookup";
+import { formatPeso } from "../../shared/money";
 
 type WorkOrder = {
   id: number;
@@ -52,7 +53,7 @@ type JournalPreview = {
   costs: { material_cost: number };
 };
 
-const searchBoms = (q: string) => searchBomsForOrderType("assembly", q);
+const searchBoms = (q: string) => lookupBomsForOrderType("assembly", q);
 
 const searchLocations = async (q: string): Promise<LookupOption[]> => {
   const qs = new URLSearchParams({ page: "1", pageSize: "20" });
@@ -90,6 +91,8 @@ export default function NewAssemblyOrderWizard() {
   const [journalPreview, setJournalPreview] = createSignal<JournalPreview | null>(null);
   const [journalError, setJournalError] = createSignal("");
   const [bomSearchEmpty, setBomSearchEmpty] = createSignal(false);
+  const [bomMismatch, setBomMismatch] = createSignal<BomMismatch | null>(null);
+  const [bomRateLimited, setBomRateLimited] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [posting, setPosting] = createSignal(false);
   const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
@@ -370,25 +373,49 @@ export default function NewAssemblyOrderWizard() {
                   setBomId(o.id);
                   setBomLabel(o.label);
                   setBomSearchEmpty(false);
+                  setBomMismatch(null);
+                  setBomRateLimited(false);
                 }}
                 onClear={() => {
                   setBomId(null);
                   setBomLabel("");
                 }}
                 fetchOptions={async (q) => {
-                  const opts = await searchBoms(q);
-                  setBomSearchEmpty(opts.length === 0);
-                  return opts;
+                  const result = await searchBoms(q);
+                  setBomMismatch(result.mismatch ?? null);
+                  setBomRateLimited(!!result.rateLimited);
+                  setBomSearchEmpty(result.options.length === 0);
+                  return result.options;
                 }}
                 placeholder="Search assembly BOM / product…"
               />
-              <Show when={bomSearchEmpty()}>
+              <Show when={bomRateLimited()}>
+                <p class="mt-2 text-xs text-amber-800">
+                  Too many requests. Wait a few seconds, then search again.
+                </p>
+              </Show>
+              <Show when={bomMismatch()}>
+                {(m) => (
+                  <p class="mt-2 text-xs text-amber-800">
+                    <span class="font-medium">{m().code}</span> is a {m().actual} BOM, not an Assembly BOM.{" "}
+                    <A href={m().href || newRecipeOrderHref()} class="font-medium text-brand-700 hover:underline">
+                      {m().cta}
+                    </A>
+                    .
+                  </p>
+                )}
+              </Show>
+              <Show when={bomSearchEmpty() && !bomMismatch() && !bomRateLimited()}>
                 <p class="mt-2 text-xs text-amber-800">
                   No Assembly BOMs (codes A…) found. Create one under{" "}
                   <A href="/app/production/setup" class="font-medium text-brand-700 hover:underline">
                     Manufacturing → Setup
                   </A>
-                  , or use New Recipe Order for Recipe BOMs (R…).
+                  , or use{" "}
+                  <A href={newRecipeOrderHref()} class="font-medium text-brand-700 hover:underline">
+                    New Recipe Order
+                  </A>{" "}
+                  for Recipe BOMs (R…).
                 </p>
               </Show>
             </Field>
@@ -543,7 +570,7 @@ export default function NewAssemblyOrderWizard() {
             <Field label="Other cost">
               <input class={inputClass} type="number" min="0" step="any" value={otherCost()} onInput={(e) => setOtherCost(e.currentTarget.value)} />
             </Field>
-            <p class="text-sm font-medium">Total additional: ₱{additionalCost().toLocaleString()}</p>
+            <p class="text-sm font-medium">Total additional: {formatPeso(additionalCost())}</p>
             <p class="text-[11px] text-text-secondary">
               These costs are capitalized into the finished-goods estimate when you post.
             </p>
@@ -566,10 +593,10 @@ export default function NewAssemblyOrderWizard() {
                 }
               >
                 <div class="mt-2 space-y-1 text-xs">
-                  <div class="flex justify-between gap-3"><span>Dr Finished goods inventory</span><span>₱{estimatedTotalCost().toLocaleString()}</span></div>
-                  <div class="flex justify-between gap-3"><span>Cr Materials inventory</span><span>₱{(journalPreview()?.costs.material_cost ?? 0).toLocaleString()}</span></div>
+                  <div class="flex justify-between gap-3"><span>Dr Finished goods inventory</span><span>{formatPeso(estimatedTotalCost())}</span></div>
+                  <div class="flex justify-between gap-3"><span>Cr Materials inventory</span><span>{formatPeso(journalPreview()?.costs.material_cost ?? 0)}</span></div>
                   <Show when={additionalCost() > 0}>
-                    <div class="flex justify-between gap-3"><span>Cr Production cost absorption</span><span>₱{additionalCost().toLocaleString()}</span></div>
+                    <div class="flex justify-between gap-3"><span>Cr Production cost absorption</span><span>{formatPeso(additionalCost())}</span></div>
                   </Show>
                 </div>
                 <Show when={!journalPreview()?.accounting_enabled}>

@@ -9,6 +9,20 @@ on:
       - ".github/workflows/e2e-smoke.yml"
 
 jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install web deps
+        working-directory: web
+        run: npm ci
+      - name: Vitest unit + link integrity
+        working-directory: web
+        run: npm test
+
   smoke:
     runs-on: ubuntu-latest
     steps:

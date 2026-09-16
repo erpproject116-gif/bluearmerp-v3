@@ -460,16 +460,36 @@ export default function ChartOfAccountsPage() {
 
   const ensureGrni = async () => {
     setEnsuringGrni(true);
-    const res = await apiFetch<{
-      account: AccountRow;
-      created: boolean;
-      mapped: boolean;
-      defaults: FinanceDefaults;
-    }>("/api/v1/finance/accounts/ensure-grni", { method: "POST" }, { silent: true });
+    const post = () =>
+      apiFetch<{
+        account: AccountRow;
+        created: boolean;
+        mapped: boolean;
+        defaults: FinanceDefaults;
+      }>("/api/v1/finance/accounts/ensure-grni", { method: "POST" }, { silent: true });
+    let res = await post();
+    if (!res.success && (res.status === 429 || res.code === "ERR_RATE_LIMITED")) {
+      await new Promise((r) => setTimeout(r, 1600));
+      res = await post();
+    }
     setEnsuringGrni(false);
     if (!res.success) {
+      const rateLimited = res.status === 429 || res.code === "ERR_RATE_LIMITED";
       const detail = res.errors ? Object.values(res.errors).filter(Boolean).join(" · ") : "";
-      toast.warning(detail || res.message || "Could not create GRNI account.");
+      if (toast.action) {
+        toast.action({
+          type: "warning",
+          title: detail || res.message || "Could not create GRNI account.",
+          message: rateLimited
+            ? "Wait a few seconds, then click Create GRNI (2115) once. Do not type 2115 into the box and Save — that does not create the account."
+            : "Use Create GRNI (2115). Typing a code in the mapping field does not create or map an account.",
+          actionLabel: rateLimited ? undefined : "Create GRNI (2115)",
+          onAction: rateLimited ? undefined : () => void ensureGrni(),
+          askHelp: true,
+        });
+      } else {
+        toast.warning(detail || res.message || "Could not create GRNI account.");
+      }
       return;
     }
 
@@ -556,6 +576,10 @@ export default function ChartOfAccountsPage() {
   };
 
   const openCreateFromMapping = (slot: DefaultSlot, query: string) => {
+    if (slot.key === "grni_account_id") {
+      void ensureGrni();
+      return;
+    }
     const trimmed = query.trim();
     const codeMatch = trimmed.match(/^(\d{3,6})\s*[-–:]?\s*(.*)$/);
     openCreate({
@@ -794,6 +818,22 @@ export default function ChartOfAccountsPage() {
   });
 
   const saveDefaults = async () => {
+    const typedGrni = (mapLabels().grni_account_id ?? "").trim();
+    if (!defaultsForm().grni_account_id && typedGrni) {
+      if (toast.action) {
+        toast.action({
+          type: "warning",
+          title: "GRNI is not mapped yet",
+          message: `"${typedGrni}" is typed text, not a selected account. Pick an existing liability, or create GRNI (2115).`,
+          actionLabel: "Create GRNI (2115)",
+          onAction: () => void ensureGrni(),
+          askHelp: true,
+        });
+      } else {
+        toast.warning("GRNI is not mapped. Create GRNI (2115) or pick a liability — typing a code does not save.");
+      }
+      return;
+    }
     setSavingDefaults(true);
     const res = await apiFetch<FinanceDefaults>("/api/v1/finance/accounts/defaults", {
       method: "PATCH",
@@ -1276,7 +1316,7 @@ export default function ChartOfAccountsPage() {
                         onClear={() => setDefaultSlot(slot.key, null, "")}
                         fetchOptions={(q) => fetchAccountsForSlot(slot.types, q)}
                         placeholder={`Search ${slot.label.toLowerCase()}…`}
-                        createLabel="Add account"
+                        createLabel={slot.key === "grni_account_id" ? "Create GRNI (2115)" : "Add account"}
                         onCreate={(q) => openCreateFromMapping(slot, q)}
                       />
                       <p class="mt-1 px-0.5 text-xs text-slate-500">{slot.hint}</p>

@@ -9,7 +9,7 @@ import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { QUOTATION_ENTITY } from "../../../shared/entityTypes";
-import { handleSaveResult, collectRequiredFieldErrors } from "../../../shared/handleSaveResult";
+import { handleSaveResult, collectRequiredFieldErrors, showClientValidationBlocker } from "../../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
 import { mergeFormErrors } from "../../../shared/formValidation";
@@ -575,7 +575,7 @@ export function QuotationModal(props: Props) {
     );
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
-      toast.warning(Object.values(validationErrors).find(Boolean) ?? "Check the highlighted fields.");
+      showClientValidationBlocker(validationErrors, toast);
       return;
     }
     const attachmentErr = validateAttachmentBeforeConfirm(

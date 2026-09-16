@@ -123,6 +123,7 @@ export function OfficialReceiptListPageInner(props: PageOptions = {}) {
         onSelect={setSelectedId}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
+        newLabel="New official receipt"
         codeKey="receipt_no"
         nameKey="date_no_display"
         sortKey={sort()}
