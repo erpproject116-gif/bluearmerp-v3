@@ -12,6 +12,16 @@ on:
       - "scripts/seed-demo-*.sql"
       - "supabase/seed.sql"
       - ".github/workflows/e2e-demo-smoke.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "web/**"
+      - "api/**"
+      - "scripts/mint-bench-jwt.mjs"
+      - "scripts/seed-ci-bench-auth.sql"
+      - "scripts/seed-demo-*.sql"
+      - "supabase/seed.sql"
+      - ".github/workflows/e2e-demo-smoke.yml"
 
 jobs:
   demo-smoke:

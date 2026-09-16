@@ -7,6 +7,11 @@ on:
     paths:
       - "web/**"
       - ".github/workflows/e2e-smoke.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "web/**"
+      - ".github/workflows/e2e-smoke.yml"
 
 jobs:
   unit:
