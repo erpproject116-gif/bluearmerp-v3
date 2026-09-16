@@ -16,18 +16,37 @@ insert into public.tenants (
   'active'
 ) on conflict (company_code) do nothing;
 
-insert into public.tenant_modules (tenant_id, module_code, is_enabled)
-select t.id, m.module_code, true
-from public.tenants t
-cross join (values ('core'), ('inventory'), ('quotation'), ('user_management'), ('sales_order'), ('sales')) as m(module_code)
-where t.company_code = 'DEMO000'
-on conflict (tenant_id, module_code) do update set is_enabled = true;
-
--- users.tenant_role defaults to 'member' and FK's tenant_roles; roles are not
--- created by a tenant-insert trigger — provision normally calls seed_tenant_defaults.
+-- Roles + tax/currency/base location before users and transactional demo seeds.
 select public.seed_tenant_defaults(t.id)
 from public.tenants t
 where t.company_code = 'DEMO000';
+
+select public.seed_tenant_base_config(t.id)
+from public.tenants t
+where t.company_code = 'DEMO000';
+
+-- Buy + finance modules (and serial/lot feature) so demo-smoke can exercise those routes.
+insert into public.tenant_modules (tenant_id, module_code, is_enabled)
+select t.id, m.module_code, true
+from public.tenants t
+cross join (
+  values
+    ('core'),
+    ('inventory'),
+    ('inventory.serial_lot'),
+    ('quotation'),
+    ('quotation.tax_mngt'),
+    ('user_management'),
+    ('sales_order'),
+    ('sales'),
+    ('purchase_request'),
+    ('purchase_order'),
+    ('purchases'),
+    ('finance')
+) as m(module_code)
+where t.company_code = 'DEMO000'
+on conflict (tenant_id, module_code) do update
+set is_enabled = true, disabled_at = null;
 
 insert into public.users (tenant_id, email, full_name, status, tenant_role)
 select t.id, 'demo@demo.bluearm.local', 'Demo Owner', 'active', 'store_admin'
