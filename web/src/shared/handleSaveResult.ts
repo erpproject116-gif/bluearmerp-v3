@@ -10,9 +10,9 @@ import {
 } from "./notificationMessageStandard";
 import { resolvePolicyActionHint } from "./policyActionHints";
 
-export function formatApiErrors(errors?: Record<string, string>): string {
+export function formatApiErrors(errors?: FormErrors | Record<string, string> | null): string {
   if (!errors) return "";
-  const messages = Object.values(errors).filter(Boolean);
+  const messages = Object.values(errors).filter((m): m is string => Boolean(m));
   return messages.join(" · ");
 }
 

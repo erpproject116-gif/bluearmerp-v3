@@ -68,7 +68,9 @@ const MESSAGE_HINTS: Array<{ match: RegExp; hint: PolicyActionHint }> = [
   { match: /process polic/i, hint: { href: "/app/user-management/process-policies", label: "Review process policies" } },
 ];
 
-export function resolvePolicyActionHint(errors?: Record<string, string> | null): PolicyActionHint | null {
+export function resolvePolicyActionHint(
+  errors?: Record<string, string | undefined> | null,
+): PolicyActionHint | null {
   if (!errors) return null;
   for (const key of Object.keys(errors)) {
     if (FIELD_HINTS[key]) return FIELD_HINTS[key];
