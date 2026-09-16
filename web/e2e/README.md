@@ -1,6 +1,6 @@
 # UI coverage — route & interaction smoke
 
-Living checklist for proving Bluearm ERP screens load and critical nested controls work. Hybrid Phase 1: **Vitest shared controls** + **Playwright CRUD/interaction journeys**. See also `docs/qa/ui-coverage.md`.
+Living checklist for proving Bluearm ERP screens load and critical nested controls work. Hybrid Phase 1: **Vitest shared controls** + **Playwright CRUD/interaction journeys**. See also `docs/qa/ui-coverage.md` and `docs/qa/live-e2e-baseline.md`.
 
 ## Static gates (no browser needed)
 
@@ -8,6 +8,28 @@ Living checklist for proving Bluearm ERP screens load and critical nested contro
   hardcoded `/app/...` string in `web/src` must resolve to a route declared in `App.tsx`.
   Routes are re-extracted at test time via `e2e/scripts/extract-app-routes.mjs` (shared
   module), so route renames immediately fail files still linking to old paths.
+- **Coverage manifest** — `npm run e2e:coverage:manifest` then `e2e/coverage-manifest.spec.ts`
+  ensures every smokeable route is inventoried.
+
+## Live safety tiers
+
+| Tier | When | Behavior |
+|------|------|----------|
+| `read-only` | Default live | Mutation guard aborts business POST/PUT/PATCH/DELETE |
+| `reversible` | Opt-in | Create **only** `E2E-*` records; never edit first production row |
+| `posting` | Opt-in | Post `E2E-*` docs after reversal path proven |
+
+```bash
+# Live read-only (safe default)
+set CI=true
+set E2E_BASE_URL=https://app.bluearmerp.com
+npm run test:e2e:live:read-only
+
+# Save this account's storageState once (gitignored)
+npm run test:e2e:auth:save
+```
+
+External `E2E_BASE_URL` **does not** start local Vite.
 
 ## Route smoke behavior
 
@@ -15,51 +37,37 @@ Living checklist for proving Bluearm ERP screens load and critical nested contro
 - **API 4xx** (except 401) are logged as `[route-smoke]` warnings — visible but non-fatal.
 - **429 rate limiting** (deployed API: ~200 authenticated req/min/user) is detected and the
   runner waits out the window once before declaring the API down. Full-mode timeout is 60 min.
+- Live runs add inter-route pacing (`E2E_ROUTE_PACE_MS`, default 450ms on app.bluearmerp.com).
 - Run against a deployed environment with `E2E_BASE_URL=https://app.bluearmerp.com`
-  (demo credentials must exist there).
+  (demo credentials or `e2e/.auth/user.json` must exist there).
 
 ## Prerequisites
 
-Authenticated e2e needs **both**:
+Authenticated e2e needs **either**:
 
-1. Vite web (`npm run dev` on `:5173`)
-2. Go API (`cd api && go run ./cmd/server` on `:8080`)
+1. `e2e/.auth/user.json` from `npm run test:e2e:auth:save`, or
+2. Demo email/password / `E2E_BENCH_TOKEN`, **and** for local API the demo Auth user linked to tenant `DEMO000`.
 
-Authenticated e2e also requires the demo Auth user to be **linked** to tenant `DEMO000`:
-
-```bash
-psql "$DATABASE_URL" -v auth_uuid="'d4ca1577-e851-49d0-b51d-d0931308e170'" -f scripts/link-demo-auth-user.sql
-```
-
-Without this link, `/app/*` shows “Account not provisioned yet” and grids never appear.
+Tenant lookups (partner/item/location/open POs) come from `e2e/fixtures/tenant-profile.json`
+or `E2E_TENANT_PROFILE` / `tenant-profile.local.json` (gitignored).
 
 ## Commands
 
 ```bash
 cd bluearmerp-v3/web
 
-# Shared Modal / LookupCombo / DateInput / … (jsdom)
 npm test
 npm run test:unit
-
-# Full Playwright suite (route smoke + History + CRUD interactions)
-npm run test:e2e
-
-# Core route list only
-npx playwright test e2e/route-smoke.spec.ts
-
-# Layer 2: non-destructive modal/button/field contracts for the eight core
-# selling, buying, and payment transaction flows
+npm run test:e2e                    # chromium project (full local/CI)
+npm run test:e2e:live:read-only
+npm run test:e2e:live:reversible    # requires mutation env flags
+npm run test:e2e:live:posting
 npm run test:e2e:core-interactions
-
-# Full static /app map (~200 paths)
 npm run test:e2e:routes:full
-
-# Nested History regression
-npx playwright test e2e/transaction-history.spec.ts
-
-# Document / master-data interaction journeys
-npx playwright test e2e/*-crud.spec.ts e2e/inventory-partners-items.spec.ts e2e/after-sales-repair.spec.ts
+npm run e2e:routes:extract
+npm run e2e:coverage:manifest
+npm run e2e:tickets:draft           # review before submit
+npm run e2e:report
 ```
 
 Env:
@@ -67,18 +75,22 @@ Env:
 | Variable | Purpose |
 |----------|---------|
 | `E2E_BASE_URL` | Default `http://localhost:5173` |
-| `E2E_DEMO_PASSWORD` | Local demo password (`web/.env.local`) |
+| `E2E_DEMO_PASSWORD` | Local/live demo password (`web/.env.local`) |
 | `E2E_BENCH_TOKEN` | CI bench JWT |
 | `E2E_FULL_ROUTE_SMOKE=1` | Visit all smokeable routes |
+| `E2E_TIER` | `read-only` \| `reversible` \| `posting` |
+| `E2E_ALLOW_MUTATIONS=1` | Required with non-read-only tier |
+| `E2E_RUN_CONFIRM` | Run id for markers + mutation confirm |
 
 ## Interaction helpers
 
 | Helper | File | Usage |
 |--------|------|--------|
-| `openNewRow`, `fillLookup`, `fillDate`, `selectByLabel`, `saveEntityModal`, `addItemLine` | `e2e/helpers/entityForm.ts` | Drive form controls |
-| `defineDocCrudSpec` | `e2e/helpers/docCrud.ts` | Shared cancel / edit / create journey |
-| Soft-skip | `softSkip` | Setup only (no table) — marks test skipped |
-| Incomplete create | `noteIncomplete` | After Cancel/Edit passed — annotates, still **passes** |
+| `openNewRow`, `fillLookup`, `fillDate`, … | `e2e/helpers/entityForm.ts` | Drive form controls |
+| `defineDocCrudSpec` | `e2e/helpers/docCrud.ts` | Read-only cancel + gated create |
+| `installMutationGuard` | `e2e/helpers/liveSafety.ts` | Block writes on live read-only |
+| Soft-skip / incomplete | `softSkip` / `noteIncomplete` | **Throw** with annotations — never silent pass |
+| Mutation ledger | `e2e/helpers/mutationLedger.ts` | Tracks `E2E-*` creates |
 
 `core-interactions.spec.ts` opens each core New transaction, checks the modal
 action contract, edits and restores an enabled field/checkbox, exercises
@@ -89,50 +101,36 @@ update, or delete ERP records.
 ### Demo seed helpers (GR / PR)
 
 ```bash
-# Re-open DEMOGR902 after e2e receive (surgical — not a full purge)
 psql "$DATABASE_URL" -f scripts/reset-demo-po-gr-open.sql
-
-# Ensure DEMOPR201/202 exist for PR History
 psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
 ```
 
-Phase 2 modules: `npx playwright test e2e/phase2-modules.spec.ts`
+Phase 2 modules: `npx playwright test e2e/phase2-modules.spec.ts --project=chromium`
 
-Unique values use `E2E-{timestamp}` via `uniqueToken()`.
+Unique values use `E2E-{runId}` via `e2eMarker()` / `uniqueToken()`.
 
 ## Artifacts
 
 | File | Role |
 |------|------|
-| `src/shared/*.test.tsx` | Shared control component tests |
 | `e2e/fixtures/app-routes.json` | Generated route inventory |
-| `e2e/helpers/appRoutes.ts` | Core route list + visit helpers |
-| `e2e/helpers/entityForm.ts` | Form interaction helpers |
-| `e2e/helpers/docCrud.ts` | Document CRUD template |
-| `e2e/*-crud.spec.ts` | Quotation, SO, Sale, PO, Purchase, OR |
-| `e2e/inventory-partners-items.spec.ts` | Partners + Items |
-| `e2e/after-sales-repair.spec.ts` | Repair orders |
-| `e2e/route-smoke.spec.ts` | Route load / no `pageerror` |
-| `e2e/transaction-history.spec.ts` | History above entity modal |
+| `e2e/fixtures/coverage-manifest.json` | Per-route coverage map |
+| `e2e/fixtures/tenant-profile.json` | Lookup fixtures |
+| `e2e/.auth/user.json` | Gitignored storageState |
+| `e2e/.evidence/<run>/` | Ledger, UX metrics, ticket drafts |
+| `docs/qa/live-e2e-run-report.md` | Latest generated report |
 
-## Module checklist
+## Support tickets
 
-| Module | Route smoke | History | Interaction/CRUD |
-|--------|:-----------:|:-------:|:----------------:|
-| Inventory partners/items | core | | e2e |
-| Quotation | core | e2e | e2e |
-| Sales order | core | e2e | e2e |
-| Sales (SI) | core | e2e | e2e |
-| PO | core | e2e | e2e |
-| Purchases | core | e2e | e2e |
-| Official receipts | core | e2e | e2e |
-| After-sales repair | smoke | | e2e |
-| GR receive | | | deep e2e (soft-skip if seed used) |
+1. Failures + UX friction → `npm run e2e:tickets:draft`
+2. Review/dedupe via Support list/export
+3. Submit only with `E2E_SUBMIT_TICKETS=1` + bearer/tenant (`e2e/scripts/submit-support-tickets.mjs`)
 
 ## Regenerating after route changes
 
 ```bash
 npm run e2e:routes:extract
+npm run e2e:coverage:manifest
 ```
 
-Commit updated `e2e/fixtures/app-routes.json`. Add high-traffic paths to `CORE_APP_ROUTES` in `e2e/helpers/appRoutes.ts`.
+Commit updated fixtures. Add high-traffic paths to `CORE_APP_ROUTES` in `e2e/helpers/appRoutes.ts`.
