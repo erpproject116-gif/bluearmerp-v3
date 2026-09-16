@@ -1,0 +1,4509 @@
+{
+  "generatedAt": "2026-09-16T03:49:57.606Z",
+  "sourceRoutes": "e2e/fixtures/app-routes.json",
+  "sourceGeneratedAt": "2026-09-16T03:49:57.321Z",
+  "totals": {
+    "smokeable": 261,
+    "parametrized": 40,
+    "byModule": {
+      "other": 61,
+      "after-sales": 8,
+      "crm": 14,
+      "dashboard": 2,
+      "documentation": 2,
+      "finance": 58,
+      "inventory": 43,
+      "operations": 9,
+      "production": 8,
+      "purchase-order": 2,
+      "purchase-request": 4,
+      "purchases": 5,
+      "quotation": 5,
+      "sales-order": 12,
+      "sales": 17,
+      "support": 1,
+      "user-management": 10
+    }
+  },
+  "parametrized": [
+    "/app/after-sales/repair-orders/:orderId/receipt",
+    "/app/after-sales/repair-orders/:orderId/warranty",
+    "/app/buying/vendor-credits/:id/print",
+    "/app/cms/p/:slug",
+    "/app/cms/pages/:id",
+    "/app/crm/clients/:id",
+    "/app/documentation/kb/:articleId",
+    "/app/finance/banking/:id",
+    "/app/finance/payment-vouchers/:id/2307",
+    "/app/finance/statutory/2307-certificates/:id/print",
+    "/app/finance/supplier-invoices/:id/print",
+    "/app/hr/payslips/:payslipId/print",
+    "/app/inventory/after-sales/*",
+    "/app/platform-command/customers/:id",
+    "/app/platform-command/customers/:id/analytics",
+    "/app/platform-command/plans/:id",
+    "/app/platform-command/tickets/:id",
+    "/app/production/:mode/jobs",
+    "/app/production/:mode/recipes",
+    "/app/purchase-order/purchase-orders/:purchaseOrderId/print",
+    "/app/purchase-order/rfq/:rfqId/print",
+    "/app/purchase-order/supplier-quotations/:sqId/print",
+    "/app/purchase-request/purchase-requests/:purchaseRequestId/print",
+    "/app/purchases/purchase-receive/:id/print",
+    "/app/purchases/purchase-receive/:purchaseId/print-doc",
+    "/app/purchases/purchases/:id/print",
+    "/app/purchases/purchases/:purchaseId/print-doc",
+    "/app/purchases/vendor-credits/:id/print",
+    "/app/quotation/quotations/:quotationId/print",
+    "/app/sales-order/sales-orders/:salesOrderId/print",
+    "/app/sales/collective-invoicing/:id/invoice/print",
+    "/app/sales/collective-invoicing/:id/slip/print",
+    "/app/sales/credit-notes/:id/print",
+    "/app/sales/sales/:id/invoice/print",
+    "/app/sales/sales/:id/print",
+    "/app/sop/documents/:id",
+    "/app/support/tickets/:id",
+    "/articles/:topic",
+    "/articles/:topic/:slug",
+    "/payslip/:token"
+  ],
+  "entries": [
+    {
+      "path": "/app/activity-logs",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/activity-logs/changes",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/after-sales/register-repair",
+      "module": "after-sales",
+      "owner": "after-sales",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/after-sales/register-repair/consumption",
+      "module": "after-sales",
+      "owner": "after-sales",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/after-sales/register-repair/new",
+      "module": "after-sales",
+      "owner": "after-sales",
+      "surface": "create",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/after-sales/register-repair/status",
+      "module": "after-sales",
+      "owner": "after-sales",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/after-sales/repair-orders",
+      "module": "after-sales",
+      "owner": "after-sales",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/after-sales/repair-orders/new",
+      "module": "after-sales",
+      "owner": "after-sales",
+      "surface": "create",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/after-sales/repair-orders/settings",
+      "module": "after-sales",
+      "owner": "after-sales",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/after-sales/repair-orders/status",
+      "module": "after-sales",
+      "owner": "after-sales",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/booking",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/booking/bookings",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/booking/calendar",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/booking/resources",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/booking/services",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/buying",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/buying/expenses",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/buying/reports",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/buying/reports/payable-status",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/buying/reports/pre-invoicing",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/buying/reports/purchase-status",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/buying/setup",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/buying/vendor-credits",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/cms",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/cms/media",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/cms/pages/settings",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/cms/redirects",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/comms/chat",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/comms/inbox",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/comms/sent-documents",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/comms/settings",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/clients",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/dashboard",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/follow-up-tasks",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/leads",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/leads/dashboard",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/notifications",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/opportunities",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/pipelines/quotations",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/reports/conversion",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/reports/customer-quotations",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/reports/expired-quotations",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/reports/item-demand",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/reports/low-stock",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/crm/settings/alert-rules",
+      "module": "crm",
+      "owner": "crm",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/dashboard/approvals",
+      "module": "dashboard",
+      "owner": "shell",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/dashboard/site-map",
+      "module": "dashboard",
+      "owner": "shell",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/data-center/inbox",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/data-center/ingestion-rules",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/documentation/kb",
+      "module": "documentation",
+      "owner": "help",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/documentation/whats-new",
+      "module": "documentation",
+      "owner": "help",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/bank-reconciliation",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/chart-of-accounts",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/fiscal-years",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/journal-entries",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/payment-entries",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/balance-sheet",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/cash-book",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/cash-flow-statement",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/fund-statement",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/general-ledger",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/profit-and-loss",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/trial-balance",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-ii/checks",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-ii/contracts",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-ii/landed-costs",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-ii/notes",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-ii/setup",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/acct-ii/withholding-codes",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/banking",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/bookkeeping",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/collections",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/disbursements",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/official-receipts",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/official-receipts/new",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "create",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/official-receipts/settings",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/payables",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/receivables",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/acct-inventory-reconciliation",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/ap-aging",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/ap-aging-details",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/ap-by-vendor",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/ar-aging",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/ar-aging-details",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/ar-ap-status",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/ar-by-customer",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/customer-vendor-book-ap",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/customer-vendor-book-ar",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/customer-vendor-book-ii-ap",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/customer-vendor-book-ii-ar",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/official-receipt-status",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/receipt-status",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/reports/supplier-payment-status",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/setup",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/1601-eq",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/2307-certificates",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/2550",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/attachments",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/books",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/compensation-wht",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/document-series",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/percentage-tax",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/taxpayer-profile",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/vat/purchases",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/vat/sales",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/finance/statutory/year-end-close",
+      "module": "finance",
+      "owner": "accounting",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/fixed-assets",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/absenteeism",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/attendance",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/discipline",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/employees",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/employees/settings",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/ess",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/evaluations",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/hire-onboarding",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/learning",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/leave",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/pay-items",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/payroll-runs",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/remittances",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/hr/special-runs",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/departments",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/departments/settings",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/find-stock",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/item-categories",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/items",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/items/settings",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/locations",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/locations/settings",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/partners",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/partners/settings",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/price-lists",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/product-bundles",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/projects",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/projects/settings",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/reports/inv-book",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/reports/inventory-status",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/reports/on-hand",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/reports/stock-ageing",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/reports/stock-balance",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/reports/stock-ledger",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/adjustment",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/lot-adjustment",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/lots",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/movements",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/pack-station",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/receive",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/receive-station",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/registry",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/reports/balance",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/reports/book",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/reports/lot-book",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/reports/reconciliation",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/reports/status",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/settings",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/serial-lot/trace",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/setup",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/stock-adjustments",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/stock-entries",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/stock-movements",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/stock-reconciliation",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/units",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/inventory/wms/scheduled-receipts",
+      "module": "inventory",
+      "owner": "inventory",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/job-costing",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/okr",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/okr/dashboard",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations/automation",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations/calendar",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations/dashboard",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations/job-costing",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations/packs",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations/tasks",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations/timeline",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/operations/work-items/settings",
+      "module": "operations",
+      "owner": "ops",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/pos",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/pos/manage",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/pos/setup",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/production",
+      "module": "production",
+      "owner": "manufacturing",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/production/issue-station",
+      "module": "production",
+      "owner": "manufacturing",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/production/orders/new",
+      "module": "production",
+      "owner": "manufacturing",
+      "surface": "create",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/production/receive-station",
+      "module": "production",
+      "owner": "manufacturing",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/production/reports",
+      "module": "production",
+      "owner": "manufacturing",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/production/setup",
+      "module": "production",
+      "owner": "manufacturing",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/production/waste-reasons",
+      "module": "production",
+      "owner": "manufacturing",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/production/weigh-parts",
+      "module": "production",
+      "owner": "manufacturing",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchase-order/purchase-orders",
+      "module": "purchase-order",
+      "owner": "buying",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchase-order/reports/items-to-receive",
+      "module": "purchase-order",
+      "owner": "buying",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchase-request/purchase-requests",
+      "module": "purchase-request",
+      "owner": "buying",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchase-request/purchase-requests/new",
+      "module": "purchase-request",
+      "owner": "buying",
+      "surface": "create",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchase-request/purchase-requests/settings",
+      "module": "purchase-request",
+      "owner": "buying",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchase-request/purchase-requests/status",
+      "module": "purchase-request",
+      "owner": "buying",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchases/expenses",
+      "module": "purchases",
+      "owner": "buying",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchases/purchase-receive/payment-status",
+      "module": "purchases",
+      "owner": "buying",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchases/purchase-receive/pre-invoicing",
+      "module": "purchases",
+      "owner": "buying",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchases/recurring-expenses",
+      "module": "purchases",
+      "owner": "buying",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/purchases/vendor-credits",
+      "module": "purchases",
+      "owner": "buying",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/quality/capa",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/quality/ncrs",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/quality/qc-requests",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/quotation/quotations",
+      "module": "quotation",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/quotation/quotations/settings",
+      "module": "quotation",
+      "owner": "selling",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/quotation/setup",
+      "module": "quotation",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/quotation/tax-mngt/tax-types",
+      "module": "quotation",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/quotation/tax-mngt/tax-types/settings",
+      "module": "quotation",
+      "owner": "selling",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/reports",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/reports/saved-views",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/delivery-receipts",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/delivery-receipts/new",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "create",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/reports/fulfillment-progress",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/reports/pending-shipment",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/reports/shipment-status",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/reports/so-analysis",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/sales-orders",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/sales-orders/release",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/sales-orders/settings",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/setup",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/shipping/orders",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales-order/shipping/rules",
+      "module": "sales-order",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/collective-invoicing/list",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/collective-invoicing/status",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/commission-rules",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/credit-notes",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/recurring-invoices",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/reports/ar-by-customer",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/reports/customer-credit-balance",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/reports/discount-status",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/reports/official-receipt-status",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/reports/si-receipt-status",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/retainer-invoices",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/sales",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/sales-categories",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/sales-returns",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/sales/pre-invoicing",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/sales/price-batch",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sales/sales/settings",
+      "module": "sales",
+      "owner": "selling",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/selling",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/selling/commissions",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/selling/reports",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/selling/reports/receivable-status",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "report",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": false,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/selling/setup",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/settings/billing",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/settings/branding",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "settings",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sop",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/sop/dashboard",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/support/tickets",
+      "module": "support",
+      "owner": "support",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/thank-you-activated",
+      "module": "other",
+      "owner": "unassigned",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/demo-data",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/groups",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/help-feedback",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/mapping-center",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/migration-center",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/process-policies",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/roles",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/tenant-modules",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/user-permissions",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    },
+    {
+      "path": "/app/user-management/users",
+      "module": "user-management",
+      "owner": "admin",
+      "surface": "page",
+      "tier": "read-only",
+      "contracts": {
+        "routeSmoke": true,
+        "pageShell": true,
+        "grid": null,
+        "form": null,
+        "history": null,
+        "chain": null,
+        "uxTask": null
+      },
+      "status": "untested"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "demo-default",
+  "tenantCode": "DEMO000",
+  "partnerQuery": "Seda",
+  "supplierQuery": "Seda",
+  "itemQuery": "Sofa",
+  "locationQuery": "Head",
+  "openPoCodes": ["DEMOGR902", "DEMOGR903"]
+}

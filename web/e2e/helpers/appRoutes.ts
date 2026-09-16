@@ -189,10 +189,14 @@ export async function visitAppRoute(
 
 export async function visitRoutesCollectFailures(page: Page, paths: string[]): Promise<VisitResult[]> {
   const failures: VisitResult[] = [];
+  const live =
+    /app\.bluearmerp\.com/i.test(process.env.E2E_BASE_URL ?? "") || process.env.E2E_PACE_MS === "1";
+  const paceMs = Number(process.env.E2E_ROUTE_PACE_MS || (live ? 450 : 0));
   for (const p of paths) {
     const r = await visitAppRoute(page, p);
     if (!r.ok) failures.push(r);
     else if (r.detail) console.warn(`[route-smoke] ${p}: ${r.detail}`);
+    if (paceMs > 0) await page.waitForTimeout(paceMs);
   }
   return failures;
 }

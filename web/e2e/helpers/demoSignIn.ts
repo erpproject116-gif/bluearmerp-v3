@@ -1,10 +1,26 @@
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { benchAuthAvailable, seedBenchSession } from "./benchAuth";
 import { assertApiReachable } from "./apiReady";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function storageStateExists(): boolean {
+  const p =
+    process.env.E2E_STORAGE_STATE?.trim() ||
+    path.join(__dirname, "../.auth/user.json");
+  return process.env.E2E_USE_STORAGE_STATE !== "0" && fs.existsSync(p);
+}
+
 export function demoAuthAvailable(): boolean {
-  return benchAuthAvailable() || Boolean(process.env.E2E_DEMO_PASSWORD || process.env.DEMO_USER_PASSWORD);
+  return (
+    storageStateExists() ||
+    benchAuthAvailable() ||
+    Boolean(process.env.E2E_DEMO_PASSWORD || process.env.DEMO_USER_PASSWORD)
+  );
 }
 
 function demoCredentials() {
@@ -21,8 +37,19 @@ function demoCredentials() {
   return { email, password };
 }
 
-/** Sign in via bench JWT (CI) or email/password (local). */
+/** Sign in via storageState, bench JWT (CI), or email/password (local). */
 export async function demoSignIn(page: Page) {
+  // Playwright config may already inject storageState from the live browser export.
+  if (storageStateExists() && !process.env.E2E_BENCH_TOKEN) {
+    await page.goto("/app/dashboard");
+    await page.waitForURL("**/app/**", { timeout: 25000 }).catch(() => undefined);
+    if (!page.url().includes("/signin")) {
+      await assertApiReachable(page);
+      return;
+    }
+    // Fall through to password/bench if storage expired.
+  }
+
   const benchToken = process.env.E2E_BENCH_TOKEN;
   if (benchToken) {
     await seedBenchSession(page, benchToken);
@@ -35,7 +62,7 @@ export async function demoSignIn(page: Page) {
   const { email, password } = demoCredentials();
   if (!password) {
     throw new Error(
-      "Missing demo password. Set E2E_DEMO_PASSWORD or DEMO_USER_PASSWORD in web/.env.local",
+      "Missing demo password. Set E2E_DEMO_PASSWORD or DEMO_USER_PASSWORD in web/.env.local (or export e2e/.auth/user.json from the signed-in browser)",
     );
   }
 

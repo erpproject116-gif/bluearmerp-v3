@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-08-18T04:34:31.268Z",
+  "generatedAt": "2026-09-16T03:49:57.321Z",
   "source": "src/App.tsx",
   "totals": {
-    "all": 396,
-    "smokeable": 275,
+    "all": 419,
+    "smokeable": 261,
     "byKind": {
-      "app_static": 275,
-      "parametrized": 39,
+      "app_static": 261,
+      "parametrized": 40,
       "print_or_doc": 9,
-      "redirect": 50,
+      "redirect": 86,
       "platform": 11,
       "public": 12
     }
@@ -59,9 +59,7 @@
     "/app/crm/reports/item-demand",
     "/app/crm/reports/low-stock",
     "/app/crm/settings/alert-rules",
-    "/app/dashboard",
     "/app/dashboard/approvals",
-    "/app/dashboard/period-summary",
     "/app/dashboard/site-map",
     "/app/data-center/inbox",
     "/app/data-center/ingestion-rules",
@@ -73,6 +71,7 @@
     "/app/finance/acct-i/fiscal-years",
     "/app/finance/acct-i/journal-entries",
     "/app/finance/acct-i/payment-entries",
+    "/app/finance/acct-i/reports/balance-sheet",
     "/app/finance/acct-i/reports/cash-book",
     "/app/finance/acct-i/reports/cash-flow-statement",
     "/app/finance/acct-i/reports/fund-statement",
@@ -143,6 +142,7 @@
     "/app/inventory/departments",
     "/app/inventory/departments/settings",
     "/app/inventory/find-stock",
+    "/app/inventory/item-categories",
     "/app/inventory/items",
     "/app/inventory/items/settings",
     "/app/inventory/locations",
@@ -162,13 +162,14 @@
     "/app/inventory/serial-lot/adjustment",
     "/app/inventory/serial-lot/lot-adjustment",
     "/app/inventory/serial-lot/lots",
-    "/app/inventory/serial-lot/manufacturing/boms",
-    "/app/inventory/serial-lot/manufacturing/work-orders",
     "/app/inventory/serial-lot/movements",
+    "/app/inventory/serial-lot/pack-station",
     "/app/inventory/serial-lot/receive",
+    "/app/inventory/serial-lot/receive-station",
     "/app/inventory/serial-lot/registry",
     "/app/inventory/serial-lot/reports/balance",
     "/app/inventory/serial-lot/reports/book",
+    "/app/inventory/serial-lot/reports/lot-book",
     "/app/inventory/serial-lot/reports/reconciliation",
     "/app/inventory/serial-lot/reports/status",
     "/app/inventory/serial-lot/settings",
@@ -195,60 +196,47 @@
     "/app/pos",
     "/app/pos/manage",
     "/app/pos/setup",
-    "/app/purchase-order/goods-receipt",
+    "/app/production",
+    "/app/production/issue-station",
+    "/app/production/orders/new",
+    "/app/production/receive-station",
+    "/app/production/reports",
+    "/app/production/setup",
+    "/app/production/waste-reasons",
+    "/app/production/weigh-parts",
     "/app/purchase-order/purchase-orders",
-    "/app/purchase-order/purchase-orders/outstanding",
-    "/app/purchase-order/purchase-orders/status",
-    "/app/purchase-order/purchase-returns",
     "/app/purchase-order/reports/items-to-receive",
-    "/app/purchase-order/reports/po-analysis",
-    "/app/purchase-order/rfq",
-    "/app/purchase-order/setup",
     "/app/purchase-request/purchase-requests",
     "/app/purchase-request/purchase-requests/new",
     "/app/purchase-request/purchase-requests/settings",
     "/app/purchase-request/purchase-requests/status",
     "/app/purchases/expenses",
-    "/app/purchases/purchase-receive/new",
     "/app/purchases/purchase-receive/payment-status",
     "/app/purchases/purchase-receive/pre-invoicing",
-    "/app/purchases/purchase-receive/settings",
-    "/app/purchases/purchase-receive/status",
     "/app/purchases/recurring-expenses",
-    "/app/purchases/setup",
     "/app/purchases/vendor-credits",
     "/app/quality/capa",
     "/app/quality/ncrs",
     "/app/quality/qc-requests",
     "/app/quotation/quotations",
-    "/app/quotation/quotations/new",
-    "/app/quotation/quotations/outstanding",
     "/app/quotation/quotations/settings",
-    "/app/quotation/quotations/status",
     "/app/quotation/setup",
-    "/app/quotation/tax-mngt/currencies",
-    "/app/quotation/tax-mngt/currencies/settings",
     "/app/quotation/tax-mngt/tax-types",
     "/app/quotation/tax-mngt/tax-types/settings",
     "/app/reports",
     "/app/reports/saved-views",
     "/app/sales-order/delivery-receipts",
     "/app/sales-order/delivery-receipts/new",
-    "/app/sales-order/reports",
+    "/app/sales-order/reports/fulfillment-progress",
     "/app/sales-order/reports/pending-shipment",
     "/app/sales-order/reports/shipment-status",
-    "/app/sales-order/reports/shipping-order-status",
     "/app/sales-order/reports/so-analysis",
     "/app/sales-order/sales-orders",
-    "/app/sales-order/sales-orders/new",
-    "/app/sales-order/sales-orders/outstanding",
     "/app/sales-order/sales-orders/release",
     "/app/sales-order/sales-orders/settings",
-    "/app/sales-order/sales-orders/status",
     "/app/sales-order/setup",
     "/app/sales-order/shipping/orders",
     "/app/sales-order/shipping/rules",
-    "/app/sales-order/shipping/trips",
     "/app/sales/collective-invoicing/list",
     "/app/sales/collective-invoicing/status",
     "/app/sales/commission-rules",
@@ -261,13 +249,11 @@
     "/app/sales/reports/si-receipt-status",
     "/app/sales/retainer-invoices",
     "/app/sales/sales",
+    "/app/sales/sales-categories",
     "/app/sales/sales-returns",
-    "/app/sales/sales/new",
     "/app/sales/sales/pre-invoicing",
     "/app/sales/sales/price-batch",
     "/app/sales/sales/settings",
-    "/app/sales/sales/status",
-    "/app/sales/setup",
     "/app/selling",
     "/app/selling/commissions",
     "/app/selling/reports",
@@ -529,15 +515,27 @@
     },
     {
       "path": "/app/dashboard",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/dashboard/approvals",
       "kind": "app_static"
     },
     {
+      "path": "/app/dashboard/getting-started",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/dashboard/onboarding",
+      "kind": "redirect"
+    },
+    {
       "path": "/app/dashboard/period-summary",
-      "kind": "app_static"
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/dashboard/recent-updates",
+      "kind": "redirect"
     },
     {
       "path": "/app/dashboard/site-map",
@@ -593,6 +591,10 @@
     },
     {
       "path": "/app/finance/acct-i/payment-entries",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/finance/acct-i/reports/balance-sheet",
       "kind": "app_static"
     },
     {
@@ -972,6 +974,10 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/inventory/item-categories",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/inventory/items",
       "kind": "app_static"
     },
@@ -1049,18 +1055,26 @@
     },
     {
       "path": "/app/inventory/serial-lot/manufacturing/boms",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/inventory/serial-lot/manufacturing/work-orders",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/inventory/serial-lot/movements",
       "kind": "app_static"
     },
     {
+      "path": "/app/inventory/serial-lot/pack-station",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/inventory/serial-lot/receive",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/inventory/serial-lot/receive-station",
       "kind": "app_static"
     },
     {
@@ -1073,6 +1087,10 @@
     },
     {
       "path": "/app/inventory/serial-lot/reports/book",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/inventory/serial-lot/reports/lot-book",
       "kind": "app_static"
     },
     {
@@ -1272,8 +1290,60 @@
       "kind": "app_static"
     },
     {
-      "path": "/app/purchase-order/goods-receipt",
+      "path": "/app/production",
       "kind": "app_static"
+    },
+    {
+      "path": "/app/production/:mode/jobs",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/production/:mode/recipes",
+      "kind": "parametrized"
+    },
+    {
+      "path": "/app/production/boms",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/production/issue-station",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/production/orders/new",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/production/receive-station",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/production/recipe-soon",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/production/reports",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/production/setup",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/production/waste-reasons",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/production/weigh-parts",
+      "kind": "app_static"
+    },
+    {
+      "path": "/app/production/work-orders",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/purchase-order/goods-receipt",
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/goods-receipt/settings",
@@ -1289,7 +1359,7 @@
     },
     {
       "path": "/app/purchase-order/purchase-orders/outstanding",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/purchase-orders/settings",
@@ -1297,11 +1367,11 @@
     },
     {
       "path": "/app/purchase-order/purchase-orders/status",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/purchase-returns",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/reports/items-to-receive",
@@ -1309,15 +1379,15 @@
     },
     {
       "path": "/app/purchase-order/reports/po-analysis",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/rfq",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/rfq/:id",
-      "kind": "parametrized"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/rfq/:rfqId/print",
@@ -1325,7 +1395,7 @@
     },
     {
       "path": "/app/purchase-order/setup",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchase-order/supplier-quotations/:sqId/print",
@@ -1389,7 +1459,7 @@
     },
     {
       "path": "/app/purchases/purchase-receive/new",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchases/purchase-receive/payment-status",
@@ -1401,11 +1471,11 @@
     },
     {
       "path": "/app/purchases/purchase-receive/settings",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchases/purchase-receive/status",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchases/purchases",
@@ -1449,7 +1519,7 @@
     },
     {
       "path": "/app/purchases/setup",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/purchases/vendor-credits",
@@ -1481,11 +1551,11 @@
     },
     {
       "path": "/app/quotation/quotations/new",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/quotation/quotations/outstanding",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/quotation/quotations/settings",
@@ -1493,7 +1563,7 @@
     },
     {
       "path": "/app/quotation/quotations/status",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/quotation/quotations/status/print",
@@ -1505,11 +1575,11 @@
     },
     {
       "path": "/app/quotation/tax-mngt/currencies",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/quotation/tax-mngt/currencies/settings",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/quotation/tax-mngt/tax-types",
@@ -1537,6 +1607,10 @@
     },
     {
       "path": "/app/sales-order/reports",
+      "kind": "redirect"
+    },
+    {
+      "path": "/app/sales-order/reports/fulfillment-progress",
       "kind": "app_static"
     },
     {
@@ -1549,7 +1623,7 @@
     },
     {
       "path": "/app/sales-order/reports/shipping-order-status",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/sales-order/reports/so-analysis",
@@ -1565,11 +1639,11 @@
     },
     {
       "path": "/app/sales-order/sales-orders/new",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/sales-order/sales-orders/outstanding",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/sales-order/sales-orders/release",
@@ -1581,7 +1655,7 @@
     },
     {
       "path": "/app/sales-order/sales-orders/status",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/sales-order/sales-orders/status/print",
@@ -1601,7 +1675,7 @@
     },
     {
       "path": "/app/sales-order/shipping/trips",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/sales/collective-invoicing/:id/invoice/print",
@@ -1680,6 +1754,10 @@
       "kind": "app_static"
     },
     {
+      "path": "/app/sales/sales-categories",
+      "kind": "app_static"
+    },
+    {
       "path": "/app/sales/sales-returns",
       "kind": "app_static"
     },
@@ -1693,7 +1771,7 @@
     },
     {
       "path": "/app/sales/sales/new",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/sales/sales/pre-invoicing",
@@ -1709,11 +1787,11 @@
     },
     {
       "path": "/app/sales/sales/status",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/sales/setup",
-      "kind": "app_static"
+      "kind": "redirect"
     },
     {
       "path": "/app/selling",
