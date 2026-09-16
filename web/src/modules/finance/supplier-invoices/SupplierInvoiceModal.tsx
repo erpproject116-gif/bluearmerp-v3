@@ -20,6 +20,14 @@ import { formatMoney } from "../../../shared/money";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import {
+  downloadAttachment,
+  formatFileSize,
+  listAttachments,
+  type Attachment,
+  type AttachmentScope,
+} from "../../../shared/attachments";
+import { mapCustomValuesToEntity, mergeCustomValues } from "../../../shared/mapCustomValues";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired, isConfirmingProgress } from "../../../shared/useProcessPolicy";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
@@ -131,6 +139,15 @@ export function SupplierInvoiceModal(props: Props) {
   const { fields, byKey, activeCustomFields } = useFormFieldSettings(PURCHASES_ENTITY.purchases);
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const [attachmentCount, setAttachmentCount] = createSignal(0);
+  type SourceAttachPreview = {
+    scope: AttachmentScope;
+    docId: number;
+    label: string;
+    files: Attachment[];
+  };
+  const [sourceAttachPreview, setSourceAttachPreview] = createSignal<SourceAttachPreview | null>(null);
+  const effectiveAttachmentCount = () =>
+    attachmentCount() + (sourceAttachPreview()?.files.length ?? 0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
@@ -286,10 +303,12 @@ export function SupplierInvoiceModal(props: Props) {
   createEffect(() => {
     if (!props.open) {
       setCreatedInvoice(null);
+      setSourceAttachPreview(null);
       return;
     }
     const ed = props.editing;
     if (ed) {
+      setSourceAttachPreview(null);
       setInvoiceDate(ed.invoice_date);
       setDateNoDisplay(ed.date_no_display);
       setInvoiceNo(ed.invoice_no);
@@ -485,13 +504,88 @@ export function SupplierInvoiceModal(props: Props) {
     toast.success(`Added ${row.item_code}.`);
   };
 
+  createEffect(() => {
+    const purchaseId = createdInvoice()?.id ?? props.editing?.id;
+    if (purchaseId && sourceAttachPreview()) {
+      setSourceAttachPreview(null);
+    }
+  });
+
+  const loadSourceAttachPreview = async (
+    scope: AttachmentScope,
+    docId: number,
+    label: string,
+  ) => {
+    if (!docId || docId <= 0) {
+      setSourceAttachPreview(null);
+      return;
+    }
+    const res = await listAttachments(scope, docId);
+    if (res.success && (res.data?.length ?? 0) > 0) {
+      setSourceAttachPreview({ scope, docId, label, files: res.data! });
+    } else {
+      setSourceAttachPreview(null);
+    }
+  };
+
+  const loadSourceCustomValues = async (path: string, docId: number) => {
+    if (!docId || docId <= 0) return;
+    const res = await apiFetch<{ custom_values?: Record<string, unknown> }>(path);
+    if (!res.success || !res.data?.custom_values) return;
+    const mapped = mapCustomValuesToEntity(res.data.custom_values, fields());
+    if (Object.keys(mapped).length === 0) return;
+    loadCustom(mergeCustomValues(customValues(), mapped));
+  };
+
   const applyPOLines = async (picked: OpenPOLine[]) => {
     if (picked.length === 0) return;
-    const meta = taxTypes().find((t) => t.id === taxTypeId());
+    const first = picked[0];
+    if (first.order_date) {
+      setInvoiceDate(first.order_date);
+      void loadPreview(first.order_date);
+    }
+    if (first.partner_id) {
+      setPartnerId(first.partner_id);
+      setVendorLabel(first.partner_name ?? "");
+    }
+    if (first.tax_type_id) {
+      setTaxTypeId(first.tax_type_id);
+      const meta = taxTypes().find((t) => t.id === first.tax_type_id);
+      setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
+    }
+    if (first.currency_id) {
+      setCurrencyId(first.currency_id);
+    }
+    if (first.location_id) {
+      setLocationId(first.location_id);
+      setLocationLabel(first.location_name ?? "");
+    }
+    if (first.pic_user_id != null) {
+      setPicUserId(first.pic_user_id);
+    }
+    if (first.pic_name) {
+      setPicName(first.pic_name);
+    }
+    if (first.project_id) {
+      setProjectId(first.project_id);
+      setProjectLabel(first.project_name ?? "");
+      setProjectName(first.project_name ?? "");
+    } else if (first.project_name) {
+      setProjectId(null);
+      setProjectLabel(first.project_name);
+      setProjectName(first.project_name);
+    }
+    // Purchases "PO Number" field — stamp the originating PO doc no.
+    setReference(first.purchase_order_no || first.reference || "");
+    if (first.notes) {
+      setNotes(first.notes);
+    }
+
+    const taxId = first.tax_type_id ?? taxTypeId();
+    const meta = taxTypes().find((t) => t.id === taxId);
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
-    const start = lines().length;
     const newLines: PurchaseRequestLineRow[] = picked.map((row, i) => ({
-      ...emptyPurchaseRequestLine(start + i + 1, String(row.unit_vat_inc), basis),
+      ...emptyPurchaseRequestLine(i + 1, String(row.unit_vat_inc), basis),
       item_id: row.item_id,
       item_code: row.item_code,
       item_name: row.item_name,
@@ -503,12 +597,25 @@ export function SupplierInvoiceModal(props: Props) {
       track_serial: row.track_serial,
       warranty_duration_months: row.warranty_duration_months ?? 0,
     }));
-    const merged = [...lines().filter((ln) => ln.item_id || ln.item_code), ...newLines].map((ln, i) => ({ ...ln, line_no: i + 1 }));
-    if (meta && taxTypeId()) {
-      setLines(await recalculatePurchaseRequestLines(merged.length ? merged : newLines, taxTypeId()!, meta));
+    if (meta && taxId) {
+      setLines(await recalculatePurchaseRequestLines(newLines, taxId, meta));
     } else {
-      setLines(merged.length ? merged : newLines);
+      setLines(newLines);
     }
+    await Promise.all([
+      loadSourceAttachPreview(
+        "purchase-order/purchase-orders",
+        first.purchase_order_id,
+        "From Purchase Order (copies when you Save)",
+      ),
+      loadSourceCustomValues(
+        `/api/v1/purchase-order/purchase-orders/${first.purchase_order_id}`,
+        first.purchase_order_id,
+      ),
+    ]);
+    toast.success(
+      "Purchase Order lines loaded. Header fields, attachments, and matching custom fields copy when you Save.",
+    );
   };
 
   const applySupplierQuotationLines = async (picked: OpenSupplierQuotationInvoiceLine[]) => {
@@ -587,7 +694,7 @@ export function SupplierInvoiceModal(props: Props) {
       processPolicy.data,
       "supplier_invoice",
       progressStatus(),
-      attachmentCount(),
+      effectiveAttachmentCount(),
       effectiveEditing()?.id,
     );
     if (attachmentErr) {
@@ -1011,17 +1118,64 @@ export function SupplierInvoiceModal(props: Props) {
                 />
               )}
             </ModalField>
-            <AttachmentsField
-              scope="finance/supplier-invoices"
-              formOpen={props.open}
-              docId={effectiveEditing()?.id}
-              label={`${uiLabel("purchasing.attachments_invoice")} (DR / vendor SI)`}
-              required={
-                policyRequiresAttachment(processPolicy.data, "supplier_invoice") &&
-                isConfirmingProgress("supplier_invoice", progressStatus())
-              }
-              onCountChange={setAttachmentCount}
-            />
+            <div class="col-span-full grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Show
+                when={sourceAttachPreview()}
+                fallback={
+                  <div class="rounded-lg border border-dashed border-stroke bg-slate-50/80 px-3 py-3">
+                    <p class="text-sm font-medium text-text-primary">From source document</p>
+                    <p class="mt-0.5 text-xs text-text-secondary">
+                      Use Load Slip → Purchase Order to preview PO files here. They copy onto this purchase when you Save.
+                    </p>
+                  </div>
+                }
+              >
+                {(preview) => (
+                  <div class="rounded-lg border border-brand-200 bg-brand-50/40 px-3 py-3">
+                    <p class="text-sm font-medium text-text-primary">{preview().label}</p>
+                    <p class="mt-0.5 text-xs text-text-secondary">
+                      Read-only from the purchase order. Files copy onto this purchase when you Save.
+                    </p>
+                    <ul class="mt-2 space-y-1">
+                      <For each={preview().files}>
+                        {(file) => (
+                          <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                            <span class="truncate text-text-primary">
+                              {file.file_name}
+                              <span class="ml-2 text-xs text-text-secondary">{formatFileSize(file.size_bytes)}</span>
+                            </span>
+                            <button
+                              type="button"
+                              class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
+                              onClick={() =>
+                                void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
+                                  if (!ok) toast.warning("Couldn't download the file. Try again.");
+                                })
+                              }
+                            >
+                              Download
+                            </button>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </div>
+                )}
+              </Show>
+              <AttachmentsField
+                scope="finance/supplier-invoices"
+                formOpen={props.open}
+                docId={effectiveEditing()?.id}
+                label={`${uiLabel("purchasing.attachments_invoice")} (DR / vendor SI)`}
+                emptyUnsavedHint="Upload extra files for this purchase (max 25 MB each). Uploads when you Save."
+                required={
+                  policyRequiresAttachment(processPolicy.data, "supplier_invoice") &&
+                  isConfirmingProgress("supplier_invoice", progressStatus()) &&
+                  !sourceAttachPreview()
+                }
+                onCountChange={setAttachmentCount}
+              />
+            </div>
             <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
               {(m) => (
                 <textarea
