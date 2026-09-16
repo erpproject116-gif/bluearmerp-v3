@@ -130,7 +130,7 @@ async function openHistory(page: Page, c: TxCase, testInfo: { skip: (cond?: bool
 
 test.describe("Transaction History nested modal", () => {
   for (const c of CASES) {
-    test(`${c.name}: History opens (list or edit modal)`, async ({ page }, testInfo) => {
+    test(`@read-only ${c.name}: History opens (list or edit modal)`, async ({ page }, testInfo) => {
       test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD for authenticated smoke");
       test.setTimeout(90_000);
 

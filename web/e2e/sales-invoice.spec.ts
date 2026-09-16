@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
 
 test.describe("Sales invoice tab", () => {
-  test("sale invoice tab shows item breakdown", async ({ page }) => {
+  test("@smoke @read-only sale invoice tab shows item breakdown", async ({ page }) => {
     test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD for authenticated smoke");
 
     await demoSignIn(page);

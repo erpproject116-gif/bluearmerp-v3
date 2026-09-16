@@ -1,22 +1,49 @@
 import { test, expect } from "@playwright/test";
 import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
 import { assertApiReachable } from "./helpers/apiReady";
+import {
+  openNewRow,
+  expectModalHeading,
+  cancelEntityModal,
+  softSkip,
+} from "./helpers/entityForm";
+import { mutationsAllowed, currentTier } from "./helpers/liveSafety";
+import { loadTenantProfile } from "./helpers/tenantProfile";
+import { ledgerAppend } from "./helpers/mutationLedger";
 
 /**
- * Deep journey — needs a confirmed open PO (DEMOGR902 preferred, DEMOGR903 fallback).
+ * Deep journey — posting GR. Live: requires E2E_TIER=posting + E2E_ALLOW_MUTATIONS=1.
  * Re-open seed: `psql "$DATABASE_URL" -f scripts/reset-demo-po-gr-open.sql`
- * or re-run `scripts/seed-demo-po-gr-open.sql` (now reopens fully-received DEMOGR902).
  */
-const CANDIDATES = [
-  { po: "DEMOGR902", serials: 5 },
-  { po: "DEMOGR903", serials: 3 },
-] as const;
-
 test.describe("Goods receipt receive", () => {
-  test("create draft GR from open demo PO, paste serials, and post", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD for authenticated smoke");
+  test("@read-only receive page shell loads and PO lookup is visible", async ({ page }, testInfo) => {
+    test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD");
+    test.setTimeout(60_000);
+    await demoSignIn(page);
+    await page.goto("/app/inventory/serial-lot/receive");
+    await assertApiReachable(page);
+    try {
+      await expect(page.getByRole("heading", { name: /Receive \/ Scan Serials/i })).toBeVisible({
+        timeout: 15000,
+      });
+    } catch {
+      softSkip(testInfo, "Serial/lot receive heading not visible (module or permission)");
+    }
+    await expect(page.getByLabel(/Purchase order/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test("@posting @mutating create draft GR from open PO, paste serials, and post", async ({ page }) => {
+    test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD");
+    test.skip(
+      !mutationsAllowed() || currentTier() !== "posting",
+      "Set E2E_TIER=posting, E2E_ALLOW_MUTATIONS=1, E2E_RUN_CONFIRM=<id>",
+    );
     test.setTimeout(120_000);
 
+    const profile = loadTenantProfile();
+    const candidates = (profile.openPoCodes?.length ? profile.openPoCodes : ["DEMOGR902", "DEMOGR903"]).map(
+      (po, i) => ({ po, serials: i === 0 ? 5 : 3 }),
+    );
     const serialPrefix = `E2E-GR-${Date.now()}`;
 
     await demoSignIn(page);
@@ -24,8 +51,8 @@ test.describe("Goods receipt receive", () => {
     await assertApiReachable(page);
     await expect(page.getByRole("heading", { name: /Receive \/ Scan Serials/i })).toBeVisible({ timeout: 15000 });
 
-    let used: (typeof CANDIDATES)[number] | null = null;
-    for (const c of CANDIDATES) {
+    let used: { po: string; serials: number } | null = null;
+    for (const c of candidates) {
       const poInput = page.getByLabel(/Purchase order/i);
       await poInput.click();
       await poInput.fill("");
@@ -47,7 +74,7 @@ test.describe("Goods receipt receive", () => {
     }
 
     if (!used) {
-      test.skip(true, "No open demo PO (run scripts/reset-demo-po-gr-open.sql or seed-demo-po-gr-open.sql)");
+      test.skip(true, "No open PO in tenant profile (set openPoCodes or reset demo GR seed)");
     }
 
     const serials = Array.from({ length: used!.serials }, (_, i) => `${serialPrefix}-${String(i + 1).padStart(2, "0")}`);
@@ -62,6 +89,13 @@ test.describe("Goods receipt receive", () => {
     await postBtn.click();
 
     await expect(page.getByText(/Goods receipt posted/i)).toBeVisible({ timeout: 15000 });
+    ledgerAppend({
+      kind: "goods-receipt",
+      marker: serialPrefix,
+      path: "/app/inventory/serial-lot/receive",
+      detail: `po=${used!.po}`,
+      status: "posted",
+    });
 
     await page.goto("/app/purchases/purchase-receive?view=history&from=goods-receipt");
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15000 });

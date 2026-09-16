@@ -21,7 +21,7 @@ async function expectInputWithValue(page: Page, value: string, timeout = 15_000)
  * staging/prefill only and never click Save/Import.
  */
 test.describe("Copilot seed handoffs", () => {
-  test("sales order doc seed prefills the create modal", async ({ page }) => {
+  test("sales order doc seed prefills the create modal @read-only", async ({ page }) => {
     test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
 
@@ -49,7 +49,7 @@ test.describe("Copilot seed handoffs", () => {
     expect(remaining).toBeNull();
   });
 
-  test("migration import seed opens the mapped-import modal prefilled", async ({ page }, testInfo) => {
+  test("@read-only migration import seed opens the mapped-import modal prefilled", async ({ page }, testInfo) => {
     test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
 
@@ -88,7 +88,7 @@ test.describe("Copilot seed handoffs", () => {
     await page.getByRole("button", { name: /^Cancel$/i }).click();
   });
 
-  test("serial/lot seed stages the paste buffer on the receive page", async ({ page }) => {
+  test("@read-only serial/lot seed stages the paste buffer on the receive page", async ({ page }) => {
     test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
 
