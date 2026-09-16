@@ -267,6 +267,13 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
   const pageTitle = () => {
     if (isReviewPurchasesPath(loc.pathname)) return reviewPurchasesHeaderTitle(loc.pathname);
+    // Partners master list: title follows Sales Customers / Purchase Vendors filter.
+    if (loc.pathname.startsWith("/app/inventory/partners")) {
+      const kind = new URLSearchParams(loc.search).get("kind");
+      if (kind === "customer") return "Customers";
+      if (kind === "vendor") return "Vendors";
+      return "Customers & vendors";
+    }
     const mod = activeModule();
     if (!mod) return "Home";
     if (activeSubBranch()) return subBranchHeaderTitle(loc.pathname, activeSubBranch()!.prefix);
@@ -276,6 +283,18 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
       return loc.pathname === f.settingsHref && f.settingsHref !== f.href ? `${base} settings` : base;
     }
     return moduleLabel(mod);
+  };
+
+  /** Drop consecutive duplicate crumb labels (e.g. Sales › Sales › Sales). */
+  const uniqueCrumbs = (parts: string[]) => {
+    const out: string[] = [];
+    for (const p of parts) {
+      const t = p.trim();
+      if (!t) continue;
+      if (out.length && out[out.length - 1]!.toLowerCase() === t.toLowerCase()) continue;
+      out.push(t);
+    }
+    return out;
   };
 
   const layout = (
@@ -396,49 +415,39 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                           ›
                         </span>
                       );
+                      const crumbParts = () => {
+                        const dept = breadcrumbDept();
+                        const parts: string[] = [];
+                        if (dept) parts.push(dept);
+                        parts.push(moduleLabel(mod()));
+                        const branch = activeSubBranch();
+                        if (branch) {
+                          parts.push(featureLabel(mod().id, branch));
+                        } else {
+                          const feat = activeFeature();
+                          // Skip primary feature when it shares the module href (avoids Sales › Sales › Sales).
+                          if (feat && feat.href !== mod().href) {
+                            parts.push(featureLabel(mod().id, feat));
+                          } else if (
+                            feat &&
+                            featureLabel(mod().id, feat).toLowerCase() !== moduleLabel(mod()).toLowerCase()
+                          ) {
+                            parts.push(featureLabel(mod().id, feat));
+                          }
+                        }
+                        return uniqueCrumbs(parts);
+                      };
                       return (
                         <p class="text-xs font-medium text-text-secondary">
-                          <Show
-                            when={activeSubBranch()}
-                            fallback={
+                          <SetupBreadcrumbHint />
+                          <For each={crumbParts()}>
+                            {(part, i) => (
                               <>
-                                <SetupBreadcrumbHint />
-                                <Show when={breadcrumbDept()}>
-                                  {(dept) => (
-                                    <>
-                                      <span>{dept()}</span>
-                                      {crumbSep()}
-                                    </>
-                                  )}
-                                </Show>
-                                <span>{moduleLabel(mod())}</span>
-                                <Show when={activeFeature()}>
-                                  {(feat) => (
-                                    <>
-                                      {crumbSep()}
-                                      <span>{featureLabel(mod().id, feat())}</span>
-                                    </>
-                                  )}
-                                </Show>
-                              </>
-                            }
-                          >
-                            {(branch) => (
-                              <>
-                                <Show when={breadcrumbDept()}>
-                                  {(dept) => (
-                                    <>
-                                      <span>{dept()}</span>
-                                      {crumbSep()}
-                                    </>
-                                  )}
-                                </Show>
-                                <span>{moduleLabel(mod())}</span>
-                                {crumbSep()}
-                                <span>{featureLabel(mod().id, branch())}</span>
+                                <Show when={i() > 0}>{crumbSep()}</Show>
+                                <span>{part}</span>
                               </>
                             )}
-                          </Show>
+                          </For>
                         </p>
                       );
                     }}

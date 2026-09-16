@@ -290,7 +290,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
-        newLabel="New Sales"
+        newLabel="New sales invoice"
         codeKey="sales_no"
         nameKey="date_no_display"
         sortKey={sort()}

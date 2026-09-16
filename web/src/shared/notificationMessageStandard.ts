@@ -105,6 +105,10 @@ export const recoveryHintFromError = (fieldError: string): string => {
 
   }
 
+  if (/base unit|Inventory → Items|Inventory -> Items/i.test(t)) {
+    return "Open Inventory → Items, edit the product, set Base unit (for example Piece), Save, then try the purchase order again.";
+  }
+
   if (/customer/i.test(t)) {
     return "Pick a customer in the Customer field (search by name). Use + New on that lookup if they are not listed yet, then Save.";
   }

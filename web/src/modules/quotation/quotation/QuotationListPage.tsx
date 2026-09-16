@@ -186,7 +186,7 @@ export function QuotationListPageInner(props: PageOptions = {}) {
       </div>
       <SpreadsheetGrid
         columns={[
-          { key: "date_no_display", header: "Date-no", clickable: true },
+          { key: "date_no_display", header: "Document no.", clickable: true },
           { key: "tax_type_name", header: "Transaction Type" },
           { key: "reference_no", header: "Reference No.", clickable: true },
           { key: "customer_name", header: "Customer" },

@@ -55,18 +55,25 @@ export function DocumentListViewBar(props: { basePath: string; views: DocumentLi
   return (
     <nav class="mb-4 flex flex-wrap gap-1 border-b border-stroke pb-2" aria-label="List views">
       <For each={props.views}>
-        {(v) => (
-          <A
-            href={hrefFor(v.id)}
-            class="rounded-lg px-3 py-1.5 text-sm font-medium"
-            classList={{
-              "bg-brand-50 text-brand-700": current() === v.id,
-              "text-text-secondary hover:bg-slate-50 hover:text-text-primary": current() !== v.id,
-            }}
-          >
-            {v.label}
-          </A>
-        )}
+        {(v) => {
+          const active = () => current() === v.id;
+          return (
+            <A
+              href={hrefFor(v.id)}
+              class="rounded-lg px-3 py-1.5 text-sm font-medium"
+              classList={{
+                "bg-brand-50 text-brand-700": active(),
+                "text-text-secondary hover:bg-slate-50 hover:text-text-primary": !active(),
+              }}
+              // Pathname-only matching would mark every view current; set aria explicitly.
+              aria-current={active() ? "page" : "false"}
+              activeClass=""
+              inactiveClass=""
+            >
+              {v.label}
+            </A>
+          );
+        }}
       </For>
     </nav>
   );

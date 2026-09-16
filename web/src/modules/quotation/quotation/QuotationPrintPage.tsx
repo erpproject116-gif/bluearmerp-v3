@@ -66,7 +66,7 @@ function PrintDocument(props: { payload: QuotationPrintPayload }) {
           <div>
             <h3 class="quotation-print__section">{uiLabel("print.quotation_details")}</h3>
             <dl class="quotation-print__dl">
-              <dt>Date-no</dt>
+              <dt>Document no.</dt>
               <dd>{q().date_no_display}</dd>
               <dt>Date</dt>
               <dd>{formatPrintDate(q().order_date)}</dd>

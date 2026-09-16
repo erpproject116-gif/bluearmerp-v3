@@ -800,7 +800,7 @@ export function QuotationModal(props: Props) {
       <draft.DraftBanner />
       <CoaSetupReminder />
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Field label="Date-no">
+      <Field label="Document no.">
         <input class={inputClass} value={dateNoDisplay()} readOnly />
       </Field>
       <Field label="Reference No.">
@@ -899,7 +899,7 @@ export function QuotationModal(props: Props) {
       <ModalLookupField
         settings={byKey}
         fieldKey="pic_name"
-        fallbackLabel="PIC"
+        fallbackLabel="Person in charge"
         value={picName}
         selectedId={picUserId}
         onInput={setPicName}
@@ -916,7 +916,7 @@ export function QuotationModal(props: Props) {
       <ModalLookupField
         settings={byKey}
         fieldKey="location_id"
-        fallbackLabel="Location-Out"
+        fallbackLabel="Ship-from location"
         fallbackRequired
         formId={QUOTATION_FORM_ID}
         errors={fieldErrors}
@@ -975,7 +975,7 @@ export function QuotationModal(props: Props) {
         required={policyRequiresAttachment(processPolicy.data, "quotation")}
         onCountChange={setAttachmentCount}
       />
-      <ModalField settings={byKey} fieldKey="note_for_pic_only" fallbackLabel="Note for PIC only" span="full">
+      <ModalField settings={byKey} fieldKey="note_for_pic_only" fallbackLabel="Note for person in charge only" span="full">
         {(m) => (
           <textarea
             class={inputClass}

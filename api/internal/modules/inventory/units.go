@@ -391,6 +391,10 @@ func RequireItemBaseUnit(ctx context.Context, q UnitQuerier, tenantID, itemID in
 // Null or each-like-vs-base lines are coerced to the item base unit. Real alternate
 // units (e.g. box) are kept when a conversion exists; otherwise an error is returned
 // so save fails before stock post.
+//
+// When the item has no base_unit_id yet, an explicit line unit is accepted so draft
+// buy documents (PO / supplier invoice) can still be recorded. Receive/stock posting
+// continues to require a base unit on the item.
 func PreferStockLineUnit(ctx context.Context, q UnitQuerier, tenantID int64, itemID *int64, unitID *int64, unitCode string) (*int64, *string, error) {
 	resolvedID, resolvedCode := ResolveLineUnit(ctx, q, tenantID, itemID, unitID, unitCode)
 	if itemID == nil || *itemID <= 0 {
@@ -398,6 +402,9 @@ func PreferStockLineUnit(ctx context.Context, q UnitQuerier, tenantID int64, ite
 	}
 	baseID, baseCode, err := RequireItemBaseUnit(ctx, q, tenantID, *itemID)
 	if err != nil {
+		if resolvedID != nil && *resolvedID > 0 {
+			return resolvedID, resolvedCode, nil
+		}
 		return nil, nil, err
 	}
 	if resolvedID == nil || *resolvedID <= 0 {

@@ -165,7 +165,10 @@ func TestPreferStockLineUnit(t *testing.T) {
 	}
 	noBase := int64(200)
 	if _, _, err = PreferStockLineUnit(ctx, db, 1, &noBase, nil, ""); err == nil {
-		t.Fatal("item without base unit should fail")
+		t.Fatal("item without base unit and no line unit should fail")
+	}
+	if id, code, err = PreferStockLineUnit(ctx, db, 1, &noBase, &pcUnit, "pc"); err != nil || id == nil || *id != pcUnit {
+		t.Fatalf("explicit line unit should save without item base: id=%v code=%v err=%v", id, code, err)
 	}
 }
 

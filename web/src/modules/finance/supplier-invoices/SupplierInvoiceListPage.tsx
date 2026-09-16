@@ -270,19 +270,18 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
           <p class="font-semibold">Looking for Goods Receipt?</p>
           <p class="mt-1 text-xs leading-relaxed">
-            That list now lives here as <strong>Purchase Receive</strong>. Use <strong>New Purchase Receive</strong>{" "}
+            That list now lives here as <strong>Purchase invoices</strong>. Use <strong>New purchase invoice</strong>{" "}
             (or Load Slip from a Purchase Order) to post stock and the supplier bill together. You were redirected from
             the old Goods Receipt menu so you would not hit a blank page.
           </p>
         </div>
       </Show>
       <div class="mb-4 rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-slate-700">
-        <p class="font-medium text-slate-800">Purchase Receive = New Purchase (stock + AP on confirm)</p>
+        <p class="font-medium text-slate-800">Purchase invoice — receive goods and bill the supplier</p>
         <p class="mt-1 text-xs">
-          Preferred: Load Slip → <span class="font-medium">Purchase Order</span> (or blank item), set qty, scan
-          serials, attach DR / vendor SI, save as Unconfirmed, then set Progress Status to{" "}
-          <span class="font-medium">Completed</span> on this list — stock and AP post together. Load Slip → Receive
-          history is legacy when goods were already received separately. This screen does not edit BOM recipes.
+          Load Slip from a Purchase Order (or add lines), set quantities, scan serials if needed, attach the delivery
+          note or vendor invoice, then save. When ready, set Progress to <span class="font-medium">Completed</span> on
+          this list — stock and the payable post together.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Next:{" "}
@@ -317,7 +316,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
-        newLabel="New Purchase Receive"
+        newLabel="New purchase invoice"
         codeKey="invoice_no"
         nameKey="date_no_display"
         sortKey={sort()}

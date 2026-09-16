@@ -184,13 +184,13 @@ export const UI_COPY_GROUPS: UiCopyGroup[] = [
   },
   {
     id: "goods_receipt",
-    title: "Purchase Receive",
+    title: "Purchase invoices",
     entries: [
-      { key: "goods_receipt.list_title", label: "List page title", fallback: "Purchase Receive" },
-      { key: "goods_receipt.list_description", label: "List page description", fallback: "Record stock in from purchase orders and attach delivery proof." },
-      { key: "goods_receipt.receive_goods", label: "New Purchase Receive button", fallback: "New Purchase Receive" },
+      { key: "goods_receipt.list_title", label: "List page title", fallback: "Purchase invoices" },
+      { key: "goods_receipt.list_description", label: "List page description", fallback: "Receive goods from purchase orders and post the supplier bill on confirm." },
+      { key: "goods_receipt.receive_goods", label: "New purchase invoice button", fallback: "New purchase invoice" },
       { key: "goods_receipt.scan_serials", label: "Scan serials panel title", fallback: "Scan serials" },
-      { key: "goods_receipt.open_in_receive", label: "Open in receive link", fallback: "Open in Purchase Receive" },
+      { key: "goods_receipt.open_in_receive", label: "Open in purchase invoice link", fallback: "Open in Purchase invoices" },
       { key: "goods_receipt.draft_only_scans", label: "Draft-only scans message", fallback: "Only draft receipts accept serial scans." },
       { key: "goods_receipt.receive_page_title", label: "Receive page title", fallback: "Receive history / Scan (legacy)" },
       { key: "goods_receipt.lot_entry", label: "Lot entry section", fallback: "Lot entry" },
