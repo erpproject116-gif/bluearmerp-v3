@@ -139,27 +139,38 @@ type supplierInvoiceBody struct {
 }
 
 type openPOLineRow struct {
-	PurchaseOrderLineID int64   `json:"purchase_order_line_id"`
-	PurchaseOrderID     int64   `json:"purchase_order_id"`
-	PurchaseOrderNo     string  `json:"purchase_order_no"`
-	Status              string  `json:"status"`
-	ProgressStatus      string  `json:"progress_status"`
-	PartnerID           int64   `json:"partner_id"`
-	PartnerName         string  `json:"partner_name"`
-	ItemID              int64   `json:"item_id"`
-	ItemCode            string  `json:"item_code"`
-	ItemName            string  `json:"item_name"`
-	OrderedQty          float64 `json:"ordered_qty"`
-	BilledQty           float64 `json:"billed_qty"`
-	BalanceQty          float64 `json:"balance_qty"`
-	UnitID              *int64  `json:"unit_id,omitempty"`
-	UnitCode            string  `json:"unit_code,omitempty"`
-	BaseUnitID          *int64  `json:"base_unit_id,omitempty"`
-	BaseUnitCode        string  `json:"base_unit_code,omitempty"`
-	UnitNonVat          float64 `json:"unit_non_vat"`
-	UnitVatInc          float64 `json:"unit_vat_inc"`
-	TrackSerial            bool `json:"track_serial,omitempty"`
-	WarrantyDurationMonths *int `json:"warranty_duration_months,omitempty"`
+	PurchaseOrderLineID    int64   `json:"purchase_order_line_id"`
+	PurchaseOrderID        int64   `json:"purchase_order_id"`
+	PurchaseOrderNo        string  `json:"purchase_order_no"`
+	Status                 string  `json:"status"`
+	ProgressStatus         string  `json:"progress_status"`
+	OrderDate              string  `json:"order_date,omitempty"`
+	PartnerID              int64   `json:"partner_id"`
+	PartnerName            string  `json:"partner_name"`
+	TaxTypeID              int64   `json:"tax_type_id"`
+	CurrencyID             int64   `json:"currency_id"`
+	LocationID             int64   `json:"location_id"`
+	LocationName           string  `json:"location_name,omitempty"`
+	PicUserID              *int64  `json:"pic_user_id,omitempty"`
+	PicName                string  `json:"pic_name,omitempty"`
+	ProjectID              *int64  `json:"project_id,omitempty"`
+	ProjectName            string  `json:"project_name,omitempty"`
+	Reference              string  `json:"reference,omitempty"`
+	Notes                  string  `json:"notes,omitempty"`
+	ItemID                 int64   `json:"item_id"`
+	ItemCode               string  `json:"item_code"`
+	ItemName               string  `json:"item_name"`
+	OrderedQty             float64 `json:"ordered_qty"`
+	BilledQty              float64 `json:"billed_qty"`
+	BalanceQty             float64 `json:"balance_qty"`
+	UnitID                 *int64  `json:"unit_id,omitempty"`
+	UnitCode               string  `json:"unit_code,omitempty"`
+	BaseUnitID             *int64  `json:"base_unit_id,omitempty"`
+	BaseUnitCode           string  `json:"base_unit_code,omitempty"`
+	UnitNonVat             float64 `json:"unit_non_vat"`
+	UnitVatInc             float64 `json:"unit_vat_inc"`
+	TrackSerial            bool    `json:"track_serial,omitempty"`
+	WarrantyDurationMonths *int    `json:"warranty_duration_months,omitempty"`
 }
 
 func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
@@ -197,7 +208,13 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := fmt.Sprintf(`
 			select pol.id, po.id, po.purchase_order_no, po.status, coalesce(po.progress_status, 'unconfirmed'),
+			  to_char(po.order_date, 'YYYY-MM-DD'),
 			  po.partner_id, coalesce(p.company_name, ''),
+			  po.tax_type_id, po.currency_id,
+			  po.location_id, coalesce(loc.location_name, ''),
+			  po.pic_user_id, coalesce(po.pic_name, ''),
+			  po.project_id, coalesce(proj.project_name, ''),
+			  coalesce(po.reference, ''), coalesce(po.notes, ''),
 			  pol.item_id, pol.item_code, pol.item_name,
 			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
 			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
@@ -209,6 +226,8 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			from public.po_purchase_order_lines pol
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
 			left join public.inv_partners p on p.id = po.partner_id
+			left join public.inv_locations loc on loc.id = po.location_id
+			left join public.inv_projects proj on proj.id = po.project_id
 			left join public.inv_items i on i.id = pol.item_id
 			left join public.inv_units bu on bu.id = i.base_unit_id
 			where %s
@@ -227,7 +246,13 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			var row openPOLineRow
 			if err := rows.Scan(
 				&row.PurchaseOrderLineID, &row.PurchaseOrderID, &row.PurchaseOrderNo, &row.Status, &row.ProgressStatus,
+				&row.OrderDate,
 				&row.PartnerID, &row.PartnerName,
+				&row.TaxTypeID, &row.CurrencyID,
+				&row.LocationID, &row.LocationName,
+				&row.PicUserID, &row.PicName,
+				&row.ProjectID, &row.ProjectName,
+				&row.Reference, &row.Notes,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
 				&row.UnitID, &row.UnitCode, &row.BaseUnitID, &row.BaseUnitCode,
