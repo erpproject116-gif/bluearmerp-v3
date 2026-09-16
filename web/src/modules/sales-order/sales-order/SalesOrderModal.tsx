@@ -30,6 +30,13 @@ import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
+import {
+  downloadAttachment,
+  formatFileSize,
+  listAttachments,
+  type Attachment,
+  type AttachmentScope,
+} from "../../../shared/attachments";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
@@ -177,6 +184,15 @@ export function SalesOrderModal(props: Props) {
   const auth = useAuth();
   const processPolicy = useProcessPolicy(() => props.open);
   const [attachmentCount, setAttachmentCount] = createSignal(0);
+  type SourceAttachPreview = {
+    scope: AttachmentScope;
+    docId: number;
+    label: string;
+    files: Attachment[];
+  };
+  const [sourceAttachPreview, setSourceAttachPreview] = createSignal<SourceAttachPreview | null>(null);
+  const effectiveAttachmentCount = () =>
+    attachmentCount() + (sourceAttachPreview()?.files.length ?? 0);
   const taxTypesQuery = useActiveTaxTypes(() => props.open);
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
@@ -326,14 +342,18 @@ export function SalesOrderModal(props: Props) {
   };
 
   let seededNewLines = false;
+  let newFormSeededForOpen = false;
 
   createEffect(() => {
     if (!props.open) {
       setCreatedSalesOrder(null);
+      setSourceAttachPreview(null);
+      newFormSeededForOpen = false;
       return;
     }
     const ed = props.editing;
     if (ed) {
+      newFormSeededForOpen = false;
       setOrderDate(ed.order_date);
       setDateNoDisplay(ed.date_no_display);
       setSalesOrderNo(ed.sales_order_no);
@@ -362,7 +382,10 @@ export function SalesOrderModal(props: Props) {
       setSourceQuotationId(ed.source_quotation_id ?? null);
       setLines(linesFromDetail(ed.lines));
       loadCustom(ed.custom_values ?? {});
-    } else {
+      setSourceAttachPreview(null);
+    } else if (!createdSalesOrder()) {
+      if (newFormSeededForOpen) return;
+      newFormSeededForOpen = true;
       const seed = takeDocSeed("sales_order");
       const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
         ...emptySalesOrderLine(index + 1),
@@ -390,6 +413,7 @@ export function SalesOrderModal(props: Props) {
       setNotes("");
       setProgressStatus("unconfirmed");
       setSourceQuotationId(null);
+      setSourceAttachPreview(null);
       seededNewLines = seedLines.length > 0;
       if (seededNewLines) {
         setLines(seedLines);
@@ -448,6 +472,23 @@ export function SalesOrderModal(props: Props) {
     loadCustom(mergeCustomValues(customValues(), mapped));
   };
 
+  const loadSourceAttachPreview = async (
+    scope: AttachmentScope,
+    docId: number,
+    label: string,
+  ) => {
+    if (!docId || docId <= 0) {
+      setSourceAttachPreview(null);
+      return;
+    }
+    const res = await listAttachments(scope, docId);
+    if (res.success && (res.data?.length ?? 0) > 0) {
+      setSourceAttachPreview({ scope, docId, label, files: res.data! });
+    } else {
+      setSourceAttachPreview(null);
+    }
+  };
+
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
     const first = picked[0];
@@ -482,7 +523,14 @@ export function SalesOrderModal(props: Props) {
     } else {
       setLines(newLines);
     }
-    await loadSourceCustomValues(`/api/v1/quotation/quotations/${first.quotation_id}`, first.quotation_id);
+    await Promise.all([
+      loadSourceCustomValues(`/api/v1/quotation/quotations/${first.quotation_id}`, first.quotation_id),
+      loadSourceAttachPreview(
+        "quotation/quotations",
+        first.quotation_id,
+        "From Quotation (copies when you Save)",
+      ),
+    ]);
   };
 
   const mapBuyingOntoSalesOrder = async (
@@ -562,7 +610,7 @@ export function SalesOrderModal(props: Props) {
       processPolicy.data,
       "sales_order",
       status,
-      attachmentCount(),
+      effectiveAttachmentCount(),
       effectiveEditing()?.id,
     );
     if (attachmentErr) {
@@ -916,6 +964,39 @@ export function SalesOrderModal(props: Props) {
             />
           )}
         </ModalField>
+        <Show when={sourceAttachPreview()}>
+          {(preview) => (
+            <div class="col-span-full rounded-lg border border-stroke bg-slate-50 px-3 py-2">
+              <p class="text-sm font-medium text-text-primary">{preview().label}</p>
+              <p class="mt-0.5 text-xs text-text-secondary">
+                Read-only preview from the source document. Files copy onto this sales order when you Save.
+              </p>
+              <ul class="mt-2 space-y-1">
+                <For each={preview().files}>
+                  {(file) => (
+                    <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span class="truncate text-text-primary">
+                        {file.file_name}
+                        <span class="ml-2 text-xs text-text-secondary">{formatFileSize(file.size_bytes)}</span>
+                      </span>
+                      <button
+                        type="button"
+                        class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
+                        onClick={() =>
+                          void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
+                            if (!ok) toast.warning("Couldn't download the file. Try again.");
+                          })
+                        }
+                      >
+                        Download
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </div>
+          )}
+        </Show>
         <AttachmentsField
           scope="sales-order/sales-orders"
           formOpen={props.open}

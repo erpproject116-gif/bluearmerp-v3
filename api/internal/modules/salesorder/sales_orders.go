@@ -517,7 +517,8 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, vErrs)
 			return
 		}
-		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSalesOrder, defaultProgress(body.ProgressStatus), 0); v != nil {
+		srcAttCount := countQuotationSourceAttachments(r.Context(), pool, body)
+		if v := processpolicy.ValidateAttachmentCount(policy, processpolicy.DocSalesOrder, defaultProgress(body.ProgressStatus), srcAttCount); v != nil {
 			response.ValidationSmart(w, v)
 			return
 		}
@@ -650,52 +651,11 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Load Slip → Save: copy quotation attachments (header and/or lines).
-		quoIDs := map[int64]struct{}{}
-		if body.SourceQuotationID != nil && *body.SourceQuotationID > 0 {
-			quoIDs[*body.SourceQuotationID] = struct{}{}
-		}
-		for _, ln := range body.Lines {
-			if ln.SourceQuotationLineID == nil || *ln.SourceQuotationLineID <= 0 {
-				continue
-			}
-			var qid int64
-			if err := pool.QueryRow(r.Context(),
-				`select quotation_id from public.quo_quotation_lines where id = $1`,
-				*ln.SourceQuotationLineID).Scan(&qid); err == nil && qid > 0 {
-				quoIDs[qid] = struct{}{}
-			}
-		}
-		copiedAtt := 0
-		copiedMsg := ""
-		for qid := range quoIDs {
-			n, err := attachmentx.Copy(r.Context(), pool, attachmentx.CopyParams{
-				SrcBaseDir: attachmentx.Dir("quotation"),
-				DstBaseDir: attachmentx.Dir("sales_order"),
-				SrcTable:   "public.quo_quotation_attachments",
-				SrcFKCol:   "quotation_id",
-				SrcID:      qid,
-				DstTable:   "public.so_sales_order_attachments",
-				DstFKCol:   "sales_order_id",
-				DstID:      id,
-				TenantID:   tu.TenantID,
-			})
-			if err != nil && copiedMsg == "" {
-				copiedMsg = " (quotation attachments could not be copied fully)"
-			} else if n > 0 {
-				copiedAtt += n
-			}
-		}
+		copiedAtt := copyQuotationSourceAttachments(r.Context(), pool, tu.TenantID, id, body)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.create", "so_sales_order", &id, nil, body)
 		so, _ := loadSalesOrder(r.Context(), pool, tu.TenantID, id)
-		msg := "Created."
-		if copiedAtt > 0 {
-			msg = fmt.Sprintf("Created. Copied %d quotation attachment(s).", copiedAtt)
-		} else if copiedMsg != "" {
-			msg = "Created." + copiedMsg
-		}
-		response.OK(w, so, msg)
+		response.OK(w, so, salesOrderCreateMessage(copiedAtt))
 	}
 }
 
@@ -762,7 +722,15 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		newProgress := defaultProgress(body.ProgressStatus)
-		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSalesOrder, newProgress, id); v != nil {
+		attCount, attErr := attachmentx.Count(r.Context(), pool, "public.so_sales_order_attachments", "sales_order_id", id)
+		if attErr != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to verify attachments.", "ERR_INTERNAL")
+			return
+		}
+		if attCount < 1 {
+			attCount = countQuotationSourceAttachments(r.Context(), pool, body)
+		}
+		if v := processpolicy.ValidateAttachmentCount(policy, processpolicy.DocSalesOrder, newProgress, attCount); v != nil {
 			response.ValidationSmart(w, v)
 			return
 		}
@@ -861,6 +829,8 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
 		}
+
+		_ = ensureQuotationSourceAttachments(r.Context(), pool, tu.TenantID, id, body)
 
 		after, _ := loadSalesOrder(r.Context(), pool, tu.TenantID, id)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales_order.update", "so_sales_order", &id, before, after)
