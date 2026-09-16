@@ -66,7 +66,7 @@ export default function SellingWorkspacePage() {
           class="rounded-xl border border-brand-200 bg-brand-50/70 p-5 shadow-sm transition hover:border-brand-400 hover:shadow-md"
         >
           <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Bill &amp; ship</p>
-          <h2 class="mt-1 text-lg font-semibold text-text-primary">New sales invoice</h2>
+          <h2 class="mt-1 text-lg font-semibold text-text-primary">New Sales</h2>
           <p class="mt-2 text-sm text-text-secondary">Invoice delivered goods and post revenue.</p>
         </A>
         <A

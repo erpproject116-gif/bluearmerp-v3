@@ -12,7 +12,7 @@ export const helpScenarioArticles: KbArticle[] = [
     scenario:
       "You do not know which screen to open for sales, purchases, cash in/out, or stock — or you opened the wrong menu and filed a ticket.",
     intro:
-      "Open Home. Use Learn for common lists, or How work flows for Sell (New Sales → Get paid) and Buy (PO → Purchase Receive → Payment Made). Dashed steps are optional. Load Slip is a button inside New Sales / Purchase Receive / PO — not a separate menu. Sidebar: Stocks, Sell, Buy, Accounting.",
+      "Open Home. Use Learn for common lists, or How work flows for Sell (New Sales → Get paid) and Buy (PO → New Purchases → Payment Made). Dashed steps are optional. Load Slip is a button inside New Sales / New Purchases / PO — not a separate menu. Sidebar: Stocks, Sales, Purchase, Accounting.",
     blocks: [
       {
         type: "steps",
@@ -20,7 +20,7 @@ export const helpScenarioArticles: KbArticle[] = [
           "Go to Home (/app/dashboard).",
           "Set masters once if needed: Partners, Items (qty tracking on for stock), Locations, Tax, Accounting setup.",
           "Click a solid pill in How work flows for the screen you need — dashed pills are optional.",
-          "On New Sales / Purchase Receive, use Load Slip only when pulling lines from an earlier document (SO, PO).",
+          "On New Sales / New Purchases, use Load Slip only when pulling lines from an earlier document (SO, PO).",
           "Use Site Map (/app/dashboard/site-map) to search menu names.",
         ],
       },
@@ -1326,7 +1326,7 @@ export const helpScenarioArticles: KbArticle[] = [
       },
     ],
     primaryHref: "/app/sales/sales/new",
-    primaryLabel: "New sales invoice",
+    primaryLabel: "New Sales",
     relatedGuideIds: ["load-slip-overview", "sales-load-slip-so", "sales-order-release"],
   },
   {

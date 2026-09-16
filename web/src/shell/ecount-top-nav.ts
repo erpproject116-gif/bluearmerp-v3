@@ -335,8 +335,8 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "sales",
-        label: "Sales invoices",
-        href: "/app/sales/sales",
+        label: "New Sales",
+        href: "/app/sales/sales/new",
         iconId: "sales",
         topId: "inv1",
         expandGroupId: "sales_process",
@@ -393,7 +393,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   {
     id: "buy",
     label: "Purchase",
-    href: "/app/purchase-order/purchase-orders",
+    href: "/app/purchases/purchase-receive",
     iconId: "buying",
     topId: "inv1",
     expandGroupId: "procurement_process",
@@ -437,13 +437,13 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "purchases",
-        label: "Purchase invoices",
-        href: "/app/purchases/purchase-receive",
+        label: "New Purchases",
+        href: "/app/purchases/purchase-receive/new",
         iconId: "purchases",
         topId: "inv1",
         expandGroupId: "procurement_process",
         moduleId: "purchases",
-        hint: "Receive stock and post the supplier bill on confirm",
+        hint: "Create a purchase — receive stock and bill the supplier on confirm",
       },
       {
         id: "expenses",

@@ -14,7 +14,7 @@ export function GoodsReceiptIShell() {
           href="/app/purchases/purchase-receive/new"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
-          New Purchase Receive
+          New Purchases
         </A>
         <A
           href="/app/purchase-order/goods-receipt"

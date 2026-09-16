@@ -239,11 +239,11 @@ export const appModules: AppModule[] = [
   },
   {
     id: "sales",
-    label: "Sales invoices",
+    label: "Sales",
     href: "/app/sales/sales",
     basePath: "/app/sales",
     features: [
-      { label: "Sales invoices", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
+      { label: "Sales", href: "/app/sales/sales", settingsHref: "/app/sales/sales/settings", headerPriority: "primary" },
       { label: "Sales categories", href: "/app/sales/sales-categories", settingsHref: "/app/sales/sales-categories", headerPriority: "overflow" },
       {
         label: "New Receivable Payment",
@@ -347,11 +347,11 @@ export const appModules: AppModule[] = [
   },
   {
     id: "purchases",
-    label: "Purchase invoices",
+    label: "Purchases",
     href: "/app/purchases/purchase-receive",
     basePath: "/app/purchases",
     features: [
-      { label: "Purchase invoices", href: "/app/purchases/purchase-receive", settingsHref: "/app/purchases/purchase-receive/settings", headerPriority: "primary" },
+      { label: "Purchases", href: "/app/purchases/purchase-receive", settingsHref: "/app/purchases/purchase-receive/settings", headerPriority: "primary" },
       {
         label: "New Payable Payment",
         href: "/app/finance/payables",

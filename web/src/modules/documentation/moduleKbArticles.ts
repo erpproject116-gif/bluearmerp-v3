@@ -385,7 +385,7 @@ export const moduleKbArticles: KbArticle[] = [
       },
     ],
     primaryHref: "/app/sales/sales/new",
-    primaryLabel: "New sales invoice",
+    primaryLabel: "New Sales",
     relatedGuideIds: ["quotation-to-sales-flow", "sales-order-release"],
   },
   {
@@ -476,7 +476,7 @@ export const moduleKbArticles: KbArticle[] = [
       },
     ],
     primaryHref: "/app/sales/sales/new",
-    primaryLabel: "New sales invoice",
+    primaryLabel: "New Sales",
     relatedGuideIds: ["sales-order-release", "wms-and-shipping", "quotation-to-sales-flow", "sales-shipping-from-line"],
   },
   {
@@ -635,7 +635,7 @@ export const moduleKbArticles: KbArticle[] = [
       },
     ],
     primaryHref: "/app/sales/sales/new",
-    primaryLabel: "New sales invoice",
+    primaryLabel: "New Sales",
     relatedGuideIds: ["sales-order-release", "sales-pre-invoicing-report", "load-slip-overview"],
   },
   {

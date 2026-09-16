@@ -84,6 +84,7 @@ function NavAreaLink(props: {
   return (
     <A
       href={props.area.href}
+      end={props.area.id === "sell" || props.area.id === "buy"}
       title={shell.collapsed() ? props.area.label : undefined}
       class="flex items-center rounded-lg text-sm font-medium transition-colors"
       classList={{
@@ -155,20 +156,12 @@ function HomeAreaBlock(props: {
     if (areaOrChildActive()) setOpen(true);
   });
 
-  const parentArea = (): HomeSidebarArea => {
-    const kids = children();
-    if (kids.length === 0) return props.area;
-    // Prefer a working landing when the static parent href module is disabled.
-    if (kids.some((k) => k.href === props.area.href)) return props.area;
-    return { ...props.area, href: kids[0]!.href };
-  };
-
   return (
     <div class="space-y-0.5">
       <div class="flex items-center gap-0.5">
         <div class="min-w-0 flex-1">
           <NavAreaLink
-            area={parentArea()}
+            area={props.area}
             active={props.active(props.area)}
             badgeCount={props.area.id === "comms" ? props.badgeCount : undefined}
           />
@@ -309,7 +302,7 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/production/setup"]);
     }
     if (area.id === "sell") {
-      return false;
+      return p === "/app/sales/sales" || p === "/app/sales/sales/";
     }
     if (area.id === "customers") {
       const kind = new URLSearchParams(loc.search).get("kind");
@@ -325,14 +318,7 @@ export function SidebarNav() {
       return p === "/app/sales/reports/ar-by-customer" || p.startsWith("/app/selling/reports/receivable-status");
     }
     if (area.id === "sales") {
-      if (isFinanceUnderSalesReportPath(p)) return false;
-      if (p === "/app/sales/reports/ar-by-customer") return false;
-      if (pathStarts(p, ["/app/sales/credit-notes", "/app/sales/retainer-invoices", "/app/sales/recurring-invoices"])) {
-        return false;
-      }
-      return (
-        pathStarts(p, ["/app/sales"]) && !p.startsWith("/app/sales/collective-invoicing")
-      );
+      return pathStarts(p, ["/app/sales/sales/new"]);
     }
     if (area.id === "credit_notes") {
       return pathStarts(p, ["/app/sales/credit-notes"]);
@@ -350,7 +336,7 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/selling"]);
     }
     if (area.id === "buy") {
-      return false;
+      return p === "/app/purchases/purchase-receive" || p === "/app/purchases/purchase-receive/";
     }
     if (area.id === "vendors") {
       return pathStarts(p, ["/app/inventory/partners"]) && new URLSearchParams(loc.search).get("kind") === "vendor";
@@ -358,8 +344,11 @@ export function SidebarNav() {
     if (area.id === "purchase_request") {
       return pathStarts(p, ["/app/purchase-request"]);
     }
+    if (area.id === "purchase_rfq") {
+      return pathStarts(p, ["/app/purchase-order/rfq"]);
+    }
     if (area.id === "purchase_order") {
-      return pathStarts(p, ["/app/purchase-order"]);
+      return pathStarts(p, ["/app/purchase-order"]) && !p.startsWith("/app/purchase-order/rfq");
     }
     if (area.id === "expenses") {
       return pathStarts(p, ["/app/purchases/expenses"]) && !p.startsWith("/app/purchases/recurring-expenses");
@@ -374,13 +363,7 @@ export function SidebarNav() {
       return p === "/app/purchases/purchase-receive/ap-by-vendor" || p.startsWith("/app/purchases/purchase-receive/ap-by-vendor/");
     }
     if (area.id === "purchases") {
-      if (p.startsWith("/app/purchases/expenses")) return false;
-      if (p.startsWith("/app/purchases/recurring-expenses")) return false;
-      if (p.startsWith("/app/purchases/vendor-credits")) return false;
-      if (p === "/app/purchases/purchase-receive/ap-by-vendor" || p.startsWith("/app/purchases/purchase-receive/ap-by-vendor/")) {
-        return false;
-      }
-      return pathStarts(p, ["/app/purchases"]);
+      return pathStarts(p, ["/app/purchases/purchase-receive/new", "/app/purchases/purchases/new"]);
     }
     if (area.id === "buying") {
       return pathStarts(p, ["/app/buying"]);

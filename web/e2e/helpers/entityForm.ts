@@ -23,7 +23,12 @@ export function noteIncomplete(
 }
 
 export async function openNewRow(page: Page) {
-  const btn = page.getByRole("button", { name: /\+?\s*New row/i }).first();
+  // Lists use "+ New row" or document-specific labels ("New Quotation", "New Sales Order", …).
+  const btn = page
+    .getByRole("button", {
+      name: /^(\+\s*)?New(\s+row)?$|^New (Quotation|Sales Order|Sales Invoice|Sales|Sale|Purchase Request|Purchase Order|Purchases|Purchase|Official Receipt|Payment Voucher|RFQ|partner|item|lead|account)/i,
+    })
+    .first();
   await expect(btn).toBeVisible({ timeout: 20000 });
   await btn.click();
 }

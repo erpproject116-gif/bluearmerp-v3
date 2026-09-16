@@ -1074,7 +1074,7 @@ export function SalesModal(props: Props) {
     <>
       <WideEntityModal
         open={props.open}
-        title={effectiveEditing() ? (props.readOnly ? "View sales invoice (deleted)" : "Edit sales invoice") : "New sales invoice"}
+        title={effectiveEditing() ? (props.readOnly ? "View Sales (deleted)" : "Edit Sales") : "New Sales"}
         icon={<ModuleIcon id="sales" class="h-5 w-5" />}
         onClose={() => props.onClose()}
         onSave={activeTab() === "details" ? () => void save() : undefined}

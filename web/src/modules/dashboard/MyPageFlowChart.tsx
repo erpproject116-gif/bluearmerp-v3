@@ -33,18 +33,18 @@ const FLOWS: FlowRow[] = [
     nodes: [
       { label: "Quotation", href: "/app/quotation/quotations", sub: "Optional", optional: true },
       { label: "Sales Order", href: "/app/sales-order/sales-orders", sub: "Optional", optional: true },
-      { label: "New Sales", href: "/app/sales/sales", sub: "Invoice + stock out" },
+      { label: "New Sales", href: "/app/sales/sales/new", sub: "Bill customer + stock out" },
       { label: "Get paid", href: "/app/finance/receivables", sub: "New Receivable Payment", accent: true },
     ],
   },
   {
     title: "Buy (recommended)",
     blurb:
-      "Purchase Order → Purchase Receive → Pay vendor. Purchase Request is optional.",
+      "Purchase Order → Purchases → Pay vendor. Purchase Request is optional.",
     nodes: [
       { label: "Purchase Request", href: "/app/purchase-request/purchase-requests/new", sub: "Optional", optional: true },
       { label: "Purchase Order", href: "/app/purchase-order/purchase-orders", sub: "Commit to vendor" },
-      { label: "Purchase Receive", href: "/app/purchases/purchase-receive", sub: "Stock + amount owed" },
+      { label: "New Purchases", href: "/app/purchases/purchase-receive/new", sub: "Stock + amount owed" },
       { label: "Pay vendor", href: "/app/finance/payables", sub: "New Payable Payment", accent: true },
     ],
   },

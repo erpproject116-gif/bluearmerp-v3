@@ -44,7 +44,7 @@ export const ONBOARDING_PLAYBOOK_WEEKS: PlaybookWeekDef[] = [
       { trackId: "selling", stepId: "quotation", sentence: "Send a formal price offer before you confirm an order.", cta: "New quotation" },
       { trackId: "selling", stepId: "sales_order", sentence: "Confirm the sale as a sales order — use Load Slip from the quote when ready.", cta: "New sales order" },
       { trackId: "selling", stepId: "so_release", sentence: "Release or pick stock so fulfillment matches what you will invoice.", cta: "Pick / release" },
-      { trackId: "selling", stepId: "sales_invoice", sentence: "Bill the customer with a sales invoice — Load Slip pulls open order lines.", cta: "New sales invoice" },
+      { trackId: "selling", stepId: "sales_invoice", sentence: "Bill the customer with New Sales — Load Slip pulls open order lines.", cta: "New Sales" },
       { trackId: "selling", stepId: "official_receipt", sentence: "Record customer payment against open invoices.", cta: "Official receipt" },
       { trackId: "serials", stepId: "serial_item", sentence: "Turn on Track serial for items you scan one unit at a time.", cta: "Products" },
       { trackId: "serials", stepId: "serial_receive", sentence: "Scan serials when goods arrive on a posted goods receipt.", cta: "Goods receipt" },

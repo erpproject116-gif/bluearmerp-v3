@@ -189,14 +189,14 @@ function SalesSection(props: {
   const s = () => props.d.sales;
   return (
     <div class="space-y-3">
-      <h2 class="text-sm font-semibold text-text-primary">Sales invoices</h2>
+      <h2 class="text-sm font-semibold text-text-primary">Sales</h2>
       <p class="text-xs text-text-secondary">
         MTD {formatPeso(s().mtd)} · YTD {formatPeso(s().ytd)}
       </p>
       <div class="grid gap-4 lg:grid-cols-2">
         <BiReportCard
           id="sales-trend"
-          title="Sales invoices (12 months)"
+          title="Sales (12 months)"
           asOf={props.asOf}
           type="bar"
           labels={(s().trend ?? []).map((p) => p.period)}

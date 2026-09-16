@@ -27,7 +27,7 @@ const CORE_DOCUMENTS: CoreDocumentCase[] = [
   {
     name: "sales invoice",
     path: "/app/sales/sales",
-    heading: /New Sales Invoice/i,
+    heading: /New Sales/i,
     expectedLabel: /Customer/i,
   },
   {
@@ -45,7 +45,7 @@ const CORE_DOCUMENTS: CoreDocumentCase[] = [
   {
     name: "purchase invoice",
     path: "/app/purchases/purchase-receive",
-    heading: /New Purchase Invoice/i,
+    heading: /New Purchases|New Purchase Invoice/i,
     expectedLabel: /Supplier|Vendor/i,
   },
   {
@@ -110,7 +110,7 @@ async function exerciseEditableControls(page: Page, heading: RegExp) {
 }
 
 test.describe("Layer 2 — core document modal/button contracts", () => {
-  test("all core New transaction modals expose working controls and validation", async ({ page }) => {
+  test("@smoke @read-only all core New transaction modals expose working controls and validation", async ({ page }) => {
     test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN or E2E_DEMO_PASSWORD");
     test.setTimeout(12 * 60 * 1000);
     page.setDefaultTimeout(15_000);
