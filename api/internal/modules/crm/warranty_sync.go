@@ -9,6 +9,48 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type saleWarrantySerialUnit struct {
+	unitID         int64
+	salesLineID    int64
+	partnerID      int64
+	itemID         int64
+	serialNo       string
+	itemCode       string
+	itemName       string
+	picName        string
+	orderDate      time.Time
+	picUserID      *int64
+	wStart         *time.Time
+	wEnd           *time.Time
+	warrantyMonths int
+}
+
+type saleWarrantyLotLine struct {
+	lineID         int64
+	itemID         *int64
+	itemCode       string
+	itemName       string
+	serialLot      string
+	partnerID      int64
+	orderDate      time.Time
+	picUserID      *int64
+	picName        string
+	warrantyMonths int
+}
+
+type receiptWarrantyUnit struct {
+	unitID         int64
+	itemID         int64
+	grLineID       *int64
+	partnerID      int64
+	serialNo       string
+	itemCode       string
+	itemName       string
+	wStart         time.Time
+	wEnd           time.Time
+	warrantyMonths int
+}
+
 // SyncWarrantyAssetsFromSale upserts crm_warranty_assets from sales lines with serial numbers.
 func SyncWarrantyAssetsFromSale(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) (int, error) {
 	unitRows, err := tx.Query(ctx, `
@@ -27,28 +69,31 @@ func SyncWarrantyAssetsFromSale(ctx context.Context, tx pgx.Tx, tenantID, salesI
 	if err != nil {
 		return 0, err
 	}
-	defer unitRows.Close()
+	var units []saleWarrantySerialUnit
+	for unitRows.Next() {
+		var u saleWarrantySerialUnit
+		if err := unitRows.Scan(&u.unitID, &u.serialNo, &u.itemID, &u.itemCode, &u.itemName, &u.wStart, &u.wEnd,
+			&u.partnerID, &u.orderDate, &u.picUserID, &u.picName, &u.salesLineID, &u.warrantyMonths); err != nil {
+			unitRows.Close()
+			return 0, err
+		}
+		units = append(units, u)
+	}
+	if err := unitRows.Err(); err != nil {
+		unitRows.Close()
+		return 0, err
+	}
+	unitRows.Close()
 
 	synced := 0
-	for unitRows.Next() {
-		var unitID, salesLineID, partnerID int64
-		var itemID int64
-		var serialNo, itemCode, itemName, picName string
-		var wStart, wEnd *time.Time
-		var orderDate time.Time
-		var picUserID *int64
-		var warrantyMonths int
-		if err := unitRows.Scan(&unitID, &serialNo, &itemID, &itemCode, &itemName, &wStart, &wEnd,
-			&partnerID, &orderDate, &picUserID, &picName, &salesLineID, &warrantyMonths); err != nil {
-			return synced, err
+	for _, u := range units {
+		start := u.orderDate
+		if u.wStart != nil {
+			start = *u.wStart
 		}
-		start := orderDate
-		if wStart != nil {
-			start = *wStart
-		}
-		end := start.AddDate(0, warrantyMonths, 0)
-		if wEnd != nil {
-			end = *wEnd
+		end := start.AddDate(0, u.warrantyMonths, 0)
+		if u.wEnd != nil {
+			end = *u.wEnd
 		}
 		status := "active"
 		if end.Before(time.Now().Truncate(24 * time.Hour)) {
@@ -61,27 +106,30 @@ func SyncWarrantyAssetsFromSale(ctx context.Context, tx pgx.Tx, tenantID, salesI
 			  warranty_start, warranty_end, status,
 			  pic_user_id, pic_name
 			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'sales',$10,$11,$12,$13,$14)
-			on conflict (tenant_id, sales_line_id, serial_no) do update set
+			on conflict (tenant_id, serial_no) where (status <> 'void') do update set
 			  partner_id = excluded.partner_id,
 			  item_id = excluded.item_id,
 			  item_code = excluded.item_code,
 			  item_name = excluded.item_name,
+			  sales_id = excluded.sales_id,
+			  sales_line_id = excluded.sales_line_id,
 			  serial_unit_id = excluded.serial_unit_id,
+			  warranty_origin = 'sales',
 			  warranty_start = excluded.warranty_start,
 			  warranty_end = excluded.warranty_end,
 			  status = excluded.status,
 			  pic_user_id = excluded.pic_user_id,
 			  pic_name = excluded.pic_name,
 			  updated_at = now()`,
-			tenantID, partnerID, itemID, strings.TrimSpace(itemCode), strings.TrimSpace(itemName), serialNo,
-			salesID, salesLineID, unitID, start, end, status, picUserID, picName)
+			tenantID, u.partnerID, u.itemID, strings.TrimSpace(u.itemCode), strings.TrimSpace(u.itemName), u.serialNo,
+			salesID, u.salesLineID, u.unitID, start, end, status, u.picUserID, u.picName)
 		if err != nil {
-			return synced, fmt.Errorf("sync warranty asset %s: %w", serialNo, err)
+			return synced, fmt.Errorf("sync warranty asset %s: %w", u.serialNo, err)
 		}
 		synced++
 	}
 	if synced > 0 {
-		return synced, unitRows.Err()
+		return synced, nil
 	}
 
 	rows, err := tx.Query(ctx, `
@@ -96,23 +144,26 @@ func SyncWarrantyAssetsFromSale(ctx context.Context, tx pgx.Tx, tenantID, salesI
 	if err != nil {
 		return 0, err
 	}
-	defer rows.Close()
-
+	var lotLines []saleWarrantyLotLine
 	for rows.Next() {
-		var lineID int64
-		var itemID *int64
-		var itemCode, itemName, serialLot, picName string
-		var partnerID int64
-		var orderDate interface{}
-		var picUserID *int64
-		var warrantyMonths int
-		if err := rows.Scan(&lineID, &itemID, &itemCode, &itemName, &serialLot, &partnerID, &orderDate, &picUserID, &picName, &warrantyMonths); err != nil {
-			return synced, err
+		var ln saleWarrantyLotLine
+		if err := rows.Scan(&ln.lineID, &ln.itemID, &ln.itemCode, &ln.itemName, &ln.serialLot, &ln.partnerID, &ln.orderDate, &ln.picUserID, &ln.picName, &ln.warrantyMonths); err != nil {
+			rows.Close()
+			return 0, err
 		}
-		if strings.TrimSpace(serialLot) == "" || warrantyMonths <= 0 {
+		lotLines = append(lotLines, ln)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, err
+	}
+	rows.Close()
+
+	for _, ln := range lotLines {
+		if strings.TrimSpace(ln.serialLot) == "" || ln.warrantyMonths <= 0 {
 			continue
 		}
-		for _, serial := range splitSerials(serialLot) {
+		for _, serial := range splitSerials(ln.serialLot) {
 			_, err := tx.Exec(ctx, `
 				insert into public.crm_warranty_assets (
 				  tenant_id, partner_id, item_id, item_code, item_name, serial_no,
@@ -125,26 +176,29 @@ func SyncWarrantyAssetsFromSale(ctx context.Context, tx pgx.Tx, tenantID, salesI
 				  case when ($9::date + make_interval(months => $10))::date < current_date then 'expired' else 'active' end,
 				  $11, $12
 				)
-				on conflict (tenant_id, sales_line_id, serial_no) do update set
+				on conflict (tenant_id, serial_no) where (status <> 'void') do update set
 				  partner_id = excluded.partner_id,
 				  item_id = excluded.item_id,
 				  item_code = excluded.item_code,
 				  item_name = excluded.item_name,
+				  sales_id = excluded.sales_id,
+				  sales_line_id = excluded.sales_line_id,
+				  warranty_origin = 'sales',
 				  warranty_start = excluded.warranty_start,
 				  warranty_end = excluded.warranty_end,
 				  status = excluded.status,
 				  pic_user_id = excluded.pic_user_id,
 				  pic_name = excluded.pic_name,
 				  updated_at = now()`,
-				tenantID, partnerID, itemID, strings.TrimSpace(itemCode), strings.TrimSpace(itemName), serial,
-				salesID, lineID, orderDate, warrantyMonths, picUserID, picName)
+				tenantID, ln.partnerID, ln.itemID, strings.TrimSpace(ln.itemCode), strings.TrimSpace(ln.itemName), serial,
+				salesID, ln.lineID, ln.orderDate, ln.warrantyMonths, ln.picUserID, ln.picName)
 			if err != nil {
 				return synced, fmt.Errorf("sync warranty asset %s: %w", serial, err)
 			}
 			synced++
 		}
 	}
-	return synced, rows.Err()
+	return synced, nil
 }
 
 // SyncWarrantyAssetsFromGoodsReceipt upserts crm_warranty_assets for GR serial units with warranty months.
@@ -162,8 +216,7 @@ func SyncWarrantyAssetsFromGoodsReceipt(ctx context.Context, tx pgx.Tx, tenantID
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
+	var units []receiptWarrantyUnit
 	for rows.Next() {
 		var unitID, itemID int64
 		var grLineID *int64
@@ -173,13 +226,34 @@ func SyncWarrantyAssetsFromGoodsReceipt(ctx context.Context, tx pgx.Tx, tenantID
 		var warrantyMonths int
 		if err := rows.Scan(&unitID, &serialNo, &itemID, &itemCode, &itemName, &wStart, &wEnd,
 			&partnerID, &grLineID, &warrantyMonths); err != nil {
+			rows.Close()
 			return err
 		}
 		if partnerID == nil || wStart == nil || wEnd == nil {
 			continue
 		}
+		units = append(units, receiptWarrantyUnit{
+			unitID:         unitID,
+			itemID:         itemID,
+			grLineID:       grLineID,
+			partnerID:      *partnerID,
+			serialNo:       serialNo,
+			itemCode:       itemCode,
+			itemName:       itemName,
+			wStart:         *wStart,
+			wEnd:           *wEnd,
+			warrantyMonths: warrantyMonths,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	for _, u := range units {
 		status := "active"
-		if wEnd.Before(time.Now().Truncate(24 * time.Hour)) {
+		if u.wEnd.Before(time.Now().Truncate(24 * time.Hour)) {
 			status = "expired"
 		}
 		_, err := tx.Exec(ctx, `
@@ -188,7 +262,7 @@ func SyncWarrantyAssetsFromGoodsReceipt(ctx context.Context, tx pgx.Tx, tenantID
 			  serial_unit_id, warranty_origin, goods_receipt_line_id,
 			  warranty_start, warranty_end, status
 			) values ($1,$2,$3,$4,$5,$6,$7,'receipt',$8,$9,$10,$11)
-			on conflict (tenant_id, serial_no) do update set
+			on conflict (tenant_id, serial_no) where (status <> 'void') do update set
 			  partner_id = excluded.partner_id,
 			  item_id = excluded.item_id,
 			  item_code = excluded.item_code,
@@ -200,11 +274,11 @@ func SyncWarrantyAssetsFromGoodsReceipt(ctx context.Context, tx pgx.Tx, tenantID
 			  warranty_end = excluded.warranty_end,
 			  status = excluded.status,
 			  updated_at = now()`,
-			tenantID, *partnerID, itemID, strings.TrimSpace(itemCode), strings.TrimSpace(itemName), serialNo,
-			unitID, grLineID, *wStart, *wEnd, status)
+			tenantID, u.partnerID, u.itemID, strings.TrimSpace(u.itemCode), strings.TrimSpace(u.itemName), u.serialNo,
+			u.unitID, u.grLineID, u.wStart, u.wEnd, status)
 		if err != nil {
-			return fmt.Errorf("sync warranty asset %s: %w", serialNo, err)
+			return fmt.Errorf("sync warranty asset %s: %w", u.serialNo, err)
 		}
 	}
-	return rows.Err()
+	return nil
 }
