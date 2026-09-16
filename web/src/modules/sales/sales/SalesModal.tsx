@@ -31,6 +31,7 @@ import {
 } from "../../../shared/attachments";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired, isConfirmingProgress } from "../../../shared/useProcessPolicy";
+import { mapCustomValuesToEntity, mergeCustomValues } from "../../../shared/mapCustomValues";
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
@@ -671,6 +672,15 @@ export function SalesModal(props: Props) {
     if (props.open && !props.editing) void loadPreview(orderDate());
   });
 
+  const loadSourceCustomValues = async (path: string, docId: number) => {
+    if (!docId || docId <= 0) return;
+    const res = await apiFetch<{ custom_values?: Record<string, unknown> }>(path);
+    if (!res.success || !res.data?.custom_values) return;
+    const mapped = mapCustomValuesToEntity(res.data.custom_values, fields());
+    if (Object.keys(mapped).length === 0) return;
+    loadCustom(mergeCustomValues(customValues(), mapped));
+  };
+
   const applySalesOrderLines = async (picked: PickedSalesOrderLine[]) => {
     if (picked.length === 0) return;
     const first = picked[0];
@@ -716,12 +726,15 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
-    await loadSourceAttachPreview(
-      "sales-order/sales-orders",
-      first.sales_order_id,
-      "From Sales Order (copies when you Save)",
-    );
-    toast.success("Sales Order lines loaded. Attachments copy when you Save. Click Save to create the sales invoice.");
+    await Promise.all([
+      loadSourceAttachPreview(
+        "sales-order/sales-orders",
+        first.sales_order_id,
+        "From Sales Order (copies when you Save)",
+      ),
+      loadSourceCustomValues(`/api/v1/sales-order/sales-orders/${first.sales_order_id}`, first.sales_order_id),
+    ]);
+    toast.success("Sales Order lines loaded. Attachments and matching custom fields copy when you Save.");
   };
 
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
@@ -757,12 +770,15 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
-    await loadSourceAttachPreview(
-      "quotation/quotations",
-      first.quotation_id,
-      "From Quotation (copies when you Save)",
-    );
-    toast.success("Quotation lines loaded. Attachments copy when you Save. Click Save to create the sales invoice.");
+    await Promise.all([
+      loadSourceAttachPreview(
+        "quotation/quotations",
+        first.quotation_id,
+        "From Quotation (copies when you Save)",
+      ),
+      loadSourceCustomValues(`/api/v1/quotation/quotations/${first.quotation_id}`, first.quotation_id),
+    ]);
+    toast.success("Quotation lines loaded. Attachments and matching custom fields copy when you Save.");
   };
 
   const applyShippingLines = async (picked: PickedShippingSlipLine[]) => {
@@ -987,7 +1003,10 @@ export function SalesModal(props: Props) {
       handleSaveResult(res, toast, ed ? "Sale saved. Open the Invoice tab to print or collect payment." : "Sale created. Open the Invoice tab next, then collect payment.", { onFieldErrors: setFieldErrors });
       return;
     }
-    toast.success(ed ? "Sale saved. Open the Invoice tab to print or collect payment." : "Sale created. Open the Invoice tab next, then collect payment.");
+    toast.success(
+      res.message?.trim() ||
+        (ed ? "Sale saved. Open the Invoice tab to print or collect payment." : "Sale created. Open the Invoice tab next, then collect payment."),
+    );
     if (ed?.id) {
       invalidateRecordHistory(queryClient, "sa_sales", ed.id);
     }

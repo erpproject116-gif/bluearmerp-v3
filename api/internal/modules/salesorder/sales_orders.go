@@ -93,6 +93,7 @@ type SalesOrder struct {
 	CreatedByName     string           `json:"created_by_name,omitempty"`
 	ItemNameSummary   string           `json:"item_name_summary,omitempty"`
 	Lines             []SalesOrderLine `json:"lines,omitempty"`
+	CustomValues      map[string]any   `json:"custom_values,omitempty"`
 }
 
 type salesOrderLineBody struct {
@@ -133,6 +134,7 @@ type salesOrderBody struct {
 	ProgressStatus    string               `json:"progress_status"`
 	SourceQuotationID *int64               `json:"source_quotation_id"`
 	Lines             []salesOrderLineBody `json:"lines"`
+	CustomValues      map[string]any       `json:"custom_values"`
 }
 
 type computedLine struct {
@@ -436,6 +438,7 @@ func loadSalesOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 		return SalesOrder{}, err
 	}
 	so.Lines = lines
+	so.CustomValues = attachCustom(ctx, pool, tenantID, entitySalesOrder, id)
 	return so, nil
 }
 
@@ -631,6 +634,15 @@ func createSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Validation(w, map[string]string{"lines": err.Error()})
 				return
 			}
+		}
+
+		customVals := body.CustomValues
+		if body.SourceQuotationID != nil && *body.SourceQuotationID > 0 {
+			customVals = mergeCustomFromQuotation(r.Context(), pool, tu.TenantID, *body.SourceQuotationID, customVals)
+		}
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySalesOrder, id, customVals); errs != nil {
+			response.Validation(w, errs)
+			return
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
@@ -838,6 +850,11 @@ func updateSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Validation(w, map[string]string{"lines": err.Error()})
 				return
 			}
+		}
+
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySalesOrder, id, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
+			return
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {

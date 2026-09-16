@@ -72,7 +72,7 @@ func attachmentMeta(kind DocKind) (table, fkCol string, ok bool) {
 }
 
 // ValidateAttachmentRequired checks tenant policy when a document moves to a confirming status.
-// docID may be zero on create — callers should reject confirming status on create separately.
+// docID may be zero on create — use ValidateAttachmentCount when source files will be copied after insert.
 func ValidateAttachmentRequired(ctx context.Context, pool *pgxpool.Pool, p Policy, kind DocKind, status string, docID int64) map[string]string {
 	if !IsConfirmingProgress(kind, status) || !policyRequiresAttachment(p, kind) {
 		return nil
@@ -88,7 +88,16 @@ func ValidateAttachmentRequired(ctx context.Context, pool *pgxpool.Pool, p Polic
 	if err != nil {
 		return map[string]string{"attachments": "Failed to verify attachments."}
 	}
-	if n < 1 {
+	return ValidateAttachmentCount(p, kind, status, n)
+}
+
+// ValidateAttachmentCount enforces the attachment policy using a known file count
+// (e.g. files that will be copied from a Load Slip source document on create).
+func ValidateAttachmentCount(p Policy, kind DocKind, status string, count int) map[string]string {
+	if !IsConfirmingProgress(kind, status) || !policyRequiresAttachment(p, kind) {
+		return nil
+	}
+	if count < 1 {
 		return map[string]string{"attachments": attachmentRequiredMsg}
 	}
 	return nil

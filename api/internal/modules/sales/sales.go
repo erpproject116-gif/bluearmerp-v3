@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
@@ -580,7 +581,10 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmartContext(w, v, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
-		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), 0); v != nil {
+		progress := defaultProgress(body.ProgressStatus)
+		srcAttCount := countSaleSourceAttachments(r.Context(), pool, body)
+		if v := processpolicy.ValidateAttachmentCount(policy, processpolicy.DocSales, progress, srcAttCount); v != nil {
+			// Confirming create with no source files yet — require an upload after save as Unconfirmed.
 			response.ValidationSmartContext(w, v, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
@@ -668,7 +672,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		progress := defaultProgress(body.ProgressStatus)
+		progress = defaultProgress(body.ProgressStatus)
 		if processpolicy.IsConfirmingProgress(processpolicy.DocSales, progress) {
 			if err := applySaleStock(r.Context(), tx, tu.TenantID, id, body.LocationID, tu.AppUserID); err != nil {
 				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
@@ -705,7 +709,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, body.CustomValues); errs != nil {
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, mergeSaleSourceCustomValues(r.Context(), pool, tu.TenantID, body)); errs != nil {
 			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
@@ -810,7 +814,15 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmartContext(w, v, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
-		if v := processpolicy.ValidateAttachmentRequired(r.Context(), pool, policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), id); v != nil {
+		attCount, attErr := attachmentx.Count(r.Context(), pool, "public.sa_sales_attachments", "sales_id", id)
+		if attErr != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to verify attachments.", "ERR_INTERNAL")
+			return
+		}
+		if attCount < 1 {
+			attCount = countSaleSourceAttachments(r.Context(), pool, body)
+		}
+		if v := processpolicy.ValidateAttachmentCount(policy, processpolicy.DocSales, defaultProgress(body.ProgressStatus), attCount); v != nil {
 			response.ValidationSmartContext(w, v, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
@@ -923,7 +935,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, body.CustomValues); errs != nil {
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, entitySales, id, mergeSaleSourceCustomValues(r.Context(), pool, tu.TenantID, body)); errs != nil {
 			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
@@ -937,6 +949,8 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
 		}
+
+		_ = ensureSaleSourceAttachments(r.Context(), pool, tu.TenantID, id, body)
 
 		after, _ := loadSale(r.Context(), pool, tu.TenantID, id)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.update", "sa_sales", &id, before, after)

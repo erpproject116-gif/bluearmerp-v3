@@ -18,6 +18,12 @@ import { useToast } from "../../../shared/toast";
 import { useAuth, hasPermission } from "../../../shared/auth-context";
 import { isTenantModuleEnabled } from "../../../shared/moduleAccess";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { useCustomValues } from "../../../shared/useCustomValues";
+import {
+  CustomFieldsSection,
+  collectCustomFieldErrors,
+} from "../../../shared/CustomFieldsSection";
+import { mapCustomValuesToEntity, mergeCustomValues } from "../../../shared/mapCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
@@ -84,6 +90,7 @@ export type SalesOrderDetail = {
   grand_total: number;
   source_quotation_id?: number | null;
   created_by_name?: string;
+  custom_values?: Record<string, unknown>;
   lines?: Array<{
     id?: number;
     line_no: number;
@@ -174,7 +181,8 @@ export function SalesOrderModal(props: Props) {
   const currenciesQuery = useActiveCurrencies(() => props.open);
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
-  const { fields, byKey } = useFormFieldSettings(SALES_ORDER_ENTITY.salesOrder);
+  const { fields, byKey, activeCustomFields } = useFormFieldSettings(SALES_ORDER_ENTITY.salesOrder);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const SALES_ORDER_FORM_ID = "sales-order-form";
   const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [saving, setSaving] = createSignal(false);
@@ -353,6 +361,7 @@ export function SalesOrderModal(props: Props) {
       setProgressStatus(ed.progress_status || "unconfirmed");
       setSourceQuotationId(ed.source_quotation_id ?? null);
       setLines(linesFromDetail(ed.lines));
+      loadCustom(ed.custom_values ?? {});
     } else {
       const seed = takeDocSeed("sales_order");
       const seedLines = (seed?.lines ?? []).slice(0, 200).map((line, index) => ({
@@ -390,6 +399,7 @@ export function SalesOrderModal(props: Props) {
       } else {
         setLines([emptySalesOrderLine(1)]);
       }
+      loadCustom({});
       void loadPreview(todayISO());
     }
   });
@@ -429,6 +439,15 @@ export function SalesOrderModal(props: Props) {
     if (props.open && !props.editing) void loadPreview(orderDate());
   });
 
+  const loadSourceCustomValues = async (path: string, docId: number) => {
+    if (!docId || docId <= 0) return;
+    const res = await apiFetch<{ custom_values?: Record<string, unknown> }>(path);
+    if (!res.success || !res.data?.custom_values) return;
+    const mapped = mapCustomValuesToEntity(res.data.custom_values, fields());
+    if (Object.keys(mapped).length === 0) return;
+    loadCustom(mergeCustomValues(customValues(), mapped));
+  };
+
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
     const first = picked[0];
@@ -463,6 +482,7 @@ export function SalesOrderModal(props: Props) {
     } else {
       setLines(newLines);
     }
+    await loadSourceCustomValues(`/api/v1/quotation/quotations/${first.quotation_id}`, first.quotation_id);
   };
 
   const mapBuyingOntoSalesOrder = async (
@@ -531,6 +551,7 @@ export function SalesOrderModal(props: Props) {
         location_id: locationId(),
       }),
       collectRequiredFieldErrors(formValues, checks),
+      collectCustomFieldErrors(customValues(), activeCustomFields()),
     );
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
@@ -588,6 +609,7 @@ export function SalesOrderModal(props: Props) {
           planned_serial_nos: ln.planned_serial_nos ?? [],
         };
       }),
+      custom_values: customValues(),
     };
 
     setSaving(true);
@@ -952,6 +974,11 @@ export function SalesOrderModal(props: Props) {
             <input class={inputClass} value={effectiveEditing()?.created_by_name ?? ""} readOnly />
           </Field>
         </Show>
+        <CustomFieldsSection
+          entityType={SALES_ORDER_ENTITY.salesOrder}
+          values={customValues}
+          onChange={setCustom}
+        />
         </div>
         <div class="col-span-full mb-2 flex flex-wrap items-end gap-3">
           <div>
