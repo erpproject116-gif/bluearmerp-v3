@@ -1,6 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable } from "./demoSignIn";
-import { ensureSignedIn, liveAuthAvailable } from "./storageAuth";
+import { test, expect } from "./fixtures";
+import { ensureSignedIn } from "./storageAuth";
 import { assertApiReachable } from "./apiReady";
 import {
   openNewRow,
@@ -19,7 +18,7 @@ import {
   noteIncomplete,
 } from "./entityForm";
 import { loadTenantProfile } from "./tenantProfile";
-import { mutationsAllowed, installMutationGuard, currentTier } from "./liveSafety";
+import { mutationsAllowed, currentTier } from "./liveSafety";
 import { ledgerAppend, e2eMarker } from "./mutationLedger";
 
 /**
@@ -73,11 +72,9 @@ export function defineDocCrudSpec(c: DocCrudCase) {
     test(`@read-only ${c.name}: cancel New; open existing without mutating first row`, async ({
       page,
     }, testInfo) => {
-      test.skip(!liveAuthAvailable() && !demoAuthAvailable(), "Set E2E_DEMO_PASSWORD, E2E_BENCH_TOKEN, or storageState");
       test.setTimeout(120_000);
       page.setDefaultTimeout(12_000);
 
-      await installMutationGuard(page);
       await ensureSignedIn(page);
       await page.goto(c.listPath);
       await assertApiReachable(page);
@@ -112,7 +109,6 @@ export function defineDocCrudSpec(c: DocCrudCase) {
     test(`@mutating @reversible ${c.name}: create E2E document when mutations allowed`, async ({
       page,
     }, testInfo) => {
-      test.skip(!liveAuthAvailable() && !demoAuthAvailable(), "Set E2E_DEMO_PASSWORD, E2E_BENCH_TOKEN, or storageState");
       test.skip(
         !mutationsAllowed(),
         `Mutations blocked (tier=${currentTier()}). Set E2E_TIER=reversible|posting, E2E_ALLOW_MUTATIONS=1, E2E_RUN_CONFIRM=<id>`,

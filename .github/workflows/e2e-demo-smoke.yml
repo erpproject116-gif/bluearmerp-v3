@@ -126,9 +126,11 @@ jobs:
           E2E_TIER: posting
           E2E_ALLOW_MUTATIONS: "1"
           E2E_RUN_CONFIRM: ci-${{ github.run_id }}
+          E2E_REQUIRE_AUTH: "1"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
         run: |
           export E2E_BENCH_TOKEN=$(node ../scripts/mint-bench-jwt.mjs)
-          npx playwright test --project=chromium \
+          npx playwright test --project=chromium --reporter=list,json \
             e2e/coverage-manifest.spec.ts \
             e2e/route-smoke.spec.ts \
             e2e/core-interactions.spec.ts \
@@ -143,3 +145,23 @@ jobs:
             e2e/inventory-partners-items.spec.ts \
             e2e/page-grid-form-contracts.spec.ts \
             e2e/business-chains.spec.ts
+
+      # A run where everything skipped still exits 0. Refuse that.
+      - name: Enforce coverage floor
+        if: always()
+        working-directory: web
+        run: node e2e/scripts/assert-coverage-floor.mjs --report test-results/results.json --job demo-smoke
+
+      # e2e/.evidence is gitignored on purpose, so CI is the only place findings
+      # survive a run. Without this artifact a red build tells you nothing.
+      - name: Upload run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-smoke-evidence-${{ github.run_id }}
+          path: |
+            web/e2e/.evidence/
+            web/test-results/
+            web/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore

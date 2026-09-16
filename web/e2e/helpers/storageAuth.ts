@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { expect } from "@playwright/test";
 import { demoAuthAvailable, demoSignIn } from "./demoSignIn";
 import { assertApiReachable } from "./apiReady";
+import { currentTier, mutationsAllowed } from "./liveSafety";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +26,39 @@ export function liveAuthAvailable(): boolean {
 }
 
 /**
+ * Tenant this run is pinned to. Opt-in via E2E_EXPECT_TENANT_CODE.
+ *
+ * Deliberately not defaulted from the tenant profile: that file ships demo
+ * values, and silently pinning to them would fail every CI run against a
+ * throwaway database while giving live runs a false sense of protection.
+ * Live mutating runs set it explicitly (see the test:e2e:live:* scripts).
+ */
+export function expectedTenantCode(): string {
+  return (process.env.E2E_EXPECT_TENANT_CODE ?? "").trim();
+}
+
+/**
+ * Refuse to continue when a mutating run is pointed at the wrong workspace.
+ * A stale storage state is the realistic way this goes wrong, and the cost of
+ * being wrong is writing real documents into someone else's tenant.
+ */
+export async function assertExpectedTenant(page: Page) {
+  const expected = expectedTenantCode();
+  if (!expected) return;
+  const hints = await captureSessionHints(page);
+  if (!hints.tenantCode) {
+    throw new Error(
+      `Live safety: tier=${currentTier()} allows mutations but the tenant could not be read from /auth/me. Refusing to continue.`,
+    );
+  }
+  if (hints.tenantCode !== expected) {
+    throw new Error(
+      `Live safety: signed in to tenant ${hints.tenantCode}, but this run is pinned to ${expected}. Refusing to mutate.`,
+    );
+  }
+}
+
+/**
  * Ensure the page is authenticated.
  * When Playwright `use.storageState` is set, this only navigates and validates.
  * Otherwise falls back to demoSignIn.
@@ -39,9 +73,12 @@ export async function ensureSignedIn(page: Page) {
       );
     }
     await assertApiReachable(page);
-    return;
+  } else {
+    await demoSignIn(page);
   }
-  await demoSignIn(page);
+  if (mutationsAllowed()) {
+    await assertExpectedTenant(page);
+  }
 }
 
 /**

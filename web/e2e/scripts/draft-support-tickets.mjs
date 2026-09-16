@@ -9,6 +9,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +28,10 @@ function draftFromFailure(f, runId) {
   const routeMatch = String(error + " " + title).match(/\/app\/[a-z0-9\-/_]+/i);
   const route = routeMatch ? routeMatch[0] : "";
   const subject = `[E2E] ${title}`.slice(0, 500);
+  const dedupeKey = `${route}|${title}`.toLowerCase();
+  // A short stable fingerprint travels inside the ticket body, so a later run can
+  // recognise its own finding through the API and not file it twice.
+  const fingerprint = `e2e-${createHash("sha1").update(dedupeKey).digest("hex").slice(0, 12)}`;
   const description = [
     "## Problem",
     error,
@@ -46,6 +51,7 @@ function draftFromFailure(f, runId) {
     `- Run ID: ${runId}`,
     `- E2E_BASE_URL: ${process.env.E2E_BASE_URL || "(unset)"}`,
     `- Tier: ${process.env.E2E_TIER || "read-only"}`,
+    `- dedupeKey: ${fingerprint}`,
     "",
     "## How to resolve (recommended fix)",
     "Reproduce manually, identify root cause (validation, API 5xx, missing seed, permission, UX copy), fix in a small PR with regression coverage.",
@@ -64,7 +70,8 @@ function draftFromFailure(f, runId) {
     route,
     sourceFile: file,
     status: "draft",
-    dedupeKey: `${route}|${title}`.toLowerCase(),
+    dedupeKey,
+    fingerprint,
   };
 }
 

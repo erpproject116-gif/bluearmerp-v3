@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 import {
   openNewRow,
@@ -17,9 +17,8 @@ import { ledgerAppend } from "./helpers/mutationLedger";
  */
 test.describe("Goods receipt receive", () => {
   test("@read-only receive page shell loads and PO lookup is visible", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD");
     test.setTimeout(60_000);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/serial-lot/receive");
     await assertApiReachable(page);
     try {
@@ -33,7 +32,6 @@ test.describe("Goods receipt receive", () => {
   });
 
   test("@posting @mutating create draft GR from open PO, paste serials, and post", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN (CI) or E2E_DEMO_PASSWORD");
     test.skip(
       !mutationsAllowed() || currentTier() !== "posting",
       "Set E2E_TIER=posting, E2E_ALLOW_MUTATIONS=1, E2E_RUN_CONFIRM=<id>",
@@ -46,7 +44,7 @@ test.describe("Goods receipt receive", () => {
     );
     const serialPrefix = `E2E-GR-${Date.now()}`;
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/serial-lot/receive");
     await assertApiReachable(page);
     await expect(page.getByRole("heading", { name: /Receive \/ Scan Serials/i })).toBeVisible({ timeout: 15000 });

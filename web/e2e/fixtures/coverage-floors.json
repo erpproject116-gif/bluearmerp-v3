@@ -1,5 +1,6 @@
 {
   "_comment": "Minimum number of tests that must actually execute per CI job. Playwright exits 0 when everything skips, so without a floor a suite can report success having covered nothing. Raise a floor when a job gains tests; lowering one should be justified in the pull request.",
-  "_measured": "smoke: observed on run 35065048891 (2 executed, 5 skipped for lack of auth)",
-  "smoke": 2
+  "_measured": "smoke: observed on run 35065048891 (2 executed, 5 skipped for lack of auth). demo-smoke: placeholder of 1 until the first run with the JSON reporter reports its real executed count, then raise it to that number.",
+  "smoke": 2,
+  "demo-smoke": 1
 }

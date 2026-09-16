@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 import {
   openNewRow,
@@ -22,11 +22,10 @@ import {
 
 test.describe("after-sales repair order interaction", () => {
   test("@read-only list: New cancel; open existing without save", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
     page.setDefaultTimeout(12_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/after-sales/repair-orders");
     await assertApiReachable(page);
 
@@ -52,14 +51,13 @@ test.describe("after-sales repair order interaction", () => {
   });
 
   test("@mutating @reversible create E2E repair order when lookups work", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
     test.setTimeout(120_000);
     page.setDefaultTimeout(12_000);
 
     const profile = loadTenantProfile();
     const note = e2eMarker("RO");
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/after-sales/repair-orders");
     await assertApiReachable(page);
 

@@ -1,5 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect, type Page } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 import { softSkip } from "./helpers/entityForm";
 
@@ -22,10 +22,9 @@ async function expectInputWithValue(page: Page, value: string, timeout = 15_000)
  */
 test.describe("Copilot seed handoffs", () => {
   test("sales order doc seed prefills the create modal @read-only", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await assertApiReachable(page);
 
     await page.evaluate(() => {
@@ -50,10 +49,9 @@ test.describe("Copilot seed handoffs", () => {
   });
 
   test("@read-only migration import seed opens the mapped-import modal prefilled", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await assertApiReachable(page);
 
     await page.evaluate(() => {
@@ -89,10 +87,9 @@ test.describe("Copilot seed handoffs", () => {
   });
 
   test("@read-only serial/lot seed stages the paste buffer on the receive page", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await assertApiReachable(page);
 
     await page.evaluate(() => {

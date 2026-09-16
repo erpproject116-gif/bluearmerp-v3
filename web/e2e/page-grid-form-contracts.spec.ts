@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
-import { installMutationGuard, isLiveProductionUrl } from "./helpers/liveSafety";
+import { isLiveProductionUrl } from "./helpers/liveSafety";
 import { softSkip } from "./helpers/entityForm";
 import { openNewRow, cancelEntityModal, expectModalHeading } from "./helpers/entityForm";
 
@@ -52,11 +52,9 @@ test.describe("UI page/grid/form contracts", () => {
   test.describe.configure({ mode: "serial" });
 
   test("@read-only page shells load without 5xx / pageerror", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(20 * 60 * 1000);
 
-    await installMutationGuard(page);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await assertApiReachable(page);
 
     const failures: string[] = [];
@@ -103,11 +101,9 @@ test.describe("UI page/grid/form contracts", () => {
   });
 
   test("@read-only grid contracts: table, search/filter shell, row open/cancel", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(15 * 60 * 1000);
 
-    await installMutationGuard(page);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
 
     for (const path of GRID_CONTRACTS) {
       await page.goto(path);
@@ -137,11 +133,9 @@ test.describe("UI page/grid/form contracts", () => {
   });
 
   test("@read-only form contracts: New modal labels, Save/Cancel, empty validation", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(15 * 60 * 1000);
 
-    await installMutationGuard(page);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
 
     for (const c of FORM_NEW_CONTRACTS) {
       await page.goto(c.path);

@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
-import { installMutationGuard, mutationsAllowed, currentTier, writeEvidence } from "./helpers/liveSafety";
+import { mutationsAllowed, currentTier, writeEvidence } from "./helpers/liveSafety";
 import { loadTenantProfile } from "./helpers/tenantProfile";
 import { e2eMarker, ledgerAppend } from "./helpers/mutationLedger";
 import {
@@ -29,11 +29,9 @@ test.describe("Business chains — Inventory pilot", () => {
   test("@read-only inventory chain: partners → items → locations → find stock → reports", async ({
     page,
   }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(10 * 60 * 1000);
 
-    await installMutationGuard(page);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
 
     const steps = [
       "/app/inventory/partners",
@@ -60,10 +58,8 @@ test.describe("Business chains — Inventory pilot", () => {
 
 test.describe("Business chains — Selling", () => {
   test("@read-only selling chain surfaces: quotation → SO → sales → OR", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(10 * 60 * 1000);
-    await installMutationGuard(page);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
 
     for (const path of [
       "/app/quotation/quotations",
@@ -83,13 +79,12 @@ test.describe("Business chains — Selling", () => {
   });
 
   test("@mutating @reversible selling: create E2E quotation draft only", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
     test.setTimeout(120_000);
 
     const profile = loadTenantProfile();
     const note = e2eMarker("SELL-QUO");
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/quotation/quotations");
     await assertApiReachable(page);
     try {
@@ -133,10 +128,8 @@ test.describe("Business chains — Buying", () => {
   test("@read-only buying chain surfaces: PR → PO → GR → purchase invoice → PV", async ({
     page,
   }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(10 * 60 * 1000);
-    await installMutationGuard(page);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
 
     for (const path of [
       "/app/purchase-request/purchase-requests",
@@ -160,10 +153,8 @@ test.describe("Business chains — Buying", () => {
 
 test.describe("Business chains — Accounting", () => {
   test("@read-only accounting surfaces: COA, JE, AR/AP hubs, key reports", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(12 * 60 * 1000);
-    await installMutationGuard(page);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
 
     for (const path of [
       "/app/finance/acct-i/chart-of-accounts",

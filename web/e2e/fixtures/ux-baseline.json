@@ -1,0 +1,16 @@
+{
+  "capturedAt": "2026-09-16T04:20:44.592Z",
+  "capturedAgainst": "live Cordova tenant 32 (app.bluearmerp.com), run live-cordova-20260916e",
+  "notes": "maxClicks and maxFriction are ceilings, not targets. A task may do better than baseline; it may never do worse. Lower a ceiling whenever a fix makes the improvement stick.",
+  "tasks": {
+    "first-quote": { "maxClicks": 2, "maxFriction": 0 },
+    "receive-po": { "maxClicks": 2, "maxFriction": 0 },
+    "collect-payment": { "maxClicks": 2, "maxFriction": 0 },
+    "pay-supplier": { "maxClicks": 2, "maxFriction": 1 },
+    "find-stock": { "maxClicks": 2, "maxFriction": 1 }
+  },
+  "summary": {
+    "maxTasksWithFriction": 2,
+    "maxAvgClicks": 2
+  }
+}

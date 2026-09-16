@@ -1,9 +1,9 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 
 test.describe("Bluearm ERP v3 smoke", () => {
-  test("@smoke @read-only sign-in page loads", async ({ page }) => {
+  test("@smoke @read-only @no-auth sign-in page loads", async ({ page }) => {
     await page.goto("/signin");
     // Already-authenticated storageState (live Google session) may redirect into the app.
     const signInHeading = page.getByRole("heading", { name: /^Sign in$/i });
@@ -24,9 +24,7 @@ test.describe("Bluearm ERP v3 smoke", () => {
   });
 
   test("@smoke @read-only demo sign-in reaches partners grid", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD (or DEMO_USER_PASSWORD in .env.local)");
-
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/partners");
     await assertApiReachable(page);
     await expect(
@@ -38,9 +36,7 @@ test.describe("Bluearm ERP v3 smoke", () => {
   });
 
   test("@smoke @read-only demo sign-in reaches after-sales repair order list", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD (or DEMO_USER_PASSWORD in .env.local)");
-
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/after-sales/repair-orders");
     await assertApiReachable(page);
     await expect(
@@ -49,9 +45,7 @@ test.describe("Bluearm ERP v3 smoke", () => {
   });
 
   test("@smoke @read-only demo repair order status page loads", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD (or DEMO_USER_PASSWORD in .env.local)");
-
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/after-sales/repair-orders/status");
     await assertApiReachable(page);
     await expect(
@@ -63,9 +57,7 @@ test.describe("Bluearm ERP v3 smoke", () => {
   });
 
   test("@smoke @read-only demo quotation list loads", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD (or DEMO_USER_PASSWORD in .env.local)");
-
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/quotation/quotations");
     await assertApiReachable(page);
     await expect(
@@ -74,9 +66,7 @@ test.describe("Bluearm ERP v3 smoke", () => {
   });
 
   test("@smoke @read-only demo tax types list", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD (or DEMO_USER_PASSWORD in .env.local)");
-
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/quotation/tax-mngt/tax-types");
     await assertApiReachable(page);
     await expect(

@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 import {
   openNewRow,
@@ -14,10 +14,9 @@ import { fillTextByLabel, selectFirstOption, saveEntityModal, noteIncomplete } f
 
 test.describe("official-receipt CRUD interaction", () => {
   test("@read-only cancel New; open existing without mutating Notes", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(120_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/finance/official-receipts");
     await assertApiReachable(page);
 
@@ -59,12 +58,11 @@ test.describe("official-receipt CRUD interaction", () => {
   test("@mutating @reversible edit Notes only when mutations allowed (prefer E2E rows)", async ({
     page,
   }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
     test.setTimeout(120_000);
 
     const note = e2eMarker("OR");
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/finance/official-receipts");
     await assertApiReachable(page);
     try {

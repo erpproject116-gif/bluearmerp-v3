@@ -1,0 +1,125 @@
+# Mutating E2E against the live tenant. Manual trigger only, by design.
+#
+# This workflow writes to real data. It is never attached to push or
+# pull_request, and it cannot be started without three separate, deliberate
+# inputs: a tier that is not read-only, an explicit allow flag, and a fresh run
+# confirmation token. The token is also the E2E marker stamped on every record
+# the run creates, which is what makes the run reversible afterwards.
+#
+# The run is not considered finished until reconcile reports zero leftover
+# records. That check runs even when the tests fail, because a failed run is
+# exactly when residue gets left behind.
+name: E2E live mutating
+
+on:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: "Mutation tier"
+        required: true
+        type: choice
+        options:
+          - reversible
+          - posting
+      confirm:
+        description: "Fresh run token, e.g. E2E-20260916-1. Must not reuse a previous run."
+        required: true
+        type: string
+      specs:
+        description: "Spec files to run"
+        required: true
+        default: "e2e/business-chains.spec.ts"
+        type: string
+      reverse:
+        description: "Reverse the records this run creates when it finishes"
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: e2e-live-mutating
+  cancel-in-progress: false
+
+jobs:
+  mutate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: live-mutating
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # A reused token would stamp new records with an old run's marker, and
+      # reconcile would then attribute them to the wrong run. Every completed run
+      # leaves an artifact named after its token, so that is the reuse check.
+      - name: Reject a reused run token
+        run: |
+          token='${{ inputs.confirm }}'
+          case "$token" in
+            E2E-*) ;;
+            *) echo "Run token must start with E2E- so records are identifiable. Got: $token"; exit 1 ;;
+          esac
+          used=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+                 --jq '.artifacts[].name' | grep -cxF "live-mutating-$token" || true)
+          if [ "$used" != "0" ]; then
+            echo "Run token $token was already used by an earlier run. Pick a fresh one."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install web deps
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright
+        working-directory: web
+        run: npx playwright install chromium --with-deps
+
+      - name: Run mutating specs
+        id: specs
+        working-directory: web
+        run: npx playwright test ${{ inputs.specs }} --project=chromium --reporter=list,json
+        env:
+          CI: "true"
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_TIER: ${{ inputs.tier }}
+          E2E_ALLOW_MUTATIONS: "1"
+          E2E_RUN_CONFIRM: ${{ inputs.confirm }}
+          E2E_REQUIRE_AUTH: "1"
+          E2E_EXPECT_TENANT_CODE: ${{ secrets.E2E_EXPECT_TENANT_CODE }}
+          E2E_BENCH_TOKEN: ${{ secrets.E2E_BENCH_TOKEN }}
+          E2E_DEMO_PASSWORD: ${{ secrets.E2E_DEMO_PASSWORD }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
+
+      - name: Enforce coverage floor
+        if: always()
+        working-directory: web
+        # The spec list is chosen at dispatch time, so a fixed per-job floor would
+        # be wrong. What must never happen is a mutating run that executed nothing.
+        run: node e2e/scripts/assert-coverage-floor.mjs --report test-results/results.json --min 1
+
+      # Runs even if the specs failed. Residue is most likely after a failure.
+      - name: Reconcile and reverse
+        if: always()
+        working-directory: web
+        run: node e2e/scripts/reconcile-mutations.mjs ${{ inputs.reverse && '--reverse' || '' }}
+        env:
+          E2E_RUN_CONFIRM: ${{ inputs.confirm }}
+          E2E_API_BASE: ${{ secrets.E2E_API_BASE }}
+          E2E_TICKET_BEARER: ${{ secrets.E2E_BENCH_TOKEN }}
+          E2E_TENANT_ID: ${{ secrets.E2E_TENANT_ID }}
+
+      - name: Upload run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-mutating-${{ inputs.confirm }}
+          path: |
+            web/e2e/.evidence/
+            web/test-results/
+          retention-days: 30
+          if-no-files-found: warn

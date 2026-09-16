@@ -1,0 +1,13 @@
+{
+  "_comment": "Web performance budget in KiB, uncompressed, over dist/assets only. firstLoadKb is the entry script plus everything index.html preloads: the bytes a user waits on before anything renders. Budgets carry ~5% headroom over the measurement below. Raising a budget needs a reason in the pull request.",
+  "_measuredAt": "2026-09-16",
+  "_measured": {
+    "firstLoadKb": 3127.5,
+    "totalJsKb": 6647.4,
+    "largestChunkKb": 1892.4,
+    "largestChunkName": "vendor-D7zEuUNN.js"
+  },
+  "firstLoadKb": 3284,
+  "totalJsKb": 6980,
+  "largestChunkKb": 1988
+}

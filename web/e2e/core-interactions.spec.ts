@@ -1,6 +1,6 @@
-import { expect, test, type Page, type Response } from "@playwright/test";
+import { expect, test, type Page, type Response } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
 import { cancelEntityModal, entityDialog, openNewRow } from "./helpers/entityForm";
 
 type CoreDocumentCase = {
@@ -111,11 +111,10 @@ async function exerciseEditableControls(page: Page, heading: RegExp) {
 
 test.describe("Layer 2 — core document modal/button contracts", () => {
   test("@smoke @read-only all core New transaction modals expose working controls and validation", async ({ page }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_BENCH_TOKEN or E2E_DEMO_PASSWORD");
     test.setTimeout(12 * 60 * 1000);
     page.setDefaultTimeout(15_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await assertApiReachable(page);
 
     const failures: string[] = [];

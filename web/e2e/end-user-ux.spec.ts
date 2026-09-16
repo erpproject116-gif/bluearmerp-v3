@@ -1,7 +1,8 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
-import { installMutationGuard, writeEvidence } from "./helpers/liveSafety";
+import { writeEvidence } from "./helpers/liveSafety";
+import { readFileSync } from "node:fs";
 
 type TaskResult = {
   id: string;
@@ -13,7 +14,18 @@ type TaskResult = {
   helpUsed: boolean;
   recovered: boolean;
   friction: string[];
+  jargon: string[];
 };
+
+type UxBaseline = {
+  capturedAt: string;
+  tasks: Record<string, { maxClicks: number; maxFriction: number }>;
+  summary: { maxTasksWithFriction: number; maxAvgClicks: number };
+};
+
+const baseline = JSON.parse(
+  readFileSync(new URL("./fixtures/ux-baseline.json", import.meta.url), "utf8"),
+) as UxBaseline;
 
 async function runTask(
   page: import("@playwright/test").Page,
@@ -65,11 +77,17 @@ async function runTask(
     recovered = true;
   }
 
-  // Terminology / duplicate entry points (lightweight heuristics)
+  // Terminology defects. These are tracked separately from friction because they are
+  // never acceptable at any level, so they must not be absorbed by a baseline ceiling.
   const body = (await page.locator("body").innerText().catch(() => "")).slice(0, 4000);
-  if (/acct-i|acct-ii/i.test(body)) friction.push("Internal module jargon visible (acct-i/acct-ii)");
-  if ((body.match(/Purchase Invoice|Purchase Receive|Supplier Invoice/gi) || []).length > 2) {
-    friction.push("Multiple invoice naming variants on one screen");
+  const jargon: string[] = [];
+  const internalNames = body.match(/acct-i{1,3}\b/gi) ?? [];
+  if (internalNames.length) {
+    jargon.push(`Internal module name shown to the user: ${[...new Set(internalNames)].join(", ")}`);
+  }
+  const invoiceNames = [...new Set((body.match(/Purchase Invoice|Purchase Receive|Supplier Invoice/gi) ?? []).map((m) => m.toLowerCase()))];
+  if (invoiceNames.length > 2) {
+    jargon.push(`Screen mixes ${invoiceNames.length} names for the same document: ${invoiceNames.join(", ")}`);
   }
 
   return {
@@ -82,6 +100,7 @@ async function runTask(
     helpUsed,
     recovered,
     friction,
+    jargon,
   };
 }
 
@@ -89,11 +108,9 @@ test.describe("Non-technical end-user UX tasks", () => {
   test("@read-only measure guided tasks: first quote, receive PO, collect payment, find stock", async ({
     page,
   }) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(15 * 60 * 1000);
 
-    await installMutationGuard(page);
-    await demoSignIn(page);
+    await ensureSignedIn(page);
 
     const results: TaskResult[] = [];
     results.push(
@@ -137,24 +154,48 @@ test.describe("Non-technical end-user UX tasks", () => {
       }),
     );
 
+    const withFriction = results.filter((r) => r.friction.length).length;
+    const avgClicks = results.reduce((a, r) => a + r.clicks, 0) / results.length;
+
     const evidencePath = writeEvidence("ux-task-results.json", {
       at: new Date().toISOString(),
+      baselineCapturedAt: baseline.capturedAt,
       results,
       summary: {
         tasks: results.length,
-        withFriction: results.filter((r) => r.friction.length).length,
-        avgClicks: results.reduce((a, r) => a + r.clicks, 0) / results.length,
+        withFriction,
+        avgClicks,
         avgMs: results.reduce((a, r) => a + r.elapsedMs, 0) / results.length,
       },
     });
 
-    // Soft assertions: tasks should reach a goal heading or record friction honestly.
     for (const r of results) {
       test.info().annotations.push({
         type: "ux-task",
         description: `${r.id}: clicks=${r.clicks} friction=${r.friction.join(";") || "none"} evidence=${evidencePath}`,
       });
     }
-    expect(results.length).toBeGreaterThanOrEqual(5);
+
+    expect(results.map((r) => r.id).sort()).toEqual(Object.keys(baseline.tasks).sort());
+
+    // Terminology defects are never baselined. See docs/qa/ux-baseline.md.
+    const jargon = results.flatMap((r) => r.jargon.map((j) => `${r.startPath}: ${j}`));
+    expect(jargon, "Internal jargon or mixed document naming reached an end-user screen").toEqual([]);
+
+    // Friction may not get worse than the committed baseline. Better is always allowed;
+    // when a fix lands, lower the ceiling in fixtures/ux-baseline.json in the same PR.
+    for (const r of results) {
+      const ceiling = baseline.tasks[r.id];
+      expect(
+        r.friction.length,
+        `Task "${r.label}" regressed: ${r.friction.join("; ")}`,
+      ).toBeLessThanOrEqual(ceiling.maxFriction);
+      expect(r.clicks, `Task "${r.label}" now costs more clicks than baseline`).toBeLessThanOrEqual(
+        ceiling.maxClicks,
+      );
+    }
+
+    expect(withFriction).toBeLessThanOrEqual(baseline.summary.maxTasksWithFriction);
+    expect(avgClicks).toBeLessThanOrEqual(baseline.summary.maxAvgClicks);
   });
 });

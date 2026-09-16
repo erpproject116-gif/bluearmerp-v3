@@ -66,9 +66,44 @@ export function assertNoBlockedMutations() {
   }
 }
 
+/**
+ * Records created during this run, keyed as "<resource>/<id>". Only these may be
+ * updated or deleted by a mutating run; everything else is pre-existing tenant data.
+ */
+const runOwnedRecords = new Set<string>();
+const markerViolations: string[] = [];
+
+export function runOwned(): string[] {
+  return [...runOwnedRecords];
+}
+
+export function assertNoMarkerViolations() {
+  if (markerViolations.length) {
+    requestStop("unexpected-mutation");
+    throw new Error(
+      `Live safety: mutation targeted a record that is not owned by this run:\n${markerViolations
+        .slice(0, 5)
+        .join("\n")}`,
+    );
+  }
+}
+
+function resourceOf(url: string): string {
+  const pathOnly = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
+  return pathOnly.replace(/\/\d+$/, "");
+}
+
+function recordKey(url: string): string | null {
+  const pathOnly = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
+  const id = /\/(\d+)$/.exec(pathOnly)?.[1];
+  return id ? `${resourceOf(url)}/${id}` : null;
+}
+
 export async function installMutationGuard(page: Page): Promise<void> {
   const allow = mutationsAllowed();
+  const marker = runId();
   blockedMutations.length = 0;
+  markerViolations.length = 0;
   await page.route("**/api/**", async (route: Route) => {
     const req = route.request();
     const method = req.method().toUpperCase();
@@ -81,12 +116,41 @@ export async function installMutationGuard(page: Page): Promise<void> {
       await route.continue();
       return;
     }
-    if (allow) {
-      await route.continue();
+    if (!allow) {
+      blockedMutations.push(`${method} ${url.replace(/^https?:\/\/[^/]+/, "")}`);
+      await route.abort("blockedbyclient");
       return;
     }
-    blockedMutations.push(`${method} ${url.replace(/^https?:\/\/[^/]+/, "")}`);
-    await route.abort("blockedbyclient");
+
+    const body = req.postData() ?? "";
+    const target = recordKey(url);
+    const carriesMarker = body.includes(marker) || body.includes(marker.replace(/^E2E-?/i, ""));
+
+    if (method === "POST" && !target) {
+      // Creating something new: it must be identifiable as ours or we cannot reverse it.
+      if (!carriesMarker) {
+        markerViolations.push(
+          `${method} ${url.replace(/^https?:\/\/[^/]+/, "")} has no "${marker}" marker in its payload`,
+        );
+        await route.abort("blockedbyclient");
+        return;
+      }
+    } else if (target && !runOwnedRecords.has(target) && !carriesMarker) {
+      // Editing or deleting something this run did not create.
+      markerViolations.push(`${method} ${target} was not created by run ${marker}`);
+      await route.abort("blockedbyclient");
+      return;
+    }
+
+    const response = await route.fetch();
+    if (method === "POST" && response.ok()) {
+      const created = await response.json().catch(() => null);
+      const id = created?.data?.id ?? created?.id;
+      if (typeof id === "number" || typeof id === "string") {
+        runOwnedRecords.add(`${resourceOf(url)}/${id}`);
+      }
+    }
+    await route.fulfill({ response });
   });
 }
 

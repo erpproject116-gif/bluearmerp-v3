@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/fixtures";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test.describe("Coverage manifest integrity", () => {
-  test("@smoke @read-only manifest covers every smokeable route from app-routes.json", async () => {
+  test("@smoke @read-only @no-auth manifest covers every smokeable route from app-routes.json", async () => {
     const routes = JSON.parse(
       fs.readFileSync(path.join(__dirname, "fixtures/app-routes.json"), "utf8"),
     ) as { smokeable: string[]; generatedAt: string };

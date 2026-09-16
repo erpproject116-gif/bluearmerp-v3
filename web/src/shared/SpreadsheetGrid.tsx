@@ -13,6 +13,9 @@ import { uiLabel } from "./branding/uiLabel";
 import { GridExportButtons, type GridExportColumn } from "./gridExport";
 import { useGridColumnPrefs } from "./useGridColumnPrefs";
 import { PageJumpControl } from "./PageJumpControl";
+import { resolveListEmptyState } from "./listEmptyStates";
+import { resolveListChainGuide } from "./listChainGuides";
+import { ModalFormGuide } from "./ModalFormGuide";
 
 const NON_HIDEABLE_KEYS = new Set(["actions", "print", "history", "lifecycle", "date_no_display"]);
 
@@ -100,6 +103,8 @@ function selectionSet(ids?: Set<number> | number[]): Set<number> {
 
 export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   const location = useLocation();
+  const emptyState = createMemo(() => resolveListEmptyState(location.pathname));
+  const chainGuide = createMemo(() => resolveListChainGuide(location.pathname));
   const [focusIdx, setFocusIdx] = createSignal(0);
   const [importing, setImporting] = createSignal(false);
   const [columnsMenuOpen, setColumnsMenuOpen] = createSignal(false);
@@ -366,6 +371,19 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   });
 
   return (
+    <>
+    <Show when={chainGuide()}>
+      {(guide) => (
+        <div class="mb-3">
+          <ModalFormGuide
+            guideId={guide().id}
+            title={guide().title}
+            summary={guide().summary}
+            steps={guide().steps}
+          />
+        </div>
+      )}
+    </Show>
     <div class="overflow-x-auto rounded-xl border border-stroke erp-surface shadow-sm">
       <div class="border-b border-stroke px-5 py-4">
         <div class="flex flex-wrap items-end gap-3">
@@ -746,7 +764,19 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             </tbody>
           </table>
           <Show when={displayRows().length === 0 && !props.loading}>
-            <p class="p-8 text-center text-sm text-text-secondary">{uiLabel("common.no_rows")}</p>
+            <Show
+              when={emptyState()}
+              fallback={
+                <p class="p-8 text-center text-sm text-text-secondary">{uiLabel("common.no_rows")}</p>
+              }
+            >
+              {(state) => (
+                <div class="mx-auto max-w-xl p-8 text-center">
+                  <p class="text-sm font-medium text-text-primary">{state().headline}</p>
+                  <p class="mt-1 text-sm text-text-secondary">{state().nextStep}</p>
+                </div>
+              )}
+            </Show>
           </Show>
         </DataTableScroll>
         </div>
@@ -794,6 +824,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
         </Show>
       </Show>
     </div>
+    </>
   );
 }
 

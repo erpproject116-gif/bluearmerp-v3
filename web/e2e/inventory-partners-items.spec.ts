@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { demoAuthAvailable, demoSignIn } from "./helpers/demoSignIn";
+import { test, expect } from "./helpers/fixtures";
+import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
 import {
   openNewRow,
@@ -17,10 +17,9 @@ import { e2eMarker, ledgerAppend } from "./helpers/mutationLedger";
 
 test.describe("inventory partners & items interaction", () => {
   test("@read-only partners: cancel New; open first row without save", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/partners");
     await assertApiReachable(page);
     try {
@@ -42,10 +41,9 @@ test.describe("inventory partners & items interaction", () => {
   });
 
   test("@read-only items: cancel New; open first row without save", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.setTimeout(90_000);
 
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/items");
     await assertApiReachable(page);
     try {
@@ -67,12 +65,11 @@ test.describe("inventory partners & items interaction", () => {
   });
 
   test("@mutating @reversible partners: create E2E partner only", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
     test.setTimeout(120_000);
 
     const name = e2eMarker("Partner");
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/partners");
     await assertApiReachable(page);
     await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
@@ -96,12 +93,11 @@ test.describe("inventory partners & items interaction", () => {
   });
 
   test("@mutating @reversible items: create E2E item only", async ({ page }, testInfo) => {
-    test.skip(!demoAuthAvailable(), "Set E2E_DEMO_PASSWORD or E2E_BENCH_TOKEN");
     test.skip(!mutationsAllowed(), `Mutations blocked (tier=${currentTier()})`);
     test.setTimeout(120_000);
 
     const name = e2eMarker("Item");
-    await demoSignIn(page);
+    await ensureSignedIn(page);
     await page.goto("/app/inventory/items");
     await assertApiReachable(page);
     await expect(page.getByRole("table").first()).toBeVisible({ timeout: 25000 });
