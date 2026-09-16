@@ -463,6 +463,7 @@ export function SalesModal(props: Props) {
       customer_label: payload.customer_label,
       location_label: payload.location_label ?? "",
       project_label: payload.project_label ?? "",
+      delivery_remarks: payload.delivery_remarks ?? "",
       commissions: [],
       custom_values: {},
     });
@@ -533,7 +534,6 @@ export function SalesModal(props: Props) {
     enabled: () => props.open,
     // Banner-only: show Restore/Discard so the user chooses (ECOUNT-style recovery).
   });
-
   const fetchTaxTypeOptions = async (q: string): Promise<LookupOption[]> => {
     const qq = q.trim().toLowerCase();
     return taxTypes()
