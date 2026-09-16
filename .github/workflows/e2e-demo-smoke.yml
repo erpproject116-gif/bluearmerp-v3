@@ -26,6 +26,8 @@ on:
 jobs:
   demo-smoke:
     runs-on: ubuntu-latest
+    # Without a cap a stuck Playwright step burns hours before anyone notices.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
