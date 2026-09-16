@@ -113,16 +113,19 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 	var taxTypeID, currencyID, partnerID, locationID int64
 	var picUserID, projectID *int64
 	var picName string
-	var projectName, reference, notes, paymentTerms *string
+	var projectName, reference, notes, paymentTerms, deliveryRemarks *string
+	var dueDate *time.Time
 	var progressStatus string
 	err = pool.QueryRow(ctx, `
 		select tax_type_id, currency_id, partner_id, pic_user_id, pic_name,
-		  location_id, project_id, project_name, reference, notes, payment_terms, progress_status
+		  location_id, project_id, project_name, reference, notes, payment_terms,
+		  delivery_remarks, due_date, progress_status
 		from public.so_sales_orders
 		where id = $1 and tenant_id = $2 and deleted_at is null`,
 		soID, tu.TenantID).Scan(
 		&taxTypeID, &currencyID, &partnerID, &picUserID, &picName,
-		&locationID, &projectID, &projectName, &reference, &notes, &paymentTerms, &progressStatus,
+		&locationID, &projectID, &projectName, &reference, &notes, &paymentTerms,
+		&deliveryRemarks, &dueDate, &progressStatus,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -267,15 +270,15 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 		  tenant_id, order_date, date_seq, sales_no,
 		  tax_type_id, currency_id, partner_id, pic_user_id, pic_name,
 		  location_id, project_id, project_name,
-		  payment_terms, notes,
+		  due_date, payment_terms, notes, delivery_remarks,
 		  progress_status, template_code, source_sales_order_id,
 		  subtotal, tax_total, grand_total, created_by_user_id
-		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'unconfirmed',$15,$16,$17,$18,$19,$20)
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'unconfirmed',$17,$18,$19,$20,$21,$22)
 		returning id`,
 		tu.TenantID, orderDate, dateSeq, salesNo,
 		taxTypeID, currencyID, partnerID, picUserID, strings.TrimSpace(picName),
 		locationID, projectID, projectName,
-		paymentTerms, notes,
+		dueDate, paymentTerms, notes, deliveryRemarks,
 		templateCode, soIDCopy,
 		subtotal, taxTotal, grandTotal, tu.AppUserID).Scan(&id)
 	if err != nil {

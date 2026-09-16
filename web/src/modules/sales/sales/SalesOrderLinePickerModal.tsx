@@ -11,6 +11,7 @@ export type OpenSalesOrderLineRow = {
   sales_order_id: number;
   sales_order_line_id: number;
   date_no_display: string;
+  order_date?: string;
   sales_order_no: string;
   progress_status?: string;
   customer_name: string;
@@ -22,8 +23,10 @@ export type OpenSalesOrderLineRow = {
   pic_name: string;
   project_id?: number | null;
   project_name?: string;
+  due_date?: string | null;
   payment_terms?: string;
   notes?: string;
+  delivery_remarks?: string;
   item_id?: number | null;
   item_code: string;
   item_name: string;

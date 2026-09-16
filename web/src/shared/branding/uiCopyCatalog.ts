@@ -62,12 +62,12 @@ export const UI_COPY_GROUPS: UiCopyGroup[] = [
       {
         key: "selling.attachments_sales_order",
         label: "Sales order attachments",
-        fallback: "Attachments (carried from Quotation, on to Sales)",
+        fallback: "New files for this sales order",
       },
       {
         key: "selling.attachments_sales",
         label: "Sales attachments",
-        fallback: "Attachments (carried from Quotation/Sales Order)",
+        fallback: "New files for this sale",
       },
     ],
   },

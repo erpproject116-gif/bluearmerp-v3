@@ -81,6 +81,7 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "si_dr_no", Label: "SI/DR No.", FieldType: "text", SortOrder: 70},
 		{FieldKey: "payment_terms", Label: "Payment terms", FieldType: "text", SortOrder: 80},
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 90},
+		{FieldKey: "delivery_remarks", Label: "Delivery remarks", FieldType: "textarea", SortOrder: 95},
 		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 100},
 		{FieldKey: "progress_status", Label: "Progress status", FieldType: "select", SortOrder: 110},
 	},

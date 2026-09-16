@@ -88,6 +88,7 @@ type Sale struct {
 	PaymentTerms       *string              `json:"payment_terms,omitempty"`
 	SiDrNo             *string              `json:"si_dr_no,omitempty"`
 	Notes              *string              `json:"notes,omitempty"`
+	DeliveryRemarks    *string              `json:"delivery_remarks,omitempty"`
 	ProgressStatus     string               `json:"progress_status"`
 	InvoicingStatus    bool                 `json:"invoicing_status"`
 	TemplateCode       string               `json:"template_code"`
@@ -139,6 +140,7 @@ type saleBody struct {
 	PaymentTerms       *string                  `json:"payment_terms"`
 	SiDrNo             *string                  `json:"si_dr_no"`
 	Notes              *string                  `json:"notes"`
+	DeliveryRemarks    *string                  `json:"delivery_remarks"`
 	ProgressStatus     string                   `json:"progress_status"`
 	TemplateCode       string                   `json:"template_code"`
 	SalesCategory      *string                  `json:"sales_category"`
@@ -406,6 +408,7 @@ func loadSale(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Sale
 		  s.partner_id, p.company_name, s.pic_user_id, s.pic_name,
 		  s.location_id, l.location_name, s.project_id, s.project_name,
 		  s.due_date, s.terms_of_payment, s.payment_terms, s.si_dr_no, s.notes,
+		  s.delivery_remarks,
 		  s.progress_status, s.invoicing_status, s.template_code, s.sales_category,
 		  s.source_sales_order_id,
 		  s.subtotal::float8, s.tax_total::float8, s.grand_total::float8,
@@ -423,6 +426,7 @@ func loadSale(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Sale
 		&sale.PartnerID, &sale.CustomerName, &sale.PicUserID, &sale.PicName,
 		&sale.LocationID, &sale.LocationName, &sale.ProjectID, &sale.ProjectName,
 		&dueDate, &sale.TermsOfPayment, &sale.PaymentTerms, &sale.SiDrNo, &sale.Notes,
+		&sale.DeliveryRemarks,
 		&sale.ProgressStatus, &sale.InvoicingStatus, &sale.TemplateCode, &sale.SalesCategory,
 		&sale.SourceSalesOrderID,
 		&sale.Subtotal, &sale.TaxTotal, &sale.GrandTotal,
@@ -628,15 +632,15 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			  tenant_id, order_date, date_seq, sales_no,
 			  tax_type_id, currency_id, partner_id, pic_user_id, pic_name,
 			  location_id, project_id, project_name,
-			  due_date, terms_of_payment, payment_terms, si_dr_no, notes,
+			  due_date, terms_of_payment, payment_terms, si_dr_no, notes, delivery_remarks,
 			  progress_status, template_code, sales_category, source_sales_order_id,
 			  subtotal, tax_total, grand_total, created_by_user_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
 			returning id`,
 			tu.TenantID, orderDate, dateSeq, salesNo,
 			body.TaxTypeID, body.CurrencyID, body.PartnerID, body.PicUserID, strings.TrimSpace(body.PicName),
 			body.LocationID, body.ProjectID, body.ProjectName,
-			dueDate, body.TermsOfPayment, body.PaymentTerms, body.SiDrNo, body.Notes,
+			dueDate, body.TermsOfPayment, body.PaymentTerms, body.SiDrNo, body.Notes, body.DeliveryRemarks,
 			defaultProgress(body.ProgressStatus), templateCode, body.SalesCategory, body.SourceSalesOrderID,
 			subtotal, taxTotal, grandTotal, tu.AppUserID).Scan(&id)
 		if err != nil {
@@ -840,13 +844,15 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			  pic_user_id = $5, pic_name = $6, location_id = $7,
 			  project_id = $8, project_name = $9,
 			  due_date = $10, terms_of_payment = $11, payment_terms = $12, si_dr_no = $13, notes = $14,
-			  progress_status = $15, template_code = $16, sales_category = $17, source_sales_order_id = $18,
-			  subtotal = $19, tax_total = $20, grand_total = $21, updated_at = now()
-			where id = $22 and tenant_id = $23 and deleted_at is null`,
+			  delivery_remarks = $15,
+			  progress_status = $16, template_code = $17, sales_category = $18, source_sales_order_id = $19,
+			  subtotal = $20, tax_total = $21, grand_total = $22, updated_at = now()
+			where id = $23 and tenant_id = $24 and deleted_at is null`,
 			orderDate, body.TaxTypeID, body.CurrencyID, body.PartnerID,
 			body.PicUserID, strings.TrimSpace(body.PicName), body.LocationID,
 			body.ProjectID, body.ProjectName,
 			dueDate, body.TermsOfPayment, body.PaymentTerms, body.SiDrNo, body.Notes,
+			body.DeliveryRemarks,
 			defaultProgress(body.ProgressStatus), templateCode, body.SalesCategory, body.SourceSalesOrderID,
 			subtotal, taxTotal, grandTotal, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {

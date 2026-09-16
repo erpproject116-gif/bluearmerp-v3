@@ -25,6 +25,7 @@ export type SalesHoldPayload = {
   payment_terms: string;
   si_dr_no: string;
   notes: string;
+  delivery_remarks?: string;
   progress_status: string;
   template_code: SalesTemplateCode;
   sales_category: string;

@@ -108,6 +108,7 @@ export type SalesDetail = {
   payment_terms?: string | null;
   si_dr_no?: string | null;
   notes?: string | null;
+  delivery_remarks?: string | null;
   custom_values?: Record<string, unknown>;
   progress_status: string;
   invoicing_status?: boolean;
@@ -283,6 +284,7 @@ export function SalesModal(props: Props) {
   const [paymentTerms, setPaymentTerms] = createSignal("");
   const [siDrNo, setSiDrNo] = createSignal("");
   const [notes, setNotes] = createSignal("");
+  const [deliveryRemarks, setDeliveryRemarks] = createSignal("");
   const [progressStatus, setProgressStatus] = createSignal("unconfirmed");
   const [salesCategory, setSalesCategory] = createSignal("");
   const [salesCategories, setSalesCategories] = createSignal<Array<{ code: string; name: string }>>([]);
@@ -330,6 +332,7 @@ export function SalesModal(props: Props) {
     payment_terms: paymentTerms(),
     si_dr_no: siDrNo(),
     notes: notes(),
+    delivery_remarks: deliveryRemarks(),
     progress_status: progressStatus(),
     sales_category: salesCategory(),
     source_sales_order_id: sourceSalesOrderId(),
@@ -359,6 +362,7 @@ export function SalesModal(props: Props) {
       payment_terms: d.payment_terms,
       si_dr_no: d.si_dr_no,
       notes: d.notes,
+      delivery_remarks: d.delivery_remarks,
       progress_status: d.progress_status,
       template_code: d.template_code,
       sales_category: d.sales_category,
@@ -404,6 +408,7 @@ export function SalesModal(props: Props) {
     setPaymentTerms(ed.payment_terms ?? "");
     setSiDrNo(ed.si_dr_no ?? "");
     setNotes(ed.notes ?? "");
+    setDeliveryRemarks(ed.delivery_remarks ?? "");
     setProgressStatus(ed.progress_status || "unconfirmed");
     setSalesCategory(ed.sales_category ?? "");
     setSourceSalesOrderId(ed.source_sales_order_id ?? null);
@@ -511,6 +516,7 @@ export function SalesModal(props: Props) {
     setPaymentTerms(payload.payment_terms);
     setSiDrNo(payload.si_dr_no);
     setNotes(payload.notes);
+    setDeliveryRemarks(payload.delivery_remarks ?? "");
     setProgressStatus(payload.progress_status || "unconfirmed");
     setSalesCategory(payload.sales_category);
     setSourceSalesOrderId(payload.source_sales_order_id);
@@ -593,6 +599,7 @@ export function SalesModal(props: Props) {
       setPaymentTerms("");
       setSiDrNo("");
       setNotes("");
+      setDeliveryRemarks("");
       setProgressStatus("unconfirmed");
       setSalesCategory("");
       setSourceSalesOrderId(null);
@@ -684,6 +691,10 @@ export function SalesModal(props: Props) {
   const applySalesOrderLines = async (picked: PickedSalesOrderLine[]) => {
     if (picked.length === 0) return;
     const first = picked[0];
+    if (first.order_date) {
+      setOrderDate(first.order_date);
+      void loadPreview(first.order_date);
+    }
     setPartnerId(first.partner_id);
     setCustomerLabel(first.customer_name);
     setLocationId(first.location_id);
@@ -692,15 +703,26 @@ export function SalesModal(props: Props) {
     setCurrencyId(first.currency_id);
     setPicName(first.pic_name);
     setSourceSalesOrderId(first.sales_order_id);
-    if (first.payment_terms) setPaymentTerms(first.payment_terms);
-    if (first.notes) setNotes(first.notes);
+    setDueDate(first.due_date ?? "");
+    setPaymentTerms(first.payment_terms ?? "");
+    setNotes(first.notes ?? "");
+    setDeliveryRemarks(first.delivery_remarks ?? "");
     if (first.project_id) {
       setProjectId(first.project_id);
       setProjectLabel(first.project_name ?? "");
       setProjectName(first.project_name ?? "");
     } else if (first.project_name) {
+      setProjectId(null);
       setProjectName(first.project_name);
       setProjectLabel(first.project_name);
+    } else {
+      setProjectId(null);
+      setProjectLabel("");
+      setProjectName("");
+    }
+    if (!salesCategory()) {
+      const general = salesCategories().find((c) => c.code === "general");
+      setSalesCategory(general?.code ?? salesCategories()[0]?.code ?? "");
     }
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
@@ -734,7 +756,7 @@ export function SalesModal(props: Props) {
       ),
       loadSourceCustomValues(`/api/v1/sales-order/sales-orders/${first.sales_order_id}`, first.sales_order_id),
     ]);
-    toast.success("Sales Order lines loaded. Attachments and matching custom fields copy when you Save.");
+    toast.success("Sales Order lines loaded. Header fields, attachments, and matching custom fields copy when you Save.");
   };
 
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
@@ -908,6 +930,7 @@ export function SalesModal(props: Props) {
         si_dr_no: siDrNo(),
         payment_terms: paymentTerms(),
         notes: notes(),
+        delivery_remarks: deliveryRemarks(),
         project_id: projectId(),
         progress_status: status,
       },
@@ -954,6 +977,7 @@ export function SalesModal(props: Props) {
       payment_terms: paymentTerms() || null,
       si_dr_no: siDrNo() || null,
       notes: notes() || null,
+      delivery_remarks: deliveryRemarks() || null,
       progress_status: status,
       template_code: templateCode(),
       sales_category: salesCategory() || null,
@@ -1339,50 +1363,63 @@ export function SalesModal(props: Props) {
             />
           )}
         </ModalField>
-        <Show when={sourceAttachPreview()}>
-          {(preview) => (
-            <div class="col-span-full rounded-lg border border-stroke bg-slate-50 px-3 py-2">
-              <p class="text-sm font-medium text-text-primary">{preview().label}</p>
-              <p class="mt-0.5 text-xs text-text-secondary">
-                Read-only preview from the source document. Files copy onto this sale when you Save.
-              </p>
-              <ul class="mt-2 space-y-1">
-                <For each={preview().files}>
-                  {(file) => (
-                    <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
-                      <span class="truncate text-text-primary">
-                        {file.file_name}
-                        <span class="ml-2 text-xs text-text-secondary">{formatFileSize(file.size_bytes)}</span>
-                      </span>
-                      <button
-                        type="button"
-                        class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
-                        onClick={() =>
-                          void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
-                            if (!ok) toast.warning("Couldn't download the file. Try again.");
-                          })
-                        }
-                      >
-                        Download
-                      </button>
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </div>
-          )}
-        </Show>
-        <AttachmentsField
-          scope="sales"
-          formOpen={props.open}
-          docId={effectiveEditing()?.id}
-          label={uiLabel("selling.attachments_sales")}
-          required={
-            policyRequiresAttachment(processPolicy.data, "sales") &&
-            isConfirmingProgress("sales", progressStatus())
-          }
-          onCountChange={setAttachmentCount}
-        />
+        <div class="col-span-full grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Show
+            when={sourceAttachPreview()}
+            fallback={
+              <div class="rounded-lg border border-dashed border-stroke bg-slate-50/80 px-3 py-3">
+                <p class="text-sm font-medium text-text-primary">From source document</p>
+                <p class="mt-0.5 text-xs text-text-secondary">
+                  Use Load Slip to preview Quotation/Sales Order files here. They copy onto this sale when you Save.
+                </p>
+              </div>
+            }
+          >
+            {(preview) => (
+              <div class="rounded-lg border border-brand-200 bg-brand-50/40 px-3 py-3">
+                <p class="text-sm font-medium text-text-primary">{preview().label}</p>
+                <p class="mt-0.5 text-xs text-text-secondary">
+                  Read-only from the source. Files copy onto this sale when you Save.
+                </p>
+                <ul class="mt-2 space-y-1">
+                  <For each={preview().files}>
+                    {(file) => (
+                      <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span class="truncate text-text-primary">
+                          {file.file_name}
+                          <span class="ml-2 text-xs text-text-secondary">{formatFileSize(file.size_bytes)}</span>
+                        </span>
+                        <button
+                          type="button"
+                          class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
+                          onClick={() =>
+                            void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
+                              if (!ok) toast.warning("Couldn't download the file. Try again.");
+                            })
+                          }
+                        >
+                          Download
+                        </button>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </div>
+            )}
+          </Show>
+          <AttachmentsField
+            scope="sales"
+            formOpen={props.open}
+            docId={effectiveEditing()?.id}
+            label={uiLabel("selling.attachments_sales")}
+            emptyUnsavedHint="Upload extra files for this sale (max 25 MB each). Uploads when you Save."
+            required={
+              policyRequiresAttachment(processPolicy.data, "sales") &&
+              isConfirmingProgress("sales", progressStatus())
+            }
+            onCountChange={setAttachmentCount}
+          />
+        </div>
         <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
           {(m) => (
             <textarea
@@ -1392,6 +1429,18 @@ export function SalesModal(props: Props) {
               placeholder={m.placeholder}
               disabled={m.disabled}
               onInput={(e) => setNotes(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="delivery_remarks" fallbackLabel="Delivery remarks" span="full">
+          {(m) => (
+            <textarea
+              class={inputClass}
+              rows={2}
+              value={deliveryRemarks()}
+              placeholder={m.placeholder}
+              disabled={m.disabled}
+              onInput={(e) => setDeliveryRemarks(e.currentTarget.value)}
             />
           )}
         </ModalField>

@@ -22,6 +22,7 @@ export type SalesDetail = {
   payment_terms?: string | null;
   si_dr_no?: string | null;
   notes?: string | null;
+  delivery_remarks?: string | null;
   progress_status: string;
   invoicing_status: boolean;
   template_code: string;

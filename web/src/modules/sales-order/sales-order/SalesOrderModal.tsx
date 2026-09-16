@@ -964,47 +964,60 @@ export function SalesOrderModal(props: Props) {
             />
           )}
         </ModalField>
-        <Show when={sourceAttachPreview()}>
-          {(preview) => (
-            <div class="col-span-full rounded-lg border border-stroke bg-slate-50 px-3 py-2">
-              <p class="text-sm font-medium text-text-primary">{preview().label}</p>
-              <p class="mt-0.5 text-xs text-text-secondary">
-                Read-only preview from the source document. Files copy onto this sales order when you Save.
-              </p>
-              <ul class="mt-2 space-y-1">
-                <For each={preview().files}>
-                  {(file) => (
-                    <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
-                      <span class="truncate text-text-primary">
-                        {file.file_name}
-                        <span class="ml-2 text-xs text-text-secondary">{formatFileSize(file.size_bytes)}</span>
-                      </span>
-                      <button
-                        type="button"
-                        class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
-                        onClick={() =>
-                          void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
-                            if (!ok) toast.warning("Couldn't download the file. Try again.");
-                          })
-                        }
-                      >
-                        Download
-                      </button>
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </div>
-          )}
-        </Show>
-        <AttachmentsField
-          scope="sales-order/sales-orders"
-          formOpen={props.open}
-          docId={effectiveEditing()?.id}
-          label={uiLabel("selling.attachments_sales_order")}
-          required={policyRequiresAttachment(processPolicy.data, "sales_order")}
-          onCountChange={setAttachmentCount}
-        />
+        <div class="col-span-full grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Show
+            when={sourceAttachPreview()}
+            fallback={
+              <div class="rounded-lg border border-dashed border-stroke bg-slate-50/80 px-3 py-3">
+                <p class="text-sm font-medium text-text-primary">From source document</p>
+                <p class="mt-0.5 text-xs text-text-secondary">
+                  Use Load Slip to preview Quotation files here. They copy onto this sales order when you Save.
+                </p>
+              </div>
+            }
+          >
+            {(preview) => (
+              <div class="rounded-lg border border-brand-200 bg-brand-50/40 px-3 py-3">
+                <p class="text-sm font-medium text-text-primary">{preview().label}</p>
+                <p class="mt-0.5 text-xs text-text-secondary">
+                  Read-only from the source. Files copy onto this sales order when you Save.
+                </p>
+                <ul class="mt-2 space-y-1">
+                  <For each={preview().files}>
+                    {(file) => (
+                      <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span class="truncate text-text-primary">
+                          {file.file_name}
+                          <span class="ml-2 text-xs text-text-secondary">{formatFileSize(file.size_bytes)}</span>
+                        </span>
+                        <button
+                          type="button"
+                          class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
+                          onClick={() =>
+                            void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
+                              if (!ok) toast.warning("Couldn't download the file. Try again.");
+                            })
+                          }
+                        >
+                          Download
+                        </button>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </div>
+            )}
+          </Show>
+          <AttachmentsField
+            scope="sales-order/sales-orders"
+            formOpen={props.open}
+            docId={effectiveEditing()?.id}
+            label={uiLabel("selling.attachments_sales_order")}
+            emptyUnsavedHint="Upload extra files for this sales order (max 25 MB each). Uploads when you Save."
+            required={policyRequiresAttachment(processPolicy.data, "sales_order")}
+            onCountChange={setAttachmentCount}
+          />
+        </div>
         <ModalField settings={byKey} fieldKey="delivery_remarks" fallbackLabel="Delivery remarks" span="full">
           {(m) => (
             <textarea

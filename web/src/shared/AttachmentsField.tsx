@@ -21,6 +21,8 @@ type Props = {
   /** When false, staged files are cleared (pass the parent modal open flag). */
   formOpen?: boolean;
   label?: string;
+  /** Optional extra class on the outer panel (e.g. layout grid children). */
+  class?: string;
   /** Hint shown when there are no files yet on an unsaved document. */
   emptyUnsavedHint?: string;
   /** When true, shows required styling and messaging. */
@@ -170,8 +172,8 @@ export function AttachmentsField(props: Props) {
   return (
     <div
       class={`rounded-lg border px-4 py-3 ${
-        showRequiredWarning() ? "border-amber-400 bg-amber-50" : "border-stroke bg-slate-50"
-      }`}
+        showRequiredWarning() ? "border-amber-400 bg-amber-50" : "border-stroke bg-white"
+      } ${props.class ?? ""}`}
     >
       <div class="mb-2 flex items-center justify-between">
         <span class="text-sm font-medium text-text-primary">

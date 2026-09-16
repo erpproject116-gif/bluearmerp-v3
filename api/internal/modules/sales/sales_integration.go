@@ -32,6 +32,7 @@ type openSalesOrderLineRow struct {
 	SalesOrderID         int64   `json:"sales_order_id"`
 	SalesOrderLineID     int64   `json:"sales_order_line_id"`
 	DateNoDisplay        string  `json:"date_no_display"`
+	OrderDate            string  `json:"order_date"`
 	SalesOrderNo         string  `json:"sales_order_no"`
 	ProgressStatus       string  `json:"progress_status"`
 	CustomerName         string  `json:"customer_name"`
@@ -43,8 +44,10 @@ type openSalesOrderLineRow struct {
 	PicName              string  `json:"pic_name"`
 	ProjectID            *int64  `json:"project_id,omitempty"`
 	ProjectName          string  `json:"project_name"`
+	DueDate              *string `json:"due_date,omitempty"`
 	PaymentTerms         string  `json:"payment_terms"`
 	Notes                string  `json:"notes"`
+	DeliveryRemarks      string  `json:"delivery_remarks"`
 	ItemID               *int64  `json:"item_id,omitempty"`
 	ItemCode             string  `json:"item_code"`
 	ItemName             string  `json:"item_name"`
@@ -107,7 +110,8 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  p.company_name, so.location_id, l.location_name, so.partner_id,
 			  so.tax_type_id, so.currency_id, so.pic_name,
 			  so.project_id, coalesce(so.project_name, ''),
-			  coalesce(so.payment_terms, ''), coalesce(so.notes, ''),
+			  so.due_date,
+			  coalesce(so.payment_terms, ''), coalesce(so.notes, ''), coalesce(so.delivery_remarks, ''),
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  coalesce(rel.released, 0)::float8,
 			  coalesce(dr.delivered, 0)::float8,
@@ -155,12 +159,13 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row openSalesOrderLineRow
 			var orderDate time.Time
+			var dueDate *time.Time
 			var dateSeq int
 			if err := rows.Scan(
 				&row.SalesOrderID, &row.SalesOrderLineID, &orderDate, &dateSeq, &row.SalesOrderNo, &row.ProgressStatus,
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
-				&row.ProjectID, &row.ProjectName, &row.PaymentTerms, &row.Notes,
+				&row.ProjectID, &row.ProjectName, &dueDate, &row.PaymentTerms, &row.Notes, &row.DeliveryRemarks,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
 				&row.ReleasedQty, &row.DeliveredQty, &row.BalanceQty,
 				&row.UnitID, &row.UnitCode,
@@ -169,6 +174,8 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
 				return
 			}
+			row.OrderDate = dateToStr(orderDate)
+			row.DueDate = datePtrToStr(dueDate)
 			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
 			out = append(out, row)
 		}
