@@ -94,6 +94,13 @@ export function OpenBalancePaymentPage(props: Props) {
   }));
 
   const rows = createMemo(() => list.data?.rows ?? []);
+  const hasFilters = createMemo(() => Boolean(q().trim() || dueFrom() || dueTo()));
+  const clearFilters = () => {
+    setQ("");
+    setDueFrom("");
+    setDueTo("");
+    setPage(1);
+  };
   const totalPages = createMemo(() => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize)));
 
   const selectedRows = createMemo(() => rows().filter((r) => selected()[rowKey(r)]));
@@ -159,7 +166,7 @@ export function OpenBalancePaymentPage(props: Props) {
         <div class="min-w-[14rem] flex-1">
           <input
             class={inputClass}
-            placeholder="Search partner or document no."
+            placeholder="Search partner, payable no., vendor invoice no., or date-no"
             value={q()}
             onInput={(e) => {
               setQ(e.currentTarget.value);
@@ -201,11 +208,24 @@ export function OpenBalancePaymentPage(props: Props) {
         >
           Search (F3)
         </button>
+        <Show when={hasFilters()}>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50"
+            onClick={clearFilters}
+          >
+            Clear filters
+          </button>
+        </Show>
         <label class="inline-flex items-center gap-2 text-sm text-text-secondary">
           <input type="checkbox" checked={allowMulti()} onChange={(e) => setAllowMulti(e.currentTarget.checked)} />
           Multi-partner bundling
         </label>
       </div>
+
+      <p class="text-xs text-text-secondary">
+        Rows are newest first by occurrence date. Open balances only — fully paid purchases do not appear here.
+      </p>
 
       <Show when={list.isError}>
         <p class="text-sm text-red-600">{(list.error as Error)?.message ?? "Failed to load."}</p>
@@ -217,7 +237,7 @@ export function OpenBalancePaymentPage(props: Props) {
             <tr>
               <th class="px-2 py-2" />
               <th class="px-2 py-2">{props.side === "ar" ? "Receivable No." : "Payable No."}</th>
-              <th class="px-2 py-2">Occurrence</th>
+              <th class="px-2 py-2 whitespace-nowrap">Occurrence ↓</th>
               <th class="px-2 py-2">Due Date</th>
               <th class="px-2 py-2">Account</th>
               <th class="px-2 py-2">Code</th>
@@ -235,7 +255,16 @@ export function OpenBalancePaymentPage(props: Props) {
             <Show when={!list.isFetching && rows().length === 0}>
               <tr>
                 <td colSpan={14} class="px-3 py-8 text-center text-text-secondary">
-                  No open balances.
+                  <Show
+                    when={hasFilters()}
+                    fallback="No open balances. Saved purchases with an unpaid balance appear here automatically."
+                  >
+                    No open balances match these filters.{" "}
+                    <button type="button" class="font-medium text-brand-700 underline" onClick={clearFilters}>
+                      Clear filters
+                    </button>{" "}
+                    to see the newest unpaid purchases.
+                  </Show>
                 </td>
               </tr>
             </Show>
