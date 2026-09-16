@@ -26,7 +26,7 @@ export async function openNewRow(page: Page) {
   // Lists use "+ New row" or document-specific labels ("New Quotation", "New Sales Order", …).
   const btn = page
     .getByRole("button", {
-      name: /^(\+\s*)?New(\s+row)?$|^New (Quotation|Sales Order|Sales Invoice|Sales|Sale|Purchase Request|Purchase Order|Purchases|Purchase|Official Receipt|Payment Voucher|RFQ|partner|item|lead|account)/i,
+      name: /^(\+\s*)?New(\s+row)?$|^New (Quotation|Sales Order|Sales Invoice|Sales|Sale|Purchase Request|Purchase Order|Purchase Receive|Purchases|Purchase Invoice|Purchase|Official Receipt|Payment Voucher|RFQ|partner|item|lead|account)/i,
     })
     .first();
   await expect(btn).toBeVisible({ timeout: 20000 });
@@ -77,7 +77,13 @@ export async function fillLookup(page: Page, label: RegExp | string, query: stri
 /** Fill native date input associated with a Field / ModalField label. */
 export async function fillDate(page: Page, label: RegExp | string, ymd: string) {
   const labelRe = typeof label === "string" ? new RegExp(`^${label}`, "i") : label;
-  const field = page.locator("label").filter({ hasText: labelRe }).first();
+  // Prefer the label that actually wraps a date input. Forms often also show a
+  // "Date-no" display field that matches /^Date/i but has no <input type="date">.
+  const field = page
+    .locator("label")
+    .filter({ hasText: labelRe })
+    .filter({ has: page.locator('input[type="date"]') })
+    .first();
   await expect(field).toBeVisible({ timeout: 15000 });
   const input = field.locator('input[type="date"]');
   await input.fill(ymd);
