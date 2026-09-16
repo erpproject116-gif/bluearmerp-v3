@@ -20,7 +20,7 @@ on:
 jobs:
   unit:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,6 +39,15 @@ jobs:
           npm run e2e:routes:extract
           npm run e2e:coverage:manifest
           npm test
+      - name: Web performance budget
+        working-directory: web
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8080
+          VITE_SUPABASE_URL: http://127.0.0.1
+          VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used
+        run: |
+          npm run build
+          npm run e2e:perf:budget
 
   smoke:
     runs-on: ubuntu-latest

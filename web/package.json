@@ -21,6 +21,8 @@
     "e2e:tickets:draft": "node e2e/scripts/draft-support-tickets.mjs",
     "e2e:tickets:submit": "node e2e/scripts/submit-support-tickets.mjs",
     "e2e:report": "node e2e/scripts/generate-run-report.mjs",
+    "e2e:reconcile": "node e2e/scripts/reconcile-mutations.mjs",
+    "e2e:perf:budget": "node e2e/scripts/assert-bundle-budget.mjs",
     "dead-code": "ts-prune -p tsconfig.app.json",
     "export:help-corpus": "vitest run src/modules/help-assistant/exportHelpCorpus.test.ts src/modules/help-assistant/exportGoldenQueries.test.ts",
     "format:cms-articles": "vitest run src/modules/cms/formatCmsArticles.export.test.ts"

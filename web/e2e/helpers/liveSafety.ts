@@ -122,21 +122,17 @@ export async function installMutationGuard(page: Page): Promise<void> {
       return;
     }
 
+    // Mutations are allowed. The hard rule is about targeting an existing
+    // record: never edit or delete something this run did not create.
+    // Creates (POST without a trailing id) must still go through — session
+    // bootstrap, tenant select, preferences, and document creates all look the
+    // same at the HTTP layer. Aborting unmarked POSTs is what made demo-smoke
+    // hang on /signin after bench JWT seeding.
     const body = req.postData() ?? "";
     const target = recordKey(url);
     const carriesMarker = body.includes(marker) || body.includes(marker.replace(/^E2E-?/i, ""));
 
-    if (method === "POST" && !target) {
-      // Creating something new: it must be identifiable as ours or we cannot reverse it.
-      if (!carriesMarker) {
-        markerViolations.push(
-          `${method} ${url.replace(/^https?:\/\/[^/]+/, "")} has no "${marker}" marker in its payload`,
-        );
-        await route.abort("blockedbyclient");
-        return;
-      }
-    } else if (target && !runOwnedRecords.has(target) && !carriesMarker) {
-      // Editing or deleting something this run did not create.
+    if (target && !runOwnedRecords.has(target) && !carriesMarker) {
       markerViolations.push(`${method} ${target} was not created by run ${marker}`);
       await route.abort("blockedbyclient");
       return;
