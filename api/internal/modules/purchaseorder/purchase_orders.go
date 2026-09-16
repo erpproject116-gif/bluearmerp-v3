@@ -199,6 +199,7 @@ func registerPurchaseOrderRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/purchase-orders/{id}/pdf", getPurchaseOrderPDF(pool))
 	r.With(auth.RequirePermission("comms.send", auth.AccessWrite)).Post("/purchase-orders/{id}/send-email", postPurchaseOrderSendEmail(pool))
 	r.With(auth.RequireSubmit("purchase_order.purchase_orders_confirm")).Patch("/purchase-orders/{id}/confirm", confirmPurchaseOrder(pool))
+	r.With(auth.RequireSubmit("purchase_order.purchase_orders_confirm")).Patch("/purchase-orders/{id}/unconfirm", unconfirmPurchaseOrder(pool))
 	r.Patch("/purchase-orders/{id}", updatePurchaseOrder(pool))
 	r.Delete("/purchase-orders/{id}", deletePurchaseOrder(pool))
 }
@@ -1208,6 +1209,87 @@ func confirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.confirm", "po_purchase_order", &id, before, po)
 		response.OK(w, po, "Confirmed.")
+	}
+}
+
+// unconfirmPurchaseOrder returns a confirmed PO to draft so headers/lines can be edited again.
+// Blocked once any line has been received or billed, or a goods receipt exists for the PO.
+func unconfirmPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+
+		before, err := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if before.Status != "confirmed" {
+			response.Err(w, http.StatusConflict, "Only confirmed purchase orders can be unconfirmed.", "ERR_CONFLICT")
+			return
+		}
+
+		for _, ln := range before.Lines {
+			if ln.ReceivedQty > 0 || ln.BilledQty > 0 {
+				response.Err(w, http.StatusConflict, "Cannot unconfirm: this purchase order already has received or billed quantity.", "ERR_CONFLICT")
+				return
+			}
+		}
+
+		var grCount int
+		if err := pool.QueryRow(r.Context(), `
+			select count(*) from public.gr_goods_receipts
+			where tenant_id = $1 and purchase_order_id = $2 and status <> 'cancelled'`,
+			tu.TenantID, id).Scan(&grCount); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to check goods receipts.", "ERR_INTERNAL")
+			return
+		}
+		if grCount > 0 {
+			response.Err(w, http.StatusConflict, "Cannot unconfirm: a goods receipt already exists for this purchase order.", "ERR_CONFLICT")
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to unconfirm.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		tag, err := tx.Exec(r.Context(), `
+			update public.po_purchase_orders
+			set status = 'draft', progress_status = 'unconfirmed', updated_at = now()
+			where id = $1 and tenant_id = $2 and deleted_at is null and status = 'confirmed'`,
+			id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusConflict, "Purchase order could not be unconfirmed.", "ERR_CONFLICT")
+			return
+		}
+
+		if _, err := tx.Exec(r.Context(), `
+			delete from public.pr_purchase_request_slip_lines sl
+			using public.po_purchase_order_lines pol
+			where sl.purchase_request_line_id = pol.purchase_request_line_id
+			  and pol.purchase_order_id = $1
+			  and sl.slip_type = 'purchase_order'
+			  and sl.slip_ref = $2`,
+			id, before.PurchaseOrderNo); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to clear purchase-request slip links.", "ERR_INTERNAL")
+			return
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to unconfirm.", "ERR_INTERNAL")
+			return
+		}
+
+		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase_order.unconfirm", "po_purchase_order", &id, before, po)
+		response.OK(w, po, "Unconfirmed.")
 	}
 }
 

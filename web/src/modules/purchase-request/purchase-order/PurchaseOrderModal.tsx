@@ -65,6 +65,7 @@ import {
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
 import { LoadingText } from "../../../shared/LoadingText";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
+import { unconfirmPurchaseOrder } from "../../../shared/usePurchaseOrderList";
 
 type PoDraftPayload = {
   order_date: string;
@@ -124,6 +125,7 @@ export type PurchaseOrderDetail = {
     description?: string | null;
     qty: number;
     received_qty?: number;
+    billed_qty?: number;
     unit_id?: number | null;
     unit_code?: string | null;
     unit_non_vat: number;
@@ -254,7 +256,13 @@ export function PurchaseOrderModal(props: Props) {
 
   const isCreate = () => props.open && effectivePoId() == null;
   const isDraft = () => isCreate() || detail()?.status === "draft";
-  const readOnly = () => Boolean(props.readOnly) || !isDraft();
+  // Only lock after detail has loaded as non-draft (or deleted view). While loading an
+  // existing draft, keep Save visible so reopening a PO does not look empty-footer.
+  const readOnly = () => Boolean(props.readOnly) || (detail() != null && !isDraft());
+  const canUnconfirm = () =>
+    !props.readOnly &&
+    detail()?.status === "confirmed" &&
+    !(detail()?.lines ?? []).some((ln) => (ln.received_qty ?? 0) > 0 || (ln.billed_qty ?? 0) > 0);
   const selectedTaxType = () => taxTypes().find((t) => t.id === taxTypeId()) ?? null;
 
   createEffect(() => {
@@ -558,6 +566,21 @@ export function PurchaseOrderModal(props: Props) {
     }
   };
 
+  const unconfirm = async () => {
+    const id = effectivePoId();
+    if (!id || !canUnconfirm()) return;
+    setSaving(true);
+    const res = await unconfirmPurchaseOrder(id);
+    setSaving(false);
+    if (!res.success) {
+      handleSaveResult(res, toast);
+      return;
+    }
+    toast.success("Purchase order unconfirmed. You can edit and Save changes again.");
+    await loadDetail(id);
+    props.onSaved();
+  };
+
   const save = async () => {
     if (!isDraft()) return;
     setFieldErrors({});
@@ -714,6 +737,35 @@ export function PurchaseOrderModal(props: Props) {
       <FormErrorSummary errors={fieldErrors} />
       <Show when={loading()}>
         <LoadingText class="text-sm text-text-secondary" as="p" />
+      </Show>
+      <Show when={!loading() && detail() && !isDraft() && !props.readOnly}>
+        <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <p>
+            This purchase order is <span class="font-medium capitalize">{statusLabel(detail()!.status)}</span> — editing
+            is locked (no Save). Confirm turns a draft into a firm order.
+          </p>
+          <Show
+            when={canUnconfirm()}
+            fallback={
+              <p class="mt-1 text-amber-900/80">
+                It already has received or billed quantity, so it cannot be unconfirmed. Create a new PO or adjust via
+                Purchase Receive / Purchases.
+              </p>
+            }
+          >
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <p class="text-amber-900/90">Unconfirm to return it to draft and enable Save.</p>
+              <button
+                type="button"
+                class="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+                disabled={saving()}
+                onClick={() => void unconfirm()}
+              >
+                {saving() ? "Unconfirming…" : "Unconfirm to edit"}
+              </button>
+            </div>
+          </Show>
+        </div>
       </Show>
       <draft.DraftBanner />
       <Show when={!loading() && (isCreate() || po())}>
