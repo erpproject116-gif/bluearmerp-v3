@@ -3,7 +3,7 @@ import { expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { benchAuthAvailable, seedBenchSession } from "./benchAuth";
+import { benchAuthAvailable, seedBenchSession, supabaseAuthStorageKey } from "./benchAuth";
 import { assertApiReachable } from "./apiReady";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,7 +54,19 @@ export async function demoSignIn(page: Page) {
   if (benchToken) {
     await seedBenchSession(page, benchToken);
     await page.goto("/app/inventory/partners");
-    await page.waitForURL("**/app/**", { timeout: 20000 });
+    try {
+      await page.waitForURL("**/app/**", { timeout: 20000 });
+    } catch {
+      throw new Error(
+        `Bench JWT sign-in did not reach /app (still on ${page.url()}). ` +
+          `Expected localStorage key ${supabaseAuthStorageKey(process.env.VITE_SUPABASE_URL || "http://127.0.0.1")}.`,
+      );
+    }
+    if (page.url().includes("/signin")) {
+      throw new Error(
+        `Bench JWT was rejected; landed on sign-in (${page.url()}). Check mint-bench-jwt + seed-ci-bench-auth.sql.`,
+      );
+    }
     await assertApiReachable(page);
     return;
   }

@@ -1,20 +1,22 @@
+/**
+ * Deep journey — posting GR via serial/lot receive station.
+ * Live: requires E2E_TIER=posting + E2E_ALLOW_MUTATIONS=1.
+ *
+ * This path posts inventory (and may auto-create a purchase invoice). It does
+ * NOT claim the same GL proof as buy-path-new-purchases.spec.ts unless the
+ * auto-created SI carries invoice_journal_entry_id — that is checked softly.
+ *
+ * Needs tenant-profile openPoCodes of confirmed POs still open for receive.
+ */
 import { test, expect } from "./helpers/fixtures";
 import { ensureSignedIn } from "./helpers/storageAuth";
 import { assertApiReachable } from "./helpers/apiReady";
-import {
-  openNewRow,
-  expectModalHeading,
-  cancelEntityModal,
-  softSkip,
-} from "./helpers/entityForm";
-import { mutationsAllowed, currentTier } from "./helpers/liveSafety";
+import { softSkip } from "./helpers/entityForm";
+import { mutationsAllowed, currentTier, writeEvidence } from "./helpers/liveSafety";
 import { loadTenantProfile } from "./helpers/tenantProfile";
 import { ledgerAppend } from "./helpers/mutationLedger";
+import { assertSerialsExist, getSupplierInvoice, listSupplierInvoicesByQ } from "./helpers/buyPath";
 
-/**
- * Deep journey — posting GR. Live: requires E2E_TIER=posting + E2E_ALLOW_MUTATIONS=1.
- * Re-open seed: `psql "$DATABASE_URL" -f scripts/reset-demo-po-gr-open.sql`
- */
 test.describe("Goods receipt receive", () => {
   test("@read-only receive page shell loads and PO lookup is visible", async ({ page }, testInfo) => {
     test.setTimeout(60_000);
@@ -31,7 +33,7 @@ test.describe("Goods receipt receive", () => {
     await expect(page.getByLabel(/Purchase order/i)).toBeVisible({ timeout: 10000 });
   });
 
-  test("@posting @mutating create draft GR from open PO, paste serials, and post", async ({ page }) => {
+  test("@posting @mutating create draft GR from open PO, paste serials, and post", async ({ page }, testInfo) => {
     test.skip(
       !mutationsAllowed() || currentTier() !== "posting",
       "Set E2E_TIER=posting, E2E_ALLOW_MUTATIONS=1, E2E_RUN_CONFIRM=<id>",
@@ -39,10 +41,15 @@ test.describe("Goods receipt receive", () => {
     test.setTimeout(120_000);
 
     const profile = loadTenantProfile();
-    const candidates = (profile.openPoCodes?.length ? profile.openPoCodes : ["DEMOGR902", "DEMOGR903"]).map(
-      (po, i) => ({ po, serials: i === 0 ? 5 : 3 }),
-    );
-    const serialPrefix = `E2E-GR-${Date.now()}`;
+    const openCodes = (profile.openPoCodes ?? []).filter(Boolean);
+    if (!openCodes.length) {
+      softSkip(
+        testInfo,
+        "tenant profile openPoCodes is empty — confirm a PO and add its purchase_order_no to tenant-profile.local.json",
+      );
+    }
+    const candidates = openCodes.map((po) => ({ po, serials: 1 }));
+    const serialPrefix = `E2E-GR-${Date.now()}-SN`;
 
     await ensureSignedIn(page);
     await page.goto("/app/inventory/serial-lot/receive");
@@ -72,10 +79,10 @@ test.describe("Goods receipt receive", () => {
     }
 
     if (!used) {
-      test.skip(true, "No open PO in tenant profile (set openPoCodes or reset demo GR seed)");
+      softSkip(testInfo, `No open PO matched openPoCodes=${openCodes.join(",")}`);
     }
 
-    const serials = Array.from({ length: used!.serials }, (_, i) => `${serialPrefix}-${String(i + 1).padStart(2, "0")}`);
+    const serials = Array.from({ length: used!.serials }, (_, i) => `${serialPrefix}${String(i + 1).padStart(2, "0")}`);
     await expect(page.getByText(new RegExp(`PO:.*${used!.po}`))).toBeVisible();
 
     await page.getByRole("button", { name: "Paste serials" }).click();
@@ -100,5 +107,27 @@ test.describe("Goods receipt receive", () => {
     await page.getByPlaceholder(/Search PO no|Search/i).fill(used!.po);
     await expect(page.getByRole("cell", { name: used!.po })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText("Posted").first()).toBeVisible({ timeout: 10000 });
+
+    const serialRows = await assertSerialsExist(page, serialPrefix, used!.serials);
+
+    // Soft GL note: auto SI may exist; only record JE when present — do not fail the GR path on it.
+    let autoSiJe: number | null = null;
+    const invoices = await listSupplierInvoicesByQ(page, used!.po);
+    if (invoices[0]) {
+      const detail = await getSupplierInvoice(page, invoices[0].id).catch(() => null);
+      autoSiJe = detail?.invoice_journal_entry_id ?? null;
+    }
+
+    writeEvidence("buy-path-serial-lot-gr.json", {
+      at: new Date().toISOString(),
+      po: used!.po,
+      serialPrefix,
+      serials: serialRows.map((r) => r.serial_no),
+      autoSupplierInvoiceJeId: autoSiJe,
+      note:
+        autoSiJe != null
+          ? "Auto SI after GR carries a journal entry id"
+          : "GR posted stock/serials; GL proof for AP remains on New Purchases Completed path",
+    });
   });
 });

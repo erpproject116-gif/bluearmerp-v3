@@ -28,7 +28,7 @@ on:
       specs:
         description: "Spec files to run"
         required: true
-        default: "e2e/business-chains.spec.ts"
+        default: "e2e/master-preflight.spec.ts e2e/buy-path-new-purchases.spec.ts e2e/goods-receipt-receive.spec.ts"
         type: string
       reverse:
         description: "Reverse the records this run creates when it finishes"

@@ -1,9 +1,11 @@
 {
+  "_comment": "Sanitized demo defaults for CI. For live Cordova, copy to tenant-profile.local.json (gitignored) and set real lookups + openPoCodes.",
   "name": "demo-default",
   "tenantCode": "DEMO000",
   "partnerQuery": "Seda",
   "supplierQuery": "Seda",
   "itemQuery": "Sofa",
+  "serialItemQuery": "Sofa",
   "locationQuery": "Head",
   "openPoCodes": ["DEMOGR902", "DEMOGR903"]
 }

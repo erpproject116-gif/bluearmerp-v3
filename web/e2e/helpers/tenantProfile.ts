@@ -13,9 +13,13 @@ export type TenantProfile = {
   partnerQuery: string;
   supplierQuery: string;
   itemQuery: string;
+  /** Prefer this for buy-path serial posting when set (falls back to itemQuery). */
+  serialItemQuery?: string;
   locationQuery: string;
   /** Open POs for GR receive (optional) */
   openPoCodes?: string[];
+  /** Branch label shown in the shell when known (documentation only). */
+  expectedBranch?: string;
 };
 
 const DEFAULT_PROFILE: TenantProfile = {
