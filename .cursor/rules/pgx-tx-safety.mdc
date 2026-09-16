@@ -1,0 +1,23 @@
+---
+description: pgx tx safety — never Exec while a Query cursor is open
+globs:
+  - api/**/*.go
+---
+
+# pgx transaction / connection safety
+
+- On a **single `pgx.Tx`**, never call `Exec` / `Query` / `QueryRow` while another `Query` result set is still open.
+- Pattern: **collect** into a slice inside `for rows.Next()`, then `rows.Close()` (and check `rows.Err()`), **then** write.
+- Same rule for `RETURNING` inserts: collect returned ids first (see `bill_receive.go` and GR post serials).
+- Prefer `pool.Query` → collect → close → follow-up queries when iterating many ids (avoids holding a pool connection while acquiring another).
+
+# Warranty / unique upserts
+
+- `crm_warranty_assets` has partial unique `(tenant_id, serial_no) WHERE status <> 'void'`.
+- Sales/receipt warranty upserts must use:
+  `on conflict (tenant_id, serial_no) where (status <> 'void')`
+- Do **not** rely only on `(tenant_id, sales_line_id, serial_no)` — that misses existing serial rows and 500s New Sales.
+
+# Regression
+
+- Keep `crm/warranty_sync_test.go` source guards green when editing warranty sync.

@@ -1337,6 +1337,10 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 				locID := locationID
+				var createdUnits []struct {
+					unitID   int64
+					serialNo string
+				}
 				for unitRows.Next() {
 					var unitID int64
 					var serialNo string
@@ -1345,12 +1349,10 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 						response.Err(w, http.StatusInternalServerError, "Failed to read serial unit.", "ERR_INTERNAL")
 						return
 					}
-					if err := inventory.InsertSerialEvent(r.Context(), tx, tu.TenantID, unitID, "received", nil, &locID, "goods_receipt", grID, &userID); err != nil {
-						unitRows.Close()
-						response.Err(w, http.StatusInternalServerError, "Failed to record serial event.", "ERR_INTERNAL")
-						return
-					}
-					_ = serialNo
+					createdUnits = append(createdUnits, struct {
+						unitID   int64
+						serialNo string
+					}{unitID: unitID, serialNo: serialNo})
 				}
 				if err := unitRows.Err(); err != nil {
 					unitRows.Close()
@@ -1358,6 +1360,13 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 				unitRows.Close()
+				for _, u := range createdUnits {
+					if err := inventory.InsertSerialEvent(r.Context(), tx, tu.TenantID, u.unitID, "received", nil, &locID, "goods_receipt", grID, &userID); err != nil {
+						response.Err(w, http.StatusInternalServerError, "Failed to record serial event.", "ERR_INTERNAL")
+						return
+					}
+					_ = u.serialNo
+				}
 			}
 
 			if ln.TrackLot && ln.ItemID != nil {
