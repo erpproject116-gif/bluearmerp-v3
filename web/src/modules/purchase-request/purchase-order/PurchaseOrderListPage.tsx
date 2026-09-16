@@ -334,6 +334,15 @@ export default function PurchaseOrderListPage() {
     lifecycle: lifecycle.filter(),
   }));
 
+  /** New POs are draft + unconfirmed. Leave filters on Completed / Confirmed / Open POs
+   * and the row looks like it never saved. Always return to the full list after a write. */
+  const afterWrite = () => {
+    setStatusFilter("");
+    setOperationalFilter("");
+    setPage(1);
+    invalidate();
+  };
+
   const onConfirm = async (row: PurchaseOrderRow) => {
     const res = await confirmPurchaseOrder(row.id);
     if (!res.success) {
@@ -346,7 +355,7 @@ export default function PurchaseOrderListPage() {
       return;
     }
     toast.success("Purchase order confirmed. Progress is now Completed — you can bill it from Purchases Load Slip.");
-    invalidate();
+    afterWrite();
   };
 
   const openPo = async (row: PurchaseOrderRow) => {
@@ -366,6 +375,24 @@ export default function PurchaseOrderListPage() {
           Voucher. Separate Receive history is legacy only.
         </p>
       </InlineTip>
+      <Show when={(statusFilter() !== "" || operationalFilter() !== "") && (list.data?.total ?? 0) === 0 && !list.isFetching}>
+        <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          Nothing matches these filters. New purchase orders start as{" "}
+          <span class="font-medium">Unconfirmed</span> drafts — set Progress and Fulfillment to All to see them.
+          The <span class="font-medium">Open POs</span> tab only lists confirmed orders.
+          <button
+            type="button"
+            class="ml-2 font-medium text-brand-700 underline"
+            onClick={() => {
+              setStatusFilter("");
+              setOperationalFilter("");
+              setPage(1);
+            }}
+          >
+            Clear filters
+          </button>
+        </div>
+      </Show>
       <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
@@ -544,12 +571,12 @@ export default function PurchaseOrderListPage() {
       <CreateFromPrModal
         open={fromPrOpen()}
         onClose={() => setFromPrOpen(false)}
-        onCreated={invalidate}
+        onCreated={afterWrite}
       />
       <CreateFromSupplierQuotationModal
         open={fromSqOpen()}
         onClose={() => setFromSqOpen(false)}
-        onCreated={invalidate}
+        onCreated={afterWrite}
       />
 
       <PurchaseOrderModal
@@ -562,7 +589,7 @@ export default function PurchaseOrderListPage() {
           setEditingPoId(null);
           setViewingDeleted(false);
         }}
-        onSaved={invalidate}
+        onSaved={afterWrite}
       />
       <lifecycle.Dialog />
       <lifecycle.BulkDialog />
