@@ -11,6 +11,7 @@ import {
   confirmPurchaseOrder,
   createPurchaseOrderFromRequest,
   createPurchaseOrderFromSupplierQuotation,
+  unconfirmPurchaseOrder,
   useInvalidatePurchaseOrders,
   usePurchaseOrderList,
   type PurchaseOrderRow,
@@ -358,6 +359,16 @@ export default function PurchaseOrderListPage() {
     afterWrite();
   };
 
+  const onUnconfirm = async (row: PurchaseOrderRow) => {
+    const res = await unconfirmPurchaseOrder(row.id);
+    if (!res.success) {
+      handleSaveResult(res, toast);
+      return;
+    }
+    toast.success("Purchase order unconfirmed. Open it to edit and Save changes.");
+    afterWrite();
+  };
+
   const openPo = async (row: PurchaseOrderRow) => {
     const deleted = await lifecycle.resolveDeleted(row.id);
     setViewingDeleted(deleted);
@@ -442,7 +453,24 @@ export default function PurchaseOrderListPage() {
             render: (r) => (
               <Show
                 when={r.status === "draft"}
-                fallback={<span>{docProgressStatusLabel(r.progress_status)}</span>}
+                fallback={
+                  <Show
+                    when={r.status === "confirmed" && (r.pct_received ?? 0) <= 0 && (r.pct_billed ?? 0) <= 0}
+                    fallback={<span>{docProgressStatusLabel(r.progress_status)}</span>}
+                  >
+                    <button
+                      type="button"
+                      class="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                      title="Return to draft so you can edit and Save"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onUnconfirm(r);
+                      }}
+                    >
+                      Confirmed → Unconfirm
+                    </button>
+                  </Show>
+                }
               >
                 <button
                   type="button"
@@ -469,7 +497,26 @@ export default function PurchaseOrderListPage() {
             header: "Confirm",
             sortable: false,
             render: (r) => (
-              <Show when={r.status === "draft"} fallback={<span class="text-text-secondary">—</span>}>
+              <Show
+                when={r.status === "draft"}
+                fallback={
+                  <Show
+                    when={r.status === "confirmed" && (r.pct_received ?? 0) <= 0 && (r.pct_billed ?? 0) <= 0}
+                    fallback={<span class="text-text-secondary">—</span>}
+                  >
+                    <button
+                      type="button"
+                      class="text-amber-800 hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onUnconfirm(r);
+                      }}
+                    >
+                      Unconfirm
+                    </button>
+                  </Show>
+                }
+              >
                 <button
                   type="button"
                   class="text-brand-600 hover:underline"

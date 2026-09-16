@@ -85,6 +85,12 @@ export async function confirmPurchaseOrder(purchaseOrderId: number) {
   });
 }
 
+export async function unconfirmPurchaseOrder(purchaseOrderId: number) {
+  return apiFetch(`/api/v1/purchase-order/purchase-orders/${purchaseOrderId}/unconfirm`, {
+    method: "PATCH",
+  });
+}
+
 export async function createPurchaseOrderFromRequest(purchaseRequestId: number) {
   return apiFetch<PurchaseOrderRow>(`/api/v1/purchase-order/purchase-orders/from-purchase-request/${purchaseRequestId}`, {
     method: "POST",
