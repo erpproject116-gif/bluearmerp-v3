@@ -53,13 +53,14 @@ jobs:
           (cd api && go run ./cmd/migrate)
           # Hard-fail catalog/demo identity seeds — silent FK errors previously left DEMO000 unusable.
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/seed.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-base-config.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
-          psql "$DATABASE_URL" -f scripts/seed-demo-quotations.sql || true
-          psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql || true
-          psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql || true
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-quotations.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-sales.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-finance-ap.sql || true
 
       - name: Build and start API
