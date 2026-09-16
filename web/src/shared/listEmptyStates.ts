@@ -53,7 +53,7 @@ const BY_PATH: { match: RegExp; state: ListEmptyState }[] = [
     state: {
       headline: "No purchase orders yet.",
       nextStep:
-        "Choose New to order stock from a supplier. Confirm the order and it becomes available to receive under Purchases.",
+        "Choose New to order stock from a supplier. Confirm the order and it becomes available to receive under Purchases. New orders start as Unconfirmed drafts — if the list looks empty, set Progress and Fulfillment back to All (Open POs only shows confirmed ones).",
     },
   },
   {
