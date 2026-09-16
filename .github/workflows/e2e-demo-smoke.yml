@@ -48,7 +48,7 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
           for f in api/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
           # Align with production: record schema_migrations via migrate CLI
-          cd api && go run ./cmd/migrate && cd ..
+          (cd api && go run ./cmd/migrate)
           psql "$DATABASE_URL" -f supabase/seed.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
           psql "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql

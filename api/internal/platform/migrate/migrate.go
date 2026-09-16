@@ -49,10 +49,15 @@ func EnsureTrackingTable(ctx context.Context, conn *pgx.Conn) error {
 }
 
 // Pending returns migration filenames not yet recorded in schema_migrations.
+// The tracking table is created when missing so a fresh database reports every
+// migration as pending instead of failing on the lookup.
 func Pending(ctx context.Context, conn *pgx.Conn, from string) ([]string, error) {
 	migDir := Dir()
 	if migDir == "" {
 		return nil, fmt.Errorf("migrations directory not found")
+	}
+	if err := EnsureTrackingTable(ctx, conn); err != nil {
+		return nil, err
 	}
 	files, err := filepath.Glob(filepath.Join(migDir, "*.sql"))
 	if err != nil {

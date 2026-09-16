@@ -50,10 +50,29 @@ jobs:
 
       - name: Build web
         working-directory: web
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8080
+          VITE_SUPABASE_URL: http://127.0.0.1
+          VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used-by-smoke
         run: npm run build
+
+      # Playwright skips its own webServer under CI, so serve the build here.
+      # Without this the smoke test loads nothing and can only ever fail.
+      - name: Start preview server
+        working-directory: web
+        run: npm run preview -- --host 127.0.0.1 --port 4173 &
+
+      - name: Wait for preview
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4173 >/dev/null && exit 0
+            sleep 2
+          done
+          echo "Preview server did not start" && exit 1
 
       - name: Sign-in page smoke
         working-directory: web
         run: npx playwright test e2e/smoke.spec.ts e2e/coverage-manifest.spec.ts --project=chromium -g "@smoke"
         env:
           CI: "true"
+          E2E_BASE_URL: http://127.0.0.1:4173
