@@ -34,8 +34,11 @@ func TestSalesUsesDeliveryBalance(t *testing.T) {
 
 func TestBalanceExpr_releaseMode(t *testing.T) {
 	got := balanceExpr(false)
-	if !strings.Contains(got, "ln.qty") || !strings.Contains(got, "slip.sold") || !strings.Contains(got, "track_serial") {
+	if !strings.Contains(got, "ln.qty") || !strings.Contains(got, "slip.sold") {
 		t.Fatalf("unexpected legacy balance expr: %q", got)
+	}
+	if strings.Contains(got, "track_serial") || strings.Contains(got, "rel.released") {
+		t.Fatalf("legacy balance should not special-case serial release: %q", got)
 	}
 }
 
@@ -47,11 +50,11 @@ func TestBalanceExpr_deliveryMode(t *testing.T) {
 }
 
 func TestZeroBalanceMessage(t *testing.T) {
-	if !strings.Contains(strings.ToLower(zeroBalanceMessage(false)), "ready to invoice") {
+	if !strings.Contains(strings.ToLower(zeroBalanceMessage(false)), "nothing left to invoice") {
 		t.Fatal("legacy message mismatch")
 	}
-	if !strings.Contains(zeroBalanceMessage(false), "Pick List") {
-		t.Fatal("legacy message should mention Pick List")
+	if strings.Contains(zeroBalanceMessage(false), "Pick List") {
+		t.Fatal("legacy zero-balance message should not push Pick List for serials")
 	}
 	if !strings.Contains(strings.ToLower(zeroBalanceMessage(true)), "delivery") {
 		t.Fatal("delivery message mismatch")
@@ -60,8 +63,17 @@ func TestZeroBalanceMessage(t *testing.T) {
 
 func TestSoMustBeCompletedForSaleMessage(t *testing.T) {
 	msg := soMustBeCompletedForSaleMessage()
-	if !strings.Contains(msg, "Completed") || !strings.Contains(strings.ToLower(msg), "in progress") {
-		t.Fatalf("expected completed-gate message, got %q", msg)
+	if !strings.Contains(msg, "In progress") || !strings.Contains(msg, "Completed") {
+		t.Fatalf("expected confirm-or-complete gate message, got %q", msg)
+	}
+}
+
+func TestSoReadyForInvoice(t *testing.T) {
+	if soReadyForInvoice("unconfirmed") {
+		t.Fatal("unconfirmed should not invoice")
+	}
+	if !soReadyForInvoice("in_progress") || !soReadyForInvoice("completed") {
+		t.Fatal("in_progress and completed should invoice")
 	}
 }
 

@@ -229,8 +229,11 @@ func AssistFromMessage(field, msg string) *Assist {
 		return &Assist{
 			Code: SASINeedsPickRelease, Field: field,
 			Title:  "This item isn’t ready to invoice yet",
-			Detail: "Serial items must be picked on a Sales Order first. Open the order → Pick List → release qty and scan the serial, then use Load Slip on this sale.",
-			Actions: []AssistAction{{Label: "Pick items on Sales Order", Href: hrefSalesOrders}},
+			Detail: "If your warehouse uses split Pick List / Delivery, release and scan serials on the Sales Order first. Otherwise confirm the order and scan serials on this sale.",
+			Actions: []AssistAction{
+				{Label: "Open Sales Orders", Href: hrefSalesOrders},
+				{Label: "Process policies", Href: "/app/user-management/process-policies"},
+			},
 		}
 	case strings.Contains(lower, "delivery note") && strings.Contains(lower, "invoice"):
 		return &Assist{
@@ -239,12 +242,12 @@ func AssistFromMessage(field, msg string) *Assist {
 			Detail: "Post a Delivery note for the completed sales order, then use Load Slip on this sale.",
 			Actions: []AssistAction{{Label: "Open Sales Orders", Href: hrefSalesOrders}},
 		}
-	case strings.Contains(lower, "not ready to invoice") && strings.Contains(lower, "completed"):
+	case strings.Contains(lower, "not ready to invoice") || strings.Contains(lower, "isn’t ready to invoice"):
 		return &Assist{
 			Code: SASONotCompletedForSale, Field: field,
-			Title:  "Sales order is not completed yet",
-			Detail: "Set the sales order progress to Completed (Confirm or In progress is not enough), then try again.",
-			Actions: []AssistAction{{Label: "Complete the Sales Order", Href: hrefSalesOrders}},
+			Title:  "Confirm the sales order first",
+			Detail: "Set the sales order Progress to In progress or Completed, then use Load Slip on this sale.",
+			Actions: []AssistAction{{Label: "Open Sales Orders", Href: hrefSalesOrders}},
 		}
 	case strings.Contains(lower, "nothing left to invoice"):
 		return &Assist{

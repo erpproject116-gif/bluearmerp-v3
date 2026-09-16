@@ -107,13 +107,13 @@ describe("handleSaveResult", () => {
     );
     expect(action).toHaveBeenCalledWith(
       expect.objectContaining({
-        actionLabel: "Pick items on Sales Order",
+        actionLabel: "Open Sales Orders",
         href: "/app/sales-order/sales-orders",
       }),
     );
     const msg = action.mock.calls[0][0].message as string;
     expect(msg.toLowerCase()).not.toContain("use the button to continue");
-    expect(msg.toLowerCase()).toMatch(/pick list|load slip|follow the button/);
+    expect(msg.toLowerCase()).toMatch(/pick list|load slip|scan serial|follow the button|sales order/);
   });
 });
 

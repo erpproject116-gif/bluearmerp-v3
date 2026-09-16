@@ -144,7 +144,7 @@ export function SalesOrderLinePickerModal(props: Props) {
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
       onApply={confirm}
-      emptyHint="No Completed Sales Order lines with open quantity. Set the SO Progress to Completed on Sales Orders first (Confirm / In progress is not enough). Fully invoiced lines are hidden. Serial-tracked items may still need Pick List release on Save. Check your user data scope includes that customer."
+      emptyHint="No open Sales Order lines to invoice. Confirm the SO (In progress or Completed) first. Fully invoiced lines are hidden. Scan serials on this sale when you Save — Pick List is optional in legacy combined mode."
       columns={[
         { key: "date_no", header: "Date-No.", cell: (r) => String(r.date_no_display ?? "") },
         { key: "so", header: "SO No.", cell: (r) => String(r.sales_order_no ?? "") },

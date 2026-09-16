@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -61,7 +62,7 @@ type openSalesOrderLineRow struct {
 func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		// New Sales Load Slip: only Completed SOs may be invoiced (Confirm / In progress is not enough).
+		// New Sales Load Slip: Confirmed (in progress) or Completed SOs with open qty.
 		p := httputil.ParseListParams(r, "order_date", map[string]string{
 			"order_date":     "so.order_date",
 			"sales_order_no": "so.sales_order_no",
@@ -71,9 +72,9 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		pageSize := openlines.PageSize(r, p.PageSize)
 		offset := (p.Page - 1) * pageSize
 
-		// Open residual = ordered − already invoiced (serial release still enforced on Save).
+		// Open residual = ordered − already invoiced (legacy auto-release on Save).
 		where := `so.tenant_id = $1 and so.deleted_at is null
-			and so.progress_status = 'completed'
+			and so.progress_status in ('in_progress', 'completed')
 			and (ln.qty - coalesce(slip.sold, 0)) > 0.0001`
 		args := []any{tu.TenantID}
 		argN := 2
@@ -182,21 +183,29 @@ func balanceExpr(useDelivery bool) string {
 	if useDelivery {
 		return "coalesce(dr.delivered, 0) - coalesce(slip.sold, 0)"
 	}
-	// Legacy: ordered residual for normal items; released residual for serial-tracked lines.
-	return `case when coalesce(i.track_serial, false)
-		then coalesce(rel.released, 0) - coalesce(slip.sold, 0)
-		else ln.qty - coalesce(slip.sold, 0) end`
+	// Legacy / skip-friendly: invoice against ordered residual for all items
+	// (including serial). Serial scan happens on the sale; Pick List is optional.
+	return "ln.qty - coalesce(slip.sold, 0)"
+}
+
+func soReadyForInvoice(progress string) bool {
+	switch strings.TrimSpace(progress) {
+	case "in_progress", "completed":
+		return true
+	default:
+		return false
+	}
 }
 
 func soMustBeCompletedForSaleMessage() string {
-	return "This sales order is not ready to invoice yet. Set its progress to Completed first (Confirm or In progress is not enough)."
+	return "This sales order isn’t ready to invoice yet. Confirm it first (set Progress to In progress or Completed), then use Load Slip."
 }
 
 func zeroBalanceMessage(useDelivery bool) string {
 	if useDelivery {
 		return "Nothing is ready to invoice from delivery yet. Post a Delivery note for the completed sales order first, then use Load Slip."
 	}
-	return "This item isn’t ready to invoice yet. For serial items, open the sales order → Pick List → release qty and scan the serial, then use Load Slip on this sale."
+	return "Nothing left to invoice on this sales order line. Lower the qty, or pick a line that still has open quantity."
 }
 
 func salesOrderLineQtyError(balance, qty float64) string {
@@ -307,7 +316,7 @@ func validateSalesOrderConversion(ctx context.Context, pool *pgxpool.Pool, tenan
 			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = "That sales order line wasn't found. Reload Load Slip and pick the line again."
 			continue
 		}
-		if progress != "completed" {
+		if !soReadyForInvoice(progress) {
 			errs[fmt.Sprintf("lines[%d].source_sales_order_line_id", i)] = soMustBeCompletedForSaleMessage()
 			continue
 		}
@@ -392,13 +401,14 @@ func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 	var locationID int64
 	var itemID *int64
 	var released, sold float64
-	var trackInventory, trackSerial bool
+	var trackInventory bool
+	var progress string
 	err := tx.QueryRow(ctx, `
 		select so.location_id, ln.item_id,
 		  coalesce(rel.released, 0)::float8,
 		  coalesce(slip.sold, 0)::float8,
 		  coalesce(i.track_inventory_qty, false),
-		  coalesce(i.track_serial, false)
+		  so.progress_status
 		from public.so_sales_order_lines ln
 		join public.so_sales_orders so on so.id = ln.sales_order_id
 		left join public.inv_items i on i.id = ln.item_id
@@ -413,11 +423,13 @@ func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 		  where slip_type = 'sales'
 		  group by sales_order_line_id
 		) slip on slip.sales_order_line_id = ln.id
-		where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null
-		  and so.progress_status = 'completed'`,
+		where ln.id = $1 and so.tenant_id = $2 and so.deleted_at is null`,
 		salesOrderLineID, tenantID,
-	).Scan(&locationID, &itemID, &released, &sold, &trackInventory, &trackSerial)
+	).Scan(&locationID, &itemID, &released, &sold, &trackInventory, &progress)
 	if err != nil {
+		return errors.New(soMustBeCompletedForSaleMessage())
+	}
+	if !soReadyForInvoice(progress) {
 		return errors.New(soMustBeCompletedForSaleMessage())
 	}
 
@@ -428,9 +440,6 @@ func ensureLegacyReleaseForInvoice(ctx context.Context, tx pgx.Tx, tenantID, use
 	shortfall := invoiceQty - availableReleased
 	if shortfall <= 0.0001 {
 		return nil
-	}
-	if trackSerial {
-		return errors.New("Serial items need Pick List release on the sales order before invoicing. Open the order → Pick List → release and scan, then use Load Slip.")
 	}
 
 	var releaseLineID int64

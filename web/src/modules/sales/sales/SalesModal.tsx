@@ -1440,9 +1440,8 @@ export function SalesModal(props: Props) {
             }}
           />
           <p class="text-xs text-text-secondary">
-            <strong>Load Slip</strong> copies open lines from a Sales Order (or quote). Prefer this for serial items
-            after Pick List. Click <strong>Save</strong> to create the invoice, then use the Invoice tab for
-            accounting.
+            <strong>Load Slip</strong> copies open lines from a confirmed Sales Order (or quote). Scan serials on
+            this sale when you Save. Click <strong>Save</strong> to create the invoice, then use the Invoice tab.
           </p>
           <ol class="mt-2 list-decimal space-y-0.5 pl-4 text-xs text-text-secondary">
             <li>
@@ -1450,10 +1449,15 @@ export function SalesModal(props: Props) {
               <A href="/app/sales-order/sales-orders" class="font-medium text-brand-700 hover:underline">
                 Sales Order
               </A>{" "}
-              (set progress to Completed when required).
+              (Progress: In progress or Completed).
             </li>
-            <li>On that order, open <strong>Pick List</strong> — release qty and scan serials.</li>
-            <li>Return here → <strong>Load Slip → Sales Order</strong> → Save.</li>
+            <li>
+              Optional: use <strong>Pick List</strong> only if your process policies require split release /
+              delivery.
+            </li>
+            <li>
+              Return here → <strong>Load Slip → Sales Order</strong> → scan serials if needed → Save.
+            </li>
           </ol>
           <Show when={!props.editing}>
             <button
