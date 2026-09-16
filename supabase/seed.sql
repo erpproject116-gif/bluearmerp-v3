@@ -23,11 +23,21 @@ cross join (values ('core'), ('inventory'), ('quotation'), ('user_management'), 
 where t.company_code = 'DEMO000'
 on conflict (tenant_id, module_code) do update set is_enabled = true;
 
-insert into public.users (tenant_id, email, full_name, status)
-select t.id, 'demo@demo.bluearm.local', 'Demo Owner', 'active'
+-- users.tenant_role defaults to 'member' and FK's tenant_roles; roles are not
+-- created by a tenant-insert trigger — provision normally calls seed_tenant_defaults.
+select public.seed_tenant_defaults(t.id)
+from public.tenants t
+where t.company_code = 'DEMO000';
+
+insert into public.users (tenant_id, email, full_name, status, tenant_role)
+select t.id, 'demo@demo.bluearm.local', 'Demo Owner', 'active', 'store_admin'
 from public.tenants t
 where t.company_code = 'DEMO000'
-on conflict (tenant_id, email) do nothing;
+on conflict (tenant_id, email) do update
+set
+  full_name = excluded.full_name,
+  status = excluded.status,
+  tenant_role = excluded.tenant_role;
 
 update public.tenants t
 set owner_user_id = u.id

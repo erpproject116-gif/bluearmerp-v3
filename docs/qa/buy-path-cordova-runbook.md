@@ -73,6 +73,24 @@ npm run e2e:reconcile -- --reverse
 
 Or GitHub Actions: workflow **E2E live mutating** (`workflow_dispatch`) with the same specs, then download the evidence artifact and reconcile.
 
+### GitHub Actions dispatch checklist
+
+| Input / secret | Value |
+|----------------|--------|
+| `tier` | `posting` |
+| `confirm` | Fresh `E2E-BUY-YYYYMMDD-N` (must not reuse an artifact name) |
+| `specs` | `e2e/master-preflight.spec.ts e2e/buy-path-new-purchases.spec.ts e2e/goods-receipt-receive.spec.ts` |
+| `reverse` | `true` |
+| Repo secret `E2E_BASE_URL` | `https://app.bluearmerp.com` |
+| Repo secret `E2E_EXPECT_TENANT_CODE` | `TRIAL-90f0ad` |
+| Repo secret `E2E_TENANT_ID` | `32` |
+| Repo secret `E2E_API_BASE` | Live API origin used by reconcile |
+| Auth | `E2E_BENCH_TOKEN` **or** storage-state export wired for Actions (Cordova user) |
+
+The workflow lives on the default branch after the harness merge. Until `E2E_*` secrets exist under the `live-mutating` environment, run the local block above with `e2e/.auth/user.json` instead of Actions.
+
+**Post-run (mandatory):** download artifact `live-mutating-<token>` → `npm run e2e:reconcile -- --reverse` with the same token → exit 0 = no residue.
+
 ## Stop conditions
 
 - Wrong tenant / auth loss

@@ -51,11 +51,12 @@ jobs:
           for f in api/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
           # Align with production: record schema_migrations via migrate CLI
           (cd api && go run ./cmd/migrate)
-          psql "$DATABASE_URL" -f supabase/seed.sql
-          psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
-          psql "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
-          psql "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
-          psql "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
+          # Hard-fail catalog/demo identity seeds — silent FK errors previously left DEMO000 unusable.
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/seed.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-purchase-requests.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/seed-demo-po-gr-open.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-quotations.sql || true
           psql "$DATABASE_URL" -f scripts/seed-demo-sales-orders.sql || true
           psql "$DATABASE_URL" -f scripts/seed-demo-sales.sql || true
@@ -65,7 +66,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
           SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
-          CORS_ORIGIN: http://localhost:4173
+          # Preview serves on 127.0.0.1:4173 (E2E_BASE_URL). localhost ≠ 127.0.0.1 for CORS.
+          CORS_ORIGIN: http://127.0.0.1:4173,http://localhost:4173
           PORT: "8080"
           MIGRATIONS_DIR: api/migrations
         run: |
@@ -100,13 +102,18 @@ jobs:
       - name: Build web for preview
         working-directory: web
         env:
-          VITE_API_BASE_URL: http://localhost:8080
+          VITE_API_BASE_URL: http://127.0.0.1:8080
           VITE_SUPABASE_URL: http://127.0.0.1
           VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used-for-bench-jwt
         run: npm run build
 
       - name: Start preview server
         working-directory: web
+        # Bake-time VITE_* is already in the bundle; export here so preview's empty-env warning is silent.
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8080
+          VITE_SUPABASE_URL: http://127.0.0.1
+          VITE_SUPABASE_ANON_KEY: ci-anon-key-not-used-for-bench-jwt
         run: npm run preview -- --host 127.0.0.1 --port 4173 &
 
       - name: Wait for preview
