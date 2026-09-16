@@ -191,14 +191,14 @@ func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if dueFrom != "" {
 			if _, err := time.Parse("2006-01-02", dueFrom); err == nil {
-				sql += fmt.Sprintf(` and s.due_date >= $%d::date`, argN)
+				sql += fmt.Sprintf(` and coalesce(s.due_date, s.order_date) >= $%d::date`, argN)
 				args = append(args, dueFrom)
 				argN++
 			}
 		}
 		if dueTo != "" {
 			if _, err := time.Parse("2006-01-02", dueTo); err == nil {
-				sql += fmt.Sprintf(` and s.due_date <= $%d::date`, argN)
+				sql += fmt.Sprintf(` and coalesce(s.due_date, s.order_date) <= $%d::date`, argN)
 				args = append(args, dueTo)
 				argN++
 			}
@@ -214,19 +214,26 @@ func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
 		orderCol := "s.order_date"
 		if col, ok := map[string]string{
 			"occurrence_date": "s.order_date",
+			"s.order_date":     "s.order_date",
 			"due_date":        "s.due_date",
+			"s.due_date":      "s.due_date",
 			"balance":         "balance",
 			"partner_name":    "p.company_name",
+			"p.company_name":  "p.company_name",
 			"item_code":       "s.sales_no",
+			"s.sales_no":      "s.sales_no",
 		}[p.Sort]; ok {
 			orderCol = col
 		}
 		orderDir := "desc"
-		if strings.EqualFold(p.Order, "asc") {
+		if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("order")), "asc") {
 			orderDir = "asc"
 		}
 		offset := httputil.Offset(p)
-		sql += fmt.Sprintf(` order by %s %s, s.id desc limit $%d offset $%d`, orderCol, orderDir, argN, argN+1)
+		sql += fmt.Sprintf(
+			` order by %s %s, s.date_seq %s, s.id %s limit $%d offset $%d`,
+			orderCol, orderDir, orderDir, orderDir, argN, argN+1,
+		)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), sql, args...)
@@ -283,6 +290,7 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 		args := []any{tu.TenantID}
 		argN := 2
 		siWhere := `si.tenant_id = $1 and si.deleted_at is null
+			  and si.partner_id is not null
 			  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001`
 		exWhere := `e.tenant_id = $1 and e.deleted_at is null and e.payment_status = 'unpaid'
 			  and e.partner_id is not null and (e.amount + e.tax_amount) > 0.0001`
@@ -293,14 +301,28 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 		if qText != "" {
-			siWhere += fmt.Sprintf(` and (coalesce(si.invoice_no,'') ilike $%d or p.company_name ilike $%d or p.partner_code ilike $%d)`, argN, argN, argN)
-			exWhere += fmt.Sprintf(` and (e.expense_no ilike $%d or coalesce(p.company_name,e.vendor_name) ilike $%d or p.partner_code ilike $%d)`, argN, argN, argN)
+			siWhere += fmt.Sprintf(` and (
+				coalesce(si.invoice_no,'') ilike $%d
+				or coalesce(si.vendor_invoice_no,'') ilike $%d
+				or coalesce(si.reference,'') ilike $%d
+				or coalesce(si.notes,'') ilike $%d
+				or coalesce(p.company_name,'') ilike $%d
+				or coalesce(p.partner_code,'') ilike $%d
+				or (to_char(si.invoice_date, 'YYYY-MM-DD') || '-' || lpad(coalesce(si.date_seq, 1)::text, 3, '0')) ilike $%d
+			)`, argN, argN, argN, argN, argN, argN, argN)
+			exWhere += fmt.Sprintf(` and (
+				e.expense_no ilike $%d
+				or coalesce(p.company_name,e.vendor_name) ilike $%d
+				or coalesce(p.partner_code,'') ilike $%d
+				or coalesce(e.description,'') ilike $%d
+			)`, argN, argN, argN, argN)
 			args = append(args, "%"+qText+"%")
 			argN++
 		}
 		if dueFrom != "" {
 			if _, err := time.Parse("2006-01-02", dueFrom); err == nil {
-				siWhere += fmt.Sprintf(` and si.due_date >= $%d::date`, argN)
+				// Null due_date falls back to invoice/expense date so filtered lists still show new purchases.
+				siWhere += fmt.Sprintf(` and coalesce(si.due_date, si.invoice_date) >= $%d::date`, argN)
 				exWhere += fmt.Sprintf(` and e.expense_date >= $%d::date`, argN)
 				args = append(args, dueFrom)
 				argN++
@@ -308,7 +330,7 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if dueTo != "" {
 			if _, err := time.Parse("2006-01-02", dueTo); err == nil {
-				siWhere += fmt.Sprintf(` and si.due_date <= $%d::date`, argN)
+				siWhere += fmt.Sprintf(` and coalesce(si.due_date, si.invoice_date) <= $%d::date`, argN)
 				exWhere += fmt.Sprintf(` and e.expense_date <= $%d::date`, argN)
 				args = append(args, dueTo)
 				argN++
@@ -329,7 +351,7 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 			    coalesce(si.project_name, proj.project_name) as project_name, null::text as department_name,
 			    coalesce(si.notes, '') as remark
 			  from public.fin_supplier_invoices si
-			  join public.inv_partners p on p.id = si.partner_id and p.tenant_id = si.tenant_id
+			  left join public.inv_partners p on p.id = si.partner_id and p.tenant_id = si.tenant_id
 			  left join public.quo_currencies cur on cur.id = si.currency_id
 			  left join public.inv_locations loc on loc.id = si.location_id
 			  left join public.inv_projects proj on proj.id = si.project_id
@@ -341,7 +363,7 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 			    coalesce(nullif(p.company_name, ''), e.vendor_name),
 			    0, '', '', null::text, null::text, coalesce(e.description, '')
 			  from public.fin_expenses e
-			  join public.inv_partners p on p.id = e.partner_id and p.tenant_id = e.tenant_id
+			  left join public.inv_partners p on p.id = e.partner_id and p.tenant_id = e.tenant_id
 			  where %s
 			) open_ap`, supplierInvoiceAppliedLateralSQLAsOf("si", ""), siWhere, exWhere)
 
@@ -355,18 +377,23 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 		orderCol := "occ_date"
 		if col, ok := map[string]string{
 			"occurrence_date": "occ_date",
+			"occ_date":        "occ_date",
 			"due_date":        "due_date",
 			"balance":         "balance",
 			"partner_name":    "partner_name",
 		}[p.Sort]; ok {
 			orderCol = col
 		}
+		// Newest occurrence first unless the client explicitly asks for asc.
 		orderDir := "desc"
-		if strings.EqualFold(p.Order, "asc") {
+		if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("order")), "asc") {
 			orderDir = "asc"
 		}
 		offset := httputil.Offset(p)
-		sql += fmt.Sprintf(` order by %s %s, doc_id desc limit $%d offset $%d`, orderCol, orderDir, argN, argN+1)
+		sql += fmt.Sprintf(
+			` order by %s %s, date_seq %s, doc_id %s limit $%d offset $%d`,
+			orderCol, orderDir, orderDir, orderDir, argN, argN+1,
+		)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), sql, args...)
