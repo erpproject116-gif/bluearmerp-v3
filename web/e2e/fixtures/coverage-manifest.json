@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-16T03:49:57.606Z",
+  "generatedAt": "2026-09-16T06:27:42.103Z",
   "sourceRoutes": "e2e/fixtures/app-routes.json",
-  "sourceGeneratedAt": "2026-09-16T03:49:57.321Z",
+  "sourceGeneratedAt": "2026-09-16T06:27:41.468Z",
   "totals": {
     "smokeable": 261,
     "parametrized": 40,
