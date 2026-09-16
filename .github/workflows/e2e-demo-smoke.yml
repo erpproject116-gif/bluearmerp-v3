@@ -37,6 +37,8 @@ jobs:
           sudo apt-get install -y postgresql-client
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
           for f in api/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
+          # Align with production: record schema_migrations via migrate CLI
+          cd api && go run ./cmd/migrate && cd ..
           psql "$DATABASE_URL" -f supabase/seed.sql
           psql "$DATABASE_URL" -f scripts/seed-demo-inventory.sql
           psql "$DATABASE_URL" -f scripts/seed-ci-bench-auth.sql
@@ -60,9 +62,24 @@ jobs:
           /tmp/server &
           sleep 3
 
+      - name: Wait for API schema health
+        run: |
+          for i in $(seq 1 30); do
+            body=$(curl -sf http://127.0.0.1:8080/health/schema || true)
+            echo "$body" | grep -q '"healthy":true' && exit 0
+            sleep 2
+          done
+          echo "API schema health check failed"; curl -s http://127.0.0.1:8080/health/schema || true; exit 1
+
       - name: Install web deps
         working-directory: web
         run: npm ci
+
+      - name: Build coverage manifest
+        working-directory: web
+        run: |
+          npm run e2e:routes:extract
+          npm run e2e:coverage:manifest
 
       - name: Install Playwright
         working-directory: web
@@ -94,9 +111,13 @@ jobs:
           CI: "true"
           E2E_BASE_URL: http://127.0.0.1:4173
           SUPABASE_JWT_SECRET: ci-test-jwt-secret-min-32-chars-long
+          E2E_TIER: posting
+          E2E_ALLOW_MUTATIONS: "1"
+          E2E_RUN_CONFIRM: ci-${{ github.run_id }}
         run: |
           export E2E_BENCH_TOKEN=$(node ../scripts/mint-bench-jwt.mjs)
-          npx playwright test \
+          npx playwright test --project=chromium \
+            e2e/coverage-manifest.spec.ts \
             e2e/route-smoke.spec.ts \
             e2e/core-interactions.spec.ts \
             e2e/sales-invoice.spec.ts \
@@ -107,4 +128,6 @@ jobs:
             e2e/purchase-order-crud.spec.ts \
             e2e/purchase-crud.spec.ts \
             e2e/official-receipt-crud.spec.ts \
-            e2e/inventory-partners-items.spec.ts
+            e2e/inventory-partners-items.spec.ts \
+            e2e/page-grid-form-contracts.spec.ts \
+            e2e/business-chains.spec.ts

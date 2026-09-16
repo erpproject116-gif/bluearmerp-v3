@@ -21,7 +21,10 @@ jobs:
         run: npm ci
       - name: Vitest unit + link integrity
         working-directory: web
-        run: npm test
+        run: |
+          npm run e2e:routes:extract
+          npm run e2e:coverage:manifest
+          npm test
 
   smoke:
     runs-on: ubuntu-latest
@@ -46,6 +49,6 @@ jobs:
 
       - name: Sign-in page smoke
         working-directory: web
-        run: npx playwright test e2e/smoke.spec.ts -g "sign-in page loads"
+        run: npx playwright test e2e/smoke.spec.ts e2e/coverage-manifest.spec.ts --project=chromium -g "@smoke"
         env:
           CI: "true"
