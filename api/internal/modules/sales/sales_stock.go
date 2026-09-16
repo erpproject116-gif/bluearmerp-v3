@@ -412,37 +412,46 @@ func reverseSaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) e
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
+	type movRow struct {
+		movID, itemID, locationID, lineID int64
+		qtyDelta                          float64
+	}
+	var movs []movRow
 	for rows.Next() {
-		var movID, itemID, locationID, lineID int64
-		var qtyDelta float64
-		if err := rows.Scan(&movID, &itemID, &locationID, &qtyDelta, &lineID); err != nil {
+		var m movRow
+		if err := rows.Scan(&m.movID, &m.itemID, &m.locationID, &m.qtyDelta, &m.lineID); err != nil {
+			rows.Close()
 			return err
 		}
-		restoreQty := -qtyDelta
+		movs = append(movs, m)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, m := range movs {
+		restoreQty := -m.qtyDelta
 		if restoreQty <= 0 {
 			continue
 		}
-		_, err = tx.Exec(ctx, `
+		if _, err = tx.Exec(ctx, `
 			insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
 			values ($1, $2, $3, $4)
 			on conflict (tenant_id, item_id, location_id)
 			do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
-			tenantID, itemID, locationID, restoreQty)
-		if err != nil {
+			tenantID, m.itemID, m.locationID, restoreQty); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `
+		if _, err = tx.Exec(ctx, `
 			insert into public.inv_stock_movements (
 			  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id
 			) values ($1, $2, $3, $4, 'sales_reversal', 'sa_sales_line', $5)`,
-			tenantID, itemID, locationID, restoreQty, lineID)
-		if err != nil {
+			tenantID, m.itemID, m.locationID, restoreQty, m.lineID); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 // reverseSaleSerials moves sold serials back to in_stock for this sales invoice.
@@ -456,32 +465,41 @@ func reverseSaleSerials(ctx context.Context, tx pgx.Tx, tenantID, salesID int64)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
+	type unitRow struct {
+		unitID int64
+		locID  *int64
+	}
+	var units []unitRow
 	for rows.Next() {
-		var unitID int64
-		var locID *int64
-		if err := rows.Scan(&unitID, &locID); err != nil {
+		var u unitRow
+		if err := rows.Scan(&u.unitID, &u.locID); err != nil {
+			rows.Close()
 			return err
 		}
-		_, err = tx.Exec(ctx, `
+		units = append(units, u)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, u := range units {
+		if _, err = tx.Exec(ctx, `
 			update public.inv_serial_units
 			set status = 'in_stock', partner_id = null, sales_line_id = null, updated_at = now()
-			where id = $1`, unitID)
-		if err != nil {
+			where id = $1`, u.unitID); err != nil {
 			return err
 		}
-		_, _ = tx.Exec(ctx, `delete from public.inv_serial_unit_sales_lines where serial_unit_id = $1`, unitID)
-		_, err = tx.Exec(ctx, `
+		_, _ = tx.Exec(ctx, `delete from public.inv_serial_unit_sales_lines where serial_unit_id = $1`, u.unitID)
+		if _, err = tx.Exec(ctx, `
 			insert into public.inv_serial_events (
 			  tenant_id, serial_unit_id, event_type, to_location_id, ref_type, ref_id
 			) values ($1, $2, 'returned', $3, 'sa_sales', $4)`,
-			tenantID, unitID, locID, salesID)
-		if err != nil {
+			tenantID, u.unitID, u.locID, salesID); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 // reverseSaleStockForLines restores qty for direct-sale stock on selected lines.
@@ -498,37 +516,46 @@ func reverseSaleStockForLines(ctx context.Context, tx pgx.Tx, tenantID int64, li
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
+	type movRow struct {
+		itemID, locationID, lineID int64
+		qtyDelta                   float64
+	}
+	var movs []movRow
 	for rows.Next() {
-		var itemID, locationID, lineID int64
-		var qtyDelta float64
-		if err := rows.Scan(&itemID, &locationID, &qtyDelta, &lineID); err != nil {
+		var m movRow
+		if err := rows.Scan(&m.itemID, &m.locationID, &m.qtyDelta, &m.lineID); err != nil {
+			rows.Close()
 			return err
 		}
-		restoreQty := -qtyDelta
+		movs = append(movs, m)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, m := range movs {
+		restoreQty := -m.qtyDelta
 		if restoreQty <= 0 {
 			continue
 		}
-		_, err = tx.Exec(ctx, `
+		if _, err = tx.Exec(ctx, `
 			insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
 			values ($1, $2, $3, $4)
 			on conflict (tenant_id, item_id, location_id)
 			do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
-			tenantID, itemID, locationID, restoreQty)
-		if err != nil {
+			tenantID, m.itemID, m.locationID, restoreQty); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `
+		if _, err = tx.Exec(ctx, `
 			insert into public.inv_stock_movements (
 			  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id
 			) values ($1, $2, $3, $4, 'sales_reversal', 'sa_sales_line', $5)`,
-			tenantID, itemID, locationID, restoreQty, lineID)
-		if err != nil {
+			tenantID, m.itemID, m.locationID, restoreQty, m.lineID); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 // reverseSaleLotForLines restores lot batch qty for selected lines.
@@ -563,32 +590,41 @@ func reverseSaleSerialsForLines(ctx context.Context, tx pgx.Tx, tenantID, salesI
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
+	type unitRow struct {
+		unitID int64
+		locID  *int64
+	}
+	var units []unitRow
 	for rows.Next() {
-		var unitID int64
-		var locID *int64
-		if err := rows.Scan(&unitID, &locID); err != nil {
+		var u unitRow
+		if err := rows.Scan(&u.unitID, &u.locID); err != nil {
+			rows.Close()
 			return err
 		}
-		_, err = tx.Exec(ctx, `
+		units = append(units, u)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, u := range units {
+		if _, err = tx.Exec(ctx, `
 			update public.inv_serial_units
 			set status = 'in_stock', partner_id = null, sales_line_id = null, updated_at = now()
-			where id = $1`, unitID)
-		if err != nil {
+			where id = $1`, u.unitID); err != nil {
 			return err
 		}
-		_, _ = tx.Exec(ctx, `delete from public.inv_serial_unit_sales_lines where serial_unit_id = $1`, unitID)
-		_, err = tx.Exec(ctx, `
+		_, _ = tx.Exec(ctx, `delete from public.inv_serial_unit_sales_lines where serial_unit_id = $1`, u.unitID)
+		if _, err = tx.Exec(ctx, `
 			insert into public.inv_serial_events (
 			  tenant_id, serial_unit_id, event_type, to_location_id, ref_type, ref_id
 			) values ($1, $2, 'returned', $3, 'sa_sales', $4)`,
-			tenantID, unitID, locID, salesID)
-		if err != nil {
+			tenantID, u.unitID, u.locID, salesID); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 // applySalesReturnStock restores inventory for a returned sales line quantity.

@@ -89,9 +89,14 @@ export default defineConfig(({ mode }) => {
           cleanupOutdatedCaches: true,
           skipWaiting: true,
           clientsClaim: true,
-          navigateFallback: "/index.html",
-          navigateFallbackDenylist: [/^\/api/],
+          // index.html is intentionally not precached; navigateFallback would throw
+          // workbox non-precached-url. Navigations go network-only (app is online-only).
+          navigateFallback: null,
           runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.mode === "navigate",
+              handler: "NetworkOnly",
+            },
             {
               urlPattern: ({ url }) => url.pathname.startsWith("/api"),
               handler: "NetworkOnly",

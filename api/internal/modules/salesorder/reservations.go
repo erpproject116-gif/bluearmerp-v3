@@ -96,28 +96,42 @@ func unreserveAllSalesOrderLines(ctx context.Context, tx pgx.Tx, tenantID, locat
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
+	type pending struct {
+		lineID   int64
+		itemID   int64
+		reserved float64
+	}
+	var pendingRows []pending
 	for rows.Next() {
 		var lineID int64
 		var itemID *int64
 		var reserved float64
 		if err := rows.Scan(&lineID, &itemID, &reserved); err != nil {
+			rows.Close()
 			return err
 		}
 		if itemID == nil || reserved <= 0 {
 			continue
 		}
-		if err := inventory.UnreserveStock(ctx, tx, tenantID, *itemID, locationID, reserved); err != nil {
+		pendingRows = append(pendingRows, pending{lineID: lineID, itemID: *itemID, reserved: reserved})
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, row := range pendingRows {
+		if err := inventory.UnreserveStock(ctx, tx, tenantID, row.itemID, locationID, row.reserved); err != nil {
 			return err
 		}
-		_, _ = tx.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			insert into public.inv_stock_movements
 			  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id)
 			values ($1, $2, $3, 0, 'so_reserve_undo', 'so_sales_order_line', $4, $5)`,
-			tenantID, *itemID, locationID, lineID, userID)
-		_, err = tx.Exec(ctx, `update public.so_sales_order_lines set qty_reserved = 0 where id = $1`, lineID)
-		if err != nil {
+			tenantID, row.itemID, locationID, row.lineID, userID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `update public.so_sales_order_lines set qty_reserved = 0 where id = $1`, row.lineID); err != nil {
 			return err
 		}
 	}
