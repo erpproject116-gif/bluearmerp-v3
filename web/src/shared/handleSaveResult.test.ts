@@ -184,6 +184,12 @@ describe("notification helpers", () => {
     expect(hasSpecificRecoveryHint("Name is required.")).toBe(true);
   });
 
+  it("recoveryHintFromError recognizes unit conversion blockers", () => {
+    const hint = recoveryHintFromError("add conversion unit→pc (or reverse) under Inventory → Units");
+    expect(hint.toLowerCase()).toMatch(/base unit|inventory → units/);
+    expect(hasSpecificRecoveryHint("add conversion unit→pc (or reverse) under Inventory → Units")).toBe(true);
+  });
+
   it("resolvePolicyActionHint maps serial receive messages", () => {
     const hint = resolvePolicyActionHint({
       lines: "Serial numbers required before confirming this bill. Receive under Purchase Receive.",

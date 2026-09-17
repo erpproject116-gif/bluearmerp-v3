@@ -43,6 +43,8 @@ export async function createUnitFromQuery(raw: string): Promise<UnitOption | nul
 
 type Props = {
   label: string;
+  /** Unique field key for aria/id when many UoM combos share the same visible label. */
+  fieldKey?: string;
   required?: boolean;
   placeholder?: string;
   disabled?: boolean;
@@ -91,6 +93,7 @@ export function UnitLookupCombo(props: Props) {
   return (
     <LookupCombo
       label={props.label}
+      fieldKey={props.fieldKey}
       required={props.required}
       placeholder={props.placeholder ?? (creating() ? "Creating…" : "Search or add UoM…")}
       disabled={props.disabled || creating()}
