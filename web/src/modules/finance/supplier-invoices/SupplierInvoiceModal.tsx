@@ -66,11 +66,13 @@ import {
 } from "../../purchase-request/purchase-request/PurchaseRequestLineGrid";
 import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
 import { SupplierInvoiceApprovalPanel } from "./SupplierInvoiceApprovalPanel";
-import { tryAutoSavePurchaseInvoice } from "../../../shared/invoiceApi";
+import { tryAutoSavePurchaseInvoice, type InvoiceAutoSaveResult } from "../../../shared/invoiceApi";
 import { TermHint } from "../../../shared/TermHint";
 import { A } from "@solidjs/router";
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
+import { SupplierInvoicePostSaveDialog } from "./SupplierInvoicePostSaveDialog";
+import { CashPaymentToVendorModal } from "./CashPaymentToVendorModal";
 
 export type { SupplierInvoiceDetail as PurchaseDetail };
 
@@ -155,6 +157,9 @@ export function SupplierInvoiceModal(props: Props) {
   const [saving, setSaving] = createSignal(false);
   const [createdInvoice, setCreatedInvoice] = createSignal<SupplierInvoiceDetail | null>(null);
   const effectiveEditing = () => props.editing ?? createdInvoice();
+  const [postSaveOpen, setPostSaveOpen] = createSignal(false);
+  const [postSaveAccounting, setPostSaveAccounting] = createSignal<InvoiceAutoSaveResult | null>(null);
+  const [cashPaymentOpen, setCashPaymentOpen] = createSignal(false);
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [rfqPickerOpen, setRfqPickerOpen] = createSignal(false);
@@ -800,6 +805,7 @@ export function SupplierInvoiceModal(props: Props) {
     }
     setCreatedInvoice(res.data);
     const autoSave = await tryAutoSavePurchaseInvoice(res.data.id);
+    setPostSaveAccounting(autoSave);
     const hasPOLines = body.lines.some(
       (ln: { purchase_order_line_id?: number | null }) =>
         ln.purchase_order_line_id != null && Number(ln.purchase_order_line_id) > 0,
@@ -830,7 +836,7 @@ export function SupplierInvoiceModal(props: Props) {
     } else {
       toast.warning(stockMsg);
     }
-    props.onClose();
+    setPostSaveOpen(true);
   };
 
   return (
@@ -1473,6 +1479,47 @@ export function SupplierInvoiceModal(props: Props) {
           void recalculatePurchaseRequestLines(lines(), t.id, t).then(setLines);
         }}
       />
+
+      <SupplierInvoicePostSaveDialog
+        open={postSaveOpen()}
+        invoiceNo={createdInvoice()?.invoice_no ?? invoiceNo()}
+        amount={createdInvoice()?.grand_total ?? 0}
+        hasSerials={lines().some((ln) => (ln.planned_serial_nos?.length ?? 0) > 0)}
+        accounting={postSaveAccounting()}
+        onDone={() => {
+          setPostSaveOpen(false);
+          props.onClose();
+        }}
+        onAccounting={() => {
+          setPostSaveOpen(false);
+          setActiveTab("invoice");
+        }}
+        onCashPayment={() => {
+          setPostSaveOpen(false);
+          setCashPaymentOpen(true);
+        }}
+      />
+
+      <Show when={createdInvoice()}>
+        <CashPaymentToVendorModal
+          open={cashPaymentOpen()}
+          supplierInvoiceId={createdInvoice()!.id}
+          partnerId={createdInvoice()!.partner_id}
+          currencyId={createdInvoice()!.currency_id}
+          amount={createdInvoice()!.grand_total}
+          invoiceNo={createdInvoice()!.invoice_no}
+          paymentDate={createdInvoice()!.invoice_date || invoiceDate()}
+          onClose={() => {
+            setCashPaymentOpen(false);
+            props.onClose();
+          }}
+          onSaved={() => {
+            props.onSaved();
+            setCashPaymentOpen(false);
+            props.onClose();
+          }}
+        />
+      </Show>
     </>
   );
 }

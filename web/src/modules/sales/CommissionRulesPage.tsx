@@ -418,7 +418,7 @@ export default function CommissionRulesPage() {
               header: "Journal",
               render: (r) =>
                 r.journal_entry_no ? (
-                  <A class="text-brand-700 underline" href={`/app/finance/journal-entries?highlight=${r.journal_entry_id}`}>
+                  <A class="text-brand-700 underline" href={`/app/finance/acct-i/journal-entries?highlight=${r.journal_entry_id}`}>
                     {r.journal_entry_no}
                   </A>
                 ) : (

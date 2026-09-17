@@ -301,7 +301,18 @@ export function InvoicePanel(props: Props) {
           </Show>
           <Show when={jeNo()}>
             <span class="text-text-secondary">
-              Journal: <span class="font-medium text-text-primary">{jeNo()}</span>
+              Journal:{" "}
+              <Show
+                when={jeId()}
+                fallback={<span class="font-medium text-text-primary">{jeNo()}</span>}
+              >
+                <A
+                  href={`/app/finance/acct-i/journal-entries?highlight=${jeId()}`}
+                  class="font-medium text-brand-700 hover:underline"
+                >
+                  {jeNo()}
+                </A>
+              </Show>
               <Show when={jeStatus()}>
                 <span class={`ml-2 rounded px-2 py-0.5 text-xs ${jeStatus() === "posted" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                   {jeStatus()}
@@ -313,8 +324,20 @@ export function InvoicePanel(props: Props) {
 
         <Show when={accountsLocked()}>
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            The linked journal entry is posted. You can still update fees and remark here; to change accounts, adjust the entry under Finance → Journal entries
-            <Show when={jeId()}> (entry #{jeId()})</Show>.
+            The linked journal entry is posted. You can still update fees and remark here; to change accounts, adjust the entry under{" "}
+            <Show
+              when={jeId()}
+              fallback={<>Finance → Journal entries</>}
+            >
+              <A
+                href={`/app/finance/acct-i/journal-entries?highlight=${jeId()}`}
+                class="font-medium text-brand-700 hover:underline"
+              >
+                Finance → Journal entries
+              </A>{" "}
+              (entry #{jeId()})
+            </Show>
+            .
           </p>
         </Show>
 
@@ -429,13 +452,33 @@ export function InvoicePanel(props: Props) {
 
         <Show when={jeNo() && !accountsLocked()}>
           <div class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm">
-            Draft journal entry ready for review in Finance after you save.
+            Draft journal entry{" "}
+            <Show when={jeId()} fallback={<span class="font-medium">{jeNo()}</span>}>
+              <A
+                href={`/app/finance/acct-i/journal-entries?highlight=${jeId()}`}
+                class="font-medium text-brand-700 hover:underline"
+              >
+                {jeNo()}
+              </A>
+            </Show>{" "}
+            ready for review in Finance after you save.
           </div>
         </Show>
 
         <Show when={jeNo() && accountsLocked()}>
           <div class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm">
-            Journal entry: <span class="font-medium">{jeNo()}</span>
+            Journal entry:{" "}
+            <Show
+              when={jeId()}
+              fallback={<span class="font-medium">{jeNo()}</span>}
+            >
+              <A
+                href={`/app/finance/acct-i/journal-entries?highlight=${jeId()}`}
+                class="font-medium text-brand-700 hover:underline"
+              >
+                {jeNo()}
+              </A>
+            </Show>
             <span class={`ml-2 rounded px-2 py-0.5 text-xs ${jeStatus() === "posted" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{jeStatus()}</span>
           </div>
         </Show>
