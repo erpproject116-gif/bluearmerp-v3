@@ -238,12 +238,46 @@ func listAvailableSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		locationID, _ := optionalInt64Query(r, "location_id")
-		where := "su.tenant_id = $1 and su.item_id = $2 and su.status in ('in_stock', 'reserved')"
+		// free_only=true: in_stock only, not reserved for sales / linked to a sale line,
+		// and not already staged on another open manufacturing job.
+		freeOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("free_only")), "true") ||
+			r.URL.Query().Get("free_only") == "1"
+		excludeWoID, _ := optionalInt64Query(r, "exclude_wo_id")
+		limit := 50
+		if lim, ok := optionalInt64Query(r, "limit"); ok && lim != nil && *lim > 0 && *lim <= 200 {
+			limit = int(*lim)
+		}
+
+		where := "su.tenant_id = $1 and su.item_id = $2"
 		args := []any{tu.TenantID, itemID}
 		argN := 3
+		if freeOnly {
+			where += " and su.status = 'in_stock' and su.sales_line_id is null"
+		} else {
+			where += " and su.status in ('in_stock', 'reserved')"
+		}
 		if locationID != nil {
 			where += fmt.Sprintf(" and su.location_id = $%d", argN)
 			args = append(args, *locationID)
+			argN++
+		}
+		if freeOnly {
+			where += fmt.Sprintf(`
+			  and not exists (
+			    select 1
+			    from public.mfg_wo_issue_serials wis
+			    join public.mfg_work_orders wo on wo.id = wis.work_order_id
+			    where wis.serial_unit_id = su.id
+			      and wo.tenant_id = $1
+			      and wo.status in ('draft', 'released')
+			      and ($%d::bigint is null or wo.id <> $%d)
+			  )`, argN, argN)
+			if excludeWoID != nil {
+				args = append(args, *excludeWoID)
+			} else {
+				args = append(args, nil)
+			}
+			argN++
 		}
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
 			select su.id, su.serial_no, su.status, su.location_id, coalesce(loc.location_name, ''),
@@ -251,7 +285,8 @@ func listAvailableSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			from public.inv_serial_units su
 			left join public.inv_locations loc on loc.id = su.location_id
 			where %s
-			order by su.serial_no`, where), args...)
+			order by coalesce(su.received_at, su.created_at) asc, su.id asc
+			limit %d`, where, limit), args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list available serials.", "ERR_INTERNAL")
 			return

@@ -143,10 +143,20 @@ func issueWorkOrderSerials(pool *pgxpool.Pool) http.HandlerFunc {
 				select su.item_id, su.serial_no
 				from public.inv_serial_units su
 				where su.id = $1 and su.tenant_id = $2 and su.location_id = $3
-				  and su.status in ('in_stock', 'reserved')
-				for update`, unitID, tu.TenantID, wo.LocationID).Scan(&itemID, &serialNo)
+				  and su.status = 'in_stock'
+				  and su.sales_line_id is null
+				  and not exists (
+				    select 1
+				    from public.mfg_wo_issue_serials wis
+				    join public.mfg_work_orders o on o.id = wis.work_order_id
+				    where wis.serial_unit_id = su.id
+				      and o.tenant_id = $2
+				      and o.status in ('draft', 'released')
+				      and o.id <> $4
+				  )
+				for update`, unitID, tu.TenantID, wo.LocationID, woID).Scan(&itemID, &serialNo)
 			if err != nil {
-				response.Validation(w, map[string]string{"serial_unit_ids": fmt.Sprintf("Serial %d not available at location.", unitID)})
+				response.Validation(w, map[string]string{"serial_unit_ids": fmt.Sprintf("Serial %d is not free in stock at this warehouse (may be reserved, sold, or staged on another job).", unitID)})
 				return
 			}
 			if !componentIDs[itemID] {

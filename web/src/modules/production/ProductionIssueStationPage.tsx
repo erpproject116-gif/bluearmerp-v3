@@ -127,7 +127,11 @@ export default function ProductionIssueStationPage() {
     const qs = new URLSearchParams({
       item_id: String(comp.component_item_id),
       location_id: String(locationId),
+      free_only: "true",
+      limit: String(Math.max(need, 20)),
     });
+    const wo = woId();
+    if (wo) qs.set("exclude_wo_id", String(wo));
     const res = await apiFetch<{ id: number; serial_no: string }[]>(
       `/api/v1/inventory/serial-units/available?${qs}`,
       undefined,
@@ -141,6 +145,65 @@ export default function ProductionIssueStationPage() {
     } else if (fillPaste) {
       setSerialPaste("");
     }
+  };
+
+  /** Pick the next free in-stock serials (not on sales / other jobs) and stage them. */
+  const autoPickAndStageSerials = async () => {
+    const wo = context();
+    const comp = activeComponent();
+    const id = woId();
+    if (!wo || !comp || !id || !comp.track_serial) return;
+    const need = remainingSerialNeed(comp);
+    if (need <= 0) {
+      mfgWarn(null, "This component already has enough serials staged.");
+      return;
+    }
+    setBusy(true);
+    const qs = new URLSearchParams({
+      item_id: String(comp.component_item_id),
+      location_id: String(wo.location_id),
+      free_only: "true",
+      exclude_wo_id: String(id),
+      limit: String(need),
+    });
+    const avail = await apiFetch<{ id: number; serial_no: string }[]>(
+      `/api/v1/inventory/serial-units/available?${qs}`,
+      undefined,
+      { silent: true },
+    );
+    const rows = (avail.data ?? []).slice(0, need);
+    if (rows.length === 0) {
+      setBusy(false);
+      mfgWarn(
+        null,
+        "No free serials in stock at this warehouse (unreserved and not used on another open job). Receive stock first.",
+      );
+      setSuggestedSerials([]);
+      setSerialPaste("");
+      return;
+    }
+    setSuggestedSerials(rows);
+    setSerialPaste(rows.map((r) => r.serial_no).join("\n"));
+    const unitIds = rows.map((r) => r.id);
+    const res = await apiFetch(`/api/v1/manufacturing/work-orders/${id}/issue-serials`, {
+      method: "POST",
+      body: JSON.stringify({ serial_unit_ids: unitIds }),
+    });
+    setBusy(false);
+    if (!res.success) {
+      mfgWarn(res.message, "Could not auto-stage those serials. Try Refresh, then Stage serials.");
+      return;
+    }
+    if (rows.length < need) {
+      mfgWarn(
+        null,
+        `Staged ${rows.length} of ${need} needed serial(s). Receive more stock, then auto-pick again.`,
+      );
+    } else {
+      mfgSuccess(`Auto-picked and staged ${rows.length} serial(s).`);
+    }
+    setSerialPaste("");
+    await refreshContext();
   };
 
   const loadWo = async (id: number) => {
@@ -413,19 +476,33 @@ export default function ProductionIssueStationPage() {
                     </h3>
                     <Show when={comp().track_serial}>
                       <p class="mt-1 text-xs text-text-secondary">
-                        Need {remainingSerialNeed(comp())} more serial(s). Available at this location are filled in
-                        automatically when present — confirm then Stage.
+                        Need {remainingSerialNeed(comp())} more serial(s). Free in-stock serials (not reserved for a sale
+                        and not staged on another open job) are listed oldest-first — Auto-pick stages them, or edit the
+                        list and Stage.
                       </p>
                       <Show when={suggestBusy()}>
-                        <p class="mt-1 text-xs text-text-secondary">Looking up available serials…</p>
+                        <p class="mt-1 text-xs text-text-secondary">Looking up free serials…</p>
                       </Show>
                       <Show when={!suggestBusy() && suggestedSerials().length === 0 && remainingSerialNeed(comp()) > 0}>
                         <p class="mt-1 text-xs text-amber-800">
-                          No available serials found at this location for this item. Receive stock first, or paste serials
-                          manually.
+                          No free serials at this warehouse for this item. Rows in red with 0 on hand need Receive first.
+                          Otherwise paste serials manually if you know them.
+                        </p>
+                      </Show>
+                      <Show when={!suggestBusy() && suggestedSerials().length > 0}>
+                        <p class="mt-1 text-xs text-text-secondary">
+                          Next free: {suggestedSerials().map((s) => s.serial_no).join(", ")}
                         </p>
                       </Show>
                       <div class="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                          disabled={busy() || suggestBusy() || !context() || remainingSerialNeed(comp()) <= 0}
+                          onClick={() => void autoPickAndStageSerials()}
+                        >
+                          Auto-pick &amp; stage next free
+                        </button>
                         <button
                           type="button"
                           class="rounded border border-stroke px-2 py-1 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
@@ -436,10 +513,10 @@ export default function ProductionIssueStationPage() {
                             if (c && wo) void prefetchAvailableSerials(c, wo.location_id, true);
                           }}
                         >
-                          Refresh available serials
+                          Refresh free serials
                         </button>
                       </div>
-                      <Field label="Serial numbers (auto-filled from available stock)">
+                      <Field label="Serial numbers (auto-filled from free stock)">
                         <textarea
                           class={inputClass}
                           rows={4}
@@ -450,7 +527,7 @@ export default function ProductionIssueStationPage() {
                       </Field>
                       <button
                         type="button"
-                        class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        class="mt-3 rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
                         disabled={busy()}
                         onClick={() => void issueSerials()}
                       >
