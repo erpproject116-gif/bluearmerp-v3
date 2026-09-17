@@ -1,10 +1,10 @@
 import { A } from "@solidjs/router";
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { apAgingExportUrl, useApAgingReport, type AgingFilters } from "../../../shared/reports/useModuleReports";
 import { FinanceLayout } from "../FinanceLayout";
-import { formatAmount } from "../../../shared/money";
+import { formatMoney } from "../../../shared/money";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -25,6 +25,10 @@ export default function ApAgingReportPage() {
     order: "desc",
     enabled: submitted(),
   }));
+
+  const pageBalanceTotal = createMemo(() =>
+    (report.data?.rows ?? []).reduce((sum, row) => sum + (Number(row.balance) || 0), 0),
+  );
 
   onMount(() => {
     search();
@@ -71,13 +75,25 @@ export default function ApAgingReportPage() {
         onExportCsv={() => void downloadReportCsv(apAgingExportUrl(filters()), "ap-aging.csv")}
       >
         <Show when={submitted() && sum()}>
-          <div class="grid gap-2 px-5 py-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
-            <span>Current: {formatAmount(sum()?.current ?? 0)}</span>
-            <span>1-30: {formatAmount(sum()?.days_1_30 ?? 0)}</span>
-            <span>31-60: {formatAmount(sum()?.days_31_60 ?? 0)}</span>
-            <span>61-90: {formatAmount(sum()?.days_61_90 ?? 0)}</span>
-            <span>90+: {formatAmount(sum()?.over_90 ?? 0)}</span>
-            <span>Total: {formatAmount(sum()?.total ?? 0)}</span>
+          <div class="grid gap-2 border-b border-stroke px-5 py-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
+            <span class="tabular-nums">
+              Current: <span class="font-medium">{formatMoney(sum()?.current ?? 0)}</span>
+            </span>
+            <span class="tabular-nums">
+              1-30: <span class="font-medium">{formatMoney(sum()?.days_1_30 ?? 0)}</span>
+            </span>
+            <span class="tabular-nums">
+              31-60: <span class="font-medium">{formatMoney(sum()?.days_31_60 ?? 0)}</span>
+            </span>
+            <span class="tabular-nums">
+              61-90: <span class="font-medium">{formatMoney(sum()?.days_61_90 ?? 0)}</span>
+            </span>
+            <span class="tabular-nums">
+              90+: <span class="font-medium">{formatMoney(sum()?.over_90 ?? 0)}</span>
+            </span>
+            <span class="tabular-nums font-semibold text-text-primary">
+              Grand total: {formatMoney(sum()?.total ?? 0)}
+            </span>
           </div>
         </Show>
         <table class="erp-grid min-w-full text-left text-sm">
@@ -111,13 +127,24 @@ export default function ApAgingReportPage() {
                   </td>
                   <td class="px-3 py-2">{row.vendor_name}</td>
                   <td class="px-3 py-2">{row.due_date}</td>
-                  <td class="px-3 py-2 text-right tabular-nums">{formatAmount(row.balance)}</td>
+                  <td class="px-3 py-2 text-right tabular-nums">{formatMoney(row.balance)}</td>
                   <td class="px-3 py-2 text-right">{row.age_days}</td>
                   <td class="px-3 py-2">{row.age_bucket}</td>
                 </tr>
               )}
             </For>
           </tbody>
+          <Show when={(report.data?.rows?.length ?? 0) > 0}>
+            <tfoot>
+              <tr class="border-t-2 border-brand-200 bg-slate-50 font-semibold text-text-primary">
+                <td class="px-3 py-2" colspan={3}>
+                  Page total
+                </td>
+                <td class="px-3 py-2 text-right tabular-nums">{formatMoney(pageBalanceTotal())}</td>
+                <td class="px-3 py-2" colspan={2} />
+              </tr>
+            </tfoot>
+          </Show>
         </table>
       </ReportPageLayout>
     </FinanceLayout>

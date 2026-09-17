@@ -125,6 +125,9 @@ export function OpenBalancePaymentPage(props: Props) {
     setPage(1);
   };
   const totalPages = createMemo(() => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize)));
+  const pageBalanceTotal = createMemo(() =>
+    rows().reduce((sum, r) => sum + (Number(r.balance) || 0), 0),
+  );
 
   const selectedRows = createMemo(() => rows().filter((r) => selected()[rowKey(r)]));
 
@@ -346,6 +349,17 @@ export function OpenBalancePaymentPage(props: Props) {
               }}
             </For>
           </tbody>
+          <Show when={rows().length > 0}>
+            <tfoot>
+              <tr class="border-t-2 border-brand-200 bg-slate-50 font-semibold text-text-primary">
+                <td class="px-2 py-2" colspan={7}>
+                  Page total
+                </td>
+                <td class="px-2 py-2 text-right tabular-nums">{formatPeso(pageBalanceTotal())}</td>
+                <td class="px-2 py-2" colspan={6} />
+              </tr>
+            </tfoot>
+          </Show>
         </table>
       </div>
 
