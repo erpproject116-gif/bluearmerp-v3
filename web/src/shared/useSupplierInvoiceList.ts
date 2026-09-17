@@ -120,7 +120,11 @@ export type OpenPOLine = {
   item_id: number;
   item_code: string;
   item_name: string;
+  spec_name?: string;
+  description?: string;
+  remark?: string;
   ordered_qty: number;
+  received_qty?: number;
   billed_qty: number;
   balance_qty: number;
   unit_id?: number | null;

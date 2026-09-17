@@ -594,6 +594,9 @@ export function SupplierInvoiceModal(props: Props) {
       item_id: row.item_id,
       item_code: row.item_code,
       item_name: row.item_name,
+      spec_name: row.spec_name ?? "",
+      description: row.description ?? row.spec_name ?? "",
+      remark: row.remark ?? "",
       qty: String(row.balance_qty),
       unit_price: String(row.unit_vat_inc),
       unit_id: row.unit_id ?? row.base_unit_id ?? null,
@@ -611,15 +614,18 @@ export function SupplierInvoiceModal(props: Props) {
       loadSourceAttachPreview(
         "purchase-order/purchase-orders",
         first.purchase_order_id,
-        "From Purchase Order (copies when you Save)",
+        `From ${first.purchase_order_no || "Purchase Order"} (included on Save)`,
       ),
       loadSourceCustomValues(
         `/api/v1/purchase-order/purchase-orders/${first.purchase_order_id}`,
         first.purchase_order_id,
       ),
     ]);
+    const attachN = sourceAttachPreview()?.files.length ?? 0;
     toast.success(
-      "Purchase Order lines loaded. Header fields, attachments, and matching custom fields copy when you Save.",
+      attachN > 0
+        ? `PO header and ${newLines.length} line(s) filled. ${attachN} attachment(s) will copy when you Save.`
+        : `PO header and ${newLines.length} line(s) filled from ${first.purchase_order_no || "Purchase Order"}.`,
     );
   };
 
@@ -791,7 +797,10 @@ export function SupplierInvoiceModal(props: Props) {
       );
       return;
     }
-    toast.success(props.editing ? "Purchase updated." : "Purchase created.");
+    toast.success(
+      res.message?.trim() ||
+        (props.editing ? "Purchase updated." : "Purchase created."),
+    );
     if (props.editing) invalidateRecordHistory(queryClient, "fin_supplier_invoice", props.editing.id);
     await draft.clearOnSave();
     props.onSaved();
@@ -1143,7 +1152,7 @@ export function SupplierInvoiceModal(props: Props) {
                   <div class="rounded-lg border border-dashed border-stroke bg-slate-50/80 px-3 py-3">
                     <p class="text-sm font-medium text-text-primary">From source document</p>
                     <p class="mt-0.5 text-xs text-text-secondary">
-                      Use Load Slip → Purchase Order to preview PO files here. They copy onto this purchase when you Save.
+                      Use Load Slip → Purchase Order to pull PO files here. They are included when you Save.
                     </p>
                   </div>
                 }
@@ -1152,7 +1161,7 @@ export function SupplierInvoiceModal(props: Props) {
                   <div class="rounded-lg border border-brand-200 bg-brand-50/40 px-3 py-3">
                     <p class="text-sm font-medium text-text-primary">{preview().label}</p>
                     <p class="mt-0.5 text-xs text-text-secondary">
-                      Read-only from the purchase order. Files copy onto this purchase when you Save.
+                      Carried from the purchase order. These files are saved onto this purchase when you Save.
                     </p>
                     <ul class="mt-2 space-y-1">
                       <For each={preview().files}>
