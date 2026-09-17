@@ -109,6 +109,10 @@ export const recoveryHintFromError = (fieldError: string): string => {
     return "Open Inventory → Items, edit the product, set Base unit (for example Piece), Save, then try the purchase order again.";
   }
 
+  if (/add conversion|unit.?conversion|Inventory → Units|Inventory -> Units/i.test(t)) {
+    return "On each part line, keep UoM as the item’s base unit (auto-filled when you pick the item), or add the named conversion under Inventory → Units, then Save again.";
+  }
+
   if (/customer/i.test(t)) {
     return "Pick a customer in the Customer field (search by name). Use + New on that lookup if they are not listed yet, then Save.";
   }

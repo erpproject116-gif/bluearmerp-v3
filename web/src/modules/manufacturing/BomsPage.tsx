@@ -6,7 +6,7 @@ import { UnitLookupCombo, formatUnitLabel } from "../../shared/UnitLookupCombo";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
-import { collectRequiredFieldErrors, handleSaveResult } from "../../shared/handleSaveResult";
+import { collectRequiredFieldErrors, handleSaveResult, showClientValidationBlocker } from "../../shared/handleSaveResult";
 import type { FormErrors } from "../../shared/formValidation";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
@@ -135,23 +135,73 @@ function liveStockPreview(ln: BomLine, convs: Conversion[]): { qty: number; code
   };
 }
 
+type ItemPickMeta = {
+  item_code: string;
+  item_name: string;
+  base_unit_id: number | null;
+  base_unit_code: string;
+  purchase_price: number;
+};
+
 async function fetchItems(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", sort: "item_code", order: "asc" });
   if (q) qs.set("q", q);
   const res = await apiFetch<
-    { id: number; item_code: string; item_name: string; base_unit_id?: number; base_unit_code?: string; purchase_price?: number }[]
+    { id: number; item_code: string; item_name: string; base_unit_id?: number | null; base_unit_code?: string; purchase_price?: number }[]
   >(`/api/v1/inventory/items?${qs}`);
   return (res.data ?? []).map((i) => ({
     id: i.id,
     label: `${i.item_code} — ${i.item_name}`,
     meta: {
-      base_unit_id: i.base_unit_id,
-      base_unit_code: i.base_unit_code,
+      base_unit_id: i.base_unit_id ?? null,
+      base_unit_code: i.base_unit_code ?? "",
       item_code: i.item_code,
       item_name: i.item_name,
-      purchase_price: i.purchase_price,
+      purchase_price: i.purchase_price ?? 0,
     },
   }));
+}
+
+/** Resolve code / base UoM / cost for a picked item (refetch when list meta is thin). */
+async function resolveItemPickMeta(opt: LookupOption): Promise<ItemPickMeta> {
+  const meta = (opt.meta ?? {}) as Partial<ItemPickMeta>;
+  const fromLabel = opt.label.split("—").map((s) => s.trim());
+  let itemCode = (meta.item_code ?? fromLabel[0] ?? "").trim();
+  let itemName = (meta.item_name ?? fromLabel.slice(1).join(" — ") ?? "").trim();
+  let baseUnitId =
+    meta.base_unit_id != null && Number(meta.base_unit_id) > 0 ? Number(meta.base_unit_id) : null;
+  let baseUnitCode = (meta.base_unit_code ?? "").trim();
+  let purchase = Number(meta.purchase_price);
+  if (!Number.isFinite(purchase) || purchase < 0) purchase = 0;
+
+  const needsDetail = !itemCode || !baseUnitId || !baseUnitCode;
+  if (needsDetail && opt.id > 0) {
+    const res = await apiFetch<{
+      item_code?: string;
+      item_name?: string;
+      base_unit_id?: number | null;
+      base_unit_code?: string;
+      purchase_price?: number;
+    }>(`/api/v1/inventory/items/${opt.id}`, undefined, { silent: true });
+    if (res.success && res.data) {
+      itemCode = (res.data.item_code ?? itemCode).trim();
+      itemName = (res.data.item_name ?? itemName).trim();
+      if (res.data.base_unit_id != null && Number(res.data.base_unit_id) > 0) {
+        baseUnitId = Number(res.data.base_unit_id);
+      }
+      baseUnitCode = (res.data.base_unit_code ?? baseUnitCode).trim();
+      const p = Number(res.data.purchase_price);
+      if (Number.isFinite(p) && p > 0) purchase = p;
+    }
+  }
+
+  return {
+    item_code: itemCode,
+    item_name: itemName,
+    base_unit_id: baseUnitId,
+    base_unit_code: baseUnitCode,
+    purchase_price: purchase,
+  };
 }
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
@@ -449,9 +499,26 @@ export default function BomsPage() {
             ? "Some output lines were typed but not picked from the list. Click each item (or press Enter) so every line is linked."
             : "Some material lines were typed but not picked from the list. Click each item (or press Enter) so every line is linked.";
       }
+      const missingBase = bodyLines.some((ln) => {
+        const full = lines().find((r) => r.component_item_id === ln.component_item_id);
+        return full && !(full.base_unit_id && full.base_unit_id > 0);
+      });
+      if (missingBase) {
+        errs.lines =
+          "A selected item has no base unit. Set Base unit under Inventory → Items, then pick the item again.";
+      }
+      const badUom = lines().find((ln) => {
+        if (!(ln.component_item_id > 0) || !(Number(ln.qty) > 0)) return false;
+        if (!ln.unit_id || !ln.base_unit_id || ln.unit_id === ln.base_unit_id) return false;
+        return convertClient(ln.unit_id, ln.base_unit_id, 1, conversions() ?? []) == null;
+      });
+      if (badUom) {
+        errs.lines = `add conversion ${badUom.unit_code || "unit"}→${badUom.base_unit_code || "base"} (or reverse) under Inventory → Units`;
+      }
     }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
+      showClientValidationBlocker(errs, toast);
       return;
     }
     setFieldErrors({});
@@ -798,7 +865,7 @@ export default function BomsPage() {
                       <span class="text-text-secondary">Part no</span>
                       <input
                         class={`${inputClass} mt-1`}
-                        value={ln.component_code ?? ""}
+                        value={lines()[idx()]?.component_code ?? ""}
                         readOnly
                         aria-readonly="true"
                         aria-label={`Part number line ${idx() + 1}`}
@@ -807,58 +874,87 @@ export default function BomsPage() {
                     </label>
                   </Show>
                   <LookupCombo
-                    label={`Line ${idx() + 1}`}
+                    label={isAssembly() ? "Item" : `Line ${idx() + 1}`}
                     required
+                    description={isAssembly() ? `Line ${idx() + 1} — pick from search so Part no, UoM, and cost fill in.` : undefined}
                     value={() => lineLabels()[idx()] ?? ""}
-                    selectedId={() => ln.component_item_id || null}
+                    selectedId={() => lines()[idx()]?.component_item_id || null}
                     onInput={(v) => setLineLabels((p) => ({ ...p, [idx()]: v }))}
                     onSelect={(o) => {
-                      const meta = o.meta as {
-                        base_unit_id?: number;
-                        base_unit_code?: string;
-                        item_code?: string;
-                        item_name?: string;
-                        purchase_price?: number;
-                      } | undefined;
-                      const purchase = Number(meta?.purchase_price);
-                      const unitCost = Number.isFinite(purchase) && purchase > 0 ? purchase : 0;
+                      void (async () => {
+                        const lineIdx = idx();
+                        const pick = await resolveItemPickMeta(o);
+                        if (!pick.base_unit_id) {
+                          mfgWarn(
+                            null,
+                            `${pick.item_code || "That item"} has no base unit. Set Base unit under Inventory → Items, then pick it again.`,
+                          );
+                        }
+                        const unitCost = pick.purchase_price > 0 ? pick.purchase_price : 0;
+                        setLines((prev) =>
+                          prev.map((row, i) => {
+                            if (i !== lineIdx) return row;
+                            const qty = Number(row.qty) > 0 ? Number(row.qty) : 1;
+                            return {
+                              ...row,
+                              component_item_id: o.id,
+                              component_code: pick.item_code || row.component_code,
+                              component_name: pick.item_name || row.component_name,
+                              qty,
+                              unit_id: pick.base_unit_id,
+                              unit_code: pick.base_unit_code,
+                              base_unit_id: pick.base_unit_id ?? undefined,
+                              base_unit_code: pick.base_unit_code,
+                              unit_cost: unitCost,
+                              line_total: unitCost * qty,
+                            };
+                          }),
+                        );
+                        setLineLabels((p) => ({
+                          ...p,
+                          [lineIdx]:
+                            pick.item_code && pick.item_name
+                              ? `${pick.item_code} — ${pick.item_name}`
+                              : o.label,
+                        }));
+                        if (pick.base_unit_code) {
+                          setLineUnitLabels((p) => ({
+                            ...p,
+                            [lineIdx]: formatUnitLabel({
+                              code: pick.base_unit_code,
+                              name: pick.base_unit_code,
+                            }),
+                          }));
+                        } else {
+                          setLineUnitLabels((p) => ({ ...p, [lineIdx]: "" }));
+                        }
+                        void refreshConversions();
+                      })();
+                    }}
+                    onClear={() => {
+                      const lineIdx = idx();
                       setLines((prev) =>
                         prev.map((row, i) =>
-                          i === idx()
+                          i === lineIdx
                             ? {
                                 ...row,
-                                component_item_id: o.id,
-                                component_code: meta?.item_code ?? row.component_code,
-                                component_name: meta?.item_name ?? row.component_name,
-                                unit_id: meta?.base_unit_id ?? row.unit_id,
-                                unit_code: meta?.base_unit_code,
-                                base_unit_id: meta?.base_unit_id,
-                                base_unit_code: meta?.base_unit_code,
-                                unit_cost: unitCost,
-                                line_total: unitCost * Number(row.qty || 0),
+                                component_item_id: 0,
+                                component_code: "",
+                                component_name: "",
+                                unit_id: null,
+                                unit_code: "",
+                                base_unit_id: undefined,
+                                base_unit_code: "",
+                                unit_cost: 0,
+                                line_total: 0,
                               }
                             : row,
                         ),
                       );
-                      setLineLabels((p) => ({ ...p, [idx()]: o.label }));
-                      if (meta?.base_unit_code) {
-                        setLineUnitLabels((p) => ({
-                          ...p,
-                          [idx()]: formatUnitLabel({ code: meta.base_unit_code!, name: meta.base_unit_code! }),
-                        }));
-                      }
-                    }}
-                    onClear={() => {
-                      // Keep typed label; Clear button clears text via onInput("").
-                      setLines((prev) =>
-                        prev.map((row, i) =>
-                          i === idx()
-                            ? { ...row, component_item_id: 0, unit_cost: 0, line_total: 0 }
-                            : row,
-                        ),
-                      );
+                      setLineUnitLabels((p) => ({ ...p, [lineIdx]: "" }));
                     }}
                     fetchOptions={fetchItems}
+                    placeholder="Search item code or name…"
                   />
                   <label class="text-sm">
                     <span class="text-text-secondary">{copy.lineQtyLabel}</span>
@@ -866,7 +962,10 @@ export default function BomsPage() {
                       type="text"
                       inputMode="decimal"
                       class={`${inputClass} mt-1`}
-                      value={ln.qty === 0 ? "" : String(ln.qty)}
+                      value={(() => {
+                        const q = lines()[idx()]?.qty;
+                        return q == null || q === 0 ? "" : String(q);
+                      })()}
                       onInput={(e) => {
                         const raw = e.currentTarget.value.trim();
                         const v = raw === "" ? 0 : Number(raw);
@@ -905,18 +1004,33 @@ export default function BomsPage() {
                   </Show>
                   <UnitLookupCombo
                     label="UoM"
-                    selectedId={() => ln.unit_id ?? null}
-                    value={() => lineUnitLabels()[idx()] ?? ln.unit_code ?? ""}
+                    fieldKey={`bom-line-uom-${idx()}`}
+                    selectedId={() => lines()[idx()]?.unit_id ?? null}
+                    value={() => lineUnitLabels()[idx()] ?? lines()[idx()]?.unit_code ?? ""}
                     onInput={(v) => setLineUnitLabels((p) => ({ ...p, [idx()]: v }))}
                     onSelect={(u) => {
+                      const lineIdx = idx();
+                      const row = lines()[lineIdx];
                       setLines((prev) =>
-                        prev.map((row, i) => (i === idx() ? { ...row, unit_id: u.id, unit_code: u.code } : row)),
+                        prev.map((r, i) => (i === lineIdx ? { ...r, unit_id: u.id, unit_code: u.code } : r)),
                       );
-                      setLineUnitLabels((p) => ({ ...p, [idx()]: formatUnitLabel(u) }));
-                      refreshConversions();
+                      setLineUnitLabels((p) => ({ ...p, [lineIdx]: formatUnitLabel(u) }));
+                      void refreshConversions();
+                      if (
+                        row?.base_unit_id &&
+                        u.id !== row.base_unit_id &&
+                        convertClient(u.id, row.base_unit_id, 1, conversions() ?? []) == null
+                      ) {
+                        mfgWarn(
+                          `add conversion ${u.code}→${row.base_unit_code || "base"} (or reverse) under Inventory → Units`,
+                          "This UoM needs a conversion to the item base unit, or switch UoM back to the base unit.",
+                        );
+                      }
                     }}
                     onClear={() => {
-                      setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, unit_id: null, unit_code: "" } : row)));
+                      setLines((prev) =>
+                        prev.map((row, i) => (i === idx() ? { ...row, unit_id: null, unit_code: "" } : row)),
+                      );
                       setLineUnitLabels((p) => ({ ...p, [idx()]: "" }));
                     }}
                   />
@@ -925,7 +1039,7 @@ export default function BomsPage() {
                       <span class="text-text-secondary">Unit cost</span>
                       <input
                         class={`${inputClass} mt-1`}
-                        value={formatCost(lineUnitCost(ln))}
+                        value={formatCost(lineUnitCost(lines()[idx()] ?? ln))}
                         readOnly
                         aria-readonly="true"
                         aria-label={`Unit cost line ${idx() + 1}`}
@@ -936,7 +1050,7 @@ export default function BomsPage() {
                       <span class="text-text-secondary">Line total</span>
                       <input
                         class={`${inputClass} mt-1`}
-                        value={formatCost(lineTotalDisplay(ln))}
+                        value={formatCost(lineTotalDisplay(lines()[idx()] ?? ln))}
                         readOnly
                         aria-readonly="true"
                         aria-label={`Line total line ${idx() + 1}`}
@@ -978,7 +1092,7 @@ export default function BomsPage() {
           </button>
           <p class="text-xs text-text-secondary">
             {isAssembly()
-              ? "Costs are estimates from purchase price; open Advanced for spare qty and batch settings."
+              ? "Pick each item from the list (don’t only type the name). Part no, UoM (base unit), and cost fill in automatically. Costs are estimates from purchase price; open Advanced for spare qty and batch settings."
               : copy.stockHint}
           </p>
         </div>
