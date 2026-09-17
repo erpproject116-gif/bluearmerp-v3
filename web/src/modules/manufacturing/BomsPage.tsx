@@ -63,6 +63,9 @@ type Bom = {
   is_active: boolean;
   notes?: string | null;
   components?: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  transaction_date?: string | null;
   lines?: BomLine[];
 };
 
@@ -94,6 +97,17 @@ function lineTotalDisplay(ln: BomLine): number {
 
 function formatCost(n: number): string {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
+function formatLocalDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
+function bomTransactionAt(r: Bom): string {
+  return r.transaction_date || r.created_at || "";
 }
 
 function convertClient(fromId: number, toId: number, qty: number, convs: Conversion[]): number | null {
@@ -166,7 +180,7 @@ export default function BomsPage() {
   const auth = useAuth();
   const canBulkDeactivate = () => hasPermission(auth.me, "manufacturing.boms_bulk", "write");
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
-    "updated_at",
+    "transaction_date",
     25,
     { defaultOrder: "desc" },
   );
@@ -551,6 +565,11 @@ export default function BomsPage() {
       </Show>
       <SpreadsheetGrid<Bom>
         columns={[
+          {
+            key: "transaction_date",
+            header: "Transaction date",
+            render: (r) => formatLocalDateTime(bomTransactionAt(r)),
+          },
           { key: "bom_code", header: "Recipe code", clickable: true },
           { key: "bom_name", header: copy.bomNameLabel, clickable: true },
           { key: "finished_item_name", header: copy.headerItemLabel },
