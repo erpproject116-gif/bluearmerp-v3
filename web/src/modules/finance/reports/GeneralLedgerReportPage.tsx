@@ -1,4 +1,4 @@
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { defaultReportDateRange, ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import {
@@ -8,6 +8,7 @@ import {
 } from "../../../shared/reports/useModuleReports";
 import { FinanceLayout } from "../FinanceLayout";
 import { MoneyCell } from "../../../shared/MoneyCell";
+import { formatMoney } from "../../../shared/money";
 
 export default function GeneralLedgerReportPage() {
   const defaults = defaultReportDateRange();
@@ -25,6 +26,16 @@ export default function GeneralLedgerReportPage() {
     order: "desc",
     enabled: submitted(),
   }));
+
+  const pageTotals = createMemo(() => {
+    let debit = 0;
+    let credit = 0;
+    for (const row of report.data?.rows ?? []) {
+      debit += Number(row.debit) || 0;
+      credit += Number(row.credit) || 0;
+    }
+    return { debit, credit };
+  });
 
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -94,14 +105,26 @@ export default function GeneralLedgerReportPage() {
                   <td class="px-3 py-2">
                     {row.account_code} — {row.account_name}
                   </td>
-                  <MoneyCell value={row.debit} sign={false} />
-                  <MoneyCell value={row.credit} sign={false} />
+                  <MoneyCell value={row.debit} />
+                  <MoneyCell value={row.credit} />
                   <td class="px-3 py-2">{row.party_name ?? ""}</td>
                   <td class="px-3 py-2">{row.remarks ?? ""}</td>
                 </tr>
               )}
             </For>
           </tbody>
+          <Show when={(report.data?.rows?.length ?? 0) > 0}>
+            <tfoot>
+              <tr class="border-t-2 border-brand-200 bg-slate-50 font-semibold text-text-primary">
+                <td class="px-3 py-2" colspan={3}>
+                  Page total
+                </td>
+                <td class="px-3 py-2 text-right tabular-nums">{formatMoney(pageTotals().debit)}</td>
+                <td class="px-3 py-2 text-right tabular-nums">{formatMoney(pageTotals().credit)}</td>
+                <td class="px-3 py-2" colspan={2} />
+              </tr>
+            </tfoot>
+          </Show>
         </table>
       </ReportPageLayout>
     </FinanceLayout>
