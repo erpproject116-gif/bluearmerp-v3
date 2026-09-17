@@ -345,6 +345,14 @@ export function SalesOrderModal(props: Props) {
   let newFormSeededForOpen = false;
 
   createEffect(() => {
+    // Only clear after this session created/saved an id — keep preview on edit + Load Slip.
+    const soId = createdSalesOrder()?.id;
+    if (soId && sourceAttachPreview()) {
+      setSourceAttachPreview(null);
+    }
+  });
+
+  createEffect(() => {
     if (!props.open) {
       setCreatedSalesOrder(null);
       setSourceAttachPreview(null);
@@ -531,6 +539,9 @@ export function SalesOrderModal(props: Props) {
         "From Quotation (copies when you Save)",
       ),
     ]);
+    toast.success(
+      "Quotation lines loaded. Header fields, attachments, and matching custom fields copy when you Save.",
+    );
   };
 
   const mapBuyingOntoSalesOrder = async (
@@ -684,8 +695,24 @@ export function SalesOrderModal(props: Props) {
           ? "Sales order updated."
           : "Sales order created."),
     );
+    // Keep modal open so AttachmentsField can flush staged files / show server-copied quotation files.
+    if (!ed) {
+      setCreatedSalesOrder(res.data);
+    }
     await draft.clearOnSave();
     props.onSaved();
+    if (!ed) {
+      return;
+    }
+    const sourced =
+      !!sourceQuotationId() ||
+      !!sourceAttachPreview() ||
+      lines().some((ln) => !!ln.source_quotation_line_id);
+    const delayMs = attachmentCount() > 0 || sourced ? 600 : 0;
+    if (delayMs > 0) {
+      window.setTimeout(() => props.onClose(), delayMs);
+      return;
+    }
     props.onClose();
   };
 

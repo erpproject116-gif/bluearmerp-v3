@@ -640,9 +640,25 @@ export function QuotationModal(props: Props) {
       });
       return;
     }
-    toast.success(props.editing ? "Quotation updated." : "Quotation created.");
+    toast.success(
+      res.message?.trim() ||
+        (props.editing ? "Quotation updated." : "Quotation created."),
+    );
+    // Keep modal open briefly so AttachmentsField can flush staged files to the new id.
+    if (!ed) {
+      setCreatedQuotation(res.data);
+    }
     await draft.clearOnSave();
     props.onSaved();
+    if (!ed) {
+      // New quotation: stay open until flush finishes (user closes when ready).
+      return;
+    }
+    const delayMs = attachmentCount() > 0 ? 600 : 0;
+    if (delayMs > 0) {
+      window.setTimeout(() => props.onClose(), delayMs);
+      return;
+    }
     props.onClose();
   };
 
