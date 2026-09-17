@@ -257,13 +257,17 @@ export function OpenBalancePaymentPage(props: Props) {
                 <td colSpan={14} class="px-3 py-8 text-center text-text-secondary">
                   <Show
                     when={hasFilters()}
-                    fallback="No open balances. Saved purchases with an unpaid balance appear here automatically."
+                    fallback={
+                      props.side === "ar"
+                        ? "No open balances. Saved sales with an unpaid balance appear here automatically (except while in E-Approval)."
+                        : "No open balances. Saved purchases with an unpaid balance appear here automatically."
+                    }
                   >
                     No open balances match these filters.{" "}
                     <button type="button" class="font-medium text-brand-700 underline" onClick={clearFilters}>
                       Clear filters
                     </button>{" "}
-                    to see the newest unpaid purchases.
+                    to see the newest unpaid {props.side === "ar" ? "sales" : "purchases"}.
                   </Show>
                 </td>
               </tr>

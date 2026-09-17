@@ -168,14 +168,15 @@ func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(loc.location_name, ''), proj.project_name, dept.department_name,
 			  coalesce(s.notes, '')
 			from public.sa_sales s
-			join public.inv_partners p on p.id = s.partner_id and p.tenant_id = s.tenant_id
+			left join public.inv_partners p on p.id = s.partner_id and p.tenant_id = s.tenant_id
 			left join public.quo_currencies cur on cur.id = s.currency_id
 			left join public.inv_locations loc on loc.id = s.location_id
 			left join public.inv_projects proj on proj.id = s.project_id
 			left join public.inv_departments dept on dept.id = s.department_id
 			%s
 			where s.tenant_id = $1 and s.deleted_at is null
-			  and s.progress_status = 'completed'
+			  and s.partner_id is not null
+			  and coalesce(s.progress_status, 'unconfirmed') <> 'e_approval'
 			  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001`,
 			saleAppliedOpenLateral(excludeParam))
 
@@ -185,7 +186,13 @@ func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 		if qText != "" {
-			sql += fmt.Sprintf(` and (s.sales_no ilike $%d or p.company_name ilike $%d or p.partner_code ilike $%d)`, argN, argN, argN)
+			sql += fmt.Sprintf(` and (
+				s.sales_no ilike $%d
+				or coalesce(p.company_name,'') ilike $%d
+				or coalesce(p.partner_code,'') ilike $%d
+				or coalesce(s.notes,'') ilike $%d
+				or (to_char(s.order_date, 'YYYY-MM-DD') || '-' || lpad(coalesce(s.date_seq, 1)::text, 3, '0')) ilike $%d
+			)`, argN, argN, argN, argN, argN)
 			args = append(args, "%"+qText+"%")
 			argN++
 		}
