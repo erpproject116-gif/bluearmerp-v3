@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, onMount, Show } from "solid-js";
+import { createMemo, createResource, createSignal, For, onMount, Show } from "solid-js";
 import { ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
 import { resolveReportDatePreset } from "../../../shared/reports/ReportDatePresets";
@@ -43,6 +43,21 @@ export default function InvBookReportPage() {
     enabled: submitted() && Boolean(applied().date_from && applied().date_to),
     runId: runId(),
   }));
+
+  const pageTotals = createMemo(() => {
+    const rows = report.data?.rows ?? [];
+    let opening = 0;
+    let receipt = 0;
+    let issue = 0;
+    let closing = 0;
+    for (const row of rows) {
+      opening += row.opening_qty ?? 0;
+      receipt += row.receipt_qty ?? 0;
+      issue += row.issue_qty ?? 0;
+      closing += row.closing_qty ?? 0;
+    }
+    return { opening, receipt, issue, closing };
+  });
 
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -187,6 +202,20 @@ export default function InvBookReportPage() {
               )}
             </For>
           </tbody>
+          <Show when={(report.data?.rows?.length ?? 0) > 0}>
+            <tfoot>
+              <tr class="border-t-2 border-brand-200 bg-slate-50 font-semibold text-text-primary">
+                <td class="px-3 py-2" colspan={2}>
+                  Page total
+                </td>
+                <td class="px-3 py-2 text-right tabular-nums">{pageTotals().opening}</td>
+                <td class="px-3 py-2 text-right tabular-nums">{pageTotals().receipt}</td>
+                <td class="px-3 py-2 text-right tabular-nums">{pageTotals().issue}</td>
+                <td class="px-3 py-2 text-right tabular-nums text-brand-700">{pageTotals().closing}</td>
+                <td class="px-3 py-2" colspan={3} />
+              </tr>
+            </tfoot>
+          </Show>
         </table>
         <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching && !report.isError}>
           <p class="px-5 py-8 text-center text-sm text-text-secondary">

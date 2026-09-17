@@ -760,21 +760,18 @@ export function SupplierInvoiceModal(props: Props) {
       return;
     }
 
-    const confirming =
-      progressStatus() === "completed" ||
-      progressStatus() === "confirm" ||
-      progressStatus() === "e_approval";
-    if (confirming) {
-      for (const ln of lines().filter((l) => l.item_id || l.item_code || l.goods_receipt_line_id || l.purchase_order_line_id)) {
-        if (!ln.track_serial) continue;
-        const need = Math.floor(Number(ln.qty) || 0);
-        const got = (ln.planned_serial_nos ?? []).length;
-        if (need > 0 && got !== need) {
-          toast.warning(
-            `Line ${ln.line_no}: serial count (${got}) must equal qty (${need}). Set qty first, then scan serials.`,
-          );
-          return;
-        }
+    // Stock posts on save (Unconfirmed). Block incomplete serials so we never
+    // "succeed" with zero inventory movement for serial-tracked lines.
+    for (const ln of lines().filter((l) => l.item_id || l.item_code || l.goods_receipt_line_id || l.purchase_order_line_id)) {
+      if (!ln.track_serial) continue;
+      if (ln.goods_receipt_line_id) continue; // already received
+      const need = Math.floor(Number(ln.qty) || 0);
+      const got = (ln.planned_serial_nos ?? []).length;
+      if (need > 0 && got !== need) {
+        toast.warning(
+          `Line ${ln.line_no}: scan ${need} serial(s) before save (have ${got}). Stock posts on save — serials must match qty.`,
+        );
+        return;
       }
     }
 
@@ -814,13 +811,28 @@ export function SupplierInvoiceModal(props: Props) {
       (ln: { goods_receipt_line_id?: number | null }) =>
         ln.goods_receipt_line_id != null && Number(ln.goods_receipt_line_id) > 0,
     );
+    const postedReceiveCount = (res.data.lines ?? []).filter(
+      (ln) => ln.goods_receipt_line_id != null && Number(ln.goods_receipt_line_id) > 0,
+    ).length;
+    const serialPending = body.lines.some(
+      (ln: { serial_nos?: string[]; qty?: number }, i: number) => {
+        const src = lines().filter((l) => l.item_id || l.item_code || l.goods_receipt_line_id || l.purchase_order_line_id)[i];
+        return Boolean(src?.track_serial) && (ln.serial_nos?.length ?? 0) === 0;
+      },
+    );
     let stockMsg =
       "Purchases do not change BOM recipes — only on-hand qty for qty-tracked items.";
-    if (hasPOLines && !hasGRLines) {
+    if (postedReceiveCount > 0 || (hasPOLines && !hasGRLines)) {
       stockMsg =
-        "Stock updated at the purchase location when items track inventory (auto-receive). BOM recipes are unchanged.";
+        "Stock posted at the purchase location for qty-tracked lines (Find Stock / Inv. Book). BOM recipes are unchanged.";
     } else if (hasGRLines) {
       stockMsg = "Already received earlier — this save is billing only. Check Inv Per Branch / Stock Movements for qty.";
+    } else if (serialPending) {
+      stockMsg =
+        "Document saved, but stock was not posted — scan serials matching qty and save again (or set Progress to Completed).";
+    } else {
+      stockMsg =
+        "Document saved. If Find Stock is unchanged, confirm items track inventory qty and a location was set.";
     }
     stockMsg = `${stockMsg} ${autoSave.message}`;
     if (toast.action) {
@@ -902,8 +914,8 @@ export function SupplierInvoiceModal(props: Props) {
             }
             fallback={
               <p class="mt-1">
-                Save the document, then set Progress to <span class="font-medium">Completed</span> to post stock
-                and AP. Next after that:{" "}
+                Stock posts on <span class="font-medium">Save</span> when qty-tracked lines have serials/lots complete.
+                Set Progress to <span class="font-medium">Completed</span> for AP / vendor bill. Next:{" "}
                 <A href="/app/finance/payment-vouchers" class="font-medium text-brand-700 hover:underline">
                   Payment Made
                 </A>
@@ -1072,7 +1084,7 @@ export function SupplierInvoiceModal(props: Props) {
                   when={Boolean(effectiveEditing())}
                   fallback={
                     <p class="rounded-lg border border-dashed border-stroke bg-slate-50 px-3 py-2 text-xs text-text-secondary">
-                      Starts as Unconfirmed. Set Progress Status on the list after save to Complete and post stock.
+                      Starts as Unconfirmed. Stock posts on save (scan serials if required). Set Progress to Completed on the list for AP.
                     </p>
                   }
                 >
@@ -1264,7 +1276,7 @@ export function SupplierInvoiceModal(props: Props) {
             <p class="text-xs text-text-secondary">
               <Show
                 when={processPolicy.data?.purchase_require_gr_before_supplier_invoice}
-                fallback="Load Slip → Purchase Order (or blank Bill) posts stock + serials when you confirm. Attach DR / vendor SI before Completed."
+                fallback="Load Slip → Purchase Order (or blank Bill) posts stock on save when serials/lots are complete. Attach DR / vendor SI before Completed (AP)."
               >
                 Process policy requires Purchase Receive before Bill — use Load Slip → Purchase Receive, or turn the gate off under Process policies (Bill-first is the default).
               </Show>
