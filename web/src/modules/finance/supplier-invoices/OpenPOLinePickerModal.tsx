@@ -191,7 +191,7 @@ export function OpenPOLinePickerModal(props: Props) {
         },
         {
           key: "balance",
-          header: "Balance",
+          header: "To receive",
           class: "text-right",
           cell: (r) => Number(r.balance_qty ?? 0),
         },
@@ -204,7 +204,7 @@ export function OpenPOLinePickerModal(props: Props) {
       ]}
       onApply={apply}
       applyLabel={props.mapOnly ? "Map selected lines" : undefined}
-      emptyHint="No open Purchase Order lines with unbilled qty. Finished POs appear when bill residual remains. Clear filters and try All."
+      emptyHint="No open Purchase Order lines left to receive. Fully received POs won’t appear here — use Load Slip → Bill if you only need to invoice a prior GR. Clear filters and try All."
     />
   );
 }

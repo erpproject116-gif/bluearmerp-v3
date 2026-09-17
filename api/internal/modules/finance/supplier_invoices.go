@@ -171,12 +171,16 @@ type openPOLineRow struct {
 	UnitVatInc             float64 `json:"unit_vat_inc"`
 	TrackSerial            bool    `json:"track_serial,omitempty"`
 	WarrantyDurationMonths *int    `json:"warranty_duration_months,omitempty"`
+	SpecName               string  `json:"spec_name,omitempty"`
+	Description            string  `json:"description,omitempty"`
+	Remark                 string  `json:"remark,omitempty"`
+	ReceivedQty            float64 `json:"received_qty"`
 }
 
 func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		// Load Slip lists all open PO billed residuals (draft + confirmed family).
+		// Load Slip → Purchase Order: open receive residual (qty − received).
 		// Cancelled POs stay excluded. No partner/date filter unless the client sends one.
 		where := `po.tenant_id = $1 and po.deleted_at is null
 			and po.status in ('draft', 'confirmed', 'partially_received', 'received')`
@@ -216,8 +220,9 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  po.project_id, coalesce(proj.project_name, ''),
 			  coalesce(po.reference, ''), coalesce(po.notes, ''),
 			  pol.item_id, pol.item_code, pol.item_name,
-			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
-			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
+			  coalesce(pol.spec_name, ''), coalesce(pol.description, ''), coalesce(pol.remark, ''),
+			  pol.qty::float8, coalesce(pol.received_qty, 0)::float8, coalesce(pol.billed_qty, 0)::float8,
+			  (pol.qty - coalesce(pol.received_qty, 0))::float8,
 			  pol.unit_id, coalesce(pol.unit_code, ''),
 			  i.base_unit_id, coalesce(bu.code, ''),
 			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8,
@@ -231,7 +236,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			left join public.inv_items i on i.id = pol.item_id
 			left join public.inv_units bu on bu.id = i.base_unit_id
 			where %s
-			  and (pol.qty - coalesce(pol.billed_qty, 0)) > 0.0001
+			  and (pol.qty - coalesce(pol.received_qty, 0)) > 0.0001
 			order by po.order_date desc, pol.line_no`, where)
 
 		rows, err := pool.Query(r.Context(), q, args...)
@@ -254,7 +259,8 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.ProjectID, &row.ProjectName,
 				&row.Reference, &row.Notes,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
-				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
+				&row.SpecName, &row.Description, &row.Remark,
+				&row.OrderedQty, &row.ReceivedQty, &row.BilledQty, &row.BalanceQty,
 				&row.UnitID, &row.UnitCode, &row.BaseUnitID, &row.BaseUnitCode,
 				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial, &row.WarrantyDurationMonths,
 			); err != nil {
