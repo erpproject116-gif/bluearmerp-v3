@@ -74,8 +74,59 @@ func enrichSourceDocIDsFromPersistedLines(
 	}
 }
 
+// enrichQuotationIDsFromSalesOrders pulls quotation ids linked via SO header
+// and SO lines (so Load Slip → Sales Order still copies Quotation files even when
+// sale lines only carry source_sales_order_line_id).
+func enrichQuotationIDsFromSalesOrders(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	soIDs, quoIDs map[int64]struct{},
+) {
+	for soID := range soIDs {
+		var headerQuo *int64
+		_ = pool.QueryRow(ctx,
+			`select source_quotation_id from public.so_sales_orders where id = $1`, soID).Scan(&headerQuo)
+		if headerQuo != nil && *headerQuo > 0 {
+			quoIDs[*headerQuo] = struct{}{}
+		}
+		rows, err := pool.Query(ctx, `
+			select distinct ql.quotation_id
+			from public.so_sales_order_lines sol
+			join public.quo_quotation_lines ql on ql.id = sol.source_quotation_line_id
+			where sol.sales_order_id = $1 and sol.source_quotation_line_id is not null`, soID)
+		if err != nil {
+			continue
+		}
+		for rows.Next() {
+			var quoID int64
+			if rows.Scan(&quoID) == nil && quoID > 0 {
+				quoIDs[quoID] = struct{}{}
+			}
+		}
+		rows.Close()
+	}
+}
+
+func saleAttachmentFileNames(ctx context.Context, pool *pgxpool.Pool, saleID int64) map[string]struct{} {
+	out := map[string]struct{}{}
+	rows, err := pool.Query(ctx,
+		`select file_name from public.sa_sales_attachments where sales_id = $1`, saleID)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if rows.Scan(&name) == nil && name != "" {
+			out[name] = struct{}{}
+		}
+	}
+	return out
+}
+
 // copySaleSourceAttachments copies SO/quotation attachments onto a new sale.
 // Best-effort: logs failures and returns total successfully copied file count.
+// Quotation files already present via SO copy are skipped (same file_name).
 func copySaleSourceAttachments(ctx context.Context, pool *pgxpool.Pool, tenantID, saleID int64, body saleBody) int {
 	resolveSO := func(lineID int64) (int64, bool) {
 		var soID int64
@@ -91,6 +142,7 @@ func copySaleSourceAttachments(ctx context.Context, pool *pgxpool.Pool, tenantID
 	}
 	soIDs, quoIDs := sourceAttachmentDocIDsFromBody(body, resolveSO, resolveQuo)
 	enrichSourceDocIDsFromPersistedLines(ctx, pool, saleID, soIDs, quoIDs)
+	enrichQuotationIDsFromSalesOrders(ctx, pool, soIDs, quoIDs)
 
 	copied := 0
 	for soID := range soIDs {
@@ -111,23 +163,27 @@ func copySaleSourceAttachments(ctx context.Context, pool *pgxpool.Pool, tenantID
 		}
 		copied += n
 	}
+	existing := saleAttachmentFileNames(ctx, pool, saleID)
 	for quoID := range quoIDs {
 		n, err := attachmentx.Copy(ctx, pool, attachmentx.CopyParams{
-			SrcBaseDir: attachmentx.Dir("quotation"),
-			DstBaseDir: attachmentx.Dir("sales"),
-			SrcTable:   "public.quo_quotation_attachments",
-			SrcFKCol:   "quotation_id",
-			SrcID:      quoID,
-			DstTable:   "public.sa_sales_attachments",
-			DstFKCol:   "sales_id",
-			DstID:      saleID,
-			TenantID:   tenantID,
+			SrcBaseDir:    attachmentx.Dir("quotation"),
+			DstBaseDir:    attachmentx.Dir("sales"),
+			SrcTable:      "public.quo_quotation_attachments",
+			SrcFKCol:      "quotation_id",
+			SrcID:         quoID,
+			DstTable:      "public.sa_sales_attachments",
+			DstFKCol:      "sales_id",
+			DstID:         saleID,
+			TenantID:      tenantID,
+			SkipFileNames: existing,
 		})
 		if err != nil {
 			log.Printf("sales.create: copy quotation %d attachments to sale %d: %v", quoID, saleID, err)
 			continue
 		}
 		copied += n
+		// Refresh names so a second quotation doesn't re-copy the same file_name.
+		existing = saleAttachmentFileNames(ctx, pool, saleID)
 	}
 	return copied
 }

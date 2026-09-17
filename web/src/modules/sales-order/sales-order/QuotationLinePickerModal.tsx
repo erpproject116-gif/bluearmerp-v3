@@ -10,6 +10,7 @@ import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 export type OpenQuotationLineRow = {
   quotation_id: number;
   quotation_line_id: number;
+  order_date?: string;
   date_no_display: string;
   reference_no: string;
   progress_status?: string;
@@ -20,6 +21,11 @@ export type OpenQuotationLineRow = {
   tax_type_id: number;
   currency_id: number;
   pic_name: string;
+  project_id?: number | null;
+  project_name?: string;
+  valid_until?: string | null;
+  payment_terms?: string;
+  notes?: string;
   item_id?: number | null;
   item_code: string;
   item_name: string;

@@ -57,6 +57,9 @@ type CopyParams struct {
 	DstFKCol   string // e.g. "sales_order_id"
 	DstID      int64
 	TenantID   int64
+	// SkipFileNames skips source rows whose file_name is already present on the destination
+	// (used when copying Quotation files after Sales Order files that already include them).
+	SkipFileNames map[string]struct{}
 }
 
 // Copy duplicates all attachment rows and their stored files from the source
@@ -107,6 +110,11 @@ func Copy(ctx context.Context, pool *pgxpool.Pool, p CopyParams) (int, error) {
 	copied := 0
 	var firstErr error
 	for i, it := range items {
+		if p.SkipFileNames != nil {
+			if _, skip := p.SkipFileNames[it.fileName]; skip {
+				continue
+			}
+		}
 		storedName := fmt.Sprintf("%d_%d_%s", time.Now().UnixNano(), i, filepath.Base(it.fileName))
 		dstStoragePath := filepath.ToSlash(filepath.Join(relDir, storedName))
 		var mime any

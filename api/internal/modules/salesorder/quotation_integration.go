@@ -18,28 +18,34 @@ import (
 )
 
 type openQuotationLineRow struct {
-	QuotationID    int64   `json:"quotation_id"`
-	QuotationLineID int64  `json:"quotation_line_id"`
-	DateNoDisplay  string  `json:"date_no_display"`
-	ReferenceNo    string  `json:"reference_no"`
-	ProgressStatus string  `json:"progress_status"`
-	CustomerName   string  `json:"customer_name"`
-	LocationID     int64   `json:"location_id"`
-	LocationName   string  `json:"location_name"`
-	PartnerID      int64   `json:"partner_id"`
-	TaxTypeID      int64   `json:"tax_type_id"`
-	CurrencyID     int64   `json:"currency_id"`
-	PicName        string  `json:"pic_name"`
-	ItemID         *int64  `json:"item_id,omitempty"`
-	ItemCode       string  `json:"item_code"`
-	ItemName       string  `json:"item_name"`
-	Description    *string `json:"description,omitempty"`
-	Qty            float64 `json:"qty"`
-	BalanceQty     float64 `json:"balance_qty"`
-	UnitID         *int64  `json:"unit_id,omitempty"`
-	UnitCode       string  `json:"unit_code,omitempty"`
-	UnitVatInc     float64 `json:"unit_vat_inc"`
-	Remark         *string `json:"remark,omitempty"`
+	QuotationID           int64   `json:"quotation_id"`
+	QuotationLineID       int64   `json:"quotation_line_id"`
+	OrderDate             string  `json:"order_date"`
+	DateNoDisplay         string  `json:"date_no_display"`
+	ReferenceNo           string  `json:"reference_no"`
+	ProgressStatus        string  `json:"progress_status"`
+	CustomerName          string  `json:"customer_name"`
+	LocationID            int64   `json:"location_id"`
+	LocationName          string  `json:"location_name"`
+	PartnerID             int64   `json:"partner_id"`
+	TaxTypeID             int64   `json:"tax_type_id"`
+	CurrencyID            int64   `json:"currency_id"`
+	PicName               string  `json:"pic_name"`
+	ProjectID             *int64  `json:"project_id,omitempty"`
+	ProjectName           string  `json:"project_name"`
+	ValidUntil            *string `json:"valid_until,omitempty"`
+	PaymentTerms          string  `json:"payment_terms"`
+	Notes                 string  `json:"notes"`
+	ItemID                *int64  `json:"item_id,omitempty"`
+	ItemCode              string  `json:"item_code"`
+	ItemName              string  `json:"item_name"`
+	Description           *string `json:"description,omitempty"`
+	Qty                   float64 `json:"qty"`
+	BalanceQty            float64 `json:"balance_qty"`
+	UnitID                *int64  `json:"unit_id,omitempty"`
+	UnitCode              string  `json:"unit_code,omitempty"`
+	UnitVatInc            float64 `json:"unit_vat_inc"`
+	Remark                *string `json:"remark,omitempty"`
 }
 
 func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
@@ -91,6 +97,9 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			select q.id, ln.id, q.order_date, q.date_seq, q.reference_no, q.progress_status,
 			  p.company_name, q.location_id, l.location_name, q.partner_id,
 			  q.tax_type_id, q.currency_id, q.pic_name,
+			  q.project_id, coalesce(q.project_name, ''),
+			  q.valid_until,
+			  coalesce(q.payment_terms, ''), coalesce(q.notes, ''),
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  ln.qty::float8,
 			  (ln.qty - coalesce(slip.qty_fulfilled, 0))::float8,
@@ -123,18 +132,25 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row openQuotationLineRow
 			var orderDate time.Time
+			var validUntil *time.Time
 			var dateSeq int
 			if err := rows.Scan(
 				&row.QuotationID, &row.QuotationLineID, &orderDate, &dateSeq, &row.ReferenceNo, &row.ProgressStatus,
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
+				&row.ProjectID, &row.ProjectName, &validUntil, &row.PaymentTerms, &row.Notes,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
 				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitVatInc, &row.Remark, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read quotation lines.", "ERR_INTERNAL")
 				return
 			}
+			row.OrderDate = orderDate.Format("2006-01-02")
 			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
+			if validUntil != nil {
+				s := validUntil.Format("2006-01-02")
+				row.ValidUntil = &s
+			}
 			out = append(out, row)
 		}
 		if out == nil {

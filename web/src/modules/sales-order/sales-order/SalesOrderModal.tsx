@@ -345,6 +345,14 @@ export function SalesOrderModal(props: Props) {
   let newFormSeededForOpen = false;
 
   createEffect(() => {
+    // Only clear after this session created/saved an id — keep preview on edit + Load Slip.
+    const soId = createdSalesOrder()?.id;
+    if (soId && sourceAttachPreview()) {
+      setSourceAttachPreview(null);
+    }
+  });
+
+  createEffect(() => {
     if (!props.open) {
       setCreatedSalesOrder(null);
       setSourceAttachPreview(null);
@@ -492,6 +500,10 @@ export function SalesOrderModal(props: Props) {
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
     const first = picked[0];
+    if (first.order_date) {
+      setOrderDate(first.order_date);
+      void loadPreview(first.order_date);
+    }
     setPartnerId(first.partner_id);
     setCustomerLabel(first.customer_name);
     setLocationId(first.location_id);
@@ -500,6 +512,22 @@ export function SalesOrderModal(props: Props) {
     setCurrencyId(first.currency_id);
     setPicName(first.pic_name);
     setSourceQuotationId(first.quotation_id);
+    setPaymentTerms(first.payment_terms ?? "");
+    setNotes(first.notes ?? "");
+    setDueDate(first.valid_until ?? "");
+    if (first.project_id) {
+      setProjectId(first.project_id);
+      setProjectLabel(first.project_name ?? "");
+      setProjectName(first.project_name ?? "");
+    } else if (first.project_name) {
+      setProjectId(null);
+      setProjectName(first.project_name);
+      setProjectLabel(first.project_name);
+    } else {
+      setProjectId(null);
+      setProjectLabel("");
+      setProjectName("");
+    }
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
     setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
@@ -531,6 +559,9 @@ export function SalesOrderModal(props: Props) {
         "From Quotation (copies when you Save)",
       ),
     ]);
+    toast.success(
+      "Quotation lines loaded. Header fields, attachments, and matching custom fields copy when you Save.",
+    );
   };
 
   const mapBuyingOntoSalesOrder = async (
@@ -684,8 +715,24 @@ export function SalesOrderModal(props: Props) {
           ? "Sales order updated."
           : "Sales order created."),
     );
+    // Keep modal open so AttachmentsField can flush staged files / show server-copied quotation files.
+    if (!ed) {
+      setCreatedSalesOrder(res.data);
+    }
     await draft.clearOnSave();
     props.onSaved();
+    if (!ed) {
+      return;
+    }
+    const sourced =
+      !!sourceQuotationId() ||
+      !!sourceAttachPreview() ||
+      lines().some((ln) => !!ln.source_quotation_line_id);
+    const delayMs = attachmentCount() > 0 || sourced ? 600 : 0;
+    if (delayMs > 0) {
+      window.setTimeout(() => props.onClose(), delayMs);
+      return;
+    }
     props.onClose();
   };
 

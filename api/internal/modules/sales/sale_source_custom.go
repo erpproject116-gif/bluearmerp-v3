@@ -26,6 +26,7 @@ func countSaleSourceAttachments(ctx context.Context, pool *pgxpool.Pool, body sa
 		return quoID, err == nil && quoID > 0
 	}
 	soIDs, quoIDs := sourceAttachmentDocIDsFromBody(body, resolveSO, resolveQuo)
+	enrichQuotationIDsFromSalesOrders(ctx, pool, soIDs, quoIDs)
 	total := 0
 	for soID := range soIDs {
 		n, err := attachmentx.Count(ctx, pool, "public.so_sales_order_attachments", "sales_order_id", soID)
@@ -84,6 +85,7 @@ func mergeSaleSourceCustomValues(ctx context.Context, pool *pgxpool.Pool, tenant
 		return quoID, err == nil && quoID > 0
 	}
 	soIDs, quoIDs := sourceAttachmentDocIDsFromBody(body, resolveSO, resolveQuo)
+	enrichQuotationIDsFromSalesOrders(ctx, pool, soIDs, quoIDs)
 
 	dstDefs, err := customfields.ListDefinitions(ctx, pool, tenantID, entitySales, true)
 	if err != nil || len(dstDefs) == 0 {

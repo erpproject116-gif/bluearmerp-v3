@@ -43,6 +43,8 @@ export function AttachmentsField(props: Props) {
   const [uploading, setUploading] = createSignal(false);
   const [busyId, setBusyId] = createSignal<number | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
+  /** Remember last known id so close can still flush staged files after parent clears docId. */
+  let lastDocId: number | undefined;
 
   const totalCount = () => items().length + pending().length;
 
@@ -95,7 +97,23 @@ export function AttachmentsField(props: Props) {
   };
 
   createEffect(() => {
+    if (props.docId && props.docId > 0) {
+      lastDocId = props.docId;
+    }
+  });
+
+  createEffect(() => {
     if (props.formOpen === false) {
+      const id = props.docId && props.docId > 0 ? props.docId : lastDocId;
+      const queue = pending();
+      if (id && queue.length > 0) {
+        void flushPendingUploads(id).finally(() => {
+          setPending([]);
+          setItems([]);
+          notifyCount();
+        });
+        return;
+      }
       setPending([]);
       setItems([]);
       notifyCount();
