@@ -64,6 +64,10 @@ type Bom struct {
 	IsActive             bool      `json:"is_active"`
 	Notes                *string   `json:"notes,omitempty"`
 	Components           string    `json:"components,omitempty"`
+	CreatedAt            *string   `json:"created_at,omitempty"`
+	UpdatedAt            *string   `json:"updated_at,omitempty"`
+	// TransactionDate is the recipe master transaction datetime (created_at).
+	TransactionDate      *string   `json:"transaction_date,omitempty"`
 	Lines                []BomLine `json:"lines,omitempty"`
 }
 
@@ -96,13 +100,18 @@ type bomLineBody struct {
 
 func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{
-		"bom_code":   "b.bom_code",
-		"bom_name":   "b.bom_name",
-		"updated_at": "b.updated_at",
+		"bom_code":          "b.bom_code",
+		"bom_name":          "b.bom_name",
+		"created_at":        "b.created_at",
+		"updated_at":        "b.updated_at",
+		"transaction_date":  "b.created_at",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		p := httputil.ParseListParams(r, "bom_code", allowed)
+		p := httputil.ParseListParams(r, "created_at", allowed)
+		if r.URL.Query().Get("order") == "" {
+			p.Order = "desc"
+		}
 		offset := httputil.Offset(p)
 
 		where := "b.tenant_id = $1"
@@ -124,9 +133,9 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 
-		sortCol := allowed[p.Sort]
+		sortCol := p.Sort
 		if sortCol == "" {
-			sortCol = "b.bom_code"
+			sortCol = "b.created_at"
 		}
 		q := fmt.Sprintf(`
 			select b.id, b.bom_code, b.bom_name, b.finished_item_id,
@@ -137,6 +146,7 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			  b.expected_yield_pct_min::float8, b.expected_yield_pct_max::float8,
 			  b.additional_cost_type, coalesce(b.direct_labor_cost, 0)::float8, coalesce(b.inbound_freight_cost, 0)::float8,
 			  b.is_active, b.notes,
+			  b.created_at::text, b.updated_at::text,
 			  string_agg(
 			    coalesce(ci.item_code, '') || ' × ' || l.qty::text || ' ' || coalesce(lu.code, coalesce(nullif(trim(ci.unit), ''), '')),
 			    ', ' order by l.line_no
@@ -151,7 +161,7 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			left join public.inv_units lu on lu.id = l.unit_id
 			where %s
 			group by b.id, fi.item_code, fi.item_name, loc.location_name, ou.code
-			order by %s %s
+			order by %s %s, b.id desc
 			limit $%d offset $%d`,
 			where, sortCol, orderSQL(p.Order), argN, argN+1)
 		args = append(args, p.PageSize, offset)
@@ -170,6 +180,8 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			var notes *string
 			var components *string
 			var addCostType *string
+			var createdAt *string
+			var updatedAt *string
 			if err := rows.Scan(
 				&row.ID, &row.BomCode, &row.BomName, &row.FinishedItemID,
 				&row.FinishedItemCode, &row.FinishedItemName,
@@ -177,7 +189,7 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.OutputQty, &row.OutputUnitID, &row.OutputUnitCode,
 				&row.YieldPct, &row.BomType, &row.ExpectedYieldPctMin, &row.ExpectedYieldPctMax,
 				&addCostType, &row.DirectLaborCost, &row.InboundFreightCost,
-				&row.IsActive, &notes, &components, &total,
+				&row.IsActive, &notes, &createdAt, &updatedAt, &components, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read BOM.", "ERR_INTERNAL")
 				return
@@ -185,6 +197,9 @@ func listBoms(pool *pgxpool.Pool) http.HandlerFunc {
 			row.AdditionalCostType = addCostType
 			row.AdditionalCost = row.DirectLaborCost + row.InboundFreightCost
 			row.Notes = notes
+			row.CreatedAt = createdAt
+			row.UpdatedAt = updatedAt
+			row.TransactionDate = createdAt
 			if components != nil {
 				row.Components = *components
 			}
