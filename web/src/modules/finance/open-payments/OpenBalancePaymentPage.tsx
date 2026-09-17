@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { formatPeso } from "../../../shared/money";
 import { DecimalInput } from "../../../shared/DecimalInput";
@@ -59,7 +60,12 @@ function docNo(r: OpenBalanceRow) {
 
 export function OpenBalancePaymentPage(props: Props) {
   const toast = useToast();
-  const [q, setQ] = createSignal("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialQ = () => {
+    const raw = searchParams.q;
+    return String(Array.isArray(raw) ? raw[0] ?? "" : raw ?? "");
+  };
+  const [q, setQ] = createSignal(initialQ());
   const [dueFrom, setDueFrom] = createSignal("");
   const [dueTo, setDueTo] = createSignal("");
   const [page, setPage] = createSignal(1);
@@ -70,6 +76,23 @@ export function OpenBalancePaymentPage(props: Props) {
   const [allowMulti, setAllowMulti] = createSignal(false);
   const [txnTarget, setTxnTarget] = createSignal<OpenBalanceRow | null>(null);
   const pageSize = 50;
+
+  createEffect(() => {
+    const next = initialQ();
+    if (next && next !== q()) {
+      setQ(next);
+      setPage(1);
+    }
+  });
+
+  const setSearchQ = (value: string) => {
+    setQ(value);
+    setPage(1);
+    const next = { ...searchParams } as Record<string, string | undefined>;
+    if (value.trim()) next.q = value.trim();
+    else delete next.q;
+    setSearchParams(next, { replace: true });
+  };
 
   const list = createQuery(() => ({
     queryKey: ["open-payments", props.side, q(), dueFrom(), dueTo(), page()],
@@ -96,7 +119,7 @@ export function OpenBalancePaymentPage(props: Props) {
   const rows = createMemo(() => list.data?.rows ?? []);
   const hasFilters = createMemo(() => Boolean(q().trim() || dueFrom() || dueTo()));
   const clearFilters = () => {
-    setQ("");
+    setSearchQ("");
     setDueFrom("");
     setDueTo("");
     setPage(1);
@@ -169,8 +192,7 @@ export function OpenBalancePaymentPage(props: Props) {
             placeholder="Search partner, payable no., vendor invoice no., or date-no"
             value={q()}
             onInput={(e) => {
-              setQ(e.currentTarget.value);
-              setPage(1);
+              setSearchQ(e.currentTarget.value);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") void list.refetch();

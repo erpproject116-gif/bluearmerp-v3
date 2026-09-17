@@ -1,5 +1,5 @@
 import { createMemo, createSignal, onMount } from "solid-js";
-import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
+import { A, useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { showBlockerResult } from "../../../shared/handleSaveResult";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
@@ -160,6 +160,21 @@ export function SalesListPageInner(props: PageOptions = {}) {
 
   return (
     <SalesLayout>
+      <div class="mb-4 rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-slate-700">
+        <p class="font-medium text-slate-800">Sales — bill the customer</p>
+        <p class="mt-1 text-xs">
+          Create or Load Slip from a Sales Order, confirm Progress when ready, then collect payment. Stock updates on
+          Find Stock for inventory-tracked items.
+        </p>
+        <p class="mt-2 text-xs text-text-secondary">
+          Next:{" "}
+          <A href="/app/finance/receivables" class="font-medium text-brand-700 hover:underline">
+            New Receivable Payment
+          </A>{" "}
+          (open balances → apply) or open a sale and use Cash In after save. Trace the GL via the Invoice tab → journal
+          entry.
+        </p>
+      </div>
       <div class="mb-3 flex justify-end gap-2">
         <button
           type="button"

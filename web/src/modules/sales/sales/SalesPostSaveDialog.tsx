@@ -22,6 +22,14 @@ export function SalesPostSaveDialog(props: Props) {
     const s = acct()?.status;
     return s === "posted" || s === "draft" || s === "already";
   };
+  const receivablesHref = () =>
+    `/app/finance/receivables?q=${encodeURIComponent(props.salesNo || "")}`;
+  const jeHref = () => {
+    const id = acct()?.journal_entry_id;
+    return id
+      ? `/app/finance/acct-i/journal-entries?highlight=${id}`
+      : "/app/finance/acct-i/journal-entries";
+  };
 
   return (
     <Modal open={props.open} title="Sale saved" onClose={props.onDone} stacked>
@@ -39,6 +47,14 @@ export function SalesPostSaveDialog(props: Props) {
         >
           <span class="font-medium">Accounting: </span>
           {acct()!.message}
+          <Show when={acct()?.journal_entry_no}>
+            {" "}
+            (
+            <A href={jeHref()} class="font-medium underline" onClick={props.onDone}>
+              {acct()!.journal_entry_no}
+            </A>
+            )
+          </Show>
         </p>
       </Show>
 
@@ -65,7 +81,7 @@ export function SalesPostSaveDialog(props: Props) {
           Find Stock
         </A>
         <A
-          href="/app/finance/receivables"
+          href={receivablesHref()}
           class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary"
           onClick={props.onDone}
         >
@@ -78,6 +94,15 @@ export function SalesPostSaveDialog(props: Props) {
             onClick={props.onDone}
           >
             Open Serials
+          </A>
+        </Show>
+        <Show when={acct()?.journal_entry_id}>
+          <A
+            href={jeHref()}
+            class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary"
+            onClick={props.onDone}
+          >
+            Open journal entry
           </A>
         </Show>
         <Show when={!booksReady()}>

@@ -774,7 +774,13 @@ export default function App() {
           <Route path="/finance/bank-reconciliation" component={() => <Navigate href="/app/finance/acct-i/bank-reconciliation" />} />
           <Route path="/finance/fiscal-years" component={() => <Navigate href="/app/finance/acct-i/fiscal-years" />} />
           <Route path="/finance/payment-entries" component={() => <Navigate href="/app/finance/acct-i/payment-entries" />} />
-          <Route path="/finance/journal-entries" component={() => <Navigate href="/app/finance/acct-i/journal-entries" />} />
+          <Route
+            path="/finance/journal-entries"
+            component={() => {
+              const loc = useLocation();
+              return <Navigate href={`/app/finance/acct-i/journal-entries${loc.search}`} />;
+            }}
+          />
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />

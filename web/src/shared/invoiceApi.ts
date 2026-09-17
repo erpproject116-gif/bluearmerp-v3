@@ -45,6 +45,8 @@ export type InvoiceAutoSaveResult = {
   /** posted | draft | already | skipped_defaults | failed */
   status: "posted" | "draft" | "already" | "skipped_defaults" | "failed";
   message: string;
+  journal_entry_id?: number | null;
+  journal_entry_no?: string | null;
 };
 
 export function getSalesInvoice(id: number): Promise<ApiResult<SalesInvoice>> {
@@ -86,17 +88,22 @@ export async function tryAutoSavePurchaseInvoice(supplierInvoiceId: number): Pro
   const existing = await getPurchaseInvoice(supplierInvoiceId);
   if (existing.success && existing.data?.purchase_account_id && existing.data?.withdrawal_account_id) {
     const st = (existing.data.journal_status || "").toLowerCase();
+    const je = {
+      journal_entry_id: existing.data.journal_entry_id,
+      journal_entry_no: existing.data.journal_entry_no || null,
+    };
     if (existing.data.journal_entry_id && st === "posted") {
-      return { ok: true, status: "posted", message: "Accounting journal already posted." };
+      return { ok: true, status: "posted", message: "Accounting journal already posted.", ...je };
     }
     if (existing.data.journal_entry_id) {
       return {
         ok: true,
         status: "draft",
         message: "Accounting journal is draft — post it under Journal Entries for Trial Balance.",
+        ...je,
       };
     }
-    return { ok: true, status: "already", message: "Purchase accounts already mapped." };
+    return { ok: true, status: "already", message: "Purchase accounts already mapped.", ...je };
   }
   const defaults = await apiFetch<FinanceAccountDefaults>("/api/v1/finance/accounts/defaults", {}, { silent: true });
   const purchaseId = defaults.data?.purchase_account_id;
@@ -119,13 +126,18 @@ export async function tryAutoSavePurchaseInvoice(supplierInvoiceId: number): Pro
   }
   const after = await getPurchaseInvoice(supplierInvoiceId);
   const st = (after.data?.journal_status || "").toLowerCase();
+  const je = {
+    journal_entry_id: after.data?.journal_entry_id ?? res.data?.journal_entry_id ?? null,
+    journal_entry_no: after.data?.journal_entry_no || null,
+  };
   if (st === "posted") {
-    return { ok: true, status: "posted", message: "Purchase journal posted to the general ledger." };
+    return { ok: true, status: "posted", message: "Purchase journal posted to the general ledger.", ...je };
   }
   return {
     ok: true,
     status: "draft",
     message: "Purchase journal created as draft — enable purchase auto-post or post under Journal Entries.",
+    ...je,
   };
 }
 
@@ -142,13 +154,18 @@ export async function tryAutoSaveSalesInvoice(salesId: number): Promise<InvoiceA
     existing.data?.journal_entry_id
   ) {
     const st = (existing.data.journal_status || "").toLowerCase();
+    const je = {
+      journal_entry_id: existing.data.journal_entry_id,
+      journal_entry_no: existing.data.journal_entry_no || null,
+    };
     if (st === "posted") {
-      return { ok: true, status: "posted", message: "Accounting journal already posted." };
+      return { ok: true, status: "posted", message: "Accounting journal already posted.", ...je };
     }
     return {
       ok: true,
       status: "draft",
       message: "Accounting journal is draft — post it under Journal Entries for Trial Balance.",
+      ...je,
     };
   }
   const defaults = await apiFetch<FinanceAccountDefaults>("/api/v1/finance/accounts/defaults", {}, { silent: true });
@@ -172,12 +189,17 @@ export async function tryAutoSaveSalesInvoice(salesId: number): Promise<InvoiceA
   }
   const after = await getSalesInvoice(salesId);
   const st = (after.data?.journal_status || "").toLowerCase();
+  const je = {
+    journal_entry_id: after.data?.journal_entry_id ?? res.data?.journal_entry_id ?? null,
+    journal_entry_no: after.data?.journal_entry_no || null,
+  };
   if (st === "posted") {
-    return { ok: true, status: "posted", message: "Sales journal posted to the general ledger." };
+    return { ok: true, status: "posted", message: "Sales journal posted to the general ledger.", ...je };
   }
   return {
     ok: true,
     status: "draft",
     message: "Sales journal created as draft — enable sales auto-post or post under Journal Entries.",
+    ...je,
   };
 }

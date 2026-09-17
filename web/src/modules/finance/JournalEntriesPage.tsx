@@ -1,6 +1,7 @@
 import { uiLabel } from "../../shared/branding/uiLabel";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { handleSaveResult } from "../../shared/handleSaveResult";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
@@ -19,6 +20,7 @@ type DimOption = { id: number; name?: string; department_name?: string; project_
 export default function JournalEntriesPage() {
   const toast = useToast();
   const client = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [statusFilter, setStatusFilter] = createSignal<"all" | "draft" | "posted">("all");
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -40,6 +42,21 @@ export default function JournalEntriesPage() {
       return res.data ?? [];
     },
   }));
+
+  createEffect(() => {
+    const raw = searchParams.highlight ?? searchParams.openId;
+    const id = Number(Array.isArray(raw) ? raw[0] : raw);
+    if (!Number.isFinite(id) || id <= 0) return;
+    if (!list.data?.some((r) => r.id === id)) return;
+    setSelectedId(id);
+    const next = { ...searchParams } as Record<string, string | undefined>;
+    delete next.highlight;
+    delete next.openId;
+    setSearchParams(next, { replace: true });
+    requestAnimationFrame(() => {
+      document.getElementById(`je-row-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  });
 
   const accounts = createQuery(() => ({
     queryKey: ["finance-accounts-picker"],
@@ -201,9 +218,11 @@ export default function JournalEntriesPage() {
             <For each={list.data ?? []}>
               {(row) => (
                 <tr
+                  id={`je-row-${row.id}`}
                   classList={{
                     "border-t border-slate-100": true,
                     "bg-brand-50": selectedId() === row.id,
+                    "ring-2 ring-brand-400 ring-inset": selectedId() === row.id,
                   }}
                   onClick={() => setSelectedId(row.id)}
                 >
