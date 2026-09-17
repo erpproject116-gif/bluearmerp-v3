@@ -109,8 +109,6 @@ export default function ProductionIssueStationPage() {
   const [busy, setBusy] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
   const [prefilled, setPrefilled] = createSignal(false);
-  const [suggestedSerials, setSuggestedSerials] = createSignal<{ id: number; serial_no: string }[]>([]);
-  const [suggestBusy, setSuggestBusy] = createSignal(false);
 
   const activeComponent = () => context()?.components.find((c) => c.component_item_id === activeComponentId());
 
@@ -124,161 +122,20 @@ export default function ProductionIssueStationPage() {
     return need;
   };
 
-  const prefetchAvailableSerials = async (comp: ScanComponent, locationId: number, fillPaste: boolean) => {
-    if (!comp.track_serial) {
-      setSuggestedSerials([]);
-      return;
+  /** Cue on the materials list: which rows still need the operator to enter a serial or lot. */
+  const rowActionHint = (comp: ScanComponent | undefined): { label: string; needsAction: boolean } => {
+    if (!comp) return { label: "—", needsAction: false };
+    if (comp.track_serial) {
+      const need = remainingSerialNeed(comp);
+      if (need > 0) return { label: `Select — enter ${need} serial${need === 1 ? "" : "s"}`, needsAction: true };
+      return { label: "Serials done", needsAction: false };
     }
-    const need = remainingSerialNeed(comp);
-    if (need <= 0) {
-      setSuggestedSerials([]);
-      if (fillPaste) setSerialPaste("");
-      return;
+    if (comp.track_lot) {
+      const need = remainingLotNeed(comp);
+      if (need > 0.0001) return { label: "Select — enter lot", needsAction: true };
+      return { label: "Lot done", needsAction: false };
     }
-    setSuggestBusy(true);
-    const qs = new URLSearchParams({
-      item_id: String(comp.component_item_id),
-      location_id: String(locationId),
-      free_only: "true",
-      limit: String(Math.max(need, 20)),
-    });
-    const wo = woId();
-    if (wo) qs.set("exclude_wo_id", String(wo));
-    const res = await apiFetch<{ id: number; serial_no: string }[]>(
-      `/api/v1/inventory/serial-units/available?${qs}`,
-      undefined,
-      { silent: true },
-    );
-    setSuggestBusy(false);
-    const rows = (res.data ?? []).slice(0, need);
-    setSuggestedSerials(rows);
-    if (fillPaste && rows.length > 0) {
-      setSerialPaste(rows.map((r) => r.serial_no).join("\n"));
-    } else if (fillPaste) {
-      setSerialPaste("");
-    }
-  };
-
-  /** Pick the next free in-stock serials (not on sales / other jobs) and stage them. */
-  const autoPickAndStageSerials = async () => {
-    const wo = context();
-    const comp = activeComponent();
-    const id = woId();
-    if (!wo || !comp || !id || !comp.track_serial) return;
-    const need = remainingSerialNeed(comp);
-    if (need <= 0) {
-      mfgWarn(null, "This component already has enough serials staged.");
-      return;
-    }
-    setBusy(true);
-    const qs = new URLSearchParams({
-      item_id: String(comp.component_item_id),
-      location_id: String(wo.location_id),
-      free_only: "true",
-      exclude_wo_id: String(id),
-      limit: String(need),
-    });
-    const avail = await apiFetch<{ id: number; serial_no: string }[]>(
-      `/api/v1/inventory/serial-units/available?${qs}`,
-      undefined,
-      { silent: true },
-    );
-    const rows = (avail.data ?? []).slice(0, need);
-    if (rows.length === 0) {
-      setBusy(false);
-      mfgWarn(
-        null,
-        "No free serials in stock at this warehouse (unreserved and not used on another open job). Receive stock first.",
-      );
-      setSuggestedSerials([]);
-      setSerialPaste("");
-      return;
-    }
-    setSuggestedSerials(rows);
-    setSerialPaste(rows.map((r) => r.serial_no).join("\n"));
-    const unitIds = rows.map((r) => r.id);
-    const res = await apiFetch(`/api/v1/manufacturing/work-orders/${id}/issue-serials`, {
-      method: "POST",
-      body: JSON.stringify({ serial_unit_ids: unitIds }),
-    });
-    setBusy(false);
-    if (!res.success) {
-      mfgWarn(res.message, "Could not auto-stage those serials. Try Refresh, then Stage serials.");
-      return;
-    }
-    if (rows.length < need) {
-      mfgWarn(
-        null,
-        `Staged ${rows.length} of ${need} needed serial(s). Receive more stock, then auto-pick again.`,
-      );
-    } else {
-      mfgSuccess(`Auto-picked and staged ${rows.length} serial(s).`);
-    }
-    setSerialPaste("");
-    await refreshContext();
-  };
-
-  /** FEFO auto-pick free lot qty and stage for the active component. */
-  const autoPickAndStageLots = async () => {
-    const wo = context();
-    const comp = activeComponent();
-    const id = woId();
-    if (!wo || !comp || !id || !comp.track_lot || comp.track_serial) return;
-    let remaining = remainingLotNeed(comp);
-    if (!(remaining > 0.0001)) {
-      mfgWarn(null, "This component already has enough lot qty staged.");
-      return;
-    }
-    setBusy(true);
-    const qs = new URLSearchParams({
-      page: "1",
-      pageSize: "50",
-      item_id: String(comp.component_item_id),
-      location_id: String(wo.location_id),
-      free_only: "true",
-    });
-    const avail = await apiFetch<LotBatchRow[]>(`/api/v1/inventory/lot-batches?${qs}`, undefined, { silent: true });
-    const batches = avail.data ?? [];
-    if (batches.length === 0) {
-      setBusy(false);
-      mfgWarn(null, "No free lot qty at this warehouse. Receive stock first, or pick a lot manually.");
-      return;
-    }
-    const lines: { lot_batch_id: number; qty: number }[] = [];
-    for (const b of batches) {
-      if (!(remaining > 0.0001)) break;
-      const free = b.qty_available != null && Number.isFinite(b.qty_available) ? Number(b.qty_available) : Number(b.qty_on_hand);
-      if (!(free > 0.0001)) continue;
-      const take = Math.min(free, remaining);
-      lines.push({ lot_batch_id: b.id, qty: take });
-      remaining -= take;
-    }
-    if (lines.length === 0) {
-      setBusy(false);
-      mfgWarn(null, "No free lot qty at this warehouse. Receive stock first.");
-      return;
-    }
-    const res = await apiFetch(`/api/v1/manufacturing/work-orders/${id}/issue-lots`, {
-      method: "POST",
-      body: JSON.stringify({ lines }),
-    });
-    setBusy(false);
-    if (!res.success) {
-      mfgWarn(res.message, "Could not auto-stage those lots. Try picking a lot manually.");
-      return;
-    }
-    const first = batches.find((b) => b.id === lines[0]?.lot_batch_id);
-    if (first) {
-      setLotBatchId(first.id);
-      setLotNo(first.lot_no);
-      setLotQty(String(lines[0].qty));
-    }
-    if (remaining > 0.0001) {
-      mfgWarn(null, `Staged what was free; still need ${remaining.toFixed(4)} more. Receive stock or add another lot.`);
-    } else {
-      mfgSuccess(`Auto-picked and staged ${lines.length} lot line(s).`);
-    }
-    await refreshContext();
+    return { label: "No serial/lot", needsAction: false };
   };
 
   const loadWo = async (id: number) => {
@@ -323,15 +180,13 @@ export default function ProductionIssueStationPage() {
       ) ?? ctxRes.data.components.find((c) => c.track_serial || c.track_lot);
     const firstId = firstNeed?.component_item_id ?? ctxRes.data.components[0]?.component_item_id ?? null;
     setActiveComponentId(firstId);
+    setSerialPaste("");
+    setLotPaste("");
+    setLotBatchId(null);
+    setLotNo("");
+    setLotQty("1");
     if (!firstNeed) {
       mfgWarn(null, "Nothing left to take — go back and Finish build.");
-      setSuggestedSerials([]);
-      setSerialPaste("");
-    } else if (firstNeed.track_serial) {
-      await prefetchAvailableSerials(firstNeed, ctxRes.data.location_id, true);
-    } else {
-      setSuggestedSerials([]);
-      setSerialPaste("");
     }
   };
 
@@ -494,50 +349,76 @@ export default function ProductionIssueStationPage() {
                 </p>
                 <Show when={needs()}>
                   {(m) => (
-                    <div class="mt-3 overflow-x-auto rounded border border-stroke">
-                      <table class="min-w-full text-left text-xs">
-                        <thead class="bg-slate-50 text-text-secondary">
-                          <tr>
-                            <th class="px-2 py-1.5">Component</th>
-                            <th class="px-2 py-1.5">To issue</th>
-                            <th class="px-2 py-1.5">On hand</th>
-                            <th class="px-2 py-1.5">Staged</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <For each={m().lines}>
-                            {(ln) => {
-                              const staged = ctx().components.find((c) => c.component_item_id === ln.component_item_id);
-                              return (
-                                <tr
-                                  class={`cursor-pointer ${activeComponentId() === ln.component_item_id ? "bg-brand-50" : ""} ${ln.shortage > 0 ? "text-red-800" : ""}`}
-                                  onClick={() => {
-                                    setActiveComponentId(ln.component_item_id);
-                                    const staged = ctx().components.find((c) => c.component_item_id === ln.component_item_id);
-                                    if (staged?.track_serial) {
-                                      void prefetchAvailableSerials(staged, ctx().location_id, true);
-                                    } else {
-                                      setSuggestedSerials([]);
+                    <div class="mt-3 space-y-2">
+                      <p class="text-xs text-text-secondary">
+                        Select each item marked for a serial (or lot), then enter it in the panel below.
+                      </p>
+                      <div class="overflow-x-auto rounded border border-stroke">
+                        <table class="min-w-full text-left text-xs">
+                          <thead class="bg-slate-50 text-text-secondary">
+                            <tr>
+                              <th class="px-2 py-1.5">Component</th>
+                              <th class="px-2 py-1.5">To issue</th>
+                              <th class="px-2 py-1.5">On hand</th>
+                              <th class="px-2 py-1.5">Staged</th>
+                              <th class="px-2 py-1.5">Your next step</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <For each={m().lines}>
+                              {(ln) => {
+                                const staged = ctx().components.find((c) => c.component_item_id === ln.component_item_id);
+                                const hint = rowActionHint(staged);
+                                const selected = activeComponentId() === ln.component_item_id;
+                                return (
+                                  <tr
+                                    class={`cursor-pointer ${selected ? "bg-brand-50" : ""} ${ln.shortage > 0 ? "text-red-800" : ""}`}
+                                    onClick={() => {
+                                      setActiveComponentId(ln.component_item_id);
                                       setSerialPaste("");
-                                    }
-                                  }}
-                                >
-                                  <td class="px-2 py-1.5">{ln.component_code} — {ln.component_name}</td>
-                                  <td class="px-2 py-1.5">{ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}</td>
-                                  <td class="px-2 py-1.5">{ln.qty_on_hand.toFixed(4)}</td>
-                                  <td class="px-2 py-1.5">
-                                    {staged?.track_serial
-                                      ? `${staged.issued_serials} serial(s)`
-                                      : staged?.track_lot
-                                        ? `${staged.issued_lot_qty.toFixed(4)} lot qty`
-                                        : "—"}
-                                  </td>
-                                </tr>
-                              );
-                            }}
-                          </For>
-                        </tbody>
-                      </table>
+                                      setLotPaste("");
+                                      setLotBatchId(null);
+                                      setLotNo("");
+                                      setLotQty("1");
+                                    }}
+                                  >
+                                    <td class="px-2 py-1.5">
+                                      <span class="font-medium">{ln.component_code}</span>
+                                      <span class="text-text-secondary"> — {ln.component_name}</span>
+                                      <Show when={hint.needsAction && staged?.track_serial}>
+                                        <span class="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                                          Serial required
+                                        </span>
+                                      </Show>
+                                      <Show when={hint.needsAction && staged?.track_lot && !staged?.track_serial}>
+                                        <span class="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                                          Lot required
+                                        </span>
+                                      </Show>
+                                    </td>
+                                    <td class="px-2 py-1.5">
+                                      {ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}
+                                    </td>
+                                    <td class="px-2 py-1.5">{ln.qty_on_hand.toFixed(4)}</td>
+                                    <td class="px-2 py-1.5">
+                                      {staged?.track_serial
+                                        ? `${staged.issued_serials} serial(s)`
+                                        : staged?.track_lot
+                                          ? `${staged.issued_lot_qty.toFixed(4)} lot qty`
+                                          : "—"}
+                                    </td>
+                                    <td
+                                      class={`px-2 py-1.5 ${hint.needsAction ? "font-medium text-amber-900" : "text-text-secondary"}`}
+                                    >
+                                      {selected && hint.needsAction ? "Selected — enter below" : hint.label}
+                                    </td>
+                                  </tr>
+                                );
+                              }}
+                            </For>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </Show>
@@ -551,59 +432,23 @@ export default function ProductionIssueStationPage() {
                     </h3>
                     <Show when={comp().track_serial}>
                       <p class="mt-1 text-xs text-text-secondary">
-                        Need {remainingSerialNeed(comp())} more serial(s). Free in-stock serials (not reserved for a sale
-                        and not staged on another open job) are listed oldest-first — Auto-pick stages them, or edit the
-                        list and Stage.
+                        Need {remainingSerialNeed(comp())} more serial(s). Enter or paste serial numbers for this item
+                        (one per line), then Stage.
                       </p>
-                      <Show when={suggestBusy()}>
-                        <p class="mt-1 text-xs text-text-secondary">Looking up free serials…</p>
-                      </Show>
-                      <Show when={!suggestBusy() && suggestedSerials().length === 0 && remainingSerialNeed(comp()) > 0}>
-                        <p class="mt-1 text-xs text-amber-800">
-                          No free serials at this warehouse for this item. Rows in red with 0 on hand need Receive first.
-                          Otherwise paste serials manually if you know them.
-                        </p>
-                      </Show>
-                      <Show when={!suggestBusy() && suggestedSerials().length > 0}>
-                        <p class="mt-1 text-xs text-text-secondary">
-                          Next free: {suggestedSerials().map((s) => s.serial_no).join(", ")}
-                        </p>
-                      </Show>
-                      <div class="mt-2 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-                          disabled={busy() || suggestBusy() || !context() || remainingSerialNeed(comp()) <= 0}
-                          onClick={() => void autoPickAndStageSerials()}
-                        >
-                          Auto-pick &amp; stage next free
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded border border-stroke px-2 py-1 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
-                          disabled={suggestBusy() || !context()}
-                          onClick={() => {
-                            const c = activeComponent();
-                            const wo = context();
-                            if (c && wo) void prefetchAvailableSerials(c, wo.location_id, true);
-                          }}
-                        >
-                          Refresh free serials
-                        </button>
-                      </div>
-                      <Field label="Serial numbers (auto-filled from free stock)">
+                      <Field label="Serial numbers">
                         <textarea
                           class={inputClass}
                           rows={4}
                           value={serialPaste()}
                           onInput={(e) => setSerialPaste(e.currentTarget.value)}
                           aria-label="Serial numbers to take"
+                          placeholder="One serial per line"
                         />
                       </Field>
                       <button
                         type="button"
-                        class="mt-3 rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
-                        disabled={busy()}
+                        class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                        disabled={busy() || remainingSerialNeed(comp()) <= 0}
                         onClick={() => void issueSerials()}
                       >
                         Stage serials
@@ -611,19 +456,9 @@ export default function ProductionIssueStationPage() {
                     </Show>
                     <Show when={comp().track_lot && !comp().track_serial}>
                       <p class="mt-1 text-xs text-text-secondary">
-                        Need {remainingLotNeed(comp()).toFixed(4)} more. Free lot qty (on hand minus staged on open
-                        jobs) is listed by earliest expiry — Auto-pick stages FEFO, or pick a lot manually.
+                        Need {remainingLotNeed(comp()).toFixed(4)} more. Pick a free lot batch (or paste lot lines), then
+                        Stage.
                       </p>
-                      <div class="mt-2 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-                          disabled={busy() || !context() || remainingLotNeed(comp()) <= 0.0001}
-                          onClick={() => void autoPickAndStageLots()}
-                        >
-                          Auto-pick &amp; stage next free
-                        </button>
-                      </div>
                       <div class="mt-3 space-y-4">
                         <Field label="Pick lot batch (free qty only)">
                           <LotLineCell
