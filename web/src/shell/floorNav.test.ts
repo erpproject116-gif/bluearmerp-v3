@@ -60,7 +60,7 @@ describe("HOME_SIDEBAR_AREAS sales/purchase landings", () => {
       "/app/purchase-order/purchase-orders",
     );
     expect(buy?.children?.find((c) => c.id === "purchases")).toMatchObject({
-      label: "New Purchases",
+      label: "Purchase Receive",
       href: "/app/purchases/purchase-receive/new",
     });
     expect(buy?.children?.[0]?.href).not.toBe(buy?.href);

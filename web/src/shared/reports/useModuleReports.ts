@@ -472,7 +472,9 @@ export function useInventoryStatusReport(params: () => ReportParams<InventorySta
         if (!res.success) throw new Error(res.message ?? "Failed to load inventory status");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
-      staleTime: 15_000,
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
     };
   });
 }

@@ -24,7 +24,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { label: "New Sales", href: "/app/sales/sales/new", group: "Quick action", permission: "sales.sales_new" },
   { label: "New purchase request", href: "/app/purchase-request/purchase-requests/new", group: "Quick action", permission: "purchase_request.purchase_requests_new" },
   { label: "New purchase order", href: "/app/purchase-order/purchase-orders", group: "Quick action", permission: "purchase_order.purchase_orders" },
-  { label: "New Purchases", href: "/app/purchases/purchase-receive/new", group: "Quick action", permission: "purchases.purchases_new" },
+  { label: "Purchase Receive", href: "/app/purchases/purchase-receive/new", group: "Quick action", permission: "purchases.purchases_new" },
   { label: "New receivable payment", href: "/app/finance/receivables", group: "Quick action", permission: "finance.official_receipts_new" },
   { label: "New payable payment", href: "/app/finance/payables", group: "Quick action", permission: "finance.payment_vouchers_new" },
   { label: "Customers", href: "/app/inventory/partners?kind=customer", group: "Quick action", permission: "inventory.partners" },

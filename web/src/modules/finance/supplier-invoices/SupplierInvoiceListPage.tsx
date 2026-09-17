@@ -270,7 +270,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
           <p class="font-semibold">Looking for Goods Receipt?</p>
           <p class="mt-1 text-xs leading-relaxed">
-            That list now lives here as <strong>Purchases</strong>. Use <strong>New Purchases</strong>{" "}
+            That list now lives here as <strong>Purchases</strong>. Use <strong>Purchase Receive</strong>{" "}
             (or Load Slip from a Purchase Order) to post stock and the supplier bill together. You were redirected from
             the old Goods Receipt menu so you would not hit a blank page.
           </p>
@@ -280,8 +280,8 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         <p class="font-medium text-slate-800">Purchases — receive goods and bill the supplier</p>
         <p class="mt-1 text-xs">
           Load Slip from a Purchase Order (or add lines), set quantities, scan serials if needed, attach the delivery
-          note or vendor invoice, then save. When ready, set Progress to <span class="font-medium">Completed</span> on
-          this list — stock and the payable post together.
+          note or vendor invoice, then save — Find Stock updates for inventory-tracked lines. Set Progress to{" "}
+          <span class="font-medium">Completed</span> on this list when ready to post the payable.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Next:{" "}
@@ -316,7 +316,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onSelectionChange={lifecycle.onSelectionChange}
         onEdit={(row) => void openEdit(row)}
         onNew={openNew}
-        newLabel="New Purchases"
+        newLabel="Purchase Receive"
         codeKey="invoice_no"
         nameKey="date_no_display"
         sortKey={sort()}

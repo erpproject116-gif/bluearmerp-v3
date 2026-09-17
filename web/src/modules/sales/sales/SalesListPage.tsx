@@ -163,8 +163,8 @@ export function SalesListPageInner(props: PageOptions = {}) {
       <div class="mb-4 rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-slate-700">
         <p class="font-medium text-slate-800">Sales — bill the customer</p>
         <p class="mt-1 text-xs">
-          Create or Load Slip from a Sales Order, confirm Progress when ready, then collect payment. Stock updates on
-          Find Stock for inventory-tracked items.
+          Create or Load Slip from a Sales Order, set Progress to <span class="font-medium">Completed</span> when
+          ready — Find Stock deducts inventory-tracked items then. Collect payment next.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Next:{" "}

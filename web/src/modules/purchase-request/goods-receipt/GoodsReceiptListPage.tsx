@@ -117,7 +117,7 @@ export default function GoodsReceiptListPage() {
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
             <span class="font-medium">Receive history (legacy).</span> For new stock-in with serials, use{" "}
             <A href="/app/purchases/purchase-receive/new" class="font-medium text-brand-700 hover:underline">
-              New Purchases
+              Purchase Receive
             </A>
             — confirm posts inventory and AP. This list keeps posted/draft receives for reverse and audit.
           </p>
@@ -138,7 +138,7 @@ export default function GoodsReceiptListPage() {
             href="/app/purchases/purchase-receive/new"
             class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
-            New Purchases
+            Purchase Receive
           </A>
           <A
             href="/app/inventory/serial-lot/receive"

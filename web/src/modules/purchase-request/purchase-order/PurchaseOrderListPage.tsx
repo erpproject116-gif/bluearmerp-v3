@@ -423,7 +423,7 @@ export default function PurchaseOrderListPage() {
           href="/app/purchases/purchase-receive/new"
           class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
         >
-          New Purchases
+          Purchase Receive
         </A>
         <A
           href="/app/purchases/purchase-receive?view=history"

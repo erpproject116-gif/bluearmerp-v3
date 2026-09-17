@@ -58,13 +58,13 @@ export function SupplierInvoicePostSaveDialog(props: Props) {
       </Show>
 
       <p class="mt-3 text-sm text-text-secondary">
-        Stock on Find Stock updates when line items track inventory. Pay next via Cash Payment or the payable
-        payment worklist.
+        Stock on Find Stock updates when line items track inventory (and serial/lot lines include their numbers). Pay
+        next via Cash Payment or the payable payment worklist.
       </p>
 
       <Show when={props.hasSerials}>
         <p class="mt-2 text-sm text-text-secondary">
-          Serial units land under Inventory → Serials after confirm posts stock.
+          Serial units land under Inventory → Serials when stock is posted.
         </p>
       </Show>
 
