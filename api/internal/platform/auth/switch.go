@@ -128,13 +128,18 @@ func branchesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				 and s.scope_type in ('location', 'warehouse')
 				where l.tenant_id = $1
 				  and l.status = 'active'
+				  and l.deleted_at is null
+				  and coalesce(l.is_rma, false) = false
 				  and s.user_id = $2
 				order by l.location_name`, tu.TenantID, tu.AppUserID)
 		} else {
 			rows, err = pool.Query(r.Context(), `
 				select l.id, l.location_code, l.location_name, l.location_type
 				from public.inv_locations l
-				where l.tenant_id = $1 and l.status = 'active'
+				where l.tenant_id = $1
+				  and l.status = 'active'
+				  and l.deleted_at is null
+				  and coalesce(l.is_rma, false) = false
 				order by l.location_name`, tu.TenantID)
 		}
 		if err != nil {

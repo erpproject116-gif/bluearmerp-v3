@@ -344,6 +344,7 @@ func inventoryStatusMatrixExpandSQL(tenantID int64, itemIDs []int64) (string, []
 		  and l.tenant_id = $1
 		  and coalesce(l.is_rma, false) = false
 		  and l.deleted_at is null
+		  and coalesce(l.status, 'active') = 'active'
 		order by i.item_code asc, l.location_name asc
 	`, []any{tenantID, itemIDs}
 }

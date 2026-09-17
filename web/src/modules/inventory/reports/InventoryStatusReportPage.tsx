@@ -17,9 +17,16 @@ import { useResizableColumns, type ColumnWidthDef } from "../../../shared/useRes
 import { StocksHowItFits } from "../StocksHowItFits";
 import { FindStockUnitsModal, type FindStockUnitsTarget } from "./FindStockUnitsModal";
 import { InvBookLedgerModal, type InvBookLedgerTarget } from "./InvBookLedgerModal";
+import {
+  buildBranchCols,
+  isActiveLocation,
+  isRmaLocation,
+  type AuthBranch,
+  type BranchCol,
+  type LocationOpt,
+} from "./buildBranchCols";
 
 type CategoryOpt = { id: number; name: string };
-type LocationOpt = { id: number; location_name: string; is_rma?: boolean; status?: string };
 
 const STOCK_STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -31,8 +38,6 @@ const STOCK_STATUS_OPTIONS = [
 ];
 
 /** One matrix column; may merge multiple location ids that share the same display name. */
-type BranchCol = { key: string; id: number; name: string; locationIds: number[] };
-
 type MatrixCell = {
   location_id: number;
   qty_on_hand: number;
@@ -99,31 +104,6 @@ function filtersFromSearchParams(params: Record<string, string | string[] | unde
 
 function fmtQty(n: number) {
   return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "";
-}
-
-/** One column per tenant branch (non-RMA). Prefer active locations; still merge duplicate names. */
-function buildBranchCols(locs: LocationOpt[], rows: InventoryStatusRow[]): BranchCol[] {
-  const source = locs.filter((l) => !l.is_rma);
-
-  const byName = new Map<string, BranchCol>();
-  const push = (id: number, name: string) => {
-    const label = (name || `Location ${id}`).trim() || `Location ${id}`;
-    const key = label.toLowerCase();
-    const existing = byName.get(key);
-    if (existing) {
-      if (!existing.locationIds.includes(id)) existing.locationIds.push(id);
-      return;
-    }
-    byName.set(key, { key, id, name: label, locationIds: [id] });
-  };
-
-  if (source.length > 0) {
-    for (const l of source) push(l.id, l.location_name);
-  }
-  // Ensure any location present in stock rows still gets a column (e.g. locations API truncated).
-  for (const r of rows) push(r.location_id, r.branch_name || r.location_name);
-
-  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function cellForBranch(item: MatrixItem, b: BranchCol): MatrixCell | null {
@@ -207,11 +187,24 @@ export default function InventoryStatusReportPage() {
     const res = await apiFetch<CategoryOpt[]>("/api/v1/inventory/item-categories");
     return res.success ? (res.data ?? []) : [];
   });
+  /** Same list as the sidebar HQ/branch switcher — does not require inventory.locations. */
+  const [authBranches] = createResource(async () => {
+    const res = await apiFetch<AuthBranch[]>("/api/v1/auth/branches");
+    return res.success ? (res.data ?? []) : [];
+  });
   const [locations] = createResource(async () => {
     const res = await apiFetch<LocationOpt[]>(
       "/api/v1/inventory/locations?page=1&pageSize=500&sort=location_name&order=asc",
     );
     return res.success ? (res.data ?? []) : [];
+  });
+
+  const branchOptions = createMemo(() => {
+    const fromAuth = authBranches() ?? [];
+    if (fromAuth.length > 0) return fromAuth.map((b) => ({ id: b.id, location_name: b.location_name }));
+    return (locations() ?? [])
+      .filter((l) => !isRmaLocation(l) && isActiveLocation(l))
+      .map((l) => ({ id: l.id, location_name: l.location_name }));
   });
 
   const report = useInventoryStatusReport(() => ({
@@ -273,22 +266,20 @@ export default function InventoryStatusReportPage() {
 
   /** One column per branch name; duplicate HQ (etc.) location rows are merged. */
   const branchCols = createMemo((): BranchCol[] =>
-    buildBranchCols(locations() ?? [], report.data?.rows ?? []),
+    buildBranchCols(authBranches() ?? [], locations() ?? [], report.data?.rows ?? []),
   );
 
   const colDefs = createMemo((): ColumnWidthDef[] => {
-    const fixed: ColumnWidthDef[] = [
+    // Branches sit right after Item Name so HQ is visible without scrolling past prices.
+    return [
       { key: "item_code", width: 120, minWidth: 88 },
       { key: "item_name", width: 220, minWidth: 140 },
+      ...branchCols().map((b) => ({ key: `loc-${b.key}`, width: 96, minWidth: 72 })),
+      { key: "total", width: 88, minWidth: 64 },
       { key: "spec", width: 160, minWidth: 100 },
       { key: "purchase", width: 120, minWidth: 88 },
       { key: "vip", width: 110, minWidth: 80 },
       { key: "sales", width: 110, minWidth: 80 },
-      { key: "total", width: 88, minWidth: 64 },
-    ];
-    return [
-      ...fixed,
-      ...branchCols().map((b) => ({ key: `loc-${b.key}`, width: 96, minWidth: 72 })),
     ];
   });
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(colDefs);
@@ -356,7 +347,7 @@ export default function InventoryStatusReportPage() {
                 }
               >
                 <option value="">All branches</option>
-                <For each={(locations() ?? []).filter((l) => !l.is_rma && (l.status == null || l.status === "active"))}>
+                <For each={branchOptions()}>
                   {(l) => <option value={l.id}>{l.location_name}</option>}
                 </For>
               </select>
@@ -423,6 +414,15 @@ export default function InventoryStatusReportPage() {
           </A>
         </p>
       </Show>
+      <Show when={matrixItems().length > 0 && branchCols().length === 0 && !authBranches.loading && !locations.loading}>
+        <p class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          No branch columns yet. Create an active location (e.g. HQ) under{" "}
+          <A href="/app/inventory/locations" class="font-medium text-brand-700 hover:underline">
+            Inventory → Locations
+          </A>
+          .
+        </p>
+      </Show>
       <Show when={matrixItems().length > 0}>
         <DataTableScroll class="overflow-x-auto">
           <table
@@ -446,6 +446,26 @@ export default function InventoryStatusReportPage() {
                   class="sticky left-[7.5rem] z-20 bg-brand-50 px-3 py-2"
                 >
                   Item Name
+                </ResizableTh>
+                <For each={branchCols()}>
+                  {(b) => (
+                    <ResizableTh
+                      columnKey={`loc-${b.key}`}
+                      width={widthFor(`loc-${b.key}`)}
+                      onResizeStart={onResizeStart}
+                      class="px-3 py-2 text-right whitespace-nowrap"
+                    >
+                      {b.name}
+                    </ResizableTh>
+                  )}
+                </For>
+                <ResizableTh
+                  columnKey="total"
+                  width={widthFor("total")}
+                  onResizeStart={onResizeStart}
+                  class="px-3 py-2 text-right"
+                >
+                  Total
                 </ResizableTh>
                 <ResizableTh columnKey="spec" width={widthFor("spec")} onResizeStart={onResizeStart} class="px-3 py-2">
                   Item Specs
@@ -474,26 +494,6 @@ export default function InventoryStatusReportPage() {
                 >
                   Sales Price
                 </ResizableTh>
-                <ResizableTh
-                  columnKey="total"
-                  width={widthFor("total")}
-                  onResizeStart={onResizeStart}
-                  class="px-3 py-2 text-right"
-                >
-                  Total
-                </ResizableTh>
-                <For each={branchCols()}>
-                  {(b) => (
-                    <ResizableTh
-                      columnKey={`loc-${b.key}`}
-                      width={widthFor(`loc-${b.key}`)}
-                      onResizeStart={onResizeStart}
-                      class="px-3 py-2 text-right whitespace-nowrap"
-                    >
-                      {b.name}
-                    </ResizableTh>
-                  )}
-                </For>
               </tr>
             </thead>
             <tbody>
@@ -530,24 +530,6 @@ export default function InventoryStatusReportPage() {
                         <Show when={item.unit_code}>
                           <div class="text-[11px] text-text-secondary">{item.unit_code}</div>
                         </Show>
-                      </ResizableTd>
-                      <ResizableTd width={widthFor("spec")} class="px-3 py-2 text-text-secondary">
-                        {item.spec_name || "—"}
-                      </ResizableTd>
-                      <ResizableTd width={widthFor("purchase")} class="px-3 py-2 text-right tabular-nums">
-                        {formatMoney(item.purchase_price)}
-                      </ResizableTd>
-                      <ResizableTd width={widthFor("vip")} class="px-3 py-2 text-right tabular-nums">
-                        {formatMoney(item.vip_price)}
-                      </ResizableTd>
-                      <ResizableTd width={widthFor("sales")} class="px-3 py-2 text-right tabular-nums">
-                        {formatMoney(item.sales_price)}
-                      </ResizableTd>
-                      <ResizableTd
-                        width={widthFor("total")}
-                        class={`px-3 py-2 text-right tabular-nums font-medium ${negTotal ? "text-red-700" : ""}`}
-                      >
-                        {fmtQty(item.total_on_hand)}
                       </ResizableTd>
                       <For each={branchCols()}>
                         {(b) => {
@@ -588,6 +570,24 @@ export default function InventoryStatusReportPage() {
                           );
                         }}
                       </For>
+                      <ResizableTd
+                        width={widthFor("total")}
+                        class={`px-3 py-2 text-right tabular-nums font-medium ${negTotal ? "text-red-700" : ""}`}
+                      >
+                        {fmtQty(item.total_on_hand)}
+                      </ResizableTd>
+                      <ResizableTd width={widthFor("spec")} class="px-3 py-2 text-text-secondary">
+                        {item.spec_name || "—"}
+                      </ResizableTd>
+                      <ResizableTd width={widthFor("purchase")} class="px-3 py-2 text-right tabular-nums">
+                        {formatMoney(item.purchase_price)}
+                      </ResizableTd>
+                      <ResizableTd width={widthFor("vip")} class="px-3 py-2 text-right tabular-nums">
+                        {formatMoney(item.vip_price)}
+                      </ResizableTd>
+                      <ResizableTd width={widthFor("sales")} class="px-3 py-2 text-right tabular-nums">
+                        {formatMoney(item.sales_price)}
+                      </ResizableTd>
                     </tr>
                   );
                 }}
