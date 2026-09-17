@@ -127,12 +127,12 @@ export default function ProductionIssueStationPage() {
     if (!comp) return { label: "—", needsAction: false };
     if (comp.track_serial) {
       const need = remainingSerialNeed(comp);
-      if (need > 0) return { label: `Select — enter ${need} serial${need === 1 ? "" : "s"}`, needsAction: true };
+      if (need > 0) return { label: `Enter ${need} serial${need === 1 ? "" : "s"}`, needsAction: true };
       return { label: "Serials done", needsAction: false };
     }
     if (comp.track_lot) {
       const need = remainingLotNeed(comp);
-      if (need > 0.0001) return { label: "Select — enter lot", needsAction: true };
+      if (need > 0.0001) return { label: "Enter lot", needsAction: true };
       return { label: "Lot done", needsAction: false };
     }
     return { label: "No serial/lot", needsAction: false };
@@ -351,7 +351,7 @@ export default function ProductionIssueStationPage() {
                   {(m) => (
                     <div class="mt-3 space-y-2">
                       <p class="text-xs text-text-secondary">
-                        Select each item marked for a serial (or lot), then enter it in the panel below.
+                        Tap a row to select it, then enter the serial (or lot) in the panel below.
                       </p>
                       <div class="overflow-x-auto rounded border border-stroke">
                         <table class="min-w-full text-left text-xs">
@@ -370,19 +370,37 @@ export default function ProductionIssueStationPage() {
                                 const staged = ctx().components.find((c) => c.component_item_id === ln.component_item_id);
                                 const hint = rowActionHint(staged);
                                 const selected = activeComponentId() === ln.component_item_id;
+                                const selectRow = () => {
+                                  setActiveComponentId(ln.component_item_id);
+                                  setSerialPaste("");
+                                  setLotPaste("");
+                                  setLotBatchId(null);
+                                  setLotNo("");
+                                  setLotQty("1");
+                                };
                                 return (
                                   <tr
-                                    class={`cursor-pointer ${selected ? "bg-brand-50" : ""} ${ln.shortage > 0 ? "text-red-800" : ""}`}
-                                    onClick={() => {
-                                      setActiveComponentId(ln.component_item_id);
-                                      setSerialPaste("");
-                                      setLotPaste("");
-                                      setLotBatchId(null);
-                                      setLotNo("");
-                                      setLotQty("1");
+                                    role="button"
+                                    tabindex={0}
+                                    aria-pressed={selected}
+                                    aria-label={`${ln.component_code} ${ln.component_name}. ${hint.label}`}
+                                    title="Click to select this component"
+                                    class={`border-l-4 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400 ${
+                                      selected
+                                        ? "border-l-brand-600 bg-brand-50 hover:bg-brand-100/80"
+                                        : hint.needsAction
+                                          ? "border-l-amber-400 bg-amber-50/40 hover:bg-amber-50 cursor-pointer"
+                                          : "border-l-transparent hover:bg-slate-50 cursor-pointer"
+                                    } ${ln.shortage > 0 && !selected ? "text-red-800" : ""}`}
+                                    onClick={selectRow}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        selectRow();
+                                      }
                                     }}
                                   >
-                                    <td class="px-2 py-1.5">
+                                    <td class="px-2 py-2">
                                       <span class="font-medium">{ln.component_code}</span>
                                       <span class="text-text-secondary"> — {ln.component_name}</span>
                                       <Show when={hint.needsAction && staged?.track_serial}>
@@ -396,21 +414,37 @@ export default function ProductionIssueStationPage() {
                                         </span>
                                       </Show>
                                     </td>
-                                    <td class="px-2 py-1.5">
+                                    <td class="px-2 py-2">
                                       {ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}
                                     </td>
-                                    <td class="px-2 py-1.5">{ln.qty_on_hand.toFixed(4)}</td>
-                                    <td class="px-2 py-1.5">
+                                    <td class="px-2 py-2">{ln.qty_on_hand.toFixed(4)}</td>
+                                    <td class="px-2 py-2">
                                       {staged?.track_serial
                                         ? `${staged.issued_serials} serial(s)`
                                         : staged?.track_lot
                                           ? `${staged.issued_lot_qty.toFixed(4)} lot qty`
                                           : "—"}
                                     </td>
-                                    <td
-                                      class={`px-2 py-1.5 ${hint.needsAction ? "font-medium text-amber-900" : "text-text-secondary"}`}
-                                    >
-                                      {selected && hint.needsAction ? "Selected — enter below" : hint.label}
+                                    <td class="px-2 py-2">
+                                      <Show
+                                        when={hint.needsAction}
+                                        fallback={
+                                          <span class="text-text-secondary">{hint.label}</span>
+                                        }
+                                      >
+                                        <span
+                                          class={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${
+                                            selected
+                                              ? "border-brand-600 bg-brand-600 text-white"
+                                              : "border-amber-300 bg-white text-amber-950 shadow-sm"
+                                          }`}
+                                        >
+                                          {selected ? "Selected — enter below" : hint.label}
+                                          <Show when={!selected}>
+                                            <span aria-hidden="true">→</span>
+                                          </Show>
+                                        </span>
+                                      </Show>
                                     </td>
                                   </tr>
                                 );
