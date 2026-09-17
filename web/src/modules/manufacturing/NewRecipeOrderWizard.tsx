@@ -147,7 +147,13 @@ export default function NewRecipeOrderWizard() {
       setJournalError("");
     } else {
       setJournalPreview(null);
-      setJournalError(res.errors?.cost ?? res.message ?? "Cost preview is unavailable.");
+      const raw = res.errors?.cost ?? res.message ?? "Cost preview is unavailable.";
+      const lower = raw.toLowerCase();
+      if (lower.includes("conn busy") || lower.includes("deallocate cached")) {
+        setJournalError("Cost preview temporarily unavailable. You can still Process & Post.");
+      } else {
+        setJournalError(raw);
+      }
     }
   };
 
@@ -413,25 +419,24 @@ export default function NewRecipeOrderWizard() {
                 aria-label="Quantity to produce"
               />
             </Field>
-            <Field label="Warehouse" required>
-              <LookupCombo
-                label="Warehouse"
-                required
-                value={locationLabel}
-                selectedId={locationId}
-                onInput={setLocationLabel}
-                onSelect={(o) => {
-                  setLocationId(o.id);
-                  setLocationLabel(o.label);
-                }}
-                onClear={() => {
-                  setLocationId(null);
-                  setLocationLabel("");
-                }}
-                fetchOptions={searchLocations}
-                placeholder="Required unless the recipe has a default warehouse"
-              />
-            </Field>
+            <LookupCombo
+              label="Warehouse"
+              required
+              description="Where materials leave stock and finished goods arrive. Required unless the recipe already has a default warehouse."
+              value={locationLabel}
+              selectedId={locationId}
+              onInput={setLocationLabel}
+              onSelect={(o) => {
+                setLocationId(o.id);
+                setLocationLabel(o.label);
+              }}
+              onClear={() => {
+                setLocationId(null);
+                setLocationLabel("");
+              }}
+              fetchOptions={searchLocations}
+              placeholder="Search warehouse…"
+            />
             <Field label="Reference / notes">
               <textarea
                 class={inputClass}

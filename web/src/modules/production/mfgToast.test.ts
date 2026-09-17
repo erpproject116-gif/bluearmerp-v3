@@ -37,6 +37,16 @@ describe("friendlyMfgMessage", () => {
     ).toContain("7 is less than required 10");
   });
 
+  it("keeps add-conversion guidance", () => {
+    expect(
+      friendlyMfgMessage("add conversion unit→pc (or reverse) under Inventory → Units", "x"),
+    ).toContain("Inventory → Units");
+  });
+
+  it("uses fallback for generic validation failed", () => {
+    expect(friendlyMfgMessage("Validation failed.", "Pick a warehouse")).toBe("Pick a warehouse");
+  });
+
   it("keeps unknown messages", () => {
     expect(friendlyMfgMessage("Custom server note", "fallback")).toBe("Custom server note");
   });
