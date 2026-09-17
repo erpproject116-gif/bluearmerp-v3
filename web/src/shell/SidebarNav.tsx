@@ -302,7 +302,16 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/production/setup"]);
     }
     if (area.id === "sell") {
-      return p === "/app/sales/sales" || p === "/app/sales/sales/";
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/sales" || norm === "/app/selling";
+    }
+    if (area.id === "sales_overview") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/sales" || norm === "/app/selling";
+    }
+    if (area.id === "sales_list") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/sales/sales" || (p.startsWith("/app/sales/sales/") && !p.startsWith("/app/sales/sales/new"));
     }
     if (area.id === "customers") {
       const kind = new URLSearchParams(loc.search).get("kind");
@@ -315,13 +324,26 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/sales-order"]);
     }
     if (area.id === "accounts_receivable") {
-      return p === "/app/sales/reports/ar-by-customer" || p.startsWith("/app/selling/reports/receivable-status");
+      return (
+        pathStarts(p, ["/app/finance/receivables"]) ||
+        p === "/app/sales/reports/ar-by-customer" ||
+        p.startsWith("/app/selling/reports/receivable-status")
+      );
     }
     if (area.id === "sales") {
       return pathStarts(p, ["/app/sales/sales/new"]);
     }
     if (area.id === "credit_notes") {
       return pathStarts(p, ["/app/sales/credit-notes"]);
+    }
+    if (area.id === "sales_invoices") {
+      return (
+        pathStarts(p, [
+          "/app/sales/retainer-invoices",
+          "/app/sales/recurring-invoices",
+          "/app/sales/collective-invoicing",
+        ])
+      );
     }
     if (area.id === "retainer_invoices") {
       return pathStarts(p, ["/app/sales/retainer-invoices"]);
@@ -336,7 +358,24 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/selling"]);
     }
     if (area.id === "buy") {
-      return p === "/app/purchases/purchase-receive" || p === "/app/purchases/purchase-receive/";
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/purchases" || norm === "/app/buying";
+    }
+    if (area.id === "purchase_overview") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/purchases" || norm === "/app/buying";
+    }
+    if (area.id === "purchase_receive_list") {
+      const norm = p.replace(/\/$/, "");
+      return (
+        norm === "/app/purchases/purchase-receive" ||
+        (p.startsWith("/app/purchases/purchase-receive/") &&
+          !p.startsWith("/app/purchases/purchase-receive/new") &&
+          !p.startsWith("/app/purchases/purchase-receive/settings") &&
+          !p.startsWith("/app/purchases/purchase-receive/pre-invoicing") &&
+          !p.startsWith("/app/purchases/purchase-receive/payment-status") &&
+          !p.startsWith("/app/purchases/purchase-receive/ap-by-vendor"))
+      );
     }
     if (area.id === "vendors") {
       return pathStarts(p, ["/app/inventory/partners"]) && new URLSearchParams(loc.search).get("kind") === "vendor";
@@ -350,6 +389,9 @@ export function SidebarNav() {
     if (area.id === "purchase_order") {
       return pathStarts(p, ["/app/purchase-order"]) && !p.startsWith("/app/purchase-order/rfq");
     }
+    if (area.id === "purchase_expenses") {
+      return pathStarts(p, ["/app/purchases/expenses", "/app/purchases/recurring-expenses"]);
+    }
     if (area.id === "expenses") {
       return pathStarts(p, ["/app/purchases/expenses"]) && !p.startsWith("/app/purchases/recurring-expenses");
     }
@@ -360,7 +402,11 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/purchases/vendor-credits", "/app/buying/vendor-credits"]);
     }
     if (area.id === "accounts_payable") {
-      return p === "/app/purchases/purchase-receive/ap-by-vendor" || p.startsWith("/app/purchases/purchase-receive/ap-by-vendor/");
+      return (
+        pathStarts(p, ["/app/finance/payables"]) ||
+        p === "/app/purchases/purchase-receive/ap-by-vendor" ||
+        p.startsWith("/app/purchases/purchase-receive/ap-by-vendor/")
+      );
     }
     if (area.id === "purchases") {
       return pathStarts(p, ["/app/purchases/purchase-receive/new", "/app/purchases/purchases/new"]);
