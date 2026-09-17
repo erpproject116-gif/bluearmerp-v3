@@ -63,8 +63,10 @@ type LotBatchRow struct {
 	LocationID   int64   `json:"location_id"`
 	LocationName string  `json:"location_name"`
 	QtyOnHand    float64 `json:"qty_on_hand"`
-	ExpiryDate   *string `json:"expiry_date,omitempty"`
-	UpdatedAt    string  `json:"updated_at"`
+	// QtyAvailable is on-hand minus qty staged on other open manufacturing jobs (when free_only=true).
+	QtyAvailable *float64 `json:"qty_available,omitempty"`
+	ExpiryDate   *string  `json:"expiry_date,omitempty"`
+	UpdatedAt    string   `json:"updated_at"`
 }
 
 type serialTransferBody struct {
@@ -238,12 +240,46 @@ func listAvailableSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		locationID, _ := optionalInt64Query(r, "location_id")
-		where := "su.tenant_id = $1 and su.item_id = $2 and su.status in ('in_stock', 'reserved')"
+		// free_only=true: in_stock only, not reserved for sales / linked to a sale line,
+		// and not already staged on another open manufacturing job.
+		freeOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("free_only")), "true") ||
+			r.URL.Query().Get("free_only") == "1"
+		excludeWoID, _ := optionalInt64Query(r, "exclude_wo_id")
+		limit := 50
+		if lim, ok := optionalInt64Query(r, "limit"); ok && lim != nil && *lim > 0 && *lim <= 200 {
+			limit = int(*lim)
+		}
+
+		where := "su.tenant_id = $1 and su.item_id = $2"
 		args := []any{tu.TenantID, itemID}
 		argN := 3
+		if freeOnly {
+			where += " and su.status = 'in_stock' and su.sales_line_id is null"
+		} else {
+			where += " and su.status in ('in_stock', 'reserved')"
+		}
 		if locationID != nil {
 			where += fmt.Sprintf(" and su.location_id = $%d", argN)
 			args = append(args, *locationID)
+			argN++
+		}
+		if freeOnly {
+			where += fmt.Sprintf(`
+			  and not exists (
+			    select 1
+			    from public.mfg_wo_issue_serials wis
+			    join public.mfg_work_orders wo on wo.id = wis.work_order_id
+			    where wis.serial_unit_id = su.id
+			      and wo.tenant_id = $1
+			      and wo.status in ('draft', 'released')
+			      and ($%d::bigint is null or wo.id <> $%d)
+			  )`, argN, argN)
+			if excludeWoID != nil {
+				args = append(args, *excludeWoID)
+			} else {
+				args = append(args, nil)
+			}
+			argN++
 		}
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
 			select su.id, su.serial_no, su.status, su.location_id, coalesce(loc.location_name, ''),
@@ -251,7 +287,8 @@ func listAvailableSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			from public.inv_serial_units su
 			left join public.inv_locations loc on loc.id = su.location_id
 			where %s
-			order by su.serial_no`, where), args...)
+			order by coalesce(su.received_at, su.created_at) asc, su.id asc
+			limit %d`, where, limit), args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list available serials.", "ERR_INTERNAL")
 			return
@@ -517,6 +554,21 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 		if strings.TrimSpace(r.URL.Query().Get("available_only")) == "true" {
 			where += " and lb.qty_on_hand > 0.0001"
 		}
+		freeOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("free_only")), "true") ||
+			r.URL.Query().Get("free_only") == "1"
+		if freeOnly {
+			// Free qty = on hand minus qty already staged on any open manufacturing job.
+			where += ` and (
+			  lb.qty_on_hand - coalesce((
+			    select sum(wil.qty)::float8
+			    from public.mfg_wo_issue_lots wil
+			    join public.mfg_work_orders wo on wo.id = wil.work_order_id
+			    where wil.lot_batch_id = lb.id
+			      and wo.tenant_id = $1
+			      and wo.status in ('draft', 'released')
+			  ), 0)
+			) > 0.0001`
+		}
 		if daysStr := strings.TrimSpace(r.URL.Query().Get("expires_in_days")); daysStr != "" {
 			if days, err := strconv.Atoi(daysStr); err == nil && days >= 0 {
 				where += fmt.Sprintf(" and lb.expiry_date is not null and lb.expiry_date <= (current_date + make_interval(days => $%d))", argN)
@@ -529,21 +581,40 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		sortCol := allowed[p.Sort]
+		orderClause := ""
 		if sortCol == "" {
-			sortCol = "lb.expiry_date"
-			p.Order = "asc"
+			if freeOnly {
+				orderClause = "lb.expiry_date asc nulls last, lb.id asc"
+			} else {
+				orderClause = "lb.expiry_date " + orderSQL("asc")
+			}
+		} else {
+			orderClause = sortCol + " " + orderSQL(p.Order)
+		}
+
+		qtySelect := "lb.qty_on_hand::float8"
+		if freeOnly {
+			qtySelect = `lb.qty_on_hand::float8,
+			  (lb.qty_on_hand - coalesce((
+			    select sum(wil.qty)::float8
+			    from public.mfg_wo_issue_lots wil
+			    join public.mfg_work_orders wo on wo.id = wil.work_order_id
+			    where wil.lot_batch_id = lb.id
+			      and wo.tenant_id = $1
+			      and wo.status in ('draft', 'released')
+			  ), 0))::float8`
 		}
 
 		q := fmt.Sprintf(`
 			select lb.id, lb.item_id, i.item_code, i.item_name, lb.lot_no,
-			  lb.location_id, loc.location_name, lb.qty_on_hand::float8, lb.expiry_date, lb.updated_at,
+			  lb.location_id, loc.location_name, %s, lb.expiry_date, lb.updated_at,
 			  count(*) over()
 			from public.inv_lot_batches lb
 			join public.inv_items i on i.id = lb.item_id
 			join public.inv_locations loc on loc.id = lb.location_id
 			where %s
-			order by %s %s
-			limit $%d offset $%d`, where, sortCol, orderSQL(p.Order), argN, argN+1)
+			order by %s
+			limit $%d offset $%d`, qtySelect, where, orderClause, argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
@@ -559,8 +630,17 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 			var row LotBatchRow
 			var expiry *time.Time
 			var updatedAt time.Time
-			if err := rows.Scan(&row.ID, &row.ItemID, &row.ItemCode, &row.ItemName, &row.LotNo,
-				&row.LocationID, &row.LocationName, &row.QtyOnHand, &expiry, &updatedAt, &total); err != nil {
+			var scanErr error
+			if freeOnly {
+				var avail float64
+				scanErr = rows.Scan(&row.ID, &row.ItemID, &row.ItemCode, &row.ItemName, &row.LotNo,
+					&row.LocationID, &row.LocationName, &row.QtyOnHand, &avail, &expiry, &updatedAt, &total)
+				row.QtyAvailable = &avail
+			} else {
+				scanErr = rows.Scan(&row.ID, &row.ItemID, &row.ItemCode, &row.ItemName, &row.LotNo,
+					&row.LocationID, &row.LocationName, &row.QtyOnHand, &expiry, &updatedAt, &total)
+			}
+			if scanErr != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read.", "ERR_INTERNAL")
 				return
 			}

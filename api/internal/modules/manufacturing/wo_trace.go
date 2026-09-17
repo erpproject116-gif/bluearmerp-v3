@@ -143,10 +143,20 @@ func issueWorkOrderSerials(pool *pgxpool.Pool) http.HandlerFunc {
 				select su.item_id, su.serial_no
 				from public.inv_serial_units su
 				where su.id = $1 and su.tenant_id = $2 and su.location_id = $3
-				  and su.status in ('in_stock', 'reserved')
-				for update`, unitID, tu.TenantID, wo.LocationID).Scan(&itemID, &serialNo)
+				  and su.status = 'in_stock'
+				  and su.sales_line_id is null
+				  and not exists (
+				    select 1
+				    from public.mfg_wo_issue_serials wis
+				    join public.mfg_work_orders o on o.id = wis.work_order_id
+				    where wis.serial_unit_id = su.id
+				      and o.tenant_id = $2
+				      and o.status in ('draft', 'released')
+				      and o.id <> $4
+				  )
+				for update`, unitID, tu.TenantID, wo.LocationID, woID).Scan(&itemID, &serialNo)
 			if err != nil {
-				response.Validation(w, map[string]string{"serial_unit_ids": fmt.Sprintf("Serial %d not available at location.", unitID)})
+				response.Validation(w, map[string]string{"serial_unit_ids": fmt.Sprintf("Serial %d is not free in stock at this warehouse (may be reserved, sold, or staged on another job).", unitID)})
 				return
 			}
 			if !componentIDs[itemID] {
@@ -218,11 +228,20 @@ func issueWorkOrderLots(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			var itemID int64
 			var lotQty float64
+			var stagedOther float64
 			err := tx.QueryRow(r.Context(), `
-				select item_id, qty_on_hand::float8
-				from public.inv_lot_batches
-				where id = $1 and tenant_id = $2 and location_id = $3
-				for update`, ln.LotBatchID, tu.TenantID, wo.LocationID).Scan(&itemID, &lotQty)
+				select lb.item_id, lb.qty_on_hand::float8,
+				  coalesce((
+				    select sum(wil.qty)::float8
+				    from public.mfg_wo_issue_lots wil
+				    join public.mfg_work_orders o on o.id = wil.work_order_id
+				    where wil.lot_batch_id = lb.id
+				      and o.tenant_id = $2
+				      and o.status in ('draft', 'released')
+				  ), 0)::float8
+				from public.inv_lot_batches lb
+				where lb.id = $1 and lb.tenant_id = $2 and lb.location_id = $3
+				for update`, ln.LotBatchID, tu.TenantID, wo.LocationID).Scan(&itemID, &lotQty, &stagedOther)
 			if err != nil {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].lot_batch_id", i): "Lot batch not found at location."})
 				return
@@ -231,8 +250,9 @@ func issueWorkOrderLots(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].lot_batch_id", i): "Lot item is not a required component."})
 				return
 			}
-			if lotQty+0.0001 < ln.Qty {
-				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): "Insufficient qty on lot batch."})
+			freeQty := lotQty - stagedOther
+			if freeQty+0.0001 < ln.Qty {
+				response.Validation(w, map[string]string{fmt.Sprintf("lines[%d].qty", i): fmt.Sprintf("Only %.4f free on this lot (on hand %.4f, %.4f already staged on open jobs).", freeQty, lotQty, stagedOther)})
 				return
 			}
 			_, err = tx.Exec(r.Context(), `
