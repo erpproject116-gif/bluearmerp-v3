@@ -224,11 +224,10 @@ export function SalesModal(props: Props) {
   const auth = useAuth();
   const processPolicy = useProcessPolicy(() => props.open);
   const [attachmentCount, setAttachmentCount] = createSignal(0);
+  type SourceAttachFile = Attachment & { scope: AttachmentScope; docId: number };
   type SourceAttachPreview = {
-    scope: AttachmentScope;
-    docId: number;
     label: string;
-    files: Attachment[];
+    files: SourceAttachFile[];
   };
   const [sourceAttachPreview, setSourceAttachPreview] = createSignal<SourceAttachPreview | null>(null);
   const effectiveAttachmentCount = () =>
@@ -638,10 +637,54 @@ export function SalesModal(props: Props) {
     }
     const res = await listAttachments(scope, docId);
     if (res.success && (res.data?.length ?? 0) > 0) {
-      setSourceAttachPreview({ scope, docId, label, files: res.data! });
+      setSourceAttachPreview({
+        label,
+        files: res.data!.map((f) => ({ ...f, scope, docId })),
+      });
     } else {
       setSourceAttachPreview(null);
     }
+  };
+
+  /** Merge SO + Quotation files for New Sales Load Slip (dedupe by file_name). */
+  const loadMergedSOAttachPreview = async (
+    soId: number,
+    quotationIds: number[],
+  ) => {
+    if (!soId || soId <= 0) {
+      setSourceAttachPreview(null);
+      return;
+    }
+    const soRes = await listAttachments("sales-order/sales-orders", soId);
+    const files: SourceAttachFile[] = [];
+    const seen = new Set<string>();
+    for (const f of soRes.success ? soRes.data ?? [] : []) {
+      seen.add(f.file_name);
+      files.push({ ...f, scope: "sales-order/sales-orders", docId: soId });
+    }
+    const uniqueQuo = [...new Set(quotationIds.filter((id) => id > 0))];
+    await Promise.all(
+      uniqueQuo.map(async (qid) => {
+        const res = await listAttachments("quotation/quotations", qid);
+        if (!res.success) return;
+        for (const f of res.data ?? []) {
+          if (seen.has(f.file_name)) continue;
+          seen.add(f.file_name);
+          files.push({ ...f, scope: "quotation/quotations", docId: qid });
+        }
+      }),
+    );
+    if (files.length === 0) {
+      setSourceAttachPreview(null);
+      return;
+    }
+    const fromQuo = uniqueQuo.length > 0 && files.some((f) => f.scope === "quotation/quotations");
+    setSourceAttachPreview({
+      label: fromQuo
+        ? "From Sales Order + Quotation (copies when you Save)"
+        : "From Sales Order (copies when you Save)",
+      files,
+    });
   };
 
   let appliedNewDefaults = false;
@@ -740,6 +783,7 @@ export function SalesModal(props: Props) {
       unit_price: String(row.unit_vat_inc),
       remark: row.remark ?? "",
       source_sales_order_line_id: row.source_sales_order_line_id,
+      source_quotation_line_id: row.source_quotation_line_id ?? null,
       track_serial: Boolean(row.track_serial),
     }));
     if (meta && first.tax_type_id) {
@@ -748,12 +792,14 @@ export function SalesModal(props: Props) {
     } else {
       setLines(newLines);
     }
+    const quotationIds = picked.flatMap((r) => {
+      const ids: number[] = [];
+      if (r.source_quotation_id) ids.push(Number(r.source_quotation_id));
+      if (r.quotation_id) ids.push(Number(r.quotation_id));
+      return ids;
+    });
     await Promise.all([
-      loadSourceAttachPreview(
-        "sales-order/sales-orders",
-        first.sales_order_id,
-        "From Sales Order (copies when you Save)",
-      ),
+      loadMergedSOAttachPreview(first.sales_order_id, quotationIds),
       loadSourceCustomValues(`/api/v1/sales-order/sales-orders/${first.sales_order_id}`, first.sales_order_id),
     ]);
     toast.success("Sales Order lines loaded. Header fields, attachments, and matching custom fields copy when you Save.");
@@ -762,6 +808,11 @@ export function SalesModal(props: Props) {
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
     const first = picked[0];
+    setSourceSalesOrderId(null);
+    if (first.order_date) {
+      setOrderDate(first.order_date);
+      void loadPreview(first.order_date);
+    }
     setPartnerId(first.partner_id);
     setCustomerLabel(first.customer_name);
     setLocationId(first.location_id);
@@ -769,6 +820,23 @@ export function SalesModal(props: Props) {
     setTaxTypeId(first.tax_type_id);
     setCurrencyId(first.currency_id);
     setPicName(first.pic_name);
+    setPaymentTerms(first.payment_terms ?? "");
+    setNotes(first.notes ?? "");
+    setDueDate(first.valid_until ?? "");
+    setDeliveryRemarks("");
+    if (first.project_id) {
+      setProjectId(first.project_id);
+      setProjectLabel(first.project_name ?? "");
+      setProjectName(first.project_name ?? "");
+    } else if (first.project_name) {
+      setProjectId(null);
+      setProjectName(first.project_name);
+      setProjectLabel(first.project_name);
+    } else {
+      setProjectId(null);
+      setProjectLabel("");
+      setProjectName("");
+    }
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
     setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");
@@ -784,6 +852,7 @@ export function SalesModal(props: Props) {
       unit_code: row.unit_code ?? "",
       unit_price: String(row.unit_vat_inc),
       remark: row.remark ?? "",
+      source_sales_order_line_id: null,
       source_quotation_line_id: row.source_quotation_line_id,
     }));
     if (meta && first.tax_type_id) {
@@ -800,7 +869,9 @@ export function SalesModal(props: Props) {
       ),
       loadSourceCustomValues(`/api/v1/quotation/quotations/${first.quotation_id}`, first.quotation_id),
     ]);
-    toast.success("Quotation lines loaded. Attachments and matching custom fields copy when you Save.");
+    toast.success(
+      "Quotation lines loaded. Header fields, attachments, and matching custom fields copy when you Save.",
+    );
   };
 
   const applyShippingLines = async (picked: PickedShippingSlipLine[]) => {
@@ -1393,7 +1464,7 @@ export function SalesModal(props: Props) {
                           type="button"
                           class="shrink-0 text-xs font-medium text-brand-700 hover:underline"
                           onClick={() =>
-                            void downloadAttachment(preview().scope, preview().docId, file).then((ok) => {
+                            void downloadAttachment(file.scope, file.docId, file).then((ok) => {
                               if (!ok) toast.warning("Couldn't download the file. Try again.");
                             })
                           }

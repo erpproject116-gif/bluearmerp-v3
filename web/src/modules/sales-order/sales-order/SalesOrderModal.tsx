@@ -500,6 +500,10 @@ export function SalesOrderModal(props: Props) {
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
     const first = picked[0];
+    if (first.order_date) {
+      setOrderDate(first.order_date);
+      void loadPreview(first.order_date);
+    }
     setPartnerId(first.partner_id);
     setCustomerLabel(first.customer_name);
     setLocationId(first.location_id);
@@ -508,6 +512,22 @@ export function SalesOrderModal(props: Props) {
     setCurrencyId(first.currency_id);
     setPicName(first.pic_name);
     setSourceQuotationId(first.quotation_id);
+    setPaymentTerms(first.payment_terms ?? "");
+    setNotes(first.notes ?? "");
+    setDueDate(first.valid_until ?? "");
+    if (first.project_id) {
+      setProjectId(first.project_id);
+      setProjectLabel(first.project_name ?? "");
+      setProjectName(first.project_name ?? "");
+    } else if (first.project_name) {
+      setProjectId(null);
+      setProjectName(first.project_name);
+      setProjectLabel(first.project_name);
+    } else {
+      setProjectId(null);
+      setProjectLabel("");
+      setProjectName("");
+    }
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
     setTaxTypeLabel(meta ? formatTaxTypeLabel(meta.name, meta.tax_mode, meta.rate_percent) : "");

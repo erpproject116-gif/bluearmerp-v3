@@ -29,37 +29,40 @@ func salesUsesDeliveryBalance(p processpolicy.Policy) bool {
 }
 
 type openSalesOrderLineRow struct {
-	SalesOrderID         int64   `json:"sales_order_id"`
-	SalesOrderLineID     int64   `json:"sales_order_line_id"`
-	DateNoDisplay        string  `json:"date_no_display"`
-	OrderDate            string  `json:"order_date"`
-	SalesOrderNo         string  `json:"sales_order_no"`
-	ProgressStatus       string  `json:"progress_status"`
-	CustomerName         string  `json:"customer_name"`
-	LocationID           int64   `json:"location_id"`
-	LocationName         string  `json:"location_name"`
-	PartnerID            int64   `json:"partner_id"`
-	TaxTypeID            int64   `json:"tax_type_id"`
-	CurrencyID           int64   `json:"currency_id"`
-	PicName              string  `json:"pic_name"`
-	ProjectID            *int64  `json:"project_id,omitempty"`
-	ProjectName          string  `json:"project_name"`
-	DueDate              *string `json:"due_date,omitempty"`
-	PaymentTerms         string  `json:"payment_terms"`
-	Notes                string  `json:"notes"`
-	DeliveryRemarks      string  `json:"delivery_remarks"`
-	ItemID               *int64  `json:"item_id,omitempty"`
-	ItemCode             string  `json:"item_code"`
-	ItemName             string  `json:"item_name"`
-	Description          *string `json:"description,omitempty"`
-	ReleasedQty          float64 `json:"released_qty"`
-	DeliveredQty         float64 `json:"delivered_qty"`
-	BalanceQty           float64 `json:"balance_qty"`
-	UnitID               *int64  `json:"unit_id,omitempty"`
-	UnitCode             *string `json:"unit_code,omitempty"`
-	UnitVatInc           float64 `json:"unit_vat_inc"`
-	Remark               *string `json:"remark,omitempty"`
-	TrackSerial          bool    `json:"track_serial,omitempty"`
+	SalesOrderID           int64   `json:"sales_order_id"`
+	SalesOrderLineID       int64   `json:"sales_order_line_id"`
+	DateNoDisplay          string  `json:"date_no_display"`
+	OrderDate              string  `json:"order_date"`
+	SalesOrderNo           string  `json:"sales_order_no"`
+	ProgressStatus         string  `json:"progress_status"`
+	CustomerName           string  `json:"customer_name"`
+	LocationID             int64   `json:"location_id"`
+	LocationName           string  `json:"location_name"`
+	PartnerID              int64   `json:"partner_id"`
+	TaxTypeID              int64   `json:"tax_type_id"`
+	CurrencyID             int64   `json:"currency_id"`
+	PicName                string  `json:"pic_name"`
+	ProjectID              *int64  `json:"project_id,omitempty"`
+	ProjectName            string  `json:"project_name"`
+	DueDate                *string `json:"due_date,omitempty"`
+	PaymentTerms           string  `json:"payment_terms"`
+	Notes                  string  `json:"notes"`
+	DeliveryRemarks        string  `json:"delivery_remarks"`
+	SourceQuotationID      *int64  `json:"source_quotation_id,omitempty"`
+	SourceQuotationLineID  *int64  `json:"source_quotation_line_id,omitempty"`
+	QuotationID            *int64  `json:"quotation_id,omitempty"`
+	ItemID                 *int64  `json:"item_id,omitempty"`
+	ItemCode               string  `json:"item_code"`
+	ItemName               string  `json:"item_name"`
+	Description            *string `json:"description,omitempty"`
+	ReleasedQty            float64 `json:"released_qty"`
+	DeliveredQty           float64 `json:"delivered_qty"`
+	BalanceQty             float64 `json:"balance_qty"`
+	UnitID                 *int64  `json:"unit_id,omitempty"`
+	UnitCode               *string `json:"unit_code,omitempty"`
+	UnitVatInc             float64 `json:"unit_vat_inc"`
+	Remark                 *string `json:"remark,omitempty"`
+	TrackSerial            bool    `json:"track_serial,omitempty"`
 }
 
 func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
@@ -112,6 +115,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  so.project_id, coalesce(so.project_name, ''),
 			  so.due_date,
 			  coalesce(so.payment_terms, ''), coalesce(so.notes, ''), coalesce(so.delivery_remarks, ''),
+			  so.source_quotation_id, ln.source_quotation_line_id, ql.quotation_id,
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  coalesce(rel.released, 0)::float8,
 			  coalesce(dr.delivered, 0)::float8,
@@ -124,6 +128,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.inv_partners p on p.id = so.partner_id
 			join public.inv_locations l on l.id = so.location_id
 			join public.so_sales_order_lines ln on ln.sales_order_id = so.id
+			left join public.quo_quotation_lines ql on ql.id = ln.source_quotation_line_id
 			left join public.inv_items i on i.id = ln.item_id
 			left join (
 			  select sales_order_line_id, sum(release_qty) as released
@@ -166,6 +171,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ProjectID, &row.ProjectName, &dueDate, &row.PaymentTerms, &row.Notes, &row.DeliveryRemarks,
+				&row.SourceQuotationID, &row.SourceQuotationLineID, &row.QuotationID,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
 				&row.ReleasedQty, &row.DeliveredQty, &row.BalanceQty,
 				&row.UnitID, &row.UnitCode,
