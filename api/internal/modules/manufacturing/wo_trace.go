@@ -424,9 +424,14 @@ func getWorkOrderScanContext(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			msg := err.Error()
-			if strings.Contains(strings.ToLower(msg), "base unit") ||
-				strings.Contains(strings.ToLower(msg), "location") ||
-				strings.Contains(strings.ToLower(msg), "component") {
+			lower := strings.ToLower(msg)
+			// Surface UoM / master-data problems as validation so the floor UI can show the fix.
+			if strings.Contains(lower, "base unit") ||
+				strings.Contains(lower, "location") ||
+				strings.Contains(lower, "component") ||
+				strings.Contains(lower, "conversion") ||
+				strings.Contains(lower, "add conversion") ||
+				strings.Contains(lower, "unit is required") {
 				response.Validation(w, map[string]string{"scan_context": msg})
 				return
 			}

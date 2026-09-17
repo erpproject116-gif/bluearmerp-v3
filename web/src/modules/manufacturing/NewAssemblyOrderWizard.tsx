@@ -143,7 +143,13 @@ export default function NewAssemblyOrderWizard() {
       setJournalError("");
     } else {
       setJournalPreview(null);
-      setJournalError(res.errors?.cost ?? res.message ?? "Cost preview unavailable.");
+      const raw = res.errors?.cost ?? res.message ?? "Cost preview unavailable.";
+      const lower = raw.toLowerCase();
+      if (lower.includes("conn busy") || lower.includes("deallocate cached")) {
+        setJournalError("Cost preview temporarily unavailable. You can still Assemble & Post.");
+      } else {
+        setJournalError(raw);
+      }
     }
   };
 
@@ -430,25 +436,24 @@ export default function NewAssemblyOrderWizard() {
                 aria-label="Quantity to produce"
               />
             </Field>
-            <Field label="Warehouse" required>
-              <LookupCombo
-                label="Warehouse"
-                required
-                value={locationLabel}
-                selectedId={locationId}
-                onInput={setLocationLabel}
-                onSelect={(o) => {
-                  setLocationId(o.id);
-                  setLocationLabel(o.label);
-                }}
-                onClear={() => {
-                  setLocationId(null);
-                  setLocationLabel("");
-                }}
-                fetchOptions={searchLocations}
-                placeholder="Required unless the BOM has a default warehouse"
-              />
-            </Field>
+            <LookupCombo
+              label="Warehouse"
+              required
+              description="Where parts leave stock and finished goods arrive. Required unless the BOM already has a default warehouse."
+              value={locationLabel}
+              selectedId={locationId}
+              onInput={setLocationLabel}
+              onSelect={(o) => {
+                setLocationId(o.id);
+                setLocationLabel(o.label);
+              }}
+              onClear={() => {
+                setLocationId(null);
+                setLocationLabel("");
+              }}
+              fetchOptions={searchLocations}
+              placeholder="Search warehouse…"
+            />
             <Field label="Reference / notes">
               <textarea
                 class={inputClass}

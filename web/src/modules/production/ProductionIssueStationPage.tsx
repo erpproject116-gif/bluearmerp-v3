@@ -152,7 +152,11 @@ export default function ProductionIssueStationPage() {
     ]);
     setLoading(false);
     if (!ctxRes.success || !ctxRes.data) {
-      mfgWarn(ctxRes.message, "This job isn’t available. Go back to Jobs and open it again.");
+      const detail =
+        ctxRes.errors?.scan_context ||
+        ctxRes.assist?.detail ||
+        ctxRes.message;
+      mfgWarn(detail, "This job isn’t available. Go back to Jobs and open it again.");
       setContext(null);
       setNeeds(null);
       return;

@@ -57,8 +57,15 @@ export function friendlyMfgMessage(raw: string | undefined | null, fallback: str
   if (lower.includes("has no base unit") || lower.includes("no base unit")) {
     return "A component item is missing its base unit. Set base unit under Inventory → Items, then refresh.";
   }
+  if (lower.includes("add conversion") || (lower.includes("conversion") && lower.includes("inventory"))) {
+    // Keep server wording — it names the exact unit pair to fix under Inventory → Units.
+    return msg;
+  }
   if (lower.includes("failed to load scan context")) {
-    return "Couldn’t open Take materials. Check component base units and try again from Jobs.";
+    return "Couldn’t open Take materials. Check component base units and unit conversions, then try again from Jobs.";
+  }
+  if (lower === "validation failed.") {
+    return fallback;
   }
   if (lower.includes("quantity must be greater") || lower.includes("qty must")) {
     return "Enter a quantity greater than zero.";

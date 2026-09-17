@@ -445,6 +445,8 @@ function NewCuttingOrderWizard() {
             </Field>
             <LookupCombo
               label="Warehouse"
+              required
+              description="Where the whole is taken from and cut pieces are received."
               value={locationLabel}
               selectedId={locationId}
               onInput={setLocationLabel}
@@ -457,6 +459,7 @@ function NewCuttingOrderWizard() {
                 setLocationLabel("");
               }}
               fetchOptions={searchLocations}
+              placeholder="Search warehouse…"
             />
             <Field label="Notes">
               <textarea class={inputClass} rows={3} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />

@@ -494,21 +494,37 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 	if err != nil {
 		return Bom{}, err
 	}
-	defer lines.Close()
-	var materials float64
+	// Scan all rows first — ConvertQty issues QueryRow on the same conn/tx and
+	// pgx returns "conn busy" if another result set is still open.
+	type bomLineScan struct {
+		ln       BomLine
+		purchase float64
+		stdRaw   []byte
+	}
+	var scanned []bomLineScan
 	for lines.Next() {
-		var ln BomLine
-		var purchase float64
-		var stdRaw []byte
+		var s bomLineScan
 		if err := lines.Scan(
-			&ln.ID, &ln.LineNo, &ln.ComponentItemID, &ln.ComponentCode, &ln.ComponentName,
-			&ln.Qty, &ln.UnitID, &ln.UnitCode, &ln.ScrapQty, &ln.OutputClassification,
-			&ln.BaseUnitID, &ln.BaseUnitCode,
-			&purchase, &stdRaw,
+			&s.ln.ID, &s.ln.LineNo, &s.ln.ComponentItemID, &s.ln.ComponentCode, &s.ln.ComponentName,
+			&s.ln.Qty, &s.ln.UnitID, &s.ln.UnitCode, &s.ln.ScrapQty, &s.ln.OutputClassification,
+			&s.ln.BaseUnitID, &s.ln.BaseUnitCode,
+			&s.purchase, &s.stdRaw,
 		); err != nil {
+			lines.Close()
 			return Bom{}, err
 		}
-		ln.OutputClassification = NormalizeOutputClassification(ln.OutputClassification)
+		s.ln.OutputClassification = NormalizeOutputClassification(s.ln.OutputClassification)
+		scanned = append(scanned, s)
+	}
+	if err := lines.Err(); err != nil {
+		lines.Close()
+		return Bom{}, err
+	}
+	lines.Close()
+
+	var materials float64
+	for _, s := range scanned {
+		ln := s.ln
 		need := ln.Qty + ln.ScrapQty
 		if ln.UnitID != nil && ln.BaseUnitID > 0 {
 			if stock, err := inventory.ConvertQty(ctx, q, tenantID, *ln.UnitID, ln.BaseUnitID, need); err == nil {
@@ -517,7 +533,7 @@ func loadBom(ctx context.Context, q pgxpoolConn, tenantID, id int64) (Bom, error
 		} else if ln.BaseUnitID > 0 && (ln.UnitID == nil || *ln.UnitID == ln.BaseUnitID) {
 			ln.StockQtyPreview = need
 		}
-		ln.UnitCost = resolveItemUnitCost(purchase, stdRaw)
+		ln.UnitCost = resolveItemUnitCost(s.purchase, s.stdRaw)
 		ln.LineTotal = ln.UnitCost * ln.Qty
 		materials += ln.LineTotal
 		row.Lines = append(row.Lines, ln)
