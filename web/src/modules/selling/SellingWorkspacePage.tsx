@@ -41,7 +41,8 @@ export default function SellingWorkspacePage() {
     <div class="space-y-6">
       <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
         <p class="text-sm text-text-secondary">{auth.me?.tenant.company_name}</p>
-        <p class="mt-1 text-sm text-text-secondary">Quote-to-cash shortcuts and selling reports.</p>
+        <h1 class="mt-1 text-2xl font-semibold tracking-tight text-text-primary">Sales</h1>
+        <p class="mt-1 text-sm text-text-secondary">Quote-to-cash overview — start a deal, fulfill, bill, and collect.</p>
       </section>
 
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

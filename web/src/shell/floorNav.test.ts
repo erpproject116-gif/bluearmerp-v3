@@ -42,20 +42,37 @@ describe("isSellBuyDesktopPreferredPath", () => {
 });
 
 describe("HOME_SIDEBAR_AREAS sales/purchase landings", () => {
-  it("parent Sales opens the sales list; New Sales is a child shortcut", () => {
+  it("parent Sales opens the sales overview; New Sales and Sales List are children", () => {
     const sell = HOME_SIDEBAR_AREAS.find((a) => a.id === "sell");
-    expect(sell?.href).toBe("/app/sales/sales");
+    expect(sell?.href).toBe("/app/sales");
+    expect(sell?.children?.find((c) => c.id === "sales_overview")).toMatchObject({
+      label: "Sales",
+      href: "/app/sales",
+    });
     expect(sell?.children?.find((c) => c.id === "sales")).toMatchObject({
       label: "New Sales",
       href: "/app/sales/sales/new",
     });
-    // Parent landing must stay on the list even though no child duplicates that href.
-    expect(sell?.children?.[0]?.href).not.toBe(sell?.href);
+    expect(sell?.children?.find((c) => c.id === "sales_list")).toMatchObject({
+      label: "Sales List",
+      href: "/app/sales/sales",
+    });
+    expect(sell?.children?.find((c) => c.id === "customers")?.label).toBe("Customers");
+    expect(sell?.children?.find((c) => c.id === "sales_invoices")?.children?.map((c) => c.label)).toEqual([
+      "Retainer Invoice",
+      "Recurring Invoice",
+      "Combined Invoice",
+    ]);
+    expect(sell?.children?.[0]?.href).toBe(sell?.href);
   });
 
-  it("parent Purchase opens the purchases list, not purchase orders", () => {
+  it("parent Purchase opens the purchase overview; receive new and list are children", () => {
     const buy = HOME_SIDEBAR_AREAS.find((a) => a.id === "buy");
-    expect(buy?.href).toBe("/app/purchases/purchase-receive");
+    expect(buy?.href).toBe("/app/purchases");
+    expect(buy?.children?.find((c) => c.id === "purchase_overview")).toMatchObject({
+      label: "Purchase",
+      href: "/app/purchases",
+    });
     expect(buy?.children?.find((c) => c.id === "purchase_order")?.href).toBe(
       "/app/purchase-order/purchase-orders",
     );
@@ -63,7 +80,12 @@ describe("HOME_SIDEBAR_AREAS sales/purchase landings", () => {
       label: "Purchase Receive",
       href: "/app/purchases/purchase-receive/new",
     });
-    expect(buy?.children?.[0]?.href).not.toBe(buy?.href);
+    expect(buy?.children?.find((c) => c.id === "purchase_receive_list")).toMatchObject({
+      label: "Purchase Receive List",
+      href: "/app/purchases/purchase-receive",
+    });
+    expect(buy?.children?.find((c) => c.id === "vendors")?.label).toBe("Vendors");
+    expect(buy?.children?.[0]?.href).toBe(buy?.href);
   });
 });
 

@@ -703,6 +703,7 @@ export default function App() {
           <Route path="/sales/credit-notes" component={CreditNotesPage} />
           <Route path="/sales/retainer-invoices" component={RetainerInvoicesPage} />
           <Route path="/sales/recurring-invoices" component={RecurringInvoicesPage} />
+          <Route path="/sales" component={SellingWorkspacePage} />
           <Route path="/finance/acct-ii/contracts" component={ContractsPage} />
           <Route path="/finance/acct-ii/landed-costs" component={LandedCostPage} />
           <Route path="/finance/acct-ii/notes" component={NotesPage} />
@@ -765,6 +766,7 @@ export default function App() {
           <Route path="/purchases/purchases/:id/print" component={PurchaseInvoicePrintPage} />
           <Route path="/purchases/purchases/:purchaseId/print-doc" component={SupplierInvoiceDocPrintPage} />
           <Route path="/purchases/purchases" component={() => <Navigate href="/app/purchases/purchase-receive" />} />
+          <Route path="/purchases" component={BuyingWorkspacePage} />
           <Route path="/finance/supplier-invoices/new" component={() => <Navigate href="/app/purchases/purchase-receive/new" />} />
           <Route path="/finance/supplier-invoices/settings" component={() => <Navigate href="/app/purchases/purchase-receive/settings" />} />
           <Route path="/finance/supplier-invoices" component={() => <Navigate href="/app/purchases/purchase-receive" />} />
@@ -774,13 +776,7 @@ export default function App() {
           <Route path="/finance/bank-reconciliation" component={() => <Navigate href="/app/finance/acct-i/bank-reconciliation" />} />
           <Route path="/finance/fiscal-years" component={() => <Navigate href="/app/finance/acct-i/fiscal-years" />} />
           <Route path="/finance/payment-entries" component={() => <Navigate href="/app/finance/acct-i/payment-entries" />} />
-          <Route
-            path="/finance/journal-entries"
-            component={() => {
-              const loc = useLocation();
-              return <Navigate href={`/app/finance/acct-i/journal-entries${loc.search}`} />;
-            }}
-          />
+          <Route path="/finance/journal-entries" component={() => <Navigate href="/app/finance/acct-i/journal-entries" />} />
           <Route path="/finance/official-receipts/new" component={OfficialReceiptNewPage} />
           <Route path="/finance/official-receipts/settings" component={OfficialReceiptSettingsPage} />
           <Route path="/finance/official-receipts" component={OfficialReceiptListPage} />
