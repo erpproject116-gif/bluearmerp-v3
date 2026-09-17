@@ -11,7 +11,9 @@ type Props = {
   lotBatchId?: number | null;
   lotNo?: string;
   disabled?: boolean;
-  onChange: (lotBatchId: number | null, lotNo: string) => void;
+  /** Prefer lots with free qty (not already staged on open jobs). */
+  freeOnly?: boolean;
+  onChange: (lotBatchId: number | null, lotNo: string, qtyAvailable?: number) => void;
 };
 
 export function LotLineCell(props: Props) {
@@ -25,8 +27,12 @@ export function LotLineCell(props: Props) {
       page: "1",
       pageSize: "50",
       item_id: String(props.itemId),
-      available_only: "true",
     });
+    if (props.freeOnly) {
+      qs.set("free_only", "true");
+    } else {
+      qs.set("available_only", "true");
+    }
     if (props.locationId) qs.set("location_id", String(props.locationId));
     const res = await apiFetch<LotBatchRow[]>(`/api/v1/inventory/lot-batches?${qs}`);
     setLoading(false);
@@ -38,6 +44,8 @@ export function LotLineCell(props: Props) {
   });
 
   const label = () => props.lotNo || (props.lotBatchId ? `Lot #${props.lotBatchId}` : "—");
+  const displayQty = (row: LotBatchRow) =>
+    row.qty_available != null && Number.isFinite(row.qty_available) ? row.qty_available : row.qty_on_hand;
 
   return (
     <>
@@ -53,14 +61,20 @@ export function LotLineCell(props: Props) {
         <Show when={!loading()} fallback={<p class="text-sm text-text-secondary">{uiLabel("common.loading")}</p>}>
           <Show
             when={rows().length > 0}
-            fallback={<p class="text-sm text-text-secondary">No available lot batches at this location.</p>}
+            fallback={
+              <p class="text-sm text-text-secondary">
+                {props.freeOnly
+                  ? "No free lot batches at this location."
+                  : "No available lot batches at this location."}
+              </p>
+            }
           >
             <table class="min-w-full text-sm">
               <thead class="bg-slate-50 text-left text-xs uppercase text-text-secondary">
                 <tr>
                   <th class="px-2 py-2">Lot no.</th>
                   <th class="px-2 py-2">Location</th>
-                  <th class="px-2 py-2 text-right">On hand</th>
+                  <th class="px-2 py-2 text-right">{props.freeOnly ? "Free" : "On hand"}</th>
                   <th class="px-2 py-2">Expiry</th>
                   <th class="px-2 py-2" />
                 </tr>
@@ -71,14 +85,14 @@ export function LotLineCell(props: Props) {
                     <tr class="border-t border-stroke">
                       <td class="px-2 py-2">{row.lot_no}</td>
                       <td class="px-2 py-2">{row.location_name}</td>
-                      <td class="px-2 py-2 text-right">{row.qty_on_hand.toFixed(4)}</td>
+                      <td class="px-2 py-2 text-right">{displayQty(row).toFixed(4)}</td>
                       <td class="px-2 py-2">{row.expiry_date?.slice(0, 10) ?? "—"}</td>
                       <td class="px-2 py-2 text-right">
                         <button
                           type="button"
                           class="rounded border border-stroke px-2 py-0.5 text-xs hover:bg-slate-50"
                           onClick={() => {
-                            props.onChange(row.id, row.lot_no);
+                            props.onChange(row.id, row.lot_no, displayQty(row));
                             setOpen(false);
                           }}
                         >

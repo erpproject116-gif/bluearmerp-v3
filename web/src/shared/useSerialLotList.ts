@@ -45,6 +45,8 @@ export type LotBatchRow = {
   location_id: number;
   location_name: string;
   qty_on_hand: number;
+  /** Free qty when listed with free_only (on hand minus staged on open jobs). */
+  qty_available?: number | null;
   expiry_date?: string | null;
   updated_at: string;
 };

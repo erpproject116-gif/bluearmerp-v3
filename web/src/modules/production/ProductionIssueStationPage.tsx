@@ -73,12 +73,19 @@ async function resolveLotBatchIds(
       pageSize: "5",
       item_id: String(itemId),
       location_id: String(locationId),
-      available_only: "true",
+      free_only: "true",
       q: row.lot_no,
     });
     const res = await apiFetch<LotBatchRow[]>(`/api/v1/inventory/lot-batches?${qs}`);
     const match = (res.data ?? []).find((b) => b.lot_no.toLowerCase() === row.lot_no.toLowerCase());
-    if (!match) throw new Error(`Lot ${row.lot_no} not found at location.`);
+    if (!match) throw new Error(`Lot ${row.lot_no} not found with free qty at this location.`);
+    const free =
+      match.qty_available != null && Number.isFinite(match.qty_available)
+        ? Number(match.qty_available)
+        : Number(match.qty_on_hand);
+    if (row.qty > free + 0.0001) {
+      throw new Error(`Lot ${row.lot_no} only has ${free.toFixed(4)} free.`);
+    }
     out.push({ lot_batch_id: match.id, qty: row.qty });
   }
   return out;
@@ -109,6 +116,11 @@ export default function ProductionIssueStationPage() {
 
   const remainingSerialNeed = (comp: ScanComponent) => {
     const need = Math.max(0, Math.round(comp.stock_to_issue) - (comp.issued_serials || 0));
+    return need;
+  };
+
+  const remainingLotNeed = (comp: ScanComponent) => {
+    const need = Math.max(0, Number(comp.stock_to_issue) - Number(comp.issued_lot_qty || 0));
     return need;
   };
 
@@ -203,6 +215,69 @@ export default function ProductionIssueStationPage() {
       mfgSuccess(`Auto-picked and staged ${rows.length} serial(s).`);
     }
     setSerialPaste("");
+    await refreshContext();
+  };
+
+  /** FEFO auto-pick free lot qty and stage for the active component. */
+  const autoPickAndStageLots = async () => {
+    const wo = context();
+    const comp = activeComponent();
+    const id = woId();
+    if (!wo || !comp || !id || !comp.track_lot || comp.track_serial) return;
+    let remaining = remainingLotNeed(comp);
+    if (!(remaining > 0.0001)) {
+      mfgWarn(null, "This component already has enough lot qty staged.");
+      return;
+    }
+    setBusy(true);
+    const qs = new URLSearchParams({
+      page: "1",
+      pageSize: "50",
+      item_id: String(comp.component_item_id),
+      location_id: String(wo.location_id),
+      free_only: "true",
+    });
+    const avail = await apiFetch<LotBatchRow[]>(`/api/v1/inventory/lot-batches?${qs}`, undefined, { silent: true });
+    const batches = avail.data ?? [];
+    if (batches.length === 0) {
+      setBusy(false);
+      mfgWarn(null, "No free lot qty at this warehouse. Receive stock first, or pick a lot manually.");
+      return;
+    }
+    const lines: { lot_batch_id: number; qty: number }[] = [];
+    for (const b of batches) {
+      if (!(remaining > 0.0001)) break;
+      const free = b.qty_available != null && Number.isFinite(b.qty_available) ? Number(b.qty_available) : Number(b.qty_on_hand);
+      if (!(free > 0.0001)) continue;
+      const take = Math.min(free, remaining);
+      lines.push({ lot_batch_id: b.id, qty: take });
+      remaining -= take;
+    }
+    if (lines.length === 0) {
+      setBusy(false);
+      mfgWarn(null, "No free lot qty at this warehouse. Receive stock first.");
+      return;
+    }
+    const res = await apiFetch(`/api/v1/manufacturing/work-orders/${id}/issue-lots`, {
+      method: "POST",
+      body: JSON.stringify({ lines }),
+    });
+    setBusy(false);
+    if (!res.success) {
+      mfgWarn(res.message, "Could not auto-stage those lots. Try picking a lot manually.");
+      return;
+    }
+    const first = batches.find((b) => b.id === lines[0]?.lot_batch_id);
+    if (first) {
+      setLotBatchId(first.id);
+      setLotNo(first.lot_no);
+      setLotQty(String(lines[0].qty));
+    }
+    if (remaining > 0.0001) {
+      mfgWarn(null, `Staged what was free; still need ${remaining.toFixed(4)} more. Receive stock or add another lot.`);
+    } else {
+      mfgSuccess(`Auto-picked and staged ${lines.length} lot line(s).`);
+    }
     await refreshContext();
   };
 
@@ -535,16 +610,36 @@ export default function ProductionIssueStationPage() {
                       </button>
                     </Show>
                     <Show when={comp().track_lot && !comp().track_serial}>
+                      <p class="mt-1 text-xs text-text-secondary">
+                        Need {remainingLotNeed(comp()).toFixed(4)} more. Free lot qty (on hand minus staged on open
+                        jobs) is listed by earliest expiry — Auto-pick stages FEFO, or pick a lot manually.
+                      </p>
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                          disabled={busy() || !context() || remainingLotNeed(comp()) <= 0.0001}
+                          onClick={() => void autoPickAndStageLots()}
+                        >
+                          Auto-pick &amp; stage next free
+                        </button>
+                      </div>
                       <div class="mt-3 space-y-4">
-                        <Field label="Pick lot batch">
+                        <Field label="Pick lot batch (free qty only)">
                           <LotLineCell
                             itemId={comp().component_item_id}
-                            locationId={ctx().location_id}
+                            locationId={context()?.location_id}
                             lotBatchId={lotBatchId()}
                             lotNo={lotNo()}
-                            onChange={(id, no) => {
+                            freeOnly
+                            onChange={(id, no, qtyAvailable) => {
                               setLotBatchId(id);
                               setLotNo(no);
+                              if (qtyAvailable != null && Number.isFinite(qtyAvailable) && qtyAvailable > 0) {
+                                const need = remainingLotNeed(comp());
+                                const take = Math.min(qtyAvailable, need > 0 ? need : qtyAvailable);
+                                setLotQty(String(take));
+                              }
                             }}
                           />
                         </Field>
@@ -559,7 +654,7 @@ export default function ProductionIssueStationPage() {
                         </Field>
                         <button
                           type="button"
-                          class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                          class="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
                           disabled={busy() || !lotBatchId()}
                           onClick={() => void issueSingleLot()}
                         >
