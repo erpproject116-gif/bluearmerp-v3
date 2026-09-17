@@ -59,8 +59,8 @@ export function SalesPostSaveDialog(props: Props) {
       </Show>
 
       <p class="mt-3 text-sm text-text-secondary">
-        Stock on Find Stock updates when line items track inventory. Collect payment next via Cash In or the
-        receivable payment worklist.
+        Find Stock updates after Progress is <strong>Completed</strong> (or after approval), for line items that track
+        inventory. Collect payment next via Cash In or the receivable payment worklist.
       </p>
 
       <Show when={props.hasSerials}>

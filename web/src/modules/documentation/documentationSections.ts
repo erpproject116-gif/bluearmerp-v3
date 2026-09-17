@@ -168,7 +168,7 @@ export const documentationSections: DocSection[] = [
     iconId: "inventory",
     intro: "Follow individual units from purchase through sale when items have serial numbers or lot batches.",
     primaryHref: "/app/purchases/purchase-receive/new",
-    primaryLabel: "New Purchases",
+    primaryLabel: "Purchase Receive",
     blocks: [
       {
         type: "flow",

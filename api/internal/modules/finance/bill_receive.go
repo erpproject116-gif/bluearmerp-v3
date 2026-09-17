@@ -142,10 +142,8 @@ func receiveForSupplierInvoiceLineTx(
 		return receiveFromPOLine(ctx, tx, tenantID, userID, locationID, partnerID, *ln.PurchaseOrderLineID, ln.Qty, serials, ln.LotLines, trackSerial, trackLot, ln.WarrantyDurationMonths)
 	}
 
-	// Blank bill line — receive without PO only when confirming (ECOUNT Bill-first).
-	if !confirming {
-		return nil, nil
-	}
+	// Blank Purchase Receive line: post stock as soon as serials/lots (if required) are complete —
+	// same as PO-linked lines. Progress can stay Unconfirmed for AP; confirm still links journal.
 	if itemID <= 0 {
 		return nil, nil
 	}

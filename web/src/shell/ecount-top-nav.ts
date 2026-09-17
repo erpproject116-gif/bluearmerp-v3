@@ -437,13 +437,13 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "purchases",
-        label: "New Purchases",
+        label: "Purchase Receive",
         href: "/app/purchases/purchase-receive/new",
         iconId: "purchases",
         topId: "inv1",
         expandGroupId: "procurement_process",
         moduleId: "purchases",
-        hint: "Create a purchase — receive stock and bill the supplier on confirm",
+        hint: "Receive stock and bill the supplier — Find Stock updates when items track inventory",
       },
       {
         id: "expenses",
