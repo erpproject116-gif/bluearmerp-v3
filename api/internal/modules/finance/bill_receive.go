@@ -119,23 +119,15 @@ func receiveForSupplierInvoiceLineTx(
 	serials := normalizeSerialNos(ln.SerialNos)
 
 	// Serial/lot items: do not qty-receive until serials/lots are complete.
+	// Fail the save (even Unconfirmed) so Purchase Receive never looks successful with zero stock.
 	if trackSerial && len(serials) == 0 {
-		if confirming {
-			return nil, errors.New("Serial numbers required before confirming this bill. Receive/scan them under Purchase Receive, or add them on this bill, then confirm.")
-		}
-		return nil, nil
+		return nil, errors.New("Serial numbers required to post stock. Scan serials matching qty, then save.")
 	}
 	if trackLot && len(ln.LotLines) == 0 {
-		if confirming {
-			return nil, errors.New("Lot numbers required before confirming this bill. Receive/enter lots under Purchase Receive, or add them on this bill, then confirm.")
-		}
-		return nil, nil
+		return nil, errors.New("Lot numbers required to post stock. Enter lot lines matching qty, then save.")
 	}
 	if trackSerial && len(serials) != int(math.Floor(ln.Qty+1e-9)) {
-		if confirming {
-			return nil, fmt.Errorf("Serial count (%d) must equal qty (%d). Add the missing serials under Purchase Receive or on this bill", len(serials), int(math.Floor(ln.Qty+1e-9)))
-		}
-		return nil, nil
+		return nil, fmt.Errorf("Serial count (%d) must equal qty (%d). Add the missing serials under Purchase Receive", len(serials), int(math.Floor(ln.Qty+1e-9)))
 	}
 
 	if ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {

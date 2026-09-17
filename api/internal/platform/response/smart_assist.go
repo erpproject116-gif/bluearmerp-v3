@@ -289,7 +289,7 @@ func AssistFromMessage(field, msg string) *Assist {
 		return &Assist{
 			Code: SASISerialLotNeedsGR, Field: field,
 			Title:  "Serial/lot items must be received first",
-			Detail: "Scan serials or lots under Purchase Receive (or on this bill before confirm) so they are in stock, then try again.",
+			Detail: "Scan serials or lots under Purchase Receive so they are in stock, then save again.",
 			Actions: []AssistAction{{Label: "Open Purchase Receive", Href: hrefGoodsReceipt}},
 		}
 	case strings.Contains(lower, "exceeds unreceived po quantity") || (strings.Contains(lower, "higher than") && strings.Contains(lower, "unreceived")):

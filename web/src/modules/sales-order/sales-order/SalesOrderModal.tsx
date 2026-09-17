@@ -715,20 +715,19 @@ export function SalesOrderModal(props: Props) {
           ? "Sales order updated."
           : "Sales order created."),
     );
-    // Keep modal open so AttachmentsField can flush staged files / show server-copied quotation files.
+    // Keep modal open briefly so AttachmentsField can flush staged files / show server-copied quotation files.
     if (!ed) {
       setCreatedSalesOrder(res.data);
     }
     await draft.clearOnSave();
     props.onSaved();
-    if (!ed) {
-      return;
-    }
     const sourced =
       !!sourceQuotationId() ||
       !!sourceAttachPreview() ||
       lines().some((ln) => !!ln.source_quotation_line_id);
-    const delayMs = attachmentCount() > 0 || sourced ? 600 : 0;
+    let delayMs = 0;
+    if (attachmentCount() > 0 || sourced) delayMs = 600;
+    else if (!ed) delayMs = 150;
     if (delayMs > 0) {
       window.setTimeout(() => props.onClose(), delayMs);
       return;

@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { PageJumpControl } from "../../../shared/PageJumpControl";
 import { defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
@@ -27,6 +27,11 @@ type Props = {
 
 function fmtQty(n: number | undefined) {
   if (n == null || !Number.isFinite(n) || Math.abs(n) < 0.0000001) return "";
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+function fmtQtyOrZero(n: number | undefined) {
+  if (n == null || !Number.isFinite(n)) return "0";
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
@@ -82,6 +87,23 @@ export function InvBookLedgerModal(props: Props) {
     enabled: props.open && props.row != null,
     runId: runId(),
   }));
+
+  const pageTotals = createMemo(() => {
+    const rows = report.data?.rows ?? [];
+    let increase = 0;
+    let release = 0;
+    let ending = 0;
+    for (const row of rows) {
+      if (row.is_beginning) {
+        ending = row.inventory_qty ?? 0;
+        continue;
+      }
+      increase += row.increase_qty ?? 0;
+      release += row.release_qty ?? 0;
+      ending = row.inventory_qty ?? ending;
+    }
+    return { increase, release, ending };
+  });
 
   const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
   const title = () => {
@@ -171,6 +193,25 @@ export function InvBookLedgerModal(props: Props) {
                       )}
                     </For>
                   </tbody>
+                  <Show when={(report.data?.rows?.length ?? 0) > 0}>
+                    <tfoot>
+                      <tr class="border-t-2 border-brand-200 bg-slate-50 font-semibold text-text-primary">
+                        <td class="px-3 py-2" colspan={3}>
+                          Page total
+                          <Show when={totalPages() > 1}>
+                            <span class="ml-1 font-normal text-text-secondary">(this page)</span>
+                          </Show>
+                        </td>
+                        <td class="px-3 py-2 text-right tabular-nums">{fmtQtyOrZero(pageTotals().increase)}</td>
+                        <td class="px-3 py-2 text-right tabular-nums">{fmtQtyOrZero(pageTotals().release)}</td>
+                        <td class="px-3 py-2 text-right tabular-nums text-brand-700">
+                          {fmtQtyOrZero(pageTotals().ending)}
+                          <div class="text-[10px] font-normal uppercase tracking-wide text-text-secondary">Ending</div>
+                        </td>
+                        <td class="px-3 py-2" colspan={2} />
+                      </tr>
+                    </tfoot>
+                  </Show>
                 </table>
                 <Show when={(report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
                   <p class="px-2 py-8 text-center text-sm text-text-secondary">No inv. book movements in this date range.</p>
@@ -184,7 +225,15 @@ export function InvBookLedgerModal(props: Props) {
             </div>
 
             <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
-              <span class="text-text-secondary">{report.data?.total ?? 0} movement(s)</span>
+              <span class="text-text-secondary">
+                {report.data?.total ?? 0} movement(s)
+                <Show when={(report.data?.rows?.length ?? 0) > 0}>
+                  {" · "}
+                  Net +{fmtQtyOrZero(pageTotals().increase - pageTotals().release)} this page
+                  {" · Ending "}
+                  {fmtQtyOrZero(pageTotals().ending)}
+                </Show>
+              </span>
               <div class="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
