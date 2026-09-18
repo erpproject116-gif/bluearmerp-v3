@@ -47,11 +47,21 @@ function fmtQtyOrZero(n: number | undefined) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+/** Ref types the Inv. Book source resolver can open as Sale / Purchase Receive. */
+const DRILLABLE_REF_TYPES = new Set([
+  "sales",
+  "sa_sales",
+  "sa_sales_line",
+  "supplier_invoice",
+  "fin_supplier_invoice",
+  "goods_receipt",
+]);
+
 function canDrill(row: InvBookSlipRow) {
   if (row.is_beginning) return false;
-  const refType = (row.ref_type ?? "").trim();
+  const refType = (row.ref_type ?? "").trim().toLowerCase();
   const refId = row.ref_id;
-  return Boolean(refType) && refId != null && Number(refId) > 0;
+  return DRILLABLE_REF_TYPES.has(refType) && refId != null && Number(refId) > 0;
 }
 
 export function InvBookLedgerModal(props: Props) {
@@ -214,7 +224,9 @@ export function InvBookLedgerModal(props: Props) {
                   {" · "}
                   {period().date_from} → {period().date_to}
                 </p>
-                <p class="mt-1 text-xs text-text-secondary">Click a movement date to open the source Sale or Purchase Receive (read-only).</p>
+                <p class="mt-1 text-xs text-text-secondary">
+                  Click a Sale or Purchase date to open the source document (read-only). Manufacturing and other movements stay plain text.
+                </p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <GridExportButtons
