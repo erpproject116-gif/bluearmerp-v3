@@ -9,6 +9,7 @@ import type { DocumentLineRow } from "./documentLinePrint";
 import { fetchAccountOptions } from "./accounts";
 import { apiFetch } from "./api";
 import { formatPeso, bindDecimalInput } from "./money";
+import { Modal } from "./Modal";
 import { useToast } from "./toast";
 import {
   savePurchaseInvoice,
@@ -34,6 +35,8 @@ type Props = {
   onPrint?: () => void;
   onSaved?: () => void;
   onApprovalChanged?: () => void;
+  /** Called after a successful void (soft-delete). Parent should close/refresh. */
+  onVoided?: () => void;
 };
 
 const CONFIG: Record<Kind, { acctIType: string; acctILabel: string; acctIILabel: string; defaultAcctI: string; defaultAcctII: string; partyLabel: string }> = {
@@ -87,6 +90,9 @@ export function InvoicePanel(props: Props) {
   const [jeStatus, setJeStatus] = createSignal("");
   const [jeId, setJeId] = createSignal<number | null>(null);
   const [saving, setSaving] = createSignal(false);
+  const [voidOpen, setVoidOpen] = createSignal(false);
+  const [voidReason, setVoidReason] = createSignal("");
+  const [voiding, setVoiding] = createSignal(false);
   const [purchaseCogsHint, setPurchaseCogsHint] = createSignal(false);
   const [ensuringPurchaseCogs, setEnsuringPurchaseCogs] = createSignal(false);
 
@@ -283,6 +289,32 @@ export function InvoicePanel(props: Props) {
     props.onSaved?.();
   };
 
+  const voidInvoice = async () => {
+    const id = props.docId;
+    if (!id) return;
+    const reason = voidReason().trim();
+    if (!reason) {
+      toast.warning("Enter a reason for the void.");
+      return;
+    }
+    setVoiding(true);
+    const path =
+      props.kind === "sales"
+        ? `/api/v1/sales/${id}/void`
+        : `/api/v1/finance/supplier-invoices/${id}/void`;
+    const res = await apiFetch(path, { method: "POST", body: JSON.stringify({ reason }) }, { silent: true });
+    setVoiding(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to void invoice.");
+      return;
+    }
+    toast.success("Invoice voided. Stock was not reversed.");
+    setVoidOpen(false);
+    setVoidReason("");
+    props.onVoided?.();
+    props.onSaved?.();
+  };
+
   return (
     <Show when={props.docId} fallback={<p class="text-sm text-text-secondary">Save the transaction first to prepare its invoice.</p>}>
       <div class="space-y-4">
@@ -324,20 +356,16 @@ export function InvoicePanel(props: Props) {
 
         <Show when={accountsLocked()}>
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            The linked journal entry is posted. You can still update fees and remark here; to change accounts, adjust the entry under{" "}
-            <Show
-              when={jeId()}
-              fallback={<>Finance → Journal entries</>}
-            >
+            The linked journal entry is posted, so Acct I/II are locked. You can still update fees and remark.
+            To change accounts, void this invoice voucher and post again (void/repost) — stock is not reversed.{" "}
+            <Show when={jeId()}>
               <A
                 href={`/app/finance/acct-i/journal-entries?highlight=${jeId()}`}
                 class="font-medium text-brand-700 hover:underline"
               >
-                Finance → Journal entries
-              </A>{" "}
-              (entry #{jeId()})
+                View journal entry #{jeId()}
+              </A>
             </Show>
-            .
           </p>
         </Show>
 
@@ -490,7 +518,15 @@ export function InvoicePanel(props: Props) {
           label="Attachments (from previous documents)"
         />
 
-        <div class="flex justify-end gap-2">
+        <div class="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            disabled={voiding()}
+            onClick={() => setVoidOpen(true)}
+          >
+            Void invoice
+          </button>
           <Show when={props.onPrint}>
             <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => props.onPrint?.()}>
               Print invoice
@@ -500,6 +536,34 @@ export function InvoicePanel(props: Props) {
             {saving() ? "Saving…" : "Save invoice"}
           </button>
         </div>
+
+        <Modal open={voidOpen()} title="Void invoice voucher" onClose={() => !voiding() && setVoidOpen(false)}>
+          <p class="mb-3 text-sm text-text-secondary">
+            This voids the accounting voucher and linked journal entry (draft cancelled or posted reversed). The document is soft-deleted with your reason for history.
+            <span class="mt-2 block font-medium text-amber-900">Stock, serials, and lots are not reversed in v1.</span>
+          </p>
+          <Field label="Reason (required)">
+            <textarea
+              class={`${inputClass} min-h-[5rem] w-full`}
+              value={voidReason()}
+              onInput={(e) => setVoidReason(e.currentTarget.value)}
+              placeholder="Why is this voucher being voided?"
+            />
+          </Field>
+          <div class="mt-4 flex justify-end gap-2">
+            <button type="button" class="rounded border border-stroke px-3 py-1.5 text-sm" disabled={voiding()} onClick={() => setVoidOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              disabled={voiding()}
+              onClick={() => void voidInvoice()}
+            >
+              {voiding() ? "Voiding…" : "Confirm void"}
+            </button>
+          </div>
+        </Modal>
       </div>
     </Show>
   );

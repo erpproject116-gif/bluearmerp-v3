@@ -14,6 +14,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/invoicejournal"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/invoicevoid"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -21,23 +22,23 @@ import (
 const salesTaxPayableCode = "2559"
 
 type salesInvoice struct {
-	SalesID          int64    `json:"sales_id"`
-	SalesNo          string   `json:"sales_no"`
-	OrderDate        string   `json:"order_date"`
-	PartnerName      string   `json:"partner_name"`
-	TaxTypeName      string   `json:"tax_type_name"`
-	Pretax           float64  `json:"pretax_amount"`
-	Tax              float64  `json:"tax"`
-	GrandTotal       float64  `json:"grand_total"`
-	Fees             float64  `json:"fees"`
-	Remark           string   `json:"remark"`
-	SalesAccountID   *int64   `json:"sales_account_id"`
-	SalesAccount     string   `json:"sales_account"`
-	DepositAccountID *int64   `json:"deposit_account_id"`
-	DepositAccount   string   `json:"deposit_account"`
-	JournalEntryID   *int64   `json:"journal_entry_id"`
-	JournalEntryNo   string   `json:"journal_entry_no"`
-	JournalStatus    string   `json:"journal_status"`
+	SalesID          int64   `json:"sales_id"`
+	SalesNo          string  `json:"sales_no"`
+	OrderDate        string  `json:"order_date"`
+	PartnerName      string  `json:"partner_name"`
+	TaxTypeName      string  `json:"tax_type_name"`
+	Pretax           float64 `json:"pretax_amount"`
+	Tax              float64 `json:"tax"`
+	GrandTotal       float64 `json:"grand_total"`
+	Fees             float64 `json:"fees"`
+	Remark           string  `json:"remark"`
+	SalesAccountID   *int64  `json:"sales_account_id"`
+	SalesAccount     string  `json:"sales_account"`
+	DepositAccountID *int64  `json:"deposit_account_id"`
+	DepositAccount   string  `json:"deposit_account"`
+	JournalEntryID   *int64  `json:"journal_entry_id"`
+	JournalEntryNo   string  `json:"journal_entry_no"`
+	JournalStatus    string  `json:"journal_status"`
 }
 
 type salesInvoiceAudit struct {
@@ -160,7 +161,7 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 				*before.SalesAccountID != body.SalesAccountID || *before.DepositAccountID != body.DepositAccountID
 			if accountsChanged {
 				response.Validation(w, map[string]string{
-					"journal_entry": "Accounts cannot be changed after the journal entry is posted. Update fees or remark only, or adjust the entry in Finance.",
+					"journal_entry": "Accounts cannot be changed after the journal entry is posted. Update fees or remark only, or void and repost the invoice to change accounts.",
 				})
 				return
 			}
@@ -209,6 +210,30 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "sales.invoice.update", "sa_sales", &id, before, after)
 		response.OK(w, map[string]any{"journal_entry_id": jeID}, "Invoice saved.")
 	}
+}
+
+// voidSalesInvoice implements the v1 "delete invoice" rule for sales invoices:
+// void the accounting voucher (cancel a draft JE, reverse a posted one), soft-delete
+// the sale with a reason for audit, and leave stock movements, serials and lots as
+// they are. Sales-order slips mirror shipped qty, so they stay attached — voiding
+// the voucher must not re-open a fulfilled order line.
+func voidSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
+	return invoicevoid.Handler(pool, invoicevoid.Config{
+		Table:         "sa_sales",
+		NumberColumn:  "sales_no",
+		JournalColumn: "invoice_journal_entry_id",
+		DocumentType:  "sa_sale",
+		DisplayName:   "Sales invoice",
+		AuditAction:   "sales.invoice.void",
+		AuditTarget:   "sa_sales",
+		JournalRemark: func(salesNo string) string { return "Void sales " + salesNo },
+		Payments: []invoicevoid.PaymentBlocker{{
+			Label: "official receipt applications",
+			Query: `select count(*) from public.fin_receipt_applications a
+				join public.fin_official_receipts r on r.id = a.official_receipt_id
+				where r.tenant_id = $1 and a.sales_id = $2 and r.deleted_at is null`,
+		}},
+	})
 }
 
 func accountsExist(ctx context.Context, pool *pgxpool.Pool, tenantID int64, ids ...int64) bool {
