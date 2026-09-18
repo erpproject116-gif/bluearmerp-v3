@@ -139,6 +139,7 @@ export function ItemMasterModal(props: Props) {
       onClose={props.onClose}
       onSave={props.onSave}
       saving={props.saving}
+      wide
       headerActions={
         <RecordHistoryButton
           variant="button"
@@ -278,21 +279,8 @@ export function ItemMasterModal(props: Props) {
       </Show>
 
       <Show when={props.itemTab === "qty"}>
-        <ModalField settings={props.byKey} fieldKey="reorder_level" fallbackLabel="Default reorder level">
-          {(m) => (
-            <DecimalInput
-              mode="qty"
-              class={inputClass}
-              placeholder="Not set"
-              disabled={m.disabled}
-              value={props.form().reorder_level == null ? "" : String(props.form().reorder_level)}
-              onValue={(v) => setForm((f) => ({ ...f, reorder_level: v === "" ? null : parseNum(v) }))}
-            />
-          )}
-        </ModalField>
-
-        <div class="col-span-full space-y-3 rounded-xl border border-stroke bg-slate-50/80 p-4">
-          <div>
+        <div class="col-span-full grid grid-cols-1 gap-x-6 gap-y-4 rounded-xl border border-stroke bg-slate-50/80 p-4 md:grid-cols-2 xl:grid-cols-3">
+          <div class="col-span-full">
             <p class="text-sm font-semibold text-text-primary">Tracking</p>
             <p class="mt-0.5 text-xs text-text-secondary">
               Quantity tracking drives Find Stock and Stock Movements. Serial tracking is on by default for new items —
@@ -300,6 +288,18 @@ export function ItemMasterModal(props: Props) {
               should stay on when you use Serial or Lot.
             </p>
           </div>
+          <ModalField settings={props.byKey} fieldKey="reorder_level" fallbackLabel="Default reorder level">
+            {(m) => (
+              <DecimalInput
+                mode="qty"
+                class={inputClass}
+                placeholder="Not set"
+                disabled={m.disabled}
+                value={props.form().reorder_level == null ? "" : String(props.form().reorder_level)}
+                onValue={(v) => setForm((f) => ({ ...f, reorder_level: v === "" ? null : parseNum(v) }))}
+              />
+            )}
+          </ModalField>
           <Field label="Inventory quantity">
             <label class="flex items-center gap-2 text-sm">
               <input
@@ -432,7 +432,7 @@ export function ItemMasterModal(props: Props) {
             </Field>
           </Show>
           <Show when={props.form().track_serial || props.form().track_lot}>
-            <p class="text-xs text-text-secondary">
+            <p class="col-span-full text-xs text-text-secondary">
               <A href="/app/inventory/serial-lot/registry" class="text-brand-600 hover:underline">
                 Serials
               </A>
@@ -448,27 +448,31 @@ export function ItemMasterModal(props: Props) {
           </Show>
         </div>
 
-        <p class="col-span-full mt-2 text-sm font-medium text-text-primary">Safety stock by document type</p>
-        <For each={SAFETY_DOC_TYPES}>
-          {(doc) => (
-            <Field label={doc.label}>
-              <DecimalInput
-                mode="qty"
-                class={inputClass}
-                placeholder="Use default"
-                value={
-                  props.form().safety_stock_by_doc[doc.key] == null ? "" : String(props.form().safety_stock_by_doc[doc.key])
-                }
-                onValue={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    safety_stock_by_doc: { ...f.safety_stock_by_doc, [doc.key]: v === "" ? null : parseNum(v) },
-                  }))
-                }
-              />
-            </Field>
-          )}
-        </For>
+        <section class="col-span-full mt-2">
+          <p class="mb-3 text-sm font-medium text-text-primary">Safety stock by document type</p>
+          <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+            <For each={SAFETY_DOC_TYPES}>
+              {(doc) => (
+                <Field label={doc.label}>
+                  <DecimalInput
+                    mode="qty"
+                    class={inputClass}
+                    placeholder="Use default"
+                    value={
+                      props.form().safety_stock_by_doc[doc.key] == null ? "" : String(props.form().safety_stock_by_doc[doc.key])
+                    }
+                    onValue={(v) =>
+                      setForm((f) => ({
+                        ...f,
+                        safety_stock_by_doc: { ...f.safety_stock_by_doc, [doc.key]: v === "" ? null : parseNum(v) },
+                      }))
+                    }
+                  />
+                </Field>
+              )}
+            </For>
+          </div>
+        </section>
       </Show>
 
       <Show when={props.itemTab === "price"}>
