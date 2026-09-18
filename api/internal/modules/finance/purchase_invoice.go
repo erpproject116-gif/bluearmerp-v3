@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/invoicejournal"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/invoicevoid"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -26,7 +27,6 @@ const inputVatCode = "1359"
 // ewtPayableCode is credited when supplier-invoice withholding is recognized at post
 // (same GL as payment-voucher withholding in buildPVPostingEvent).
 const ewtPayableCode = "2360"
-
 
 type purchaseInvoice struct {
 	SupplierInvoiceID   int64   `json:"supplier_invoice_id"`
@@ -273,6 +273,33 @@ func putPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "purchase.invoice.update", "fin_supplier_invoice", &id, before, after)
 		response.OK(w, map[string]any{"journal_entry_id": jeID}, "Invoice saved.")
 	}
+}
+
+// voidPurchaseInvoice implements the v1 "delete invoice" rule for supplier invoices:
+// void the accounting voucher (cancel a draft JE, reverse a posted one), soft-delete
+// the invoice with a reason for audit, and leave goods-receipt stock, serials and
+// lots untouched.
+func voidPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
+	return invoicevoid.Handler(pool, invoicevoid.Config{
+		Table:         "fin_supplier_invoices",
+		NumberColumn:  "invoice_no",
+		JournalColumn: "invoice_journal_entry_id",
+		DocumentType:  "fin_supplier_invoice",
+		DisplayName:   "Supplier invoice",
+		AuditAction:   "purchase.invoice.void",
+		AuditTarget:   "fin_supplier_invoice",
+		JournalRemark: func(invoiceNo string) string { return "Void purchase " + invoiceNo },
+		Payments: []invoicevoid.PaymentBlocker{{
+			Label: "payment voucher applications",
+			Query: `select count(*) from public.fin_payment_applications a
+				join public.fin_payment_vouchers p on p.id = a.payment_voucher_id
+				where p.tenant_id = $1 and a.supplier_invoice_id = $2 and p.deleted_at is null`,
+		}},
+		// Goods-receipt slips only track invoiced qty (same rows the invoice edit
+		// path rewrites), so detaching them re-opens the receipt for billing
+		// without touching GR stock movements.
+		ReleaseSlipsSQL: `delete from public.gr_goods_receipt_slip_lines where supplier_invoice_id = $1`,
+	})
 }
 
 // syncPurchaseInvoiceJournalAfterBill ensures CoA defaults and syncs the purchase invoice JE

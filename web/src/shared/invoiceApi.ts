@@ -71,6 +71,31 @@ export function savePurchaseInvoice(
   return apiFetch(`/api/v1/finance/supplier-invoices/${id}/invoice`, { method: "PUT", body: JSON.stringify(body) });
 }
 
+/** Outcome of voiding an invoice voucher. Stock is never part of a void. */
+export type InvoiceVoidResult = {
+  document_id: number;
+  document_no: string;
+  journal_entry_id: number | null;
+  /** none = no linked entry, cancelled = draft entry, reversed = posted entry. */
+  journal_action: "none" | "cancelled" | "reversed";
+  reversal_journal_entry_id?: number | null;
+  released_slip_lines: number;
+};
+
+/** Void the sales accounting voucher and soft-delete the sale for audit. */
+export function voidSalesInvoice(id: number, reason: string): Promise<ApiResult<InvoiceVoidResult>> {
+  return apiFetch(`/api/v1/sales/${id}/void`, { method: "POST", body: JSON.stringify({ reason }) }, { silent: true });
+}
+
+/** Void the purchase accounting voucher and soft-delete the supplier invoice for audit. */
+export function voidPurchaseInvoice(id: number, reason: string): Promise<ApiResult<InvoiceVoidResult>> {
+  return apiFetch(
+    `/api/v1/finance/supplier-invoices/${id}/void`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+    { silent: true },
+  );
+}
+
 type FinanceAccountDefaults = {
   sales_account_id?: number | null;
   purchase_account_id?: number | null;

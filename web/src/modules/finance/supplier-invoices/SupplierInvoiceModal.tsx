@@ -941,6 +941,10 @@ export function SupplierInvoiceModal(props: Props) {
               const id = effectiveEditing()?.id;
               if (id) openPurchaseInvoicePrint(id);
             }}
+            onVoided={() => {
+              props.onSaved();
+              props.onClose();
+            }}
             onApprovalChanged={() => {
               void apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${effectiveEditing()!.id}`).then((res) => {
                 if (res.success && res.data) setProgressStatus(res.data.progress_status);

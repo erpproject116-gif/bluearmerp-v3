@@ -403,6 +403,8 @@ func registerSupplierInvoiceRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/supplier-invoices", createSupplierInvoice(pool))
 	r.Get("/supplier-invoices/{id}/invoice", getPurchaseInvoice(pool))
 	r.Put("/supplier-invoices/{id}/invoice", putPurchaseInvoice(pool))
+	r.With(auth.RequirePermission("finance.supplier_invoices", auth.AccessWrite)).
+		Post("/supplier-invoices/{id}/void", voidPurchaseInvoice(pool))
 	r.Get("/supplier-invoices/{id}", getSupplierInvoice(pool))
 	r.Get("/supplier-invoices/{id}/print", getSupplierInvoicePrint(pool))
 	r.Get("/supplier-invoices/{id}/pdf", getSupplierInvoicePDF(pool))

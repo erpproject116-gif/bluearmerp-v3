@@ -1,4 +1,4 @@
-﻿package sales
+package sales
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/crm"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
@@ -201,6 +201,7 @@ func registerSalesRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Patch("/{id}/invoicing-status", patchSalesInvoicingStatus(pool))
 	r.Get("/{id}/invoice", getSalesInvoice(pool))
 	r.Put("/{id}/invoice", putSalesInvoice(pool))
+	r.With(auth.RequirePermission("sales.sales", auth.AccessWrite)).Post("/{id}/void", voidSalesInvoice(pool))
 	r.Get("/{id}", getSale(pool))
 	r.Patch("/{id}", updateSale(pool))
 	r.Delete("/{id}", deleteSale(pool))
@@ -1155,7 +1156,6 @@ func hasDiscountTemplate(templateCode string) bool {
 	return templateCode == "non_vat" || templateCode == "vat_included"
 }
 
-
 func saleAssistLinks(sourceSalesOrderID *int64) response.AssistLinkContext {
 	var links response.AssistLinkContext
 	if sourceSalesOrderID != nil && *sourceSalesOrderID > 0 {
@@ -1163,4 +1163,3 @@ func saleAssistLinks(sourceSalesOrderID *int64) response.AssistLinkContext {
 	}
 	return links
 }
-
