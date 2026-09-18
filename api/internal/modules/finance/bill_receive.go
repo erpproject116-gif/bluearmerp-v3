@@ -39,7 +39,48 @@ func confirmingBillProgress(progress string) bool {
 	return p == "completed" || p == "confirm" || p == "e_approval"
 }
 
-func validateBillLineSerialLots(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody, confirming bool) (trackSerial, trackLot bool, itemID int64, err error) {
+func trackingPolicyRequired(policy string) bool {
+	return !strings.EqualFold(strings.TrimSpace(policy), "optional")
+}
+
+func validateTrackingCapture(
+	trackSerial bool,
+	serialPolicy string,
+	trackLot bool,
+	lotPolicy string,
+	qty float64,
+	rawSerials []string,
+	lots []billLotLine,
+) error {
+	serials := normalizeSerialNos(rawSerials)
+	if trackSerial {
+		required := trackingPolicyRequired(serialPolicy)
+		if len(serials) > 0 || required {
+			needQty := int(math.Floor(qty + 1e-9))
+			if needQty < 1 {
+				return errors.New("qty must be at least 1 for serial-tracked items")
+			}
+			if len(serials) != needQty {
+				return fmt.Errorf("serial count (%d) must equal qty (%d)", len(serials), needQty)
+			}
+		}
+	}
+	if trackLot {
+		required := trackingPolicyRequired(lotPolicy)
+		if len(lots) > 0 || required {
+			var sum float64
+			for _, lot := range lots {
+				sum += lot.Qty
+			}
+			if math.Abs(sum-qty) > 0.0001 {
+				return fmt.Errorf("lot qty sum (%.4f) must equal line qty (%.4f)", sum, qty)
+			}
+		}
+	}
+	return nil
+}
+
+func validateBillLineSerialLots(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody) (trackSerial, trackLot bool, itemID int64, serialPolicy, lotPolicy string, err error) {
 	var id *int64
 	if ln.ItemID != nil && *ln.ItemID > 0 {
 		id = ln.ItemID
@@ -70,34 +111,27 @@ func validateBillLineSerialLots(ctx context.Context, tx pgx.Tx, tenantID int64, 
 		}
 	}
 	if id == nil || *id <= 0 {
-		return false, false, 0, nil
+		return false, false, 0, "", "", nil
 	}
 	itemID = *id
 	_ = tx.QueryRow(ctx, `
-		select coalesce(track_serial, false), coalesce(track_lot, false)
+		select coalesce(track_serial, false), coalesce(track_lot, false),
+		       coalesce(serial_policy, 'required'), coalesce(lot_policy, 'required')
 		from public.inv_items where id = $1 and tenant_id = $2`, itemID, tenantID).
-		Scan(&trackSerial, &trackLot)
+		Scan(&trackSerial, &trackLot, &serialPolicy, &lotPolicy)
 
-	serials := normalizeSerialNos(ln.SerialNos)
-	needQty := int(math.Floor(ln.Qty + 1e-9))
-	if trackSerial && confirming {
-		if needQty < 1 {
-			return trackSerial, trackLot, itemID, fmt.Errorf("qty must be at least 1 for serial-tracked items")
-		}
-		if len(serials) != needQty {
-			return trackSerial, trackLot, itemID, fmt.Errorf("serial count (%d) must equal qty (%d)", len(serials), needQty)
-		}
+	if err := validateTrackingCapture(
+		trackSerial,
+		serialPolicy,
+		trackLot,
+		lotPolicy,
+		ln.Qty,
+		ln.SerialNos,
+		ln.LotLines,
+	); err != nil {
+		return trackSerial, trackLot, itemID, serialPolicy, lotPolicy, err
 	}
-	if trackLot && confirming {
-		var sum float64
-		for _, lot := range ln.LotLines {
-			sum += lot.Qty
-		}
-		if math.Abs(sum-ln.Qty) > 0.0001 {
-			return trackSerial, trackLot, itemID, fmt.Errorf("lot qty sum (%.4f) must equal line qty (%.4f)", sum, ln.Qty)
-		}
-	}
-	return trackSerial, trackLot, itemID, nil
+	return trackSerial, trackLot, itemID, serialPolicy, lotPolicy, nil
 }
 
 // receiveForSupplierInvoiceLineTx posts stock (and serials/lots) under the hood via a posted GR.
@@ -105,30 +139,18 @@ func validateBillLineSerialLots(ctx context.Context, tx pgx.Tx, tenantID int64, 
 func receiveForSupplierInvoiceLineTx(
 	ctx context.Context, tx pgx.Tx,
 	tenantID, userID, locationID, partnerID int64,
-	ln supplierInvoiceLineBody, confirming bool,
+	ln supplierInvoiceLineBody,
 ) (*int64, error) {
 	// Already linked to a posted GR — bill only.
 	if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
 		return ln.GoodsReceiptLineID, nil
 	}
 
-	trackSerial, trackLot, itemID, err := validateBillLineSerialLots(ctx, tx, tenantID, ln, confirming)
+	trackSerial, trackLot, itemID, _, _, err := validateBillLineSerialLots(ctx, tx, tenantID, ln)
 	if err != nil {
 		return nil, err
 	}
 	serials := normalizeSerialNos(ln.SerialNos)
-
-	// Serial/lot items: do not qty-receive until serials/lots are complete.
-	// Fail the save (even Unconfirmed) so Purchase Receive never looks successful with zero stock.
-	if trackSerial && len(serials) == 0 {
-		return nil, errors.New("Serial numbers required to post stock. Scan serials matching qty, then save.")
-	}
-	if trackLot && len(ln.LotLines) == 0 {
-		return nil, errors.New("Lot numbers required to post stock. Enter lot lines matching qty, then save.")
-	}
-	if trackSerial && len(serials) != int(math.Floor(ln.Qty+1e-9)) {
-		return nil, fmt.Errorf("Serial count (%d) must equal qty (%d). Add the missing serials under Purchase Receive", len(serials), int(math.Floor(ln.Qty+1e-9)))
-	}
 
 	if ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
 		return receiveFromPOLine(ctx, tx, tenantID, userID, locationID, partnerID, *ln.PurchaseOrderLineID, ln.Qty, serials, ln.LotLines, trackSerial, trackLot, ln.WarrantyDurationMonths)

@@ -29,87 +29,87 @@ import (
 )
 
 type SupplierInvoiceLine struct {
-	ID                  int64   `json:"id,omitempty"`
-	LineNo              int     `json:"line_no"`
-	GoodsReceiptLineID  *int64  `json:"goods_receipt_line_id,omitempty"`
-	PurchaseOrderLineID *int64  `json:"purchase_order_line_id,omitempty"`
-	ItemID              *int64  `json:"item_id,omitempty"`
-	ItemCode            string  `json:"item_code,omitempty"`
-	ItemName            string  `json:"item_name,omitempty"`
-	Description         *string `json:"description,omitempty"`
-	Qty                 float64 `json:"qty"`
-	UnitID              *int64  `json:"unit_id,omitempty"`
-	UnitCode            string  `json:"unit_code,omitempty"`
-	UnitNonVat          float64 `json:"unit_non_vat"`
-	NonVatTotal         float64 `json:"non_vat_total"`
-	TaxAmount           float64 `json:"tax_amount"`
-	UnitVatInc          float64 `json:"unit_vat_inc"`
-	LineTotal           float64 `json:"line_total"`
-	Remark                 *string      `json:"remark,omitempty"`
-	WarrantyDurationMonths *int         `json:"warranty_duration_months,omitempty"`
-	TrackSerial            bool         `json:"track_serial,omitempty"`
-	SerialNos              []string     `json:"serial_nos,omitempty"`
+	ID                     int64         `json:"id,omitempty"`
+	LineNo                 int           `json:"line_no"`
+	GoodsReceiptLineID     *int64        `json:"goods_receipt_line_id,omitempty"`
+	PurchaseOrderLineID    *int64        `json:"purchase_order_line_id,omitempty"`
+	ItemID                 *int64        `json:"item_id,omitempty"`
+	ItemCode               string        `json:"item_code,omitempty"`
+	ItemName               string        `json:"item_name,omitempty"`
+	Description            *string       `json:"description,omitempty"`
+	Qty                    float64       `json:"qty"`
+	UnitID                 *int64        `json:"unit_id,omitempty"`
+	UnitCode               string        `json:"unit_code,omitempty"`
+	UnitNonVat             float64       `json:"unit_non_vat"`
+	NonVatTotal            float64       `json:"non_vat_total"`
+	TaxAmount              float64       `json:"tax_amount"`
+	UnitVatInc             float64       `json:"unit_vat_inc"`
+	LineTotal              float64       `json:"line_total"`
+	Remark                 *string       `json:"remark,omitempty"`
+	WarrantyDurationMonths *int          `json:"warranty_duration_months,omitempty"`
+	TrackSerial            bool          `json:"track_serial,omitempty"`
+	SerialNos              []string      `json:"serial_nos,omitempty"`
 	LotLines               []billLotLine `json:"lot_lines,omitempty"`
 }
 
 type SupplierInvoice struct {
-	ID              int64                 `json:"id"`
-	InvoiceDate     string                `json:"invoice_date"`
-	DateSeq         int                   `json:"date_seq"`
-	DateNoDisplay   string                `json:"date_no_display"`
-	InvoiceNo       string                `json:"invoice_no"`
-	TaxTypeID       *int64                `json:"tax_type_id,omitempty"`
-	TaxTypeName     string                `json:"tax_type_name,omitempty"`
-	PartnerID       int64                 `json:"partner_id"`
-	VendorName      string                `json:"vendor_name"`
-	CurrencyID      int64                 `json:"currency_id"`
-	CurrencyCode    string                `json:"currency_code,omitempty"`
-	PicUserID       *int64                `json:"pic_user_id,omitempty"`
-	PicName         string                `json:"pic_name,omitempty"`
-	LocationID      *int64                `json:"location_id,omitempty"`
-	LocationName    string                `json:"location_name,omitempty"`
-	ProjectID       *int64                `json:"project_id,omitempty"`
-	ProjectName     *string               `json:"project_name,omitempty"`
-	DueDate         *string               `json:"due_date,omitempty"`
-	TermsOfPayment  *string               `json:"terms_of_payment,omitempty"`
-	PaymentTerms    *string               `json:"payment_terms,omitempty"`
-	VendorInvoiceNo *string               `json:"vendor_invoice_no,omitempty"`
-	Reference       *string               `json:"reference,omitempty"`
-	Notes           *string               `json:"notes,omitempty"`
-	Subtotal        float64               `json:"subtotal"`
-	TaxTotal        float64               `json:"tax_total"`
-	GrandTotal      float64               `json:"grand_total"`
-	PaidAmount      float64               `json:"paid_amount,omitempty"`
-	Balance         float64               `json:"balance,omitempty"`
-	PaymentStatus   string                `json:"payment_status,omitempty"`
-	ProgressStatus  string                `json:"progress_status"`
-	CreatedByName   string                `json:"created_by_name,omitempty"`
-	ItemNameSummary string                `json:"item_name_summary,omitempty"`
-	PONumbers       string                `json:"po_numbers,omitempty"`
-	InvoicingStatus bool                  `json:"invoicing_status"`
+	ID               int64                     `json:"id"`
+	InvoiceDate      string                    `json:"invoice_date"`
+	DateSeq          int                       `json:"date_seq"`
+	DateNoDisplay    string                    `json:"date_no_display"`
+	InvoiceNo        string                    `json:"invoice_no"`
+	TaxTypeID        *int64                    `json:"tax_type_id,omitempty"`
+	TaxTypeName      string                    `json:"tax_type_name,omitempty"`
+	PartnerID        int64                     `json:"partner_id"`
+	VendorName       string                    `json:"vendor_name"`
+	CurrencyID       int64                     `json:"currency_id"`
+	CurrencyCode     string                    `json:"currency_code,omitempty"`
+	PicUserID        *int64                    `json:"pic_user_id,omitempty"`
+	PicName          string                    `json:"pic_name,omitempty"`
+	LocationID       *int64                    `json:"location_id,omitempty"`
+	LocationName     string                    `json:"location_name,omitempty"`
+	ProjectID        *int64                    `json:"project_id,omitempty"`
+	ProjectName      *string                   `json:"project_name,omitempty"`
+	DueDate          *string                   `json:"due_date,omitempty"`
+	TermsOfPayment   *string                   `json:"terms_of_payment,omitempty"`
+	PaymentTerms     *string                   `json:"payment_terms,omitempty"`
+	VendorInvoiceNo  *string                   `json:"vendor_invoice_no,omitempty"`
+	Reference        *string                   `json:"reference,omitempty"`
+	Notes            *string                   `json:"notes,omitempty"`
+	Subtotal         float64                   `json:"subtotal"`
+	TaxTotal         float64                   `json:"tax_total"`
+	GrandTotal       float64                   `json:"grand_total"`
+	PaidAmount       float64                   `json:"paid_amount,omitempty"`
+	Balance          float64                   `json:"balance,omitempty"`
+	PaymentStatus    string                    `json:"payment_status,omitempty"`
+	ProgressStatus   string                    `json:"progress_status"`
+	CreatedByName    string                    `json:"created_by_name,omitempty"`
+	ItemNameSummary  string                    `json:"item_name_summary,omitempty"`
+	PONumbers        string                    `json:"po_numbers,omitempty"`
+	InvoicingStatus  bool                      `json:"invoicing_status"`
 	Lines            []SupplierInvoiceLine     `json:"lines,omitempty"`
 	WithholdingLines []WithholdingLineResponse `json:"withholding_lines,omitempty"`
 	CustomValues     map[string]any            `json:"custom_values,omitempty"`
 }
 
 type supplierInvoiceLineBody struct {
-	LineNo              int     `json:"line_no"`
-	GoodsReceiptLineID  *int64  `json:"goods_receipt_line_id"`
-	PurchaseOrderLineID *int64  `json:"purchase_order_line_id"`
-	ItemID              *int64  `json:"item_id"`
-	ItemCode            string  `json:"item_code"`
-	ItemName            string  `json:"item_name"`
-	Description         *string `json:"description"`
-	Qty                 float64 `json:"qty"`
-	UnitID              *int64  `json:"unit_id"`
-	UnitCode            string  `json:"unit_code"`
-	UnitPrice           float64 `json:"unit_price"`
-	InputBasis          string  `json:"input_basis"`
-	UnitNonVat          float64 `json:"unit_non_vat"`
-	NonVatTotal         float64 `json:"non_vat_total"`
-	TaxAmount           float64 `json:"tax_amount"`
-	UnitVatInc          float64 `json:"unit_vat_inc"`
-	LineTotal           float64       `json:"line_total"`
+	LineNo                 int           `json:"line_no"`
+	GoodsReceiptLineID     *int64        `json:"goods_receipt_line_id"`
+	PurchaseOrderLineID    *int64        `json:"purchase_order_line_id"`
+	ItemID                 *int64        `json:"item_id"`
+	ItemCode               string        `json:"item_code"`
+	ItemName               string        `json:"item_name"`
+	Description            *string       `json:"description"`
+	Qty                    float64       `json:"qty"`
+	UnitID                 *int64        `json:"unit_id"`
+	UnitCode               string        `json:"unit_code"`
+	UnitPrice              float64       `json:"unit_price"`
+	InputBasis             string        `json:"input_basis"`
+	UnitNonVat             float64       `json:"unit_non_vat"`
+	NonVatTotal            float64       `json:"non_vat_total"`
+	TaxAmount              float64       `json:"tax_amount"`
+	UnitVatInc             float64       `json:"unit_vat_inc"`
+	LineTotal              float64       `json:"line_total"`
 	Remark                 *string       `json:"remark"`
 	SerialNos              []string      `json:"serial_nos"`
 	LotLines               []billLotLine `json:"lot_lines"`
@@ -117,22 +117,22 @@ type supplierInvoiceLineBody struct {
 }
 
 type supplierInvoiceBody struct {
-	InvoiceDate     string                    `json:"invoice_date"`
-	TaxTypeID       int64                     `json:"tax_type_id"`
-	PartnerID       int64                     `json:"partner_id"`
-	CurrencyID      int64                     `json:"currency_id"`
-	PicUserID       *int64                    `json:"pic_user_id"`
-	PicName         string                    `json:"pic_name"`
-	LocationID      int64                     `json:"location_id"`
-	ProjectID       *int64                    `json:"project_id"`
-	ProjectName     *string                   `json:"project_name"`
-	DueDate         *string                   `json:"due_date"`
-	TermsOfPayment  *string                   `json:"terms_of_payment"`
-	PaymentTerms    *string                   `json:"payment_terms"`
-	VendorInvoiceNo *string                   `json:"vendor_invoice_no"`
-	Reference       *string                   `json:"reference"`
-	Notes           *string                   `json:"notes"`
-	ProgressStatus  string                    `json:"progress_status"`
+	InvoiceDate      string                    `json:"invoice_date"`
+	TaxTypeID        int64                     `json:"tax_type_id"`
+	PartnerID        int64                     `json:"partner_id"`
+	CurrencyID       int64                     `json:"currency_id"`
+	PicUserID        *int64                    `json:"pic_user_id"`
+	PicName          string                    `json:"pic_name"`
+	LocationID       int64                     `json:"location_id"`
+	ProjectID        *int64                    `json:"project_id"`
+	ProjectName      *string                   `json:"project_name"`
+	DueDate          *string                   `json:"due_date"`
+	TermsOfPayment   *string                   `json:"terms_of_payment"`
+	PaymentTerms     *string                   `json:"payment_terms"`
+	VendorInvoiceNo  *string                   `json:"vendor_invoice_no"`
+	Reference        *string                   `json:"reference"`
+	Notes            *string                   `json:"notes"`
+	ProgressStatus   string                    `json:"progress_status"`
 	Lines            []supplierInvoiceLineBody `json:"lines"`
 	WithholdingLines []withholdingLineBody     `json:"withholding_lines"`
 	CustomValues     map[string]any            `json:"custom_values"`
@@ -1230,7 +1230,7 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 		}
 		grLineID := ln.GoodsReceiptLineID
 		if grLineID == nil || *grLineID <= 0 {
-			autoGR, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, partnerID, ln, confirming)
+			autoGR, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, partnerID, ln)
 			if err != nil {
 				return fmt.Errorf("line %d: %w", lineNo, err)
 			}
@@ -1240,24 +1240,26 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 		} else if confirming {
 			// GR-sourced: bill-only (stock already posted). Enforce serials via GR or client payload.
 			if len(normalizeSerialNos(ln.SerialNos)) > 0 {
-				if _, _, _, err := validateBillLineSerialLots(ctx, tx, tenantID, ln, confirming); err != nil {
+				if _, _, _, _, _, err := validateBillLineSerialLots(ctx, tx, tenantID, ln); err != nil {
 					return fmt.Errorf("line %d: %w", lineNo, err)
 				}
 			} else {
 				var trackSerial bool
+				var serialPolicy string
 				if ln.ItemID != nil && *ln.ItemID > 0 {
 					_ = tx.QueryRow(ctx, `
-						select coalesce(track_serial, false) from public.inv_items where id = $1 and tenant_id = $2`,
-						*ln.ItemID, tenantID).Scan(&trackSerial)
+						select coalesce(track_serial, false), coalesce(serial_policy, 'required')
+						from public.inv_items where id = $1 and tenant_id = $2`,
+						*ln.ItemID, tenantID).Scan(&trackSerial, &serialPolicy)
 				} else {
 					_ = tx.QueryRow(ctx, `
-						select coalesce(i.track_serial, false)
+						select coalesce(i.track_serial, false), coalesce(i.serial_policy, 'required')
 						from public.gr_goods_receipt_lines grl
 						left join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
 						left join public.inv_items i on i.id = pol.item_id
-						where grl.id = $1`, *grLineID).Scan(&trackSerial)
+						where grl.id = $1`, *grLineID).Scan(&trackSerial, &serialPolicy)
 				}
-				if trackSerial {
+				if trackSerial && trackingPolicyRequired(serialPolicy) {
 					var sc int
 					_ = tx.QueryRow(ctx, `select count(*) from public.gr_goods_receipt_serials where goods_receipt_line_id = $1`, *grLineID).Scan(&sc)
 					need := int(ln.Qty + 1e-9)
@@ -1527,7 +1529,7 @@ func confirmOpenReceivesOnSupplierInvoiceTx(ctx context.Context, tx pgx.Tx, tena
 			SerialNos:           ln.SerialNos,
 			LotLines:            ln.LotLines,
 		}
-		autoGR, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, inv.PartnerID, body, true)
+		autoGR, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, inv.PartnerID, body)
 		if err != nil {
 			return fmt.Errorf("line %d: %w", ln.LineNo, err)
 		}
@@ -1654,4 +1656,3 @@ func patchSupplierInvoiceProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		response.OK(w, inv, "Updated.")
 	}
 }
-
