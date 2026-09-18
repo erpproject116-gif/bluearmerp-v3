@@ -103,6 +103,38 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
     expect(expense).toBeGreaterThan(buy);
   });
 
+  it("separates core ERP from Manufacturing and More Apps", () => {
+    const ids = HOME_SIDEBAR_AREAS.map((a) => a.id);
+    const mfg = ids.indexOf("production");
+    const afterMfg = ids.indexOf("sep_after_manufacturing");
+    const quotation = ids.indexOf("quotation");
+    const beforeMore = ids.indexOf("sep_before_more");
+    const more = ids.indexOf("more");
+    expect(afterMfg).toBe(mfg + 1);
+    expect(quotation).toBe(afterMfg + 1);
+    expect(beforeMore).toBeGreaterThan(ids.indexOf("accounting"));
+    expect(more).toBe(beforeMore + 1);
+    expect(HOME_SIDEBAR_AREAS.find((a) => a.id === "sep_after_manufacturing")?.kind).toBe("separator");
+  });
+
+  it("gives RFQ/PR outstanding vs history distinct hrefs", () => {
+    const rfq = HOME_SIDEBAR_AREAS.find((a) => a.id === "rfq");
+    expect(rfq?.iconId).toBe("rfq");
+    expect(rfq?.children?.find((c) => c.id === "rfq_outstanding")?.href).toBe(
+      "/app/purchase-order/rfq?view=outstanding",
+    );
+    expect(rfq?.children?.find((c) => c.id === "rfq_history")?.href).toBe(
+      "/app/purchase-order/rfq?view=history",
+    );
+    const pr = HOME_SIDEBAR_AREAS.find((a) => a.id === "purchase_request");
+    expect(pr?.children?.find((c) => c.id === "purchase_request_outstanding")?.href).toBe(
+      "/app/purchase-request/purchase-requests/status",
+    );
+    expect(pr?.children?.find((c) => c.id === "purchase_request_history")?.href).toBe(
+      "/app/purchase-request/purchase-requests/status?view=history",
+    );
+  });
+
   it("RFQ New opens create via ?new=1; Expense holds vendors and AP", () => {
     const rfq = HOME_SIDEBAR_AREAS.find((a) => a.id === "rfq");
     expect(rfq?.href).toBe("/app/rfq");
