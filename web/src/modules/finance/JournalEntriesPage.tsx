@@ -11,7 +11,23 @@ import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 
-type JournalEntryRow = { id: number; entry_no: string; status: string; remarks?: string };
+type JournalEntryRow = {
+  id: number;
+  entry_no: string;
+  status: string;
+  remarks?: string;
+  entry_date?: string;
+  archived_at?: string | null;
+  reversed_at?: string | null;
+  reversal_of_entry_id?: number | null;
+  reversed_by_entry_id?: number | null;
+};
+
+type JournalEntryDetail = JournalEntryRow & {
+  lines?: { account_code: string; debit: number; credit: number; dept_id?: number | null; project_id?: number | null }[];
+};
+
+type StatusFilter = "all" | "draft" | "posted" | "archived";
 
 type JournalLine = { account_code: string; debit: string; credit: string; dept_id: string; project_id: string };
 type AccountOption = { id: number; account_code: string; account_name: string; is_active: boolean };
@@ -22,8 +38,9 @@ export default function JournalEntriesPage() {
   const client = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const [statusFilter, setStatusFilter] = createSignal<"all" | "draft" | "posted">("all");
+  const [statusFilter, setStatusFilter] = createSignal<StatusFilter>("all");
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [editId, setEditId] = createSignal<number | null>(null);
   const [remarks, setRemarks] = createSignal("");
   const [lines, setLines] = createSignal<JournalLine[]>([
     { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
@@ -31,12 +48,18 @@ export default function JournalEntriesPage() {
   ]);
   const [saving, setSaving] = createSignal(false);
   const [posting, setPosting] = createSignal(false);
+  const [acting, setActing] = createSignal(false);
 
   const list = createQuery(() => ({
     queryKey: ["journal-entries", statusFilter()],
     queryFn: async () => {
       const qs = new URLSearchParams({ pageSize: "50" });
-      if (statusFilter() !== "all") qs.set("status", statusFilter());
+      if (statusFilter() === "archived") {
+        qs.set("status", "archived");
+        qs.set("include_archived", "1");
+      } else if (statusFilter() !== "all") {
+        qs.set("status", statusFilter());
+      }
       const res = await apiFetch<JournalEntryRow[]>(`/api/v1/finance/journal-entries?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load");
       return res.data ?? [];
