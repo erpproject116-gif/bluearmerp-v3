@@ -37,7 +37,9 @@ export function validatePurchaseTrackingLine(line: PurchaseTrackingLine): string
       }
       const total = lots.reduce((sum, lot) => sum + (Number(lot.qty) || 0), 0);
       if (Math.abs(total - qty) > 0.0001) {
-        return `Line ${line.line_no}: lot qty (${total.toFixed(4)}) must equal line qty (${qty.toFixed(4)}).`;
+        const lotQty = Math.round(total * 10000) / 10000;
+        const lineQty = Math.round(qty * 10000) / 10000;
+        return `Line ${line.line_no}: lot qty (${lotQty}) must equal line qty (${lineQty}).`;
       }
     }
   }

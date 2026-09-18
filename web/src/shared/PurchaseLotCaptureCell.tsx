@@ -32,8 +32,9 @@ export function PurchaseLotCaptureCell(props: Props) {
     if (props.lots.length === 0) {
       return props.policy?.trim().toLowerCase() === "optional" ? "Optional · add lots" : "Add lots";
     }
-    const total = props.lots.reduce((sum, lot) => sum + Number(lot.qty || 0), 0);
-    return `${props.lots.length} lot${props.lots.length === 1 ? "" : "s"} · ${total.toFixed(4)}`;
+    const totalQty = props.lots.reduce((sum, lot) => sum + Number(lot.qty || 0), 0);
+    const displayQty = Math.round(totalQty * 10000) / 10000;
+    return `${props.lots.length} lot${props.lots.length === 1 ? "" : "s"} · ${displayQty}`;
   };
 
   const save = () => {

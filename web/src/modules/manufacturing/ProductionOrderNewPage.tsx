@@ -17,6 +17,7 @@ import { cuttingStepGuidance } from "../production/mfgWizardStepGuidance";
 import { mfgStationHandoff, mfgSuccess, mfgWarn } from "../production/mfgToast";
 import { jobsHref } from "../production/mfgProductionMode";
 import { submitBusyLabel } from "../../shared/submitCopy";
+import { formatMoney } from "../../shared/money";
 import NewAssemblyOrderWizard from "./NewAssemblyOrderWizard";
 import NewRecipeOrderWizard from "./NewRecipeOrderWizard";
 import { searchBomsForOrderType } from "./mfgBomLookup";
@@ -624,7 +625,7 @@ function NewCuttingOrderWizard() {
             <Field label="Other cost">
               <input class={inputClass} type="number" min="0" step="any" value={otherCost()} onInput={(e) => setOtherCost(e.currentTarget.value)} />
             </Field>
-            <p class="text-sm font-medium">Total additional: ₱{additionalCost().toLocaleString()}</p>
+            <p class="text-sm font-medium">Total additional: {formatMoney(additionalCost())}</p>
             <p class="text-[11px] text-text-secondary">
               With Inventory GL enabled, these costs increase cut-output inventory value and credit Production cost absorption.
             </p>
@@ -642,16 +643,16 @@ function NewCuttingOrderWizard() {
               <Show when={journalPreview()} fallback={<p class="mt-1 text-xs text-text-secondary">Cost preview unavailable.</p>}>
                 <div class="mt-1 flex justify-between gap-3 text-xs">
                   <span>Dr Cut outputs inventory</span>
-                  <span>₱{estimatedTotalCost().toLocaleString()}</span>
+                  <span>{formatMoney(estimatedTotalCost())}</span>
                 </div>
                 <div class="flex justify-between gap-3 text-xs">
                   <span>Cr Raw material inventory</span>
-                  <span>₱{(journalPreview()?.costs.material_cost ?? 0).toLocaleString()}</span>
+                  <span>{formatMoney(journalPreview()?.costs.material_cost ?? 0)}</span>
                 </div>
                 <Show when={additionalCost() > 0}>
                   <div class="flex justify-between gap-3 text-xs">
                     <span>Cr Production cost absorption</span>
-                    <span>₱{additionalCost().toLocaleString()}</span>
+                    <span>{formatMoney(additionalCost())}</span>
                   </div>
                 </Show>
                 <Show when={!journalPreview()?.accounting_enabled}>
