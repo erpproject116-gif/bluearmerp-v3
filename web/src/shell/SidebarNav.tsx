@@ -94,7 +94,9 @@ function NavAreaLink(props: {
         props.area.id === "rfq" ||
         props.area.id === "purchase_request" ||
         props.area.id === "purchase_order" ||
-        props.area.id === "expense"
+        props.area.id === "expense" ||
+        props.area.id === "sales_process" ||
+        props.area.id === "purchase_process"
       }
       title={shell.collapsed() ? props.area.label : undefined}
       class="flex items-center rounded-lg text-sm font-medium transition-colors"
@@ -158,8 +160,11 @@ function HomeAreaBlock(props: {
 }) {
   const shell = useShell();
   const children = () => props.childrenOf(props.area);
-  const areaOrChildActive = () =>
-    props.active(props.area) || children().some((c) => props.active(c));
+  const descendantActive = (area: HomeSidebarArea): boolean => {
+    if (props.active(area)) return true;
+    return props.childrenOf(area).some((c) => descendantActive(c));
+  };
+  const areaOrChildActive = () => descendantActive(props.area);
   const initiallyOpen = () => {
     if (areaOrChildActive()) return true;
     if (children().length === 0) return false;
@@ -273,6 +278,9 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/inventory/serial-lot"]);
     }
     if (area.id === "production") {
+      return false;
+    }
+    if (area.id === "sales_process" || area.id === "purchase_process") {
       return false;
     }
     if (area.id === "production_workflow") {
