@@ -3,7 +3,7 @@ import { createSignal, Show, type JSX } from "solid-js";
 type Props = {
   title: string;
   description?: string;
-  /** Closed by default so the grid is visible first. */
+  /** Open by default so Search/filters are visible; pass false to start collapsed. */
   defaultOpen?: boolean;
   children: JSX.Element;
   actions?: JSX.Element;
@@ -11,7 +11,7 @@ type Props = {
 
 /** Collapsible filter/search card used on report and list pages. */
 export function CollapsibleFilterPanel(props: Props) {
-  const [open, setOpen] = createSignal(props.defaultOpen === true);
+  const [open, setOpen] = createSignal(props.defaultOpen !== false);
 
   return (
     <section class="rounded-xl border border-stroke bg-white shadow-sm">

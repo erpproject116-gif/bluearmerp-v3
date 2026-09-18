@@ -2,7 +2,8 @@ import { createSignal, onMount, Show, onCleanup } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { formatAmount } from "../../shared/money";
 import { PRICE_LEVEL_KEYS, SAFETY_DOC_TYPES } from "../../shared/itemMasterConstants";
-import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
+import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import {
   BulkItemTrackingModal,
@@ -118,6 +119,7 @@ function rowToForm(row: Item): ItemFormState {
 
 export default function ItemsPage() {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("item_code");
+  const [draftQ, setDraftQ] = createSignal("");
   const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -249,7 +251,21 @@ export default function ItemsPage() {
     };
   });
 
+  const applyItemSearch = () => {
+    setQ(draftQ().trim());
+    setPage(1);
+  };
+
+  const resetItemFilters = () => {
+    setDraftQ("");
+    setQ("");
+    setStatusFilter("");
+    setAdvancedFilters(emptyItemsAdvancedFilters());
+    setPage(1);
+  };
+
   onMount(() => {
+    setDraftQ(q());
     void apiFetch<ItemCategory[]>("/api/v1/inventory/item-categories").then((res) => {
       setCategories(res.data ?? []);
     });
@@ -257,6 +273,10 @@ export default function ItemsPage() {
       if (e.key === "F3") {
         e.preventDefault();
         setAdvancedOpen(true);
+      }
+      if (e.key === "F8") {
+        e.preventDefault();
+        applyItemSearch();
       }
       if (e.key === "Escape") setMoreOpen(false);
     };
@@ -409,7 +429,68 @@ export default function ItemsPage() {
   };
 
   return (
-    <div>
+    <div class="space-y-4">
+      <CollapsibleFilterPanel
+        title="Items"
+        description="Search by code or name, filter by status, then Search (F8). Use Advanced (F3) for category, type, and tracking filters."
+        actions={
+          <>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              onClick={applyItemSearch}
+            >
+              Search (F8)
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+              onClick={resetItemFilters}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
+              onClick={() => setAdvancedOpen(true)}
+            >
+              Advanced (F3)
+            </button>
+          </>
+        }
+      >
+        <div class="grid gap-4 md:grid-cols-2">
+          <Field label="Keyword">
+            <input
+              class={inputClass}
+              value={draftQ()}
+              onInput={(e) => setDraftQ(e.currentTarget.value)}
+              placeholder="Search by code or name…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyItemSearch();
+                }
+              }}
+            />
+          </Field>
+          <Field label="Status">
+            <select
+              class={inputClass}
+              value={statusFilter()}
+              onChange={(e) => {
+                setStatusFilter(e.currentTarget.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </Field>
+        </div>
+      </CollapsibleFilterPanel>
+
       <SpreadsheetGrid
         columns={[
           { key: "item_code", header: "Code", clickable: true },
@@ -452,7 +533,10 @@ export default function ItemsPage() {
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}
-        onSearchChange={setQ}
+        onSearchChange={(v) => {
+          setQ(v);
+          setDraftQ(v);
+        }}
         searchPlaceholder="Search by code or name…"
         status={statusFilter()}
         onStatusChange={setStatusFilter}

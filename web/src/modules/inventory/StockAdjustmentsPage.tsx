@@ -1,9 +1,10 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
-import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
+import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
 
@@ -88,9 +89,22 @@ export default function StockAdjustmentsPage() {
   const [adjustOpen, setAdjustOpen] = createSignal(false);
   const [editRequestId, setEditRequestId] = createSignal<number | null>(null);
   const [status, setStatus] = createSignal("");
+  const [draftQ, setDraftQ] = createSignal("");
   const initialDates = defaultDateRange();
   const [dateFrom, setDateFrom] = createSignal(initialDates.from);
   const [dateTo, setDateTo] = createSignal(initialDates.to);
+
+  onMount(() => {
+    setDraftQ(q());
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F8") {
+        e.preventDefault();
+        search();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    onCleanup(() => window.removeEventListener("keydown", onKey));
+  });
 
   const list = createQuery(() => ({
     queryKey: ["stock-adjustment-requests", page(), sort(), order(), q(), status(), dateFrom(), dateTo()],
@@ -118,6 +132,22 @@ export default function StockAdjustmentsPage() {
     void qc.invalidateQueries({ queryKey: ["stock-movements"] });
   };
 
+  const search = () => {
+    setQ(draftQ().trim());
+    setPage(1);
+    invalidate();
+  };
+
+  const reset = () => {
+    const d = defaultDateRange();
+    setDateFrom(d.from);
+    setDateTo(d.to);
+    setStatus("");
+    setDraftQ("");
+    setQ("");
+    setPage(1);
+  };
+
   const openNew = () => {
     setEditRequestId(null);
     setAdjustOpen(true);
@@ -132,82 +162,69 @@ export default function StockAdjustmentsPage() {
   };
 
   return (
-    <>
-      <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stroke bg-white p-4 shadow-sm">
-        <div class="w-full">
-          <h2 class="text-base font-semibold text-text-primary">Stock adjustments</h2>
-          <p class="mt-1 text-xs text-text-secondary">
-            All quantity change requests by item and location (branch), with From → To comparison, who submitted,
-            and who approved or rejected. Inventory updates only after an approver confirms. Pending items also
-            appear in{" "}
-            <A href="/app/dashboard/approvals" class="text-brand-700 hover:underline">
+    <div class="space-y-4">
+      <CollapsibleFilterPanel
+        title="Stock adjustments"
+        description="All quantity change requests by item and location (branch), with From → To comparison, who submitted, and who approved or rejected. Inventory updates only after an approver confirms. Pending items also appear in Approvals. Search (F8)."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
+              Reset to 90 days
+            </button>
+            <A
+              href="/app/dashboard/approvals"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
+            >
               Approvals
             </A>
-            .
-          </p>
+            <A
+              href="/app/inventory/stock-movements"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
+            >
+              Stock movements
+            </A>
+            <button type="button" class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={openNew}>
+              New adjustment
+            </button>
+          </>
+        }
+      >
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Field label="Keyword">
+            <input
+              class={inputClass}
+              value={draftQ()}
+              onInput={(e) => setDraftQ(e.currentTarget.value)}
+              placeholder="Item, location, reason, status…"
+            />
+          </Field>
+          <Field label="From">
+            <DateInput class={inputClass} value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
+          </Field>
+          <Field label="To">
+            <DateInput class={inputClass} value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
+          </Field>
+          <Field label="Status">
+            <select
+              class={inputClass}
+              value={status()}
+              onChange={(e) => {
+                setStatus(e.currentTarget.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All</option>
+              <option value="draft">Draft</option>
+              <option value="e_approval">Pending approval</option>
+              <option value="completed">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </Field>
         </div>
-        <label class="text-sm">
-          <span class="mb-1 block text-text-secondary">From</span>
-          <DateInput
-            class="rounded border border-stroke px-2 py-1.5 text-sm"
-            value={dateFrom()}
-            onInput={(e) => setDateFrom(e.currentTarget.value)}
-          />
-        </label>
-        <label class="text-sm">
-          <span class="mb-1 block text-text-secondary">To</span>
-          <DateInput
-            class="rounded border border-stroke px-2 py-1.5 text-sm"
-            value={dateTo()}
-            onInput={(e) => setDateTo(e.currentTarget.value)}
-          />
-        </label>
-        <label class="text-sm">
-          <span class="mb-1 block text-text-secondary">Status</span>
-          <select
-            class="rounded border border-stroke px-2 py-1.5 text-sm"
-            value={status()}
-            onChange={(e) => {
-              setStatus(e.currentTarget.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All</option>
-            <option value="draft">Draft</option>
-            <option value="e_approval">Pending approval</option>
-            <option value="completed">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </label>
-        <button type="button" class="rounded-lg bg-brand px-4 py-2 text-sm text-white" onClick={invalidate}>
-          Refresh
-        </button>
-        <button
-          type="button"
-          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
-          onClick={() => {
-            const d = defaultDateRange();
-            setDateFrom(d.from);
-            setDateTo(d.to);
-            setStatus("");
-            setQ("");
-            setPage(1);
-          }}
-        >
-          Reset to 90 days
-        </button>
-        <div class="ml-auto flex flex-wrap gap-2">
-          <A
-            href="/app/inventory/stock-movements"
-            class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
-          >
-            Stock movements
-          </A>
-          <button type="button" class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={openNew}>
-            New adjustment
-          </button>
-        </div>
-      </div>
+      </CollapsibleFilterPanel>
 
       <SpreadsheetGrid<StockAdjustmentRequestRow>
         columns={[
@@ -322,6 +339,7 @@ export default function StockAdjustmentsPage() {
         search={q()}
         onSearchChange={(v) => {
           setQ(v);
+          setDraftQ(v);
           setPage(1);
         }}
         searchPlaceholder="Search item, location, reason, status…"
@@ -344,6 +362,6 @@ export default function StockAdjustmentsPage() {
         }}
         onSaved={invalidate}
       />
-    </>
+    </div>
   );
 }
