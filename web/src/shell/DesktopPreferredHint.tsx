@@ -7,10 +7,12 @@ const PREFIXES = [
   "/app/sales-order",
   "/app/sales",
   "/app/selling",
+  "/app/rfq",
   "/app/purchase-request",
   "/app/purchase-order",
   "/app/purchases",
   "/app/buying",
+  "/app/expenses",
 ] as const;
 
 export function isSellBuyDesktopPreferredPath(pathname: string): boolean {
