@@ -39,6 +39,7 @@ type JournalEntryLine struct {
 	Credit      float64 `json:"credit"`
 	DeptID      *int64  `json:"dept_id,omitempty"`
 	ProjectID   *int64  `json:"project_id,omitempty"`
+	Remarks     string  `json:"remarks,omitempty"`
 }
 
 type JournalEntryDetail struct {
@@ -77,7 +78,7 @@ func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
 		args := []any{tu.TenantID}
 		where := "tenant_id = $1"
 		if statusFilter == "archived" {
-			where += " and archived_at is not null"
+			where += " and (archived_at is not null or status = 'cancelled')"
 		} else {
 			if !includeArchived {
 				where += " and archived_at is null"
@@ -85,6 +86,8 @@ func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
 			if statusFilter == "draft" || statusFilter == "posted" || statusFilter == "cancelled" {
 				args = append(args, statusFilter)
 				where += fmt.Sprintf(" and status = $%d", len(args))
+			} else if !includeArchived {
+				where += " and status <> 'cancelled'"
 			}
 		}
 		args = append(args, p.PageSize, offset)
@@ -154,7 +157,7 @@ func loadJournalEntryDetail(ctx context.Context, pool *pgxpool.Pool, tenantID, i
 	}
 	rows, err := pool.Query(ctx, `
 		select jel.line_no, a.account_code, coalesce(a.account_name, ''),
-		  jel.debit::float8, jel.credit::float8, jel.dept_id, jel.project_id
+		  jel.debit::float8, jel.credit::float8, jel.dept_id, jel.project_id, coalesce(jel.remarks, '')
 		from public.fin_journal_entry_lines jel
 		join public.fin_accounts a on a.id = jel.account_id
 		where jel.journal_entry_id = $1
@@ -166,10 +169,13 @@ func loadJournalEntryDetail(ctx context.Context, pool *pgxpool.Pool, tenantID, i
 	detail.Lines = []JournalEntryLine{}
 	for rows.Next() {
 		var ln JournalEntryLine
-		if err := rows.Scan(&ln.LineNo, &ln.AccountCode, &ln.AccountName, &ln.Debit, &ln.Credit, &ln.DeptID, &ln.ProjectID); err != nil {
+		if err := rows.Scan(&ln.LineNo, &ln.AccountCode, &ln.AccountName, &ln.Debit, &ln.Credit, &ln.DeptID, &ln.ProjectID, &ln.Remarks); err != nil {
 			return nil, err
 		}
 		detail.Lines = append(detail.Lines, ln)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return &detail, nil
 }
@@ -376,6 +382,15 @@ func reverseJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"archived_at": "Unarchive before reversing."})
 			return
 		}
+		if len(src.Lines) == 0 {
+			response.Validation(w, map[string]string{"lines": "Journal entry has no lines to reverse."})
+			return
+		}
+		// The reversing entry is dated today, so today's period must be open.
+		if errs := validatePostingDate(r.Context(), pool, tu.TenantID, time.Now().UTC().Truncate(24*time.Hour)); len(errs) > 0 {
+			response.ValidationSmart(w, errs)
+			return
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -408,18 +423,27 @@ func reverseJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to resolve reversal accounts.", "ERR_INTERNAL")
 				return
 			}
+			var lineRemarks any
+			if strings.TrimSpace(ln.Remarks) != "" {
+				lineRemarks = ln.Remarks
+			}
 			if _, err = tx.Exec(r.Context(), `
-				insert into public.fin_journal_entry_lines (journal_entry_id, line_no, account_id, debit, credit, dept_id, project_id)
-				values ($1,$2,$3,$4,$5,$6,$7)`, revID, i+1, accountID, ln.Credit, ln.Debit, ln.DeptID, ln.ProjectID); err != nil {
+				insert into public.fin_journal_entry_lines (journal_entry_id, line_no, account_id, debit, credit, dept_id, project_id, remarks)
+				values ($1,$2,$3,$4,$5,$6,$7,$8)`, revID, i+1, accountID, ln.Credit, ln.Debit, ln.DeptID, ln.ProjectID, lineRemarks); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to insert reversing lines.", "ERR_INTERNAL")
 				return
 			}
 		}
-		if _, err := tx.Exec(r.Context(), `
+		tag, err := tx.Exec(r.Context(), `
 			update public.fin_journal_entries
 			set reversed_at = now(), reversed_by_entry_id = $2, updated_at = now()
-			where id = $1 and tenant_id = $3 and status = 'posted'`, id, revID, tu.TenantID); err != nil {
+			where id = $1 and tenant_id = $3 and status = 'posted' and reversed_by_entry_id is null`, id, revID, tu.TenantID)
+		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to mark original as reversed.", "ERR_INTERNAL")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			response.Validation(w, map[string]string{"reversed_by_entry_id": "This entry was already reversed."})
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
@@ -440,6 +464,20 @@ func archiveJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"id": "Invalid id."})
 			return
 		}
+		var status string
+		var reversedBy *int64
+		if err := pool.QueryRow(r.Context(), `
+			select status, reversed_by_entry_id from public.fin_journal_entries
+			where id = $1 and tenant_id = $2 and archived_at is null`, id, tu.TenantID).Scan(&status, &reversedBy); err != nil {
+			response.Err(w, http.StatusNotFound, "Journal entry not found or already archived.", "ERR_NOT_FOUND")
+			return
+		}
+		// Archiving only hides the entry; a posted entry still sits in the ledger,
+		// so it has to be reversed before it can leave the default list.
+		if status == "posted" && reversedBy == nil {
+			response.Validation(w, map[string]string{"status": "Reverse this posted entry before archiving it."})
+			return
+		}
 		tag, err := pool.Exec(r.Context(), `
 			update public.fin_journal_entries
 			set archived_at = now(), updated_at = now()
@@ -448,7 +486,7 @@ func archiveJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Journal entry not found or already archived.", "ERR_NOT_FOUND")
 			return
 		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.journal_entry.archive", "fin_journal_entry", &id, nil, map[string]any{"archived": true})
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.journal_entry.archive", "fin_journal_entry", &id, map[string]any{"status": status}, map[string]any{"archived": true})
 		response.OK(w, map[string]any{"id": id, "archived": true}, "Archived.")
 	}
 }

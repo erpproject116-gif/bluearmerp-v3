@@ -110,12 +110,45 @@ export default function JournalEntriesPage() {
 
   const invalidate = () => void client.invalidateQueries({ queryKey: ["journal-entries"] });
 
+  const selectedRow = () => (list.data ?? []).find((r) => r.id === selectedId()) ?? null;
+  const isArchived = (row: JournalEntryRow) => Boolean(row.archived_at) || row.status === "cancelled";
+
   const openCreate = () => {
+    setEditId(null);
     setRemarks("");
     setLines([
       { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
       { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
     ]);
+    setModalOpen(true);
+  };
+
+  const openEdit = async () => {
+    const row = selectedRow();
+    if (!row) {
+      toast.warning("Select a draft journal entry to edit.");
+      return;
+    }
+    if (row.status !== "draft" || isArchived(row)) {
+      toast.warning("Only draft journal entries can be edited.");
+      return;
+    }
+    const res = await apiFetch<JournalEntryDetail>(`/api/v1/finance/journal-entries/${row.id}`);
+    if (!res.success || !res.data) {
+      toast.error(res.message ?? "Failed to load journal entry.");
+      return;
+    }
+    const loaded = (res.data.lines ?? []).map((ln) => ({
+      account_code: ln.account_code ?? "",
+      debit: ln.debit ? String(ln.debit) : "",
+      credit: ln.credit ? String(ln.credit) : "",
+      dept_id: ln.dept_id ? String(ln.dept_id) : "",
+      project_id: ln.project_id ? String(ln.project_id) : "",
+    }));
+    while (loaded.length < 2) loaded.push({ account_code: "", debit: "", credit: "", dept_id: "", project_id: "" });
+    setEditId(row.id);
+    setRemarks(res.data.remarks ?? "");
+    setLines(loaded);
     setModalOpen(true);
   };
 
@@ -127,11 +160,11 @@ export default function JournalEntriesPage() {
       setRemarks(payload.remarks);
       setLines(payload.lines?.length ? payload.lines : [{ account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }, { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }]);
     },
-    enabled: () => modalOpen(),
-    autoApply: () => modalOpen(),
+    enabled: () => modalOpen() && editId() === null,
+    autoApply: () => modalOpen() && editId() === null,
   });
 
-  const createEntry = async () => {
+  const saveEntry = async () => {
     const parsed = lines()
       .map((ln) => ({
         account_code: ln.account_code.trim(),
@@ -145,21 +178,22 @@ export default function JournalEntriesPage() {
       toast.warning("At least two lines with account codes are required.");
       return;
     }
+    const id = editId();
     setSaving(true);
-    const res = await apiFetch<JournalEntryRow>("/api/v1/finance/journal-entries", {
-      method: "POST",
-      body: JSON.stringify({ remarks: remarks(), lines: parsed }),
-    });
+    const res = await apiFetch<JournalEntryRow>(
+      id ? `/api/v1/finance/journal-entries/${id}` : "/api/v1/finance/journal-entries",
+      { method: id ? "PUT" : "POST", body: JSON.stringify({ remarks: remarks(), lines: parsed }) },
+    );
     setSaving(false);
-    if (!handleSaveResult(res, toast, "Draft journal entry created.")) return;
-    await draft.clearOnSave();
+    if (!handleSaveResult(res, toast, id ? "Draft journal entry updated." : "Draft journal entry created.")) return;
+    if (!id) await draft.clearOnSave();
     setModalOpen(false);
+    setEditId(null);
     invalidate();
   };
 
   const postSelected = async () => {
-    const id = selectedId();
-    const row = (list.data ?? []).find((r) => r.id === id);
+    const row = selectedRow();
     if (!row) {
       toast.warning("Select a draft journal entry to post.");
       return;
@@ -169,9 +203,62 @@ export default function JournalEntriesPage() {
       return;
     }
     setPosting(true);
-    const res = await apiFetch(`/api/v1/finance/journal-entries/${id}/post`, { method: "POST" });
+    const res = await apiFetch(`/api/v1/finance/journal-entries/${row.id}/post`, { method: "POST" });
     setPosting(false);
     if (!handleSaveResult(res, toast, "Journal entry posted.")) return;
+    invalidate();
+  };
+
+  const reverseSelected = async () => {
+    const row = selectedRow();
+    if (!row) {
+      toast.warning("Select a posted journal entry to reverse.");
+      return;
+    }
+    if (row.status !== "posted" || row.reversed_by_entry_id) {
+      toast.warning("Only posted entries that have not been reversed can be reversed.");
+      return;
+    }
+    if (!window.confirm(`Reverse ${row.entry_no}? A mirrored entry will be posted today.`)) return;
+    setActing(true);
+    const res = await apiFetch(`/api/v1/finance/journal-entries/${row.id}/reverse`, { method: "POST" });
+    setActing(false);
+    if (!handleSaveResult(res, toast, "Reversing entry posted.")) return;
+    invalidate();
+  };
+
+  const archiveSelected = async () => {
+    const row = selectedRow();
+    if (!row) {
+      toast.warning("Select a journal entry to archive.");
+      return;
+    }
+    if (isArchived(row)) {
+      toast.warning("This journal entry is already archived.");
+      return;
+    }
+    if (row.status === "posted" && !row.reversed_by_entry_id) {
+      toast.warning("Reverse this posted entry before archiving it.");
+      return;
+    }
+    if (!window.confirm(`Archive ${row.entry_no}? It stays in the books but is hidden from the default list.`)) return;
+    setActing(true);
+    const res = await apiFetch(`/api/v1/finance/journal-entries/${row.id}/archive`, { method: "POST" });
+    setActing(false);
+    if (!handleSaveResult(res, toast, "Journal entry archived.")) return;
+    invalidate();
+  };
+
+  const unarchiveSelected = async () => {
+    const row = selectedRow();
+    if (!row || !row.archived_at) {
+      toast.warning("Select an archived journal entry to restore.");
+      return;
+    }
+    setActing(true);
+    const res = await apiFetch(`/api/v1/finance/journal-entries/${row.id}/unarchive`, { method: "POST" });
+    setActing(false);
+    if (!handleSaveResult(res, toast, "Journal entry restored.")) return;
     invalidate();
   };
 
@@ -185,11 +272,12 @@ export default function JournalEntriesPage() {
             <select
               class="rounded-lg border border-stroke px-2 py-1.5 text-sm text-text-primary"
               value={statusFilter()}
-              onChange={(e) => setStatusFilter(e.currentTarget.value as "all" | "draft" | "posted")}
+              onChange={(e) => setStatusFilter(e.currentTarget.value as StatusFilter)}
             >
-              <option value="all">All</option>
+              <option value="all">All (active)</option>
               <option value="draft">Drafts only</option>
               <option value="posted">Posted only</option>
+              <option value="archived">Archived</option>
             </select>
           </label>
           <button
@@ -202,11 +290,49 @@ export default function JournalEntriesPage() {
           <button
             type="button"
             class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+            disabled={selectedRow()?.status !== "draft" || isArchived(selectedRow()!)}
+            onClick={() => void openEdit()}
+          >
+            Edit selected
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
             disabled={posting()}
             onClick={() => void postSelected()}
           >
             {posting() ? "Posting…" : "Post selected"}
           </button>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+            disabled={acting() || selectedRow()?.status !== "posted" || Boolean(selectedRow()?.reversed_by_entry_id)}
+            onClick={() => void reverseSelected()}
+          >
+            Reverse selected
+          </button>
+          <Show
+            when={selectedRow()?.archived_at}
+            fallback={
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+                disabled={acting() || !selectedRow() || isArchived(selectedRow()!)}
+                onClick={() => void archiveSelected()}
+              >
+                Archive selected
+              </button>
+            }
+          >
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+              disabled={acting()}
+              onClick={() => void unarchiveSelected()}
+            >
+              Restore selected
+            </button>
+          </Show>
           <button
             type="button"
             class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
@@ -246,6 +372,7 @@ export default function JournalEntriesPage() {
                     "border-t border-slate-100": true,
                     "bg-brand-50": selectedId() === row.id,
                     "ring-2 ring-brand-400 ring-inset": selectedId() === row.id,
+                    "text-slate-400": isArchived(row),
                   }}
                   onClick={() => setSelectedId(row.id)}
                 >
@@ -253,7 +380,15 @@ export default function JournalEntriesPage() {
                     <input type="radio" checked={selectedId() === row.id} readOnly />
                   </td>
                   <td class="px-3 py-2">{row.entry_no}</td>
-                  <td class="px-3 py-2 capitalize">{row.status}</td>
+                  <td class="px-3 py-2 capitalize">
+                    {row.status}
+                    <Show when={row.reversed_by_entry_id}>
+                      <span class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">Reversed</span>
+                    </Show>
+                    <Show when={isArchived(row)}>
+                      <span class="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">Archived</span>
+                    </Show>
+                  </td>
                   <td class="px-3 py-2">{row.remarks ?? "—"}</td>
                 </tr>
               )}
@@ -264,13 +399,18 @@ export default function JournalEntriesPage() {
 
       <EntityModal
         open={modalOpen()}
-        title="New journal entry (draft)"
-        onClose={() => setModalOpen(false)}
-        onSave={() => void createEntry()}
+        title={editId() ? "Edit journal entry (draft)" : "New journal entry (draft)"}
+        onClose={() => {
+          setModalOpen(false);
+          setEditId(null);
+        }}
+        onSave={() => void saveEntry()}
         saving={saving()}
         wide
       >
-        <draft.DraftBanner />
+        <Show when={editId() === null}>
+          <draft.DraftBanner />
+        </Show>
         <ModalFormGuide guideId="journal_entry" spanFull />
         <Field label="Remarks">
           <input class={inputClass} value={remarks()} onInput={(e) => setRemarks(e.currentTarget.value)} />
