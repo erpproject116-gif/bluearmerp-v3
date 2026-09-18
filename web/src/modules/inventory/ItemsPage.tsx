@@ -32,6 +32,7 @@ import {
 import { ItemBarcodeModal } from "./ItemBarcodeModal";
 import { ItemsAdvancedSearch, emptyItemsAdvancedFilters, type ItemsAdvancedFilters } from "./ItemsAdvancedSearch";
 import { SerialGenerateModal } from "./serial-lot/SerialGenerateModal";
+import { StockAdjustmentModal } from "./StockAdjustmentModal";
 import { downloadReportCsv } from "../../shared/reports/downloadReportCsv";
 
 type Item = {
@@ -140,6 +141,10 @@ export default function ItemsPage() {
   const [bulkEditOpen, setBulkEditOpen] = createSignal(false);
   const [bulkEditSubmitting, setBulkEditSubmitting] = createSignal(false);
   const [moreOpen, setMoreOpen] = createSignal(false);
+  const [serialLotMenuOpen, setSerialLotMenuOpen] = createSignal(false);
+  const [adjustOpen, setAdjustOpen] = createSignal(false);
+  const [adjustItemId, setAdjustItemId] = createSignal<number | null>(null);
+  const [adjustItemLabel, setAdjustItemLabel] = createSignal("");
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const lifecycle = useMasterLifecycle({
@@ -278,11 +283,15 @@ export default function ItemsPage() {
         e.preventDefault();
         applyItemSearch();
       }
-      if (e.key === "Escape") setMoreOpen(false);
+      if (e.key === "Escape") {
+        setMoreOpen(false);
+        setSerialLotMenuOpen(false);
+      }
     };
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       if (!t.closest("[data-items-more-menu]")) setMoreOpen(false);
+      if (!t.closest("[data-items-serial-lot-menu]")) setSerialLotMenuOpen(false);
     };
     window.addEventListener("keydown", onKey);
     document.addEventListener("click", onDocClick);
@@ -422,6 +431,18 @@ export default function ItemsPage() {
     setGenerateOpen(true);
   };
 
+  const openStockAdjustment = () => {
+    const rows = selectedItemsForBarcode();
+    if (rows.length !== 1) {
+      toast.warning("Select exactly one item to create a stock adjustment.");
+      return;
+    }
+    const item = rows[0]!;
+    setAdjustItemId(item.id);
+    setAdjustItemLabel(`${item.item_code} — ${item.item_name}`);
+    setAdjustOpen(true);
+  };
+
   const generateInitial = () => {
     const pick = selectedItemsForBarcode().find((r) => r.track_serial);
     if (!pick) return { id: null as number | null, label: "" };
@@ -532,14 +553,6 @@ export default function ItemsPage() {
         pageSize={pageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
-        search={q()}
-        onSearchChange={(v) => {
-          setQ(v);
-          setDraftQ(v);
-        }}
-        searchPlaceholder="Search by code or name…"
-        status={statusFilter()}
-        onStatusChange={setStatusFilter}
         itemsCsvImport
         itemsImportExportMenu
         onExportCsv={exportItems}
@@ -559,39 +572,81 @@ export default function ItemsPage() {
               </button>
             </Show>
             <Show when={canManageItems() && lifecycle.filter() !== "deleted"}>
-              <div class="flex flex-wrap items-end gap-1 rounded-lg border border-stroke px-1 py-0.5">
+              <div class="relative" data-items-serial-lot-menu>
                 <button
                   type="button"
-                  class="rounded-md px-2.5 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
-                  disabled={lifecycle.selectedIds().size === 0}
-                  onClick={() => openBulkTracking("enable_serial")}
-                  title="Enable Track serial numbers on selected items"
+                  class="inline-flex items-center gap-1 rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
+                  aria-expanded={serialLotMenuOpen()}
+                  aria-haspopup="menu"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSerialLotMenuOpen((v) => !v);
+                  }}
                 >
-                  Enable serial{lifecycle.selectedIds().size > 0 ? ` (${lifecycle.selectedIds().size})` : ""}
+                  Serial / Lot actions
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
                 </button>
-                <button
-                  type="button"
-                  class="rounded-md px-2.5 py-1.5 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-40"
-                  disabled={lifecycle.selectedIds().size === 0}
-                  onClick={() => openBulkTracking("disable_serial")}
-                >
-                  Disable serial
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md px-2.5 py-1.5 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-40"
-                  disabled={lifecycle.selectedIds().size === 0}
-                  onClick={() => openBulkTracking("enable_lot")}
-                >
-                  Enable lot
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md px-2.5 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
-                  onClick={openGenerateSerials}
-                >
-                  Generate serials
-                </button>
+                <Show when={serialLotMenuOpen()}>
+                  <div
+                    role="menu"
+                    class="absolute right-0 z-50 mt-1 min-w-[12rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50 disabled:opacity-40"
+                      disabled={lifecycle.selectedIds().size === 0}
+                      title="Enable Track serial numbers on selected items"
+                      onClick={() => {
+                        setSerialLotMenuOpen(false);
+                        openBulkTracking("enable_serial");
+                      }}
+                    >
+                      Enable serial{lifecycle.selectedIds().size > 0 ? ` (${lifecycle.selectedIds().size})` : ""}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50 disabled:opacity-40"
+                      disabled={lifecycle.selectedIds().size === 0}
+                      onClick={() => {
+                        setSerialLotMenuOpen(false);
+                        openBulkTracking("disable_serial");
+                      }}
+                    >
+                      Disable serial
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50 disabled:opacity-40"
+                      disabled={lifecycle.selectedIds().size === 0}
+                      onClick={() => {
+                        setSerialLotMenuOpen(false);
+                        openBulkTracking("enable_lot");
+                      }}
+                    >
+                      Enable lot
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50"
+                      onClick={() => {
+                        setSerialLotMenuOpen(false);
+                        openGenerateSerials();
+                      }}
+                    >
+                      Generate serials
+                    </button>
+                  </div>
+                </Show>
               </div>
             </Show>
             <lifecycle.FilterControl />
@@ -618,19 +673,8 @@ export default function ItemsPage() {
               <Show when={moreOpen()}>
                 <div
                   role="menu"
-                  class="absolute right-0 z-20 mt-1 min-w-[10rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
+                  class="absolute right-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
                 >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    class="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-slate-50"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      setAdvancedOpen(true);
-                    }}
-                  >
-                    Advanced (F3)
-                  </button>
                   <button
                     type="button"
                     role="menuitem"
@@ -645,6 +689,17 @@ export default function ItemsPage() {
                 </div>
               </Show>
             </div>
+            <Show when={canManageItems() && lifecycle.filter() !== "deleted"}>
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+                disabled={lifecycle.selectedIds().size !== 1}
+                title="Create a stock adjustment for the selected item"
+                onClick={openStockAdjustment}
+              >
+                Stock adjustment
+              </button>
+            </Show>
           </>
         }
       />
@@ -680,6 +735,22 @@ export default function ItemsPage() {
         initialItemLabel={generateInitial().label}
         onClose={() => setGenerateOpen(false)}
         onGenerated={() => {
+          invalidate("items");
+        }}
+      />
+      <StockAdjustmentModal
+        open={adjustOpen()}
+        initialItemId={adjustItemId()}
+        initialItemLabel={adjustItemLabel()}
+        onClose={() => {
+          setAdjustOpen(false);
+          setAdjustItemId(null);
+          setAdjustItemLabel("");
+        }}
+        onSaved={() => {
+          setAdjustOpen(false);
+          setAdjustItemId(null);
+          setAdjustItemLabel("");
           invalidate("items");
         }}
       />

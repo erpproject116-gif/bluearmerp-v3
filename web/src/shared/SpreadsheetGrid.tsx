@@ -366,8 +366,8 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   });
 
   return (
-    <div class="overflow-x-auto rounded-xl border border-stroke erp-surface shadow-sm">
-      <div class="border-b border-stroke px-5 py-4">
+    <div class="rounded-xl border border-stroke erp-surface shadow-sm">
+      <div class="relative z-10 border-b border-stroke px-5 py-4">
         <div class="flex flex-wrap items-end gap-3">
           <Show when={props.onStatusChange}>
             <label class="shrink-0">
@@ -446,15 +446,22 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               <div class="relative" ref={(el) => (columnsMenuEl = el)}>
                 <button
                   type="button"
-                  class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                  class="inline-flex items-center gap-1 rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
                   aria-expanded={columnsMenuOpen()}
                   aria-haspopup="true"
                   onClick={() => setColumnsMenuOpen((o) => !o)}
                 >
                   Columns
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
                 </button>
                 <Show when={columnsMenuOpen()}>
-                  <div class="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-stroke bg-white p-3 shadow-lg">
+                  <div class="absolute right-0 z-50 mt-1 w-64 rounded-lg border border-stroke bg-white p-3 shadow-lg">
                     <div class="mb-2 flex items-center justify-between gap-2">
                       <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Show columns</p>
                       <button
@@ -502,7 +509,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
                 <Show when={importExportMenuOpen()}>
                   <div
                     role="menu"
-                    class="absolute right-0 z-20 mt-1 min-w-[10rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
+                    class="absolute right-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
                   >
                     <button
                       type="button"
@@ -620,6 +627,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           </div>
         </div>
       </div>
+      <div class="overflow-x-auto">
       <Show when={isInitialLoading()}>
         <div class="flex flex-col items-center justify-center gap-3 p-12" role="status" aria-live="polite" aria-busy="true">
           <span
@@ -793,6 +801,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
           </div>
         </Show>
       </Show>
+      </div>
     </div>
   );
 }
