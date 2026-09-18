@@ -5,6 +5,7 @@ import { apiFetch } from "../../shared/api";
 import { formatPeso } from "../../shared/money";
 import {
   reportsDateRangeFromQuery,
+  withReportDateQuery,
   type ReportDatePresetId,
 } from "../../shared/reports/ReportDatePresets";
 import { ReportDateRangePicker } from "../../shared/reports/ReportDateRangePicker";
@@ -170,13 +171,13 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
               <Kpi
                 label="AR total / overdue"
                 value={`${formatPeso(d().ar_total)} / ${formatPeso(d().ar_overdue)}`}
-                href="/app/finance/collections"
+                href="/app/finance/reports/ar-aging"
                 warn={(d().ar_overdue ?? 0) > 0}
               />
               <Kpi
                 label="AP total / overdue"
                 value={`${formatPeso(d().ap_total)} / ${formatPeso(d().ap_overdue)}`}
-                href="/app/finance/disbursements"
+                href="/app/finance/reports/ap-aging"
                 warn={(d().ap_overdue ?? 0) > 0}
               />
               <Kpi
@@ -192,16 +193,71 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
               />
             </section>
 
-            <Show when={d().has_journal_pnl}>
-              <section>
-                <h3 class="mb-2 text-sm font-semibold text-text-primary">Profit &amp; loss (posted journals)</h3>
+            <section>
+              <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 class="text-sm font-semibold text-text-primary">Profit &amp; loss</h3>
+                <A
+                  href={withReportDateQuery(
+                    "/app/finance/acct-i/reports/profit-and-loss",
+                    range().from,
+                    range().to,
+                  )}
+                  class="text-xs font-medium text-brand-700 hover:underline"
+                >
+                  Open full P&amp;L
+                </A>
+              </div>
+              <Show
+                when={d().has_journal_pnl}
+                fallback={
+                  <p class="rounded-lg border border-dashed border-stroke bg-white px-3 py-3 text-sm text-text-secondary">
+                    No posted journal P&amp;L in this window yet.{" "}
+                    <A
+                      href={withReportDateQuery(
+                        "/app/finance/acct-i/reports/profit-and-loss",
+                        range().from,
+                        range().to,
+                      )}
+                      class="font-medium text-brand-700 hover:underline"
+                    >
+                      Open Profit &amp; Loss
+                    </A>{" "}
+                    or post journals under Bookkeeping.
+                  </p>
+                }
+              >
                 <div class="grid gap-3 sm:grid-cols-3">
-                  <Kpi label="Income" value={formatPeso(d().pnl_income)} href="/app/finance/acct-i/reports/profit-and-loss" />
-                  <Kpi label="Expense" value={formatPeso(d().pnl_expense)} href="/app/finance/acct-i/reports/profit-and-loss" />
-                  <Kpi label="Net" value={formatPeso(d().pnl_net)} href="/app/finance/acct-i/reports/profit-and-loss" warn={(d().pnl_net ?? 0) < 0} />
+                  <Kpi
+                    label="Income"
+                    value={formatPeso(d().pnl_income)}
+                    href={withReportDateQuery(
+                      "/app/finance/acct-i/reports/profit-and-loss",
+                      range().from,
+                      range().to,
+                    )}
+                  />
+                  <Kpi
+                    label="Expense"
+                    value={formatPeso(d().pnl_expense)}
+                    href={withReportDateQuery(
+                      "/app/finance/acct-i/reports/profit-and-loss",
+                      range().from,
+                      range().to,
+                    )}
+                  />
+                  <Kpi
+                    label="Net"
+                    value={formatPeso(d().pnl_net)}
+                    href={withReportDateQuery(
+                      "/app/finance/acct-i/reports/profit-and-loss",
+                      range().from,
+                      range().to,
+                    )}
+                    warn={(d().pnl_net ?? 0) < 0}
+                  />
                 </div>
-              </section>
-            </Show>
+              </Show>
+            </section>
 
             <section class="grid gap-4 lg:grid-cols-2">
               <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm">

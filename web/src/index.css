@@ -33,8 +33,13 @@ body {
 }
 
 .erp-grid th {
+  /* Relative for column resizer; sticky headers must win when both apply. */
   position: relative;
   overflow: hidden;
+}
+
+.erp-grid th.sticky {
+  position: sticky;
 }
 
 .erp-grid td {

@@ -17,6 +17,8 @@ export function ResizableTh(props: {
   width: number;
   onResizeStart: (key: string, e: MouseEvent) => void;
   class?: string;
+  /** Extra inline styles (e.g. sticky `left` from a live column width). */
+  style?: Record<string, string>;
   resizable?: boolean;
   onClick?: (e: MouseEvent) => void;
   children: JSX.Element;
@@ -24,7 +26,7 @@ export function ResizableTh(props: {
   return (
     <th
       class={`erp-grid-th ${props.class ?? ""}`.trim()}
-      style={columnCellStyle(props.width)}
+      style={{ ...columnCellStyle(props.width), ...(props.style ?? {}) }}
       onClick={props.onClick}
     >
       {props.children}
@@ -45,11 +47,16 @@ export function ResizableTh(props: {
 export function ResizableTd(props: {
   width: number;
   class?: string;
+  style?: Record<string, string>;
   children: JSX.Element;
   onClick?: (e: MouseEvent) => void;
 }) {
   return (
-    <td class={props.class} style={columnCellStyle(props.width)} onClick={props.onClick}>
+    <td
+      class={props.class}
+      style={{ ...columnCellStyle(props.width), ...(props.style ?? {}) }}
+      onClick={props.onClick}
+    >
       {props.children}
     </td>
   );

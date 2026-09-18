@@ -628,14 +628,18 @@ export function SidebarNav() {
       return p === "/app/finance" || p === "/app/finance/";
     }
     if (area.id === "bookkeeping") {
-      return pathStarts(p, ["/app/finance/bookkeeping", "/app/finance/acct-i"]);
+      return (
+        pathStarts(p, ["/app/finance/bookkeeping"]) ||
+        (pathStarts(p, ["/app/finance/acct-i"]) &&
+          !p.startsWith("/app/finance/acct-i/journal-entries") &&
+          !p.startsWith("/app/finance/acct-i/reports"))
+      );
     }
     if (area.id === "ledger") {
       return pathStarts(p, [
         "/app/finance/acct-i/journal-entries",
         "/app/finance/journal-entries",
         "/app/finance/official-receipts",
-        "/app/finance/reports",
       ]);
     }
     if (area.id === "cash") {
@@ -653,6 +657,15 @@ export function SidebarNav() {
     }
     if (area.id === "banking") {
       return pathStarts(p, ["/app/finance/banking"]);
+    }
+    if (area.id === "ar_aging") {
+      return pathStarts(p, ["/app/finance/reports/ar-aging"]);
+    }
+    if (area.id === "ap_aging") {
+      return pathStarts(p, ["/app/finance/reports/ap-aging"]);
+    }
+    if (area.id === "profit_and_loss") {
+      return pathStarts(p, ["/app/finance/acct-i/reports/profit-and-loss", "/app/finance/reports/profit-and-loss"]);
     }
     if (area.id === "more" || area.id === "setup") {
       return false;

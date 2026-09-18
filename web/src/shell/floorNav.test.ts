@@ -152,6 +152,15 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
     expect(expense?.children?.find((c) => c.id === "vendors")?.label).toBe("Vendors");
     expect(expense?.children?.find((c) => c.id === "accounts_payable")?.href).toBe("/app/finance/payables");
   });
+
+  it("Accounting sidebar exposes aging and Profit & Loss", () => {
+    const accounting = HOME_SIDEBAR_AREAS.find((a) => a.id === "accounting");
+    expect(accounting?.children?.find((c) => c.id === "ar_aging")?.href).toBe("/app/finance/reports/ar-aging");
+    expect(accounting?.children?.find((c) => c.id === "ap_aging")?.href).toBe("/app/finance/reports/ap-aging");
+    expect(accounting?.children?.find((c) => c.id === "profit_and_loss")?.href).toBe(
+      "/app/finance/acct-i/reports/profit-and-loss",
+    );
+  });
 });
 
 describe("shouldShowFloorBottomNav", () => {

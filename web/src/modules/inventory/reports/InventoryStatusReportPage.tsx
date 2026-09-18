@@ -443,7 +443,8 @@ export default function InventoryStatusReportPage() {
                   columnKey="item_name"
                   width={widthFor("item_name")}
                   onResizeStart={onResizeStart}
-                  class="sticky left-[7.5rem] z-20 bg-brand-50 px-3 py-2"
+                  class="sticky z-20 bg-brand-50 px-3 py-2"
+                  style={{ left: `${widthFor("item_code")}px` }}
                 >
                   Item Name
                 </ResizableTh>
@@ -504,7 +505,7 @@ export default function InventoryStatusReportPage() {
                     <tr class={`border-t border-stroke/60 ${negTotal ? "bg-red-50" : ""}`}>
                       <ResizableTd
                         width={widthFor("item_code")}
-                        class="sticky left-0 z-[1] bg-inherit px-3 py-2 font-medium tabular-nums"
+                        class={`sticky left-0 z-[1] px-3 py-2 font-medium tabular-nums ${negTotal ? "bg-red-50" : "bg-white"}`}
                       >
                         <button
                           type="button"
@@ -517,7 +518,8 @@ export default function InventoryStatusReportPage() {
                       </ResizableTd>
                       <ResizableTd
                         width={widthFor("item_name")}
-                        class="sticky left-[7.5rem] z-[1] bg-inherit px-3 py-2"
+                        class={`sticky z-[1] px-3 py-2 ${negTotal ? "bg-red-50" : "bg-white"}`}
+                        style={{ left: `${widthFor("item_code")}px` }}
                       >
                         <button
                           type="button"
