@@ -4,7 +4,7 @@ import { shouldShowFloorBottomNav } from "./FloorBottomNav";
 import { HOME_SIDEBAR_AREAS } from "./ecount-top-nav";
 import type { MeData } from "../shared/auth-context";
 
-function me(overrides: Partial<MeData["user"] & { moduleCodes?: string[] }> = {}): MeData {
+function me(overrides: Partial<MeData["user"]> & { moduleCodes?: string[] } = {}): MeData {
   const { moduleCodes, ...userOverrides } = overrides;
   const codes = moduleCodes ?? ["manufacturing", "inventory", "comms"];
   return {
