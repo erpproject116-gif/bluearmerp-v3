@@ -217,6 +217,27 @@ export function ModuleIcon(props: Props): JSX.Element {
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
         </svg>
       );
+    case "production_assembly":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l.75 1.5h4.5l.75-1.5M6 9.75h12M8.25 9.75V19.5h7.5V9.75M10.5 13.5h3M10.5 16.5h3" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 9.75l2.25-5.25h10.5L19.5 9.75" />
+        </svg>
+      );
+    case "production_cutting":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm0 9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 8.25L19.5 4.5M6.75 15.75L19.5 19.5M14.25 12h6" />
+        </svg>
+      );
+    case "production_recipe":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75v3.75m6-3.75v3.75M8.25 7.5h7.5A2.25 2.25 0 0118 9.75v1.5a6 6 0 01-12 0v-1.5A2.25 2.25 0 018.25 7.5z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17.25h4.5M10.5 20.25h3" />
+        </svg>
+      );
     case "quality":
       return (
         <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
