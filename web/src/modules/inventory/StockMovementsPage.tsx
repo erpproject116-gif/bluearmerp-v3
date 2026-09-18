@@ -1,9 +1,10 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { A, useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
-import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
+import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
@@ -50,13 +51,27 @@ export default function StockMovementsPage() {
   const [entryType, setEntryType] = createSignal<StockEntryType>("transfer");
   const [entryReason, setEntryReason] = createSignal<StockEntryReasonPreset>("");
   const [movementType, setMovementType] = createSignal("");
+  const [draftQ, setDraftQ] = createSignal("");
   const initialDates = defaultDateRange();
   const [dateFrom, setDateFrom] = createSignal(initialDates.from);
   const [dateTo, setDateTo] = createSignal(initialDates.to);
 
   onMount(() => {
     const urlQ = searchParams.q;
-    if (typeof urlQ === "string" && urlQ.trim()) setQ(urlQ.trim());
+    if (typeof urlQ === "string" && urlQ.trim()) {
+      setQ(urlQ.trim());
+      setDraftQ(urlQ.trim());
+    } else {
+      setDraftQ(q());
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F8") {
+        e.preventDefault();
+        search();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    onCleanup(() => window.removeEventListener("keydown", onKey));
   });
 
   const list = createQuery(() => ({
@@ -83,6 +98,22 @@ export default function StockMovementsPage() {
     void qc.invalidateQueries({ queryKey: ["stock-entries"] });
   };
 
+  const search = () => {
+    setQ(draftQ().trim());
+    setPage(1);
+    invalidate();
+  };
+
+  const reset = () => {
+    const d = defaultDateRange();
+    setDateFrom(d.from);
+    setDateTo(d.to);
+    setMovementType("");
+    setDraftQ("");
+    setQ("");
+    setPage(1);
+  };
+
   const openEntry = (type: StockEntryType, reason: StockEntryReasonPreset = "") => {
     setEntryType(type);
     setEntryReason(reason);
@@ -90,74 +121,76 @@ export default function StockMovementsPage() {
   };
 
   return (
-    <>
-      <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stroke bg-white p-4 shadow-sm">
-        <p class="w-full text-xs text-text-secondary">
-          Showing the last 90 days by default. Clear dates to see all history. Movements appear after Purchases
-          (auto-receive), Purchase Receive, Stock Entry, Sales, or adjustments.
-        </p>
-        <label class="text-sm">
-          <span class="mb-1 block text-text-secondary">From</span>
-          <DateInput class="rounded border border-stroke px-2 py-1.5 text-sm" value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
-        </label>
-        <label class="text-sm">
-          <span class="mb-1 block text-text-secondary">To</span>
-          <DateInput class="rounded border border-stroke px-2 py-1.5 text-sm" value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
-        </label>
-        <label class="text-sm">
-          <span class="mb-1 block text-text-secondary">Movement type</span>
-          <select class="rounded border border-stroke px-2 py-1.5 text-sm" value={movementType()} onChange={(e) => setMovementType(e.currentTarget.value)}>
-            <option value="">All</option>
-            <option value="adjustment">Adjustment</option>
-            <option value="so_release">SO Release</option>
-            <option value="sales">Sales</option>
-            <option value="goods_receipt">Purchase Receive</option>
-            <option value="transfer_in">Transfer in</option>
-            <option value="transfer_out">Transfer out</option>
-            <option value="issue">Issue</option>
-            <option value="receipt">Receipt</option>
-            <option value="internal_use">Internal use</option>
-            <option value="product_defect">Product defect</option>
-          </select>
-        </label>
-        <button type="button" class="rounded-lg bg-brand px-4 py-2 text-sm text-white" onClick={invalidate}>
-          Refresh
-        </button>
-        <button
-          type="button"
-          class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
-          onClick={() => {
-            const d = defaultDateRange();
-            setDateFrom(d.from);
-            setDateTo(d.to);
-            setMovementType("");
-            setQ("");
-            setPage(1);
-          }}
-        >
-          Reset to 90 days
-        </button>
-        <div class="ml-auto flex flex-wrap gap-2">
-          <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => openEntry("transfer")}>
-            Stock transfer
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => openEntry("issue", "internal_use")}>
-            Internal use
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => openEntry("issue", "product_defect")}>
-            Product defect
-          </button>
-          <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => setAdjustOpen(true)}>
-            Stock adjustment
-          </button>
-          <A
-            href="/app/inventory/stock-adjustments"
-            class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
-          >
-            Adjustment history
-          </A>
+    <div class="space-y-4">
+      <CollapsibleFilterPanel
+        title="Stock Movements"
+        description="Showing the last 90 days by default. Clear dates to see all history. Movements appear after Purchases (auto-receive), Purchase Receive, Stock Entry, Sales, or adjustments. Search (F8)."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
+              Search (F8)
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
+              Reset to 90 days
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => openEntry("transfer")}>
+              Stock transfer
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+              onClick={() => openEntry("issue", "internal_use")}
+            >
+              Internal use
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
+              onClick={() => openEntry("issue", "product_defect")}
+            >
+              Product defect
+            </button>
+            <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => setAdjustOpen(true)}>
+              Stock adjustment
+            </button>
+            <A href="/app/inventory/stock-adjustments" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50">
+              Adjustment history
+            </A>
+          </>
+        }
+      >
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Field label="Keyword">
+            <input
+              class={inputClass}
+              value={draftQ()}
+              onInput={(e) => setDraftQ(e.currentTarget.value)}
+              placeholder="Item, location, type, reason…"
+            />
+          </Field>
+          <Field label="From">
+            <DateInput class={inputClass} value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />
+          </Field>
+          <Field label="To">
+            <DateInput class={inputClass} value={dateTo()} onInput={(e) => setDateTo(e.currentTarget.value)} />
+          </Field>
+          <Field label="Movement type">
+            <select class={inputClass} value={movementType()} onChange={(e) => setMovementType(e.currentTarget.value)}>
+              <option value="">All</option>
+              <option value="adjustment">Adjustment</option>
+              <option value="so_release">SO Release</option>
+              <option value="sales">Sales</option>
+              <option value="goods_receipt">Purchase Receive</option>
+              <option value="transfer_in">Transfer in</option>
+              <option value="transfer_out">Transfer out</option>
+              <option value="issue">Issue</option>
+              <option value="receipt">Receipt</option>
+              <option value="internal_use">Internal use</option>
+              <option value="product_defect">Product defect</option>
+            </select>
+          </Field>
         </div>
-      </div>
+      </CollapsibleFilterPanel>
 
       <SpreadsheetGrid
         columns={[
@@ -193,6 +226,7 @@ export default function StockMovementsPage() {
         search={q()}
         onSearchChange={(v) => {
           setQ(v);
+          setDraftQ(v);
           setPage(1);
         }}
         searchPlaceholder="Search item, location, type, reason…"
@@ -214,6 +248,6 @@ export default function StockMovementsPage() {
         lockType
         autoPost
       />
-    </>
+    </div>
   );
 }
