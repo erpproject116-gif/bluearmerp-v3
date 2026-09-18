@@ -20,6 +20,7 @@ import { submitBusyLabel } from "../../shared/submitCopy";
 import NewAssemblyOrderWizard from "./NewAssemblyOrderWizard";
 import NewRecipeOrderWizard from "./NewRecipeOrderWizard";
 import { searchBomsForOrderType } from "./mfgBomLookup";
+import { buildManufacturingCostInput, totalManufacturingConversionCost } from "./manufacturingCostInput";
 
 type WorkOrder = {
   id: number;
@@ -85,6 +86,9 @@ function NewCuttingOrderWizard() {
   const [locationLabel, setLocationLabel] = createSignal("");
   const [qty, setQty] = createSignal("1");
   const [notes, setNotes] = createSignal("");
+  const [labor, setLabor] = createSignal("");
+  const [overhead, setOverhead] = createSignal("");
+  const [otherCost, setOtherCost] = createSignal("");
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
   const [actualByItem, setActualByItem] = createSignal<Record<number, string>>({});
   const [wasteQty, setWasteQty] = createSignal("");
@@ -95,6 +99,9 @@ function NewCuttingOrderWizard() {
   const [fieldErrors, setFieldErrors] = createSignal<FormErrors>({});
   const [inputTracked, setInputTracked] = createSignal(false);
   const [journalPreview, setJournalPreview] = createSignal<JournalPreview | null>(null);
+  const costInput = () => buildManufacturingCostInput(labor(), overhead(), otherCost());
+  const additionalCost = () => totalManufacturingConversionCost(costInput());
+  const estimatedTotalCost = () => (journalPreview()?.costs.material_cost ?? 0) + additionalCost();
 
   const hasInputShortage = () => {
     const input = needs()?.input_line;
@@ -309,6 +316,19 @@ function NewCuttingOrderWizard() {
       }
     }
 
+    const costSave = await apiFetch(
+      `/api/v1/manufacturing/work-orders/${id}/cost-input`,
+      {
+        method: "PUT",
+        body: JSON.stringify(costInput()),
+      },
+      { silent: true },
+    );
+    if (!costSave.success) {
+      mfgWarn(costSave.message, "Could not save cutting costs.");
+      return;
+    }
+
     setPosting(true);
     if (row.status === "draft") {
       const rel = await apiFetch(`/api/v1/manufacturing/work-orders/${id}/release`, { method: "POST" }, { silent: true });
@@ -333,6 +353,7 @@ function NewCuttingOrderWizard() {
           actual_input_qty: Number(qty()),
           output_weighs: buildOutputWeighs(),
           waste_lines: wasteLines,
+          ...costInput(),
         }),
       },
       { silent: true },
@@ -591,30 +612,66 @@ function NewCuttingOrderWizard() {
       </Show>
 
       <Show when={step() === 3}>
-        <section class="rounded-xl border border-stroke bg-white p-4 space-y-2 text-sm">
-          <h2 class="font-semibold">Production summary</h2>
-          <p>Input to consume: {qty()}</p>
-          <p>Finished / primary outputs: {summary().finished.toFixed(4)}</p>
-          <p>By-products: {summary().byproduct.toFixed(4)}</p>
-          <p>Waste: {summary().waste.toFixed(4)}</p>
-          <p class="text-xs text-text-secondary">Waste-classified lines do not increase sellable stock.</p>
-          <div class="mt-3 border-t border-stroke pt-3">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Journal preview</h3>
-            <Show when={journalPreview()} fallback={<p class="mt-1 text-xs text-text-secondary">Cost preview unavailable.</p>}>
-              <div class="mt-1 flex justify-between gap-3 text-xs">
-                <span>Dr Cut outputs inventory</span>
-                <span>₱{(journalPreview()?.costs.total_cost ?? 0).toLocaleString()}</span>
-              </div>
-              <div class="flex justify-between gap-3 text-xs">
-                <span>Cr Raw material inventory</span>
-                <span>₱{(journalPreview()?.costs.material_cost ?? 0).toLocaleString()}</span>
-              </div>
-              <Show when={!journalPreview()?.accounting_enabled}>
-                <p class="mt-1 text-[11px] text-amber-700">Preview only: Inventory GL is disabled.</p>
+        <section class="grid gap-4 md:grid-cols-2">
+          <div class="space-y-3 rounded-xl border border-stroke bg-white p-4">
+            <h2 class="text-sm font-semibold">Production cost (optional)</h2>
+            <Field label="Labor cost">
+              <input class={inputClass} type="number" min="0" step="any" value={labor()} onInput={(e) => setLabor(e.currentTarget.value)} />
+            </Field>
+            <Field label="Overhead">
+              <input class={inputClass} type="number" min="0" step="any" value={overhead()} onInput={(e) => setOverhead(e.currentTarget.value)} />
+            </Field>
+            <Field label="Other cost">
+              <input class={inputClass} type="number" min="0" step="any" value={otherCost()} onInput={(e) => setOtherCost(e.currentTarget.value)} />
+            </Field>
+            <p class="text-sm font-medium">Total additional: ₱{additionalCost().toLocaleString()}</p>
+            <p class="text-[11px] text-text-secondary">
+              With Inventory GL enabled, these costs increase cut-output inventory value and credit Production cost absorption.
+            </p>
+          </div>
+
+          <div class="space-y-2 rounded-xl border border-stroke bg-white p-4 text-sm">
+            <h2 class="font-semibold">Production summary</h2>
+            <p>Input to consume: {qty()}</p>
+            <p>Finished / primary outputs: {summary().finished.toFixed(4)}</p>
+            <p>By-products: {summary().byproduct.toFixed(4)}</p>
+            <p>Waste: {summary().waste.toFixed(4)}</p>
+            <p class="text-xs text-text-secondary">Waste-classified lines do not increase sellable stock.</p>
+            <div class="mt-3 border-t border-stroke pt-3">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Journal preview</h3>
+              <Show when={journalPreview()} fallback={<p class="mt-1 text-xs text-text-secondary">Cost preview unavailable.</p>}>
+                <div class="mt-1 flex justify-between gap-3 text-xs">
+                  <span>Dr Cut outputs inventory</span>
+                  <span>₱{estimatedTotalCost().toLocaleString()}</span>
+                </div>
+                <div class="flex justify-between gap-3 text-xs">
+                  <span>Cr Raw material inventory</span>
+                  <span>₱{(journalPreview()?.costs.material_cost ?? 0).toLocaleString()}</span>
+                </div>
+                <Show when={additionalCost() > 0}>
+                  <div class="flex justify-between gap-3 text-xs">
+                    <span>Cr Production cost absorption</span>
+                    <span>₱{additionalCost().toLocaleString()}</span>
+                  </div>
+                </Show>
+                <Show when={!journalPreview()?.accounting_enabled}>
+                  <p class="mt-1 text-[11px] text-amber-700">Preview only: Inventory GL is disabled.</p>
+                </Show>
               </Show>
-            </Show>
+            </div>
           </div>
         </section>
+        <aside class="rounded-xl border border-blue-100 bg-blue-50 p-4 text-xs text-blue-950">
+          <p class="font-semibold">Where results and costs go</p>
+          <p class="mt-1">
+            Finished quantities appear in <A href="/app/inventory/find-stock" class="font-medium underline">Find Stock</A>.
+            Manufacturing labor, overhead, and other costs appear in journals and inventory value when Inventory GL is on.
+            Use <A href="/app/finance/acct-ii/landed-costs" class="font-medium underline">Landed Cost</A> for inbound purchase freight,
+            <A href="/app/purchases/expenses" class="font-medium underline"> Expenses</A> for miscellaneous operating costs,
+            Sales Order → Shipping for outbound freight, and
+            <A href="/app/sales/commission-rules" class="font-medium underline"> Sales Commissions</A> for commission accruals.
+          </p>
+        </aside>
         <div class="flex justify-between">
           <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm" onClick={() => setStep(2)}>
             ← Back
