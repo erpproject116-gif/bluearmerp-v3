@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { apiFetch } from "../../../shared/api";
 import { PageJumpControl } from "../../../shared/PageJumpControl";
 import { defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
 import { ReportLoadingOverlay } from "../../../shared/reports/ReportLoadingOverlay";
@@ -7,7 +8,12 @@ import { GridExportButtons } from "../../../shared/gridExport";
 import {
   useInvBookSlips,
   type InvBookSlipFilters,
+  type InvBookSlipRow,
 } from "../../../shared/reports/useModuleReports";
+import { useToast } from "../../../shared/toast";
+import { SupplierInvoiceModal } from "../../finance/supplier-invoices/SupplierInvoiceModal";
+import type { SupplierInvoiceDetail } from "../../../shared/useSupplierInvoiceList";
+import { SalesModal, type SalesDetail } from "../../sales/sales/SalesModal";
 
 export type InvBookLedgerTarget = {
   item_id: number;
@@ -25,6 +31,12 @@ type Props = {
   onClose: () => void;
 };
 
+type InvBookSource = {
+  kind: "sales" | "purchase";
+  doc_id: number;
+  label?: string;
+};
+
 function fmtQty(n: number | undefined) {
   if (n == null || !Number.isFinite(n) || Math.abs(n) < 0.0000001) return "";
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
@@ -35,9 +47,20 @@ function fmtQtyOrZero(n: number | undefined) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+function canDrill(row: InvBookSlipRow) {
+  if (row.is_beginning) return false;
+  const refType = (row.ref_type ?? "").trim();
+  const refId = row.ref_id;
+  return Boolean(refType) && refId != null && Number(refId) > 0;
+}
+
 export function InvBookLedgerModal(props: Props) {
+  const toast = useToast();
   const [page, setPage] = createSignal(1);
   const [runId, setRunId] = createSignal(0);
+  const [openingSource, setOpeningSource] = createSignal(false);
+  const [salesDoc, setSalesDoc] = createSignal<SalesDetail | null>(null);
+  const [purchaseDoc, setPurchaseDoc] = createSignal<SupplierInvoiceDetail | null>(null);
   const pageSize = 100;
   let tableRoot: HTMLDivElement | undefined;
 
@@ -45,12 +68,20 @@ export function InvBookLedgerModal(props: Props) {
     if (!props.open || !props.row) return;
     setPage(1);
     setRunId((n) => n + 1);
+    setSalesDoc(null);
+    setPurchaseDoc(null);
   });
 
   createEffect(() => {
     if (!props.open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (salesDoc() || purchaseDoc()) {
+          e.preventDefault();
+          setSalesDoc(null);
+          setPurchaseDoc(null);
+          return;
+        }
         e.preventDefault();
         props.onClose();
       }
@@ -112,6 +143,49 @@ export function InvBookLedgerModal(props: Props) {
     return `${row.item_name} (${row.item_code})`;
   };
 
+  const openSource = async (row: InvBookSlipRow) => {
+    if (!canDrill(row) || openingSource()) return;
+    setOpeningSource(true);
+    try {
+      const qs = new URLSearchParams({
+        ref_type: String(row.ref_type ?? ""),
+        ref_id: String(row.ref_id ?? ""),
+      });
+      const src = await apiFetch<InvBookSource>(`/api/v1/inventory/reports/inv-book/source?${qs}`, {}, { silent: true });
+      if (!src.success || !src.data?.doc_id) {
+        toast.warning(src.message?.trim() || "No Sale or Purchase Receive is linked to this movement.");
+        return;
+      }
+      if (src.data.kind === "sales") {
+        const detail = await apiFetch<SalesDetail>(`/api/v1/sales/${src.data.doc_id}?lifecycle=all`, {}, { silent: true });
+        if (!detail.success || !detail.data) {
+          toast.warning(detail.message?.trim() || "Could not load the Sales document.");
+          return;
+        }
+        setPurchaseDoc(null);
+        setSalesDoc(detail.data);
+        return;
+      }
+      if (src.data.kind === "purchase") {
+        const detail = await apiFetch<SupplierInvoiceDetail>(
+          `/api/v1/finance/supplier-invoices/${src.data.doc_id}?lifecycle=all`,
+          {},
+          { silent: true },
+        );
+        if (!detail.success || !detail.data) {
+          toast.warning(detail.message?.trim() || "Could not load the Purchase Receive.");
+          return;
+        }
+        setSalesDoc(null);
+        setPurchaseDoc(detail.data);
+        return;
+      }
+      toast.warning("This movement type cannot open a Sale or Purchase Receive.");
+    } finally {
+      setOpeningSource(false);
+    }
+  };
+
   return (
     <Show when={props.open && props.row}>
       <Portal>
@@ -140,6 +214,7 @@ export function InvBookLedgerModal(props: Props) {
                   {" · "}
                   {period().date_from} → {period().date_to}
                 </p>
+                <p class="mt-1 text-xs text-text-secondary">Click a movement date to open the source Sale or Purchase Receive (read-only).</p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <GridExportButtons
@@ -161,7 +236,7 @@ export function InvBookLedgerModal(props: Props) {
             </div>
 
             <div class="min-h-0 flex-1 overflow-auto px-5 py-3" ref={(el) => (tableRoot = el)}>
-              <ReportLoadingOverlay loading={report.isFetching}>
+              <ReportLoadingOverlay loading={report.isFetching || openingSource()}>
                 <table class="erp-grid min-w-full text-left text-sm">
                   <thead class="sticky top-0 z-[1] bg-brand-50 text-xs font-semibold uppercase text-brand-700">
                     <tr>
@@ -181,7 +256,21 @@ export function InvBookLedgerModal(props: Props) {
                         <tr
                           class={`border-t border-stroke/60 ${row.is_beginning ? "bg-amber-50/60 font-medium text-red-700" : ""}`}
                         >
-                          <td class="px-3 py-2 whitespace-nowrap">{row.created_at?.slice?.(0, 10) ?? row.created_at}</td>
+                          <td class="px-3 py-2 whitespace-nowrap">
+                            <Show
+                              when={canDrill(row)}
+                              fallback={<span>{row.created_at?.slice?.(0, 10) ?? row.created_at}</span>}
+                            >
+                              <button
+                                type="button"
+                                class="text-left text-brand-700 hover:underline disabled:opacity-50"
+                                disabled={openingSource()}
+                                onClick={() => void openSource(row)}
+                              >
+                                {row.created_at?.slice?.(0, 10) ?? row.created_at}
+                              </button>
+                            </Show>
+                          </td>
                           <td class="px-3 py-2">{row.partner_name}</td>
                           <td class="px-3 py-2 text-text-secondary">{row.remark}</td>
                           <td class="px-3 py-2 text-right tabular-nums">{fmtQty(row.increase_qty)}</td>
@@ -256,6 +345,22 @@ export function InvBookLedgerModal(props: Props) {
             </div>
           </div>
         </div>
+
+        <SalesModal
+          open={salesDoc() != null}
+          editing={salesDoc()}
+          templateCode={salesDoc()?.template_code ?? "default"}
+          readOnly
+          onClose={() => setSalesDoc(null)}
+          onSaved={() => setSalesDoc(null)}
+        />
+        <SupplierInvoiceModal
+          open={purchaseDoc() != null}
+          editing={purchaseDoc()}
+          readOnly
+          onClose={() => setPurchaseDoc(null)}
+          onSaved={() => setPurchaseDoc(null)}
+        />
       </Portal>
     </Show>
   );

@@ -67,6 +67,7 @@ func registerInventoryReportRoutes(r chi.Router, pool *pgxpool.Pool) {
 		rr.Get("/inv-book/export", exportInvBookReport(pool))
 		rr.Get("/inv-book", listInvBookReport(pool))
 		rr.Get("/inv-book/slips", listInvBookSlips(pool))
+		rr.Get("/inv-book/source", resolveInvBookSource(pool))
 		rr.Get("/inventory-status/export", exportInventoryStatusReport(pool))
 		rr.Get("/inventory-status", listInventoryStatusReport(pool))
 	})
