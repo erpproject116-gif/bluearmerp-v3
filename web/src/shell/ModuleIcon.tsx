@@ -285,6 +285,19 @@ export function ModuleIcon(props: Props): JSX.Element {
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
         </svg>
       );
+    case "sales_process":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h18L14.25 12v6.75L9.75 21V12L3 4.5z" />
+        </svg>
+      );
+    case "purchase_process":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v9m0 0l-3-3m3 3l3-3" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5h15l-1.2 8.1a1.5 1.5 0 01-1.49 1.275H7.19A1.5 1.5 0 015.7 18.6L4.5 10.5z" />
+        </svg>
+      );
     case "sales_order":
       return (
         <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
