@@ -67,13 +67,11 @@ import {
 } from "../../purchase-request/purchase-request/PurchaseRequestLineGrid";
 import { docSeedLinePatch, takeDocSeed } from "../../../shared/docSeed";
 import { SupplierInvoiceApprovalPanel } from "./SupplierInvoiceApprovalPanel";
-import { tryAutoSavePurchaseInvoice, type InvoiceAutoSaveResult } from "../../../shared/invoiceApi";
+import { tryAutoSavePurchaseInvoice } from "../../../shared/invoiceApi";
 import { TermHint } from "../../../shared/TermHint";
 import { A } from "@solidjs/router";
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { useCustomValues } from "../../../shared/useCustomValues";
-import { SupplierInvoicePostSaveDialog } from "./SupplierInvoicePostSaveDialog";
-import { CashPaymentToVendorModal } from "./CashPaymentToVendorModal";
 
 export type { SupplierInvoiceDetail as PurchaseDetail };
 
@@ -162,9 +160,6 @@ export function SupplierInvoiceModal(props: Props) {
   const [saving, setSaving] = createSignal(false);
   const [createdInvoice, setCreatedInvoice] = createSignal<SupplierInvoiceDetail | null>(null);
   const effectiveEditing = () => props.editing ?? createdInvoice();
-  const [postSaveOpen, setPostSaveOpen] = createSignal(false);
-  const [postSaveAccounting, setPostSaveAccounting] = createSignal<InvoiceAutoSaveResult | null>(null);
-  const [cashPaymentOpen, setCashPaymentOpen] = createSignal(false);
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [poPickerOpen, setPoPickerOpen] = createSignal(false);
   const [rfqPickerOpen, setRfqPickerOpen] = createSignal(false);
@@ -817,67 +812,36 @@ export function SupplierInvoiceModal(props: Props) {
       );
       return;
     }
-    toast.success(
-      res.message?.trim() ||
-        (props.editing ? "Purchase updated." : "Purchase created."),
-    );
     if (props.editing) invalidateRecordHistory(queryClient, "fin_supplier_invoice", props.editing.id);
     await draft.clearOnSave();
     props.onSaved();
     if (props.editing) {
+      toast.success(res.message?.trim() || "Purchase updated.");
       void tryAutoSavePurchaseInvoice(props.editing.id);
       props.onClose();
       return;
     }
     setCreatedInvoice(res.data);
     const autoSave = await tryAutoSavePurchaseInvoice(res.data.id);
-    setPostSaveAccounting(autoSave);
-    const hasPOLines = body.lines.some(
-      (ln: { purchase_order_line_id?: number | null }) =>
-        ln.purchase_order_line_id != null && Number(ln.purchase_order_line_id) > 0,
-    );
-    const hasGRLines = body.lines.some(
-      (ln: { goods_receipt_line_id?: number | null }) =>
-        ln.goods_receipt_line_id != null && Number(ln.goods_receipt_line_id) > 0,
-    );
-    const postedReceiveCount = (res.data.lines ?? []).filter(
-      (ln) => ln.goods_receipt_line_id != null && Number(ln.goods_receipt_line_id) > 0,
-    ).length;
-    const serialPending = body.lines.some(
-      (ln: { serial_nos?: string[]; qty?: number }, i: number) => {
-        const src = lines().filter((l) => l.item_id || l.item_code || l.goods_receipt_line_id || l.purchase_order_line_id)[i];
-        return Boolean(src?.track_serial) && (ln.serial_nos?.length ?? 0) === 0;
-      },
-    );
-    let stockMsg =
-      "Purchases do not change BOM recipes — only on-hand qty for qty-tracked items.";
-    if (postedReceiveCount > 0 || (hasPOLines && !hasGRLines)) {
-      stockMsg =
-        "Stock posted at the purchase location for qty-tracked lines (Find Stock / Inv. Book). BOM recipes are unchanged.";
-    } else if (hasGRLines) {
-      stockMsg = "Already received earlier — this save is billing only. Check Inv Per Branch / Stock Movements for qty.";
-    } else if (serialPending) {
-      stockMsg =
-        "Document saved, but stock was not posted — scan serials matching qty and save again (or set Progress to Completed).";
-    } else {
-      stockMsg =
-        "Document saved. If Find Stock is unchanged, confirm items track inventory qty and a location was set.";
-    }
-    stockMsg = `${stockMsg} ${autoSave.message}`;
-    if (toast.action) {
-      toast.action({
-        type: autoSave.ok ? "success" : "warning",
-        title: autoSave.ok ? "Purchase created — accounting ready." : "Purchase created.",
-        message: stockMsg,
-        actionLabel: "Inv Per Branch",
-        href: "/app/inventory/find-stock",
-      });
-    } else if (autoSave.ok) {
-      toast.success(stockMsg);
-    } else {
-      toast.warning(stockMsg);
-    }
-    setPostSaveOpen(true);
+    const docNo = res.data.invoice_no || invoiceNo();
+    const amount = formatMoney(res.data.grand_total ?? 0);
+    const jeNo = autoSave.journal_entry_no?.trim();
+    const jeId = autoSave.journal_entry_id;
+    const message = jeNo
+      ? `${docNo} saved — ${amount}. Accounting: ${jeNo}.`
+      : `${docNo} saved — ${amount}. ${autoSave.message || ""}`.trim();
+    toast.action({
+      type: autoSave.ok ? "success" : "warning",
+      title: "Purchase saved",
+      message,
+      actionLabel: jeId ? "Open JE" : "Find Stock",
+      href: jeId
+        ? `/app/finance/acct-i/journal-entries?highlight=${jeId}`
+        : "/app/inventory/find-stock",
+      sticky: false,
+      askHelp: !autoSave.ok,
+    });
+    props.onClose();
   };
 
   return (
@@ -1520,47 +1484,6 @@ export function SupplierInvoiceModal(props: Props) {
           void recalculatePurchaseRequestLines(lines(), t.id, t).then(setLines);
         }}
       />
-
-      <SupplierInvoicePostSaveDialog
-        open={postSaveOpen()}
-        invoiceNo={createdInvoice()?.invoice_no ?? invoiceNo()}
-        amount={createdInvoice()?.grand_total ?? 0}
-        hasSerials={lines().some((ln) => (ln.planned_serial_nos?.length ?? 0) > 0)}
-        accounting={postSaveAccounting()}
-        onDone={() => {
-          setPostSaveOpen(false);
-          props.onClose();
-        }}
-        onAccounting={() => {
-          setPostSaveOpen(false);
-          setActiveTab("invoice");
-        }}
-        onCashPayment={() => {
-          setPostSaveOpen(false);
-          setCashPaymentOpen(true);
-        }}
-      />
-
-      <Show when={createdInvoice()}>
-        <CashPaymentToVendorModal
-          open={cashPaymentOpen()}
-          supplierInvoiceId={createdInvoice()!.id}
-          partnerId={createdInvoice()!.partner_id}
-          currencyId={createdInvoice()!.currency_id}
-          amount={createdInvoice()!.grand_total}
-          invoiceNo={createdInvoice()!.invoice_no}
-          paymentDate={createdInvoice()!.invoice_date || invoiceDate()}
-          onClose={() => {
-            setCashPaymentOpen(false);
-            props.onClose();
-          }}
-          onSaved={() => {
-            props.onSaved();
-            setCashPaymentOpen(false);
-            props.onClose();
-          }}
-        />
-      </Show>
     </>
   );
 }

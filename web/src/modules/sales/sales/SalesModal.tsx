@@ -35,7 +35,8 @@ import { mapCustomValuesToEntity, mergeCustomValues } from "../../../shared/mapC
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
-import { tryAutoSaveSalesInvoice, type InvoiceAutoSaveResult } from "../../../shared/invoiceApi";
+import { tryAutoSaveSalesInvoice } from "../../../shared/invoiceApi";
+import { formatMoney } from "../../../shared/money";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, SALES_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
@@ -45,8 +46,6 @@ import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
-import { SalesPostSaveDialog } from "./SalesPostSaveDialog";
-import { CashInFromCustomerModal } from "./CashInFromCustomerModal";
 import {
   QuotationLinePickerModal,
   type PickedQuotationLine,
@@ -249,9 +248,6 @@ export function SalesModal(props: Props) {
   const [grPickerOpen, setGrPickerOpen] = createSignal(false);
   const [createdSale, setCreatedSale] = createSignal<SalesDetail | null>(null);
   const [holdOpen, setHoldOpen] = createSignal(false);
-  const [postSaveOpen, setPostSaveOpen] = createSignal(false);
-  const [postSaveAccounting, setPostSaveAccounting] = createSignal<InvoiceAutoSaveResult | null>(null);
-  const [cashInOpen, setCashInOpen] = createSignal(false);
   const effectiveEditing = () => props.editing ?? createdSale();
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
   const [showNewLocation, setShowNewLocation] = createSignal(false);
@@ -1098,10 +1094,6 @@ export function SalesModal(props: Props) {
       handleSaveResult(res, toast, ed ? "Sale saved. Open the Invoice tab to print or collect payment." : "Sale created. Open the Invoice tab next, then collect payment.", { onFieldErrors: setFieldErrors });
       return;
     }
-    toast.success(
-      res.message?.trim() ||
-        (ed ? "Sale saved. Open the Invoice tab to print or collect payment." : "Sale created. Open the Invoice tab next, then collect payment."),
-    );
     if (ed?.id) {
       invalidateRecordHistory(queryClient, "sa_sales", ed.id);
     }
@@ -1112,26 +1104,24 @@ export function SalesModal(props: Props) {
     await draft.clearOnSave();
     props.onSaved();
     const autoSave = await tryAutoSaveSalesInvoice(res.data.id);
-    setPostSaveAccounting(autoSave);
-    const stockNote = `${autoSave.message} Stock updates when the item tracks inventory quantity.`;
-    if (toast.action) {
-      toast.action({
-        type: autoSave.ok ? "success" : "warning",
-        title: ed ? "Sales updated." : "Sales created.",
-        message: stockNote,
-        actionLabel: "Open sale",
-        href: `/app/sales/sales?openId=${res.data.id}`,
-      });
-    } else if (autoSave.ok) {
-      toast.success(stockNote);
-    } else {
-      toast.warning(stockNote);
-    }
-    // New sales: keep form open behind post-save dialog (Cash In / Accounting).
-    if (!ed) {
-      setPostSaveOpen(true);
-      return;
-    }
+    const docNo = res.data.sales_no || salesNo();
+    const amount = formatMoney(res.data.grand_total ?? 0);
+    const jeNo = autoSave.journal_entry_no?.trim();
+    const jeId = autoSave.journal_entry_id;
+    const message = jeNo
+      ? `${docNo} saved — ${amount}. Accounting: ${jeNo}.`
+      : `${docNo} saved — ${amount}. ${autoSave.message || ""}`.trim();
+    toast.action({
+      type: autoSave.ok ? "success" : "warning",
+      title: ed ? "Sale saved" : "Sale saved",
+      message,
+      actionLabel: jeId ? "Open JE" : "Find Stock",
+      href: jeId
+        ? `/app/finance/acct-i/journal-entries?highlight=${jeId}`
+        : "/app/inventory/find-stock",
+      sticky: false,
+      askHelp: !autoSave.ok,
+    });
     // Allow pending uploads / server Copy to surface on AttachmentsField, then close.
     const sourced =
       !!sourceSalesOrderId() ||
@@ -1747,48 +1737,6 @@ export function SalesModal(props: Props) {
         onClose={() => setReturnLinesOpen(false)}
         onConfirm={(lineIds) => void returnSelectedLines(lineIds)}
       />
-
-      <SalesPostSaveDialog
-        open={postSaveOpen()}
-        salesId={createdSale()?.id ?? 0}
-        salesNo={createdSale()?.sales_no ?? salesNo()}
-        amount={createdSale()?.grand_total ?? 0}
-        hasSerials={lines().some((ln) => (ln.serial_unit_ids?.length ?? 0) > 0 || !!ln.serial_lot_no?.trim())}
-        accounting={postSaveAccounting()}
-        onDone={() => {
-          setPostSaveOpen(false);
-          props.onClose();
-        }}
-        onAccounting={() => {
-          setPostSaveOpen(false);
-          setActiveTab("invoice");
-        }}
-        onCashIn={() => {
-          setPostSaveOpen(false);
-          setCashInOpen(true);
-        }}
-      />
-
-      <Show when={createdSale()}>
-        <CashInFromCustomerModal
-          open={cashInOpen()}
-          salesId={createdSale()!.id}
-          partnerId={createdSale()!.partner_id}
-          currencyId={createdSale()!.currency_id}
-          amount={createdSale()!.grand_total}
-          salesNo={createdSale()!.sales_no}
-          receiptDate={createdSale()!.order_date}
-          onClose={() => {
-            setCashInOpen(false);
-            props.onClose();
-          }}
-          onSaved={() => {
-            props.onSaved();
-            setCashInOpen(false);
-            props.onClose();
-          }}
-        />
-      </Show>
     </>
   );
 }
