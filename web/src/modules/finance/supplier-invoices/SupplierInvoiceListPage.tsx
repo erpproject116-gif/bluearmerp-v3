@@ -388,6 +388,10 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
             attachmentsScope="finance/supplier-invoices"
             onPrint={() => openPurchaseInvoicePrint(viewRow()!.id)}
             onSaved={invalidate}
+            onVoided={() => {
+              invalidate();
+              setViewRow(null);
+            }}
             onApprovalChanged={() => {
               void apiFetch<SupplierInvoiceDetail>(`/api/v1/finance/supplier-invoices/${viewRow()!.id}`).then((res) => {
                 if (res.success && res.data) {

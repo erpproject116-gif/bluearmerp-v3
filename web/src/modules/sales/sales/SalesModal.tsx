@@ -1249,6 +1249,10 @@ export function SalesModal(props: Props) {
             progressStatus={progressStatus()}
             attachmentsScope="sales"
             onPrint={() => effectiveEditing() && openSalesInvoicePrint(effectiveEditing()!.id)}
+            onVoided={() => {
+              props.onSaved();
+              props.onClose();
+            }}
             onApprovalChanged={() => {
               void (async () => {
                 const res = await apiFetch<SalesDetail>(`/api/v1/sales/${effectiveEditing()!.id}`);
