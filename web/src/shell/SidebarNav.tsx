@@ -30,13 +30,15 @@ function pathStarts(pathname: string, bases: string[]): boolean {
 }
 
 function areaEnabled(area: HomeSidebarArea, me: MeData | null | undefined): boolean {
+  if (area.kind === "separator") return true;
   if (!area.moduleId) return true;
   return isTenantModuleEnabled(me, area.moduleId);
 }
 
 function NavAreaLink(props: {
   area: HomeSidebarArea;
-  active?: boolean;
+  /** Prefer a function so query-string changes recompute highlight. */
+  activeCheck?: () => boolean;
   nested?: boolean;
   badgeCount?: number;
   badgeLabel?: string;
@@ -44,7 +46,7 @@ function NavAreaLink(props: {
   const shell = useShell();
   const loc = useLocation();
   const active = () => {
-    if (props.active != null) return props.active;
+    if (props.activeCheck) return props.activeCheck();
     const href = props.area.href;
     if (href === "/app/dashboard") {
       return (
@@ -103,6 +105,10 @@ function NavAreaLink(props: {
         "bg-brand-50 text-brand-600": active(),
         "text-text-secondary hover:erp-panel hover:text-text-primary": !active(),
       }}
+      // Pathname-only router matching would light up every ?view= sibling; drive active ourselves.
+      activeClass=""
+      inactiveClass=""
+      aria-current={active() ? "page" : undefined}
       onClick={onNavigate}
       aria-label={
         badgeText()
@@ -171,7 +177,7 @@ function HomeAreaBlock(props: {
         <div class="min-w-0 flex-1">
           <NavAreaLink
             area={props.area}
-            active={props.active(props.area)}
+            activeCheck={() => props.active(props.area)}
             badgeCount={props.area.id === "comms" ? props.badgeCount : undefined}
           />
         </div>
@@ -195,7 +201,7 @@ function HomeAreaBlock(props: {
             {(child) => (
               <Show
                 when={(child.children ?? []).length > 0}
-                fallback={<NavAreaLink area={child} active={props.active(child)} nested />}
+                fallback={<NavAreaLink area={child} activeCheck={() => props.active(child)} nested />}
               >
                 <HomeAreaBlock area={child} active={props.active} childrenOf={props.childrenOf} />
               </Show>
@@ -217,7 +223,7 @@ export function SidebarNav() {
 
   createEffect(
     on(
-      () => loc.pathname,
+      () => [loc.pathname, loc.search] as const,
       () => {
         queueMicrotask(() => {
           if (navEl) navEl.scrollTop = savedScrollTop;
@@ -326,7 +332,7 @@ export function SidebarNav() {
         !view
       );
     }
-    if (area.id === "sales_outstanding" || area.id === "sales_invoices_status") {
+    if (area.id === "sales_outstanding") {
       return (
         (p === "/app/sales/sales" || p === "/app/sales/sales/") &&
         new URLSearchParams(loc.search).get("view") === "status"
@@ -482,15 +488,30 @@ export function SidebarNav() {
       return norm === "/app/rfq";
     }
     if (area.id === "rfq_list") {
+      const view = new URLSearchParams(loc.search).get("view");
+      const isNew =
+        new URLSearchParams(loc.search).get("new") === "1" ||
+        new URLSearchParams(loc.search).get("new") === "true";
       return (
         pathStarts(p, ["/app/purchase-order/rfq"]) &&
         !p.startsWith("/app/purchase-order/rfq/") &&
-        new URLSearchParams(loc.search).get("new") !== "1" &&
-        new URLSearchParams(loc.search).get("new") !== "true"
+        !view &&
+        !isNew
       );
     }
-    if (area.id === "rfq_outstanding" || area.id === "rfq_history") {
-      return false;
+    if (area.id === "rfq_outstanding") {
+      return (
+        pathStarts(p, ["/app/purchase-order/rfq"]) &&
+        !p.startsWith("/app/purchase-order/rfq/") &&
+        new URLSearchParams(loc.search).get("view") === "outstanding"
+      );
+    }
+    if (area.id === "rfq_history") {
+      return (
+        pathStarts(p, ["/app/purchase-order/rfq"]) &&
+        !p.startsWith("/app/purchase-order/rfq/") &&
+        new URLSearchParams(loc.search).get("view") === "history"
+      );
     }
     if (area.id === "rfq_new") {
       return (
@@ -517,8 +538,17 @@ export function SidebarNav() {
     if (area.id === "purchase_request_new") {
       return pathStarts(p, ["/app/purchase-request/purchase-requests/new"]);
     }
-    if (area.id === "purchase_request_outstanding" || area.id === "purchase_request_history") {
-      return pathStarts(p, ["/app/purchase-request/purchase-requests/status"]);
+    if (area.id === "purchase_request_outstanding") {
+      return (
+        pathStarts(p, ["/app/purchase-request/purchase-requests/status"]) &&
+        new URLSearchParams(loc.search).get("view") !== "history"
+      );
+    }
+    if (area.id === "purchase_request_history") {
+      return (
+        pathStarts(p, ["/app/purchase-request/purchase-requests/status"]) &&
+        new URLSearchParams(loc.search).get("view") === "history"
+      );
     }
     if (area.id === "purchase_rfq") {
       return pathStarts(p, ["/app/purchase-order/rfq"]);
@@ -609,11 +639,12 @@ export function SidebarNav() {
       ]);
     }
     if (area.id === "cash") {
-      return pathStarts(p, ["/app/finance/collections"]);
+      return pathStarts(p, ["/app/finance/receivables", "/app/finance/collections"]);
     }
     if (area.id === "disbursements") {
       return (
         pathStarts(p, [
+          "/app/finance/payables",
           "/app/finance/disbursements",
           "/app/finance/payment-vouchers",
           "/app/finance/acct-ii",
@@ -666,12 +697,24 @@ export function SidebarNav() {
     >
       <For each={sidebarAreas()}>
         {(area) => (
-          <Show when={areaEnabled(area, auth.me)}>
-            <HomeAreaBlock
-              area={area}
-              active={homeActive}
-              childrenOf={childrenOf}
-              badgeCount={area.id === "comms" ? chatUnread.unreadTotal() : undefined}
+          <Show
+            when={area.kind === "separator"}
+            fallback={
+              <Show when={areaEnabled(area, auth.me)}>
+                <HomeAreaBlock
+                  area={area}
+                  active={homeActive}
+                  childrenOf={childrenOf}
+                  badgeCount={area.id === "comms" ? chatUnread.unreadTotal() : undefined}
+                />
+              </Show>
+            }
+          >
+            <div
+              class="mx-2 my-2 border-t border-stroke"
+              classList={{ "mx-1": shell.collapsed() }}
+              role="separator"
+              aria-hidden="true"
             />
           </Show>
         )}
