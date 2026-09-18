@@ -304,7 +304,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   { id: "sep_after_manufacturing", label: "", href: "#", iconId: "overview", kind: "separator" },
   {
     id: "sales_process",
-    label: "Sales Process",
+    label: "Sales",
     href: "/app/quotation",
     iconId: "sales_process",
     topId: "inv1",
@@ -553,7 +553,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   },
   {
     id: "purchase_process",
-    label: "Purchase Process",
+    label: "Purchase",
     href: "/app/rfq",
     iconId: "purchase_process",
     topId: "inv1",
@@ -733,7 +733,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "buy",
-        label: "Purchase",
+        label: "Purchase Receive",
         href: "/app/purchases",
         iconId: "buying",
         topId: "inv1",

@@ -53,7 +53,7 @@ describe("isSellBuyDesktopPreferredPath", () => {
 });
 
 describe("HOME_SIDEBAR_AREAS document area landings", () => {
-  it("nests Sales Process and Purchase Process after Manufacturing", () => {
+  it("nests Sales and Purchase after Manufacturing", () => {
     const ids = HOME_SIDEBAR_AREAS.map((a) => a.id);
     const mfg = ids.indexOf("production");
     const afterMfg = ids.indexOf("sep_after_manufacturing");
@@ -64,14 +64,16 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
     expect(purchaseProcess).toBe(salesProcess + 1);
     expect(HOME_SIDEBAR_AREAS.find((a) => a.id === "sales_process")?.iconId).toBe("sales_process");
     expect(HOME_SIDEBAR_AREAS.find((a) => a.id === "purchase_process")?.iconId).toBe("purchase_process");
+    expect(HOME_SIDEBAR_AREAS.find((a) => a.id === "sales_process")?.label).toBe("Sales");
+    expect(HOME_SIDEBAR_AREAS.find((a) => a.id === "purchase_process")?.label).toBe("Purchase");
   });
 
-  it("Sales Process holds Quotation → Sales Order → Sales", () => {
+  it("Sales holds Quotation → Sales Order → Sales", () => {
     const sales = HOME_SIDEBAR_AREAS.find((a) => a.id === "sales_process");
     expect(sales?.children?.map((c) => c.id)).toEqual(["quotation", "sales_order", "sell"]);
   });
 
-  it("Purchase Process holds RFQ → PR → PO → Purchase → Expense", () => {
+  it("Purchase holds RFQ → PR → PO → Purchase Receive → Expense", () => {
     const purchase = HOME_SIDEBAR_AREAS.find((a) => a.id === "purchase_process");
     expect(purchase?.children?.map((c) => c.id)).toEqual([
       "rfq",
@@ -80,6 +82,7 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
       "buy",
       "expense",
     ]);
+    expect(purchase?.children?.find((c) => c.id === "buy")?.label).toBe("Purchase Receive");
   });
 
   it("Quotation overview is parent landing with list/new/outstanding/history children", () => {
