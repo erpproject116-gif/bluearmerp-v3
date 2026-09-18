@@ -45,6 +45,9 @@ export type SupplierInvoiceLine = {
   remark?: string | null;
   warranty_duration_months?: number | null;
   track_serial?: boolean;
+  serial_policy?: string;
+  track_lot?: boolean;
+  lot_policy?: string;
   serial_nos?: string[];
   lot_lines?: { lot_no: string; qty: number }[];
 };
@@ -134,6 +137,9 @@ export type OpenPOLine = {
   unit_non_vat: number;
   unit_vat_inc: number;
   track_serial?: boolean;
+  serial_policy?: string;
+  track_lot?: boolean;
+  lot_policy?: string;
   warranty_duration_months?: number | null;
 };
 

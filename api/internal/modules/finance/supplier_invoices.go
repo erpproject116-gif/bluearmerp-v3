@@ -48,6 +48,9 @@ type SupplierInvoiceLine struct {
 	Remark                 *string       `json:"remark,omitempty"`
 	WarrantyDurationMonths *int          `json:"warranty_duration_months,omitempty"`
 	TrackSerial            bool          `json:"track_serial,omitempty"`
+	SerialPolicy           string        `json:"serial_policy,omitempty"`
+	TrackLot               bool          `json:"track_lot,omitempty"`
+	LotPolicy              string        `json:"lot_policy,omitempty"`
 	SerialNos              []string      `json:"serial_nos,omitempty"`
 	LotLines               []billLotLine `json:"lot_lines,omitempty"`
 }
@@ -170,6 +173,9 @@ type openPOLineRow struct {
 	UnitNonVat             float64 `json:"unit_non_vat"`
 	UnitVatInc             float64 `json:"unit_vat_inc"`
 	TrackSerial            bool    `json:"track_serial,omitempty"`
+	SerialPolicy           string  `json:"serial_policy,omitempty"`
+	TrackLot               bool    `json:"track_lot,omitempty"`
+	LotPolicy              string  `json:"lot_policy,omitempty"`
 	WarrantyDurationMonths *int    `json:"warranty_duration_months,omitempty"`
 	SpecName               string  `json:"spec_name,omitempty"`
 	Description            string  `json:"description,omitempty"`
@@ -226,7 +232,8 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  pol.unit_id, coalesce(pol.unit_code, ''),
 			  i.base_unit_id, coalesce(bu.code, ''),
 			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8,
-			  coalesce(i.track_serial, false),
+			  coalesce(i.track_serial, false), coalesce(i.serial_policy, 'required'),
+			  coalesce(i.track_lot, false), coalesce(i.lot_policy, 'required'),
 			  coalesce(pol.warranty_duration_months, i.warranty_duration_months)
 			from public.po_purchase_order_lines pol
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
@@ -262,7 +269,9 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.SpecName, &row.Description, &row.Remark,
 				&row.OrderedQty, &row.ReceivedQty, &row.BilledQty, &row.BalanceQty,
 				&row.UnitID, &row.UnitCode, &row.BaseUnitID, &row.BaseUnitCode,
-				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial, &row.WarrantyDurationMonths,
+				&row.UnitNonVat, &row.UnitVatInc,
+				&row.TrackSerial, &row.SerialPolicy, &row.TrackLot, &row.LotPolicy,
+				&row.WarrantyDurationMonths,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read PO lines.", "ERR_INTERNAL")
 				return
@@ -295,6 +304,9 @@ type openSupplierQuotationInvoiceLineRow struct {
 	UnitNonVat              float64 `json:"unit_non_vat"`
 	UnitVatInc              float64 `json:"unit_vat_inc"`
 	TrackSerial             bool    `json:"track_serial,omitempty"`
+	SerialPolicy            string  `json:"serial_policy,omitempty"`
+	TrackLot                bool    `json:"track_lot,omitempty"`
+	LotPolicy               string  `json:"lot_policy,omitempty"`
 }
 
 func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc {
@@ -318,7 +330,8 @@ func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc 
 			  pol.qty::float8, coalesce(pol.billed_qty, 0)::float8,
 			  (pol.qty - coalesce(pol.billed_qty, 0))::float8,
 			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8,
-			  coalesce(i.track_serial, false)
+			  coalesce(i.track_serial, false), coalesce(i.serial_policy, 'required'),
+			  coalesce(i.track_lot, false), coalesce(i.lot_policy, 'required')
 			from public.po_purchase_order_lines pol
 			join public.po_purchase_orders po on po.id = pol.purchase_order_id
 			join public.rfq_supplier_quotation_lines ln on ln.id = pol.supplier_quotation_line_id
@@ -343,7 +356,8 @@ func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc 
 				&row.SupplierQuotationID, &row.SupplierQuotationLineID, &row.QuoteNo, &row.QuoteStatus, &row.RFQID,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.OrderedQty, &row.BilledQty, &row.BalanceQty,
-				&row.UnitNonVat, &row.UnitVatInc, &row.TrackSerial,
+				&row.UnitNonVat, &row.UnitVatInc,
+				&row.TrackSerial, &row.SerialPolicy, &row.TrackLot, &row.LotPolicy,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read supplier quotation lines.", "ERR_INTERNAL")
 				return
@@ -743,7 +757,8 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		  sil.unit_non_vat::float8, sil.non_vat_total::float8,
 		  sil.tax_amount::float8, sil.unit_vat_inc::float8, sil.line_total::float8, sil.remark,
 		  sil.warranty_duration_months,
-		  coalesce(i.track_serial, false),
+		  coalesce(i.track_serial, false), coalesce(i.serial_policy, 'required'),
+		  coalesce(i.track_lot, false), coalesce(i.lot_policy, 'required'),
 		  coalesce(sil.serial_nos, '[]'::jsonb), coalesce(sil.lot_lines, '[]'::jsonb)
 		from public.fin_supplier_invoice_lines sil
 		left join public.inv_items i on i.id = sil.item_id
@@ -761,7 +776,9 @@ func loadSupplierInvoice(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 			&ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Description,
 			&ln.Qty, &ln.UnitID, &ln.UnitCode,
 			&ln.UnitNonVat, &ln.NonVatTotal, &ln.TaxAmount, &ln.UnitVatInc, &ln.LineTotal, &ln.Remark,
-			&ln.WarrantyDurationMonths, &ln.TrackSerial, &serialJSON, &lotJSON,
+			&ln.WarrantyDurationMonths,
+			&ln.TrackSerial, &ln.SerialPolicy, &ln.TrackLot, &ln.LotPolicy,
+			&serialJSON, &lotJSON,
 		); err != nil {
 			return SupplierInvoice{}, err
 		}

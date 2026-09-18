@@ -36,6 +36,7 @@ import { HistoryLogModal } from "../../../shared/HistoryLogModal";
 import { LoadSlipMenu, PURCHASE_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { postInventoryItemSearch } from "../../../shared/inventoryItemSearch";
 import { itemSpecAsLineDescription, coalesceSpecDescription } from "../../../shared/itemLineSpecDescription";
+import { validatePurchaseTrackingLine } from "../../../shared/purchaseReceiveTracking";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
@@ -128,7 +129,11 @@ function linesFromDetail(lines?: SupplierInvoiceDetail["lines"]): PurchaseReques
     goods_receipt_line_id: ln.goods_receipt_line_id ?? null,
     purchase_order_line_id: ln.purchase_order_line_id ?? null,
     track_serial: Boolean(ln.track_serial),
+    serial_policy: ln.serial_policy ?? "required",
     planned_serial_nos: ln.serial_nos ?? [],
+    track_lot: Boolean(ln.track_lot),
+    lot_policy: ln.lot_policy ?? "required",
+    lot_lines: ln.lot_lines ?? [],
     warranty_duration_months: ln.warranty_duration_months ?? 0,
   }));
 }
@@ -498,6 +503,11 @@ export function SupplierInvoiceModal(props: Props) {
       unit_code: row.base_unit_code ?? "",
       qty: "1",
       unit_price: price,
+      track_serial: Boolean(row.track_serial),
+      serial_policy: row.serial_policy ?? "required",
+      track_lot: Boolean(row.track_lot),
+      lot_policy: row.lot_policy ?? "required",
+      lot_lines: [],
     };
     const merged = [...filled, patch].map((ln, i) => ({ ...ln, line_no: i + 1 }));
     if (meta && taxTypeId()) {
@@ -603,6 +613,10 @@ export function SupplierInvoiceModal(props: Props) {
       unit_code: row.unit_code || row.base_unit_code || "",
       purchase_order_line_id: row.purchase_order_line_id,
       track_serial: row.track_serial,
+      serial_policy: row.serial_policy ?? "required",
+      track_lot: row.track_lot,
+      lot_policy: row.lot_policy ?? "required",
+      lot_lines: [],
       warranty_duration_months: row.warranty_duration_months ?? 0,
     }));
     if (meta && taxId) {
@@ -753,6 +767,7 @@ export function SupplierInvoiceModal(props: Props) {
           line_total: ln.line_total === "" ? 0 : Number(ln.line_total),
           remark: ln.remark || null,
           serial_nos: ln.planned_serial_nos ?? [],
+          lot_lines: ln.lot_lines ?? [],
           warranty_duration_months: ln.warranty_duration_months ?? 0,
         })),
       withholding_lines: withholdingLines()
@@ -766,17 +781,22 @@ export function SupplierInvoiceModal(props: Props) {
       return;
     }
 
-    // Stock posts on save (Unconfirmed). Block incomplete serials so we never
-    // "succeed" with zero inventory movement for serial-tracked lines.
+    // Stock posts on save (Unconfirmed). Required capture must be complete;
+    // optional capture may be empty, but partial serial/lot capture is invalid.
     for (const ln of lines().filter((l) => l.item_id || l.item_code || l.goods_receipt_line_id || l.purchase_order_line_id)) {
-      if (!ln.track_serial) continue;
-      if (ln.goods_receipt_line_id) continue; // already received
-      const need = Math.floor(Number(ln.qty) || 0);
-      const got = (ln.planned_serial_nos ?? []).length;
-      if (need > 0 && got !== need) {
-        toast.warning(
-          `Line ${ln.line_no}: scan ${need} serial(s) before save (have ${got}). Stock posts on save — serials must match qty.`,
-        );
+      const issue = validatePurchaseTrackingLine({
+        line_no: ln.line_no,
+        qty: ln.qty,
+        goods_receipt_line_id: ln.goods_receipt_line_id,
+        track_serial: ln.track_serial,
+        serial_policy: ln.serial_policy,
+        serial_nos: ln.planned_serial_nos,
+        track_lot: ln.track_lot,
+        lot_policy: ln.lot_policy,
+        lot_lines: ln.lot_lines,
+      });
+      if (issue) {
+        toast.warning(issue);
         return;
       }
     }
