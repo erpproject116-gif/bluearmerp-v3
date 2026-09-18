@@ -1,4 +1,4 @@
-import DocAreaOverviewPage from "../../shared/DocAreaOverviewPage";
+import DocAreaOverviewPage from "../../../shared/DocAreaOverviewPage";
 
 export default function RfqOverviewPage() {
   return (
