@@ -21,6 +21,8 @@ import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { PartnerSearchModal, type PartnerSearchRow } from "./PartnerSearchModal";
 import { SerialCellHint, SerialLineCell } from "../../../shared/SerialLineCell";
 import { DocumentSerialScanBar } from "../../../shared/DocumentSerialScanBar";
+import { PurchaseLotCaptureCell, type PurchaseLotLine } from "../../../shared/PurchaseLotCaptureCell";
+import { shouldShowPurchaseSerialScanBar } from "../../../shared/purchaseReceiveTracking";
 import type { ResolvedSerialUnit } from "../../../shared/serialScanTypes";
 import { useToast } from "../../../shared/toast";
 import {
@@ -65,6 +67,9 @@ export type PurchaseRequestLineRow = {
   track_serial?: boolean;
   serial_policy?: string;
   planned_serial_nos?: string[];
+  track_lot?: boolean;
+  lot_policy?: string;
+  lot_lines?: PurchaseLotLine[];
 };
 
 export function emptyPurchaseRequestLine(
@@ -115,7 +120,7 @@ const LINE_COLUMNS = [
   { key: "unit_vat_inc", header: "Unit (VAT inc.)", width: 110 },
   { key: "line_total", header: "Line Total", width: 110 },
   { key: "warranty", header: "Warranty", width: 140 },
-  { key: "serials", header: "Serials", width: 180 },
+  { key: "serials", header: "Serial / Lot", width: 180 },
   { key: "remark", header: "Remark", width: 100 },
   { key: "actions", header: "", width: 72 },
 ] as const;
@@ -290,6 +295,9 @@ export function PurchaseRequestLineGrid(props: Props) {
             track_serial: Boolean(item.track_serial),
             serial_policy: item.serial_policy ?? "required",
             planned_serial_nos: [],
+            track_lot: Boolean(item.track_lot),
+            lot_policy: item.lot_policy ?? "required",
+            lot_lines: [],
             warranty_duration_months: item.warranty_duration_months ?? 0,
           }
         : ln,
@@ -484,12 +492,21 @@ export function PurchaseRequestLineGrid(props: Props) {
           {uiLabel("lines.add_button")}
         </button>
       </div>
-      <DocumentSerialScanBar
-        locationId={null}
-        context="purchase"
-        placeholder="Scan serial no. — Enter fills item + planned serial"
-        onUnits={applySerialUnits}
-        onUnregistered={(sn) => {
+      <Show
+        when={shouldShowPurchaseSerialScanBar(
+          props.lines().map((line) => ({
+            line_no: line.line_no,
+            qty: line.qty,
+            track_serial: line.track_serial,
+          })),
+        )}
+      >
+        <DocumentSerialScanBar
+          locationId={null}
+          context="purchase"
+          placeholder="Scan serial no. — Enter fills item + planned serial"
+          onUnits={applySerialUnits}
+          onUnregistered={(sn) => {
           // Unknown serial (new supplier stock): if exactly one serial-tracked line
           // already has an item, attach it there as a planned serial. Otherwise let
           // the bar show the fix guidance (we can't guess the item).
@@ -510,8 +527,9 @@ export function PurchaseRequestLineGrid(props: Props) {
           props.onChange(next);
           toast.success(`Added ${sn} to ${ln.item_code || "the item line"}.`);
           return true;
-        }}
-      />
+          }}
+        />
+      </Show>
       <Show when={!props.taxTypeId()}>
         <p class="mb-2 text-xs text-amber-700">{uiLabel("lines.tax_hint")}</p>
       </Show>
@@ -570,6 +588,8 @@ export function PurchaseRequestLineGrid(props: Props) {
                           item_id: null,
                           track_serial: false,
                           planned_serial_nos: [],
+                          track_lot: false,
+                          lot_lines: [],
                         })
                       }
                       onBlur={(e) => void resolveItemCode(idx, e.currentTarget.value)}
@@ -592,6 +612,8 @@ export function PurchaseRequestLineGrid(props: Props) {
                           item_id: null,
                           track_serial: false,
                           planned_serial_nos: [],
+                          track_lot: false,
+                          lot_lines: [],
                         })
                       }
                     />
@@ -681,10 +703,7 @@ export function PurchaseRequestLineGrid(props: Props) {
                     </ResizableTd>
                   </Show>
                   <ResizableTd width={widthFor("serials")} class="px-2 py-1">
-                    <Show
-                      when={!line().item_id || line().track_serial}
-                      fallback={<SerialCellHint hasItem={Boolean(line().item_id)} />}
-                    >
+                    <Show when={!line().item_id || line().track_serial}>
                       <div class="space-y-1">
                         <Show when={line().item_id && line().track_serial && props.serialCaptureMode !== "bill"}>
                           <p class="text-[10px] uppercase tracking-wide text-text-secondary">
@@ -719,6 +738,22 @@ export function PurchaseRequestLineGrid(props: Props) {
                           }
                         />
                       </div>
+                    </Show>
+                    <Show when={line().item_id && line().track_lot && !line().track_serial}>
+                      <Show
+                        when={props.docKind === "purchase_receive"}
+                        fallback={<span class="text-xs text-text-secondary">Lot tracked at receipt</span>}
+                      >
+                        <PurchaseLotCaptureCell
+                          lots={line().lot_lines ?? []}
+                          expectedQty={parseNum(line().qty)}
+                          policy={line().lot_policy}
+                          onChange={(lots) => void updateLine(idx, { lot_lines: lots })}
+                        />
+                      </Show>
+                    </Show>
+                    <Show when={line().item_id && !line().track_serial && !line().track_lot}>
+                      <SerialCellHint hasItem />
                     </Show>
                   </ResizableTd>
                   <ResizableTd width={widthFor("remark")} class="px-2 py-1">
