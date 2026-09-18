@@ -14,6 +14,8 @@ import { useToast } from "./toast";
 import {
   savePurchaseInvoice,
   saveSalesInvoice,
+  voidPurchaseInvoice,
+  voidSalesInvoice,
   type PurchaseInvoice,
   type SalesInvoice,
 } from "./invoiceApi";
@@ -298,11 +300,8 @@ export function InvoicePanel(props: Props) {
       return;
     }
     setVoiding(true);
-    const path =
-      props.kind === "sales"
-        ? `/api/v1/sales/${id}/void`
-        : `/api/v1/finance/supplier-invoices/${id}/void`;
-    const res = await apiFetch(path, { method: "POST", body: JSON.stringify({ reason }) }, { silent: true });
+    const res =
+      props.kind === "sales" ? await voidSalesInvoice(id, reason) : await voidPurchaseInvoice(id, reason);
     setVoiding(false);
     if (!res.success) {
       toast.warning(res.message ?? "Failed to void invoice.");
