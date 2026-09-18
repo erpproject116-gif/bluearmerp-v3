@@ -85,6 +85,20 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
     expect(purchase?.children?.find((c) => c.id === "buy")?.label).toBe("Purchase Receive");
   });
 
+  it("Manufacturing nested items use distinct icons", () => {
+    const mfg = HOME_SIDEBAR_AREAS.find((a) => a.id === "production");
+    const byId = Object.fromEntries((mfg?.children ?? []).map((c) => [c.id, c.iconId]));
+    expect(byId.production_workflow).toBe("overview");
+    expect(byId.production_all).toBe("production_wo");
+    expect(byId.production_assembly).toBe("production_assembly");
+    expect(byId.production_disassembly).toBe("production_cutting");
+    expect(byId.production_recipe).toBe("production_recipe");
+    expect(byId.production_reports).toBe("reports");
+    expect(byId.production_setup).toBe("setup");
+    const iconIds = (mfg?.children ?? []).map((c) => c.iconId);
+    expect(new Set(iconIds).size).toBe(iconIds.length);
+  });
+
   it("Quotation overview is parent landing with list/new/outstanding/history children", () => {
     const quotation = findArea("quotation");
     expect(quotation?.href).toBe("/app/quotation");
