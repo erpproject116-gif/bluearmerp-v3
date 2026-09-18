@@ -3,6 +3,8 @@ package inventory
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -245,5 +247,91 @@ func listInvBookSlips(pool *pgxpool.Pool) http.HandlerFunc {
 			out = append(out, row)
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)
+	}
+}
+
+type invBookSource struct {
+	Kind    string `json:"kind"` // sales | purchase
+	DocID   int64  `json:"doc_id"`
+	Label   string `json:"label,omitempty"`
+	RefType string `json:"ref_type,omitempty"`
+	RefID   int64  `json:"ref_id,omitempty"`
+}
+
+// resolveInvBookSource maps a stock-movement ref to a Sale or Purchase Receive document.
+func resolveInvBookSource(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		refType := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("ref_type")))
+		refID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("ref_id")), 10, 64)
+		if err != nil || refID <= 0 || refType == "" {
+			response.Validation(w, map[string]string{"ref": "ref_type and ref_id are required."})
+			return
+		}
+
+		switch refType {
+		case "sales", "sa_sales":
+			var id int64
+			var no string
+			err := pool.QueryRow(r.Context(), `
+				select id, coalesce(sales_no, '') from public.sa_sales
+				where id = $1 and tenant_id = $2`, refID, tu.TenantID).Scan(&id, &no)
+			if err != nil {
+				response.Err(w, http.StatusNotFound, "Sales document not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.OK(w, invBookSource{Kind: "sales", DocID: id, Label: no, RefType: refType, RefID: refID}, "")
+			return
+
+		case "sa_sales_line":
+			var id int64
+			var no string
+			err := pool.QueryRow(r.Context(), `
+				select s.id, coalesce(s.sales_no, '')
+				from public.sa_sales_lines ln
+				join public.sa_sales s on s.id = ln.sales_id
+				where ln.id = $1 and s.tenant_id = $2`, refID, tu.TenantID).Scan(&id, &no)
+			if err != nil {
+				response.Err(w, http.StatusNotFound, "Sales document not found for this line.", "ERR_NOT_FOUND")
+				return
+			}
+			response.OK(w, invBookSource{Kind: "sales", DocID: id, Label: no, RefType: refType, RefID: refID}, "")
+			return
+
+		case "supplier_invoice", "fin_supplier_invoice":
+			var id int64
+			var no string
+			err := pool.QueryRow(r.Context(), `
+				select id, coalesce(invoice_no, '') from public.fin_supplier_invoices
+				where id = $1 and tenant_id = $2`, refID, tu.TenantID).Scan(&id, &no)
+			if err != nil {
+				response.Err(w, http.StatusNotFound, "Purchase Receive not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.OK(w, invBookSource{Kind: "purchase", DocID: id, Label: no, RefType: refType, RefID: refID}, "")
+			return
+
+		case "goods_receipt":
+			var id int64
+			var no string
+			err := pool.QueryRow(r.Context(), `
+				select si.id, coalesce(si.invoice_no, '')
+				from public.gr_goods_receipt_slip_lines sl
+				join public.gr_goods_receipt_lines grl on grl.id = sl.goods_receipt_line_id
+				join public.fin_supplier_invoices si on si.id = sl.supplier_invoice_id
+				where grl.goods_receipt_id = $1 and si.tenant_id = $2 and sl.slip_type = 'supplier_invoice'
+				order by si.id desc
+				limit 1`, refID, tu.TenantID).Scan(&id, &no)
+			if err != nil {
+				response.Err(w, http.StatusNotFound, "No Purchase Receive linked to this goods receipt.", "ERR_NOT_FOUND")
+				return
+			}
+			response.OK(w, invBookSource{Kind: "purchase", DocID: id, Label: no, RefType: refType, RefID: refID}, "")
+			return
+
+		default:
+			response.Err(w, http.StatusBadRequest, "This movement type cannot open a Sale or Purchase Receive.", "ERR_UNSUPPORTED")
+			return
+		}
 	}
 }

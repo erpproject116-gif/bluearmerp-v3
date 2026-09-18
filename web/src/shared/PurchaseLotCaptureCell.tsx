@@ -1,4 +1,4 @@
-import { createSignal, For } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { Modal } from "./Modal";
 import { inputClass } from "./SpreadsheetGrid";
 
@@ -19,22 +19,43 @@ export function PurchaseLotCaptureCell(props: Props) {
   const [open, setOpen] = createSignal(false);
   const [draft, setDraft] = createSignal<PurchaseLotLine[]>([]);
 
+  const isMulti = () => props.lots.length > 1;
+  const singleLotNo = () => (props.lots.length === 1 ? props.lots[0]?.lot_no ?? "" : "");
+  const placeholder = () =>
+    props.policy?.trim().toLowerCase() === "optional" ? "Optional lot no." : "Lot number";
+
+  // Keep single-lot qty aligned with the receive line qty.
+  createEffect(() => {
+    if (props.lots.length !== 1) return;
+    const lot = props.lots[0];
+    if (!lot) return;
+    const nextQty = props.expectedQty > 0 ? props.expectedQty : 0;
+    if (Number(lot.qty) === nextQty) return;
+    props.onChange([{ ...lot, qty: nextQty }]);
+  });
+
   const openEditor = () => {
     setDraft(
       props.lots.length > 0
         ? props.lots.map((lot) => ({ ...lot }))
-        : [{ lot_no: "", qty: props.expectedQty > 0 ? props.expectedQty : 0 }],
+        : [{ lot_no: singleLotNo(), qty: props.expectedQty > 0 ? props.expectedQty : 0 }],
     );
     setOpen(true);
   };
 
   const summary = () => {
-    if (props.lots.length === 0) {
-      return props.policy?.trim().toLowerCase() === "optional" ? "Optional · add lots" : "Add lots";
-    }
     const totalQty = props.lots.reduce((sum, lot) => sum + Number(lot.qty || 0), 0);
     const displayQty = Math.round(totalQty * 10000) / 10000;
-    return `${props.lots.length} lot${props.lots.length === 1 ? "" : "s"} · ${displayQty}`;
+    return `${props.lots.length} lots · ${displayQty}`;
+  };
+
+  const setSingleLot = (lotNo: string) => {
+    const trimmed = lotNo.trim();
+    if (!trimmed) {
+      props.onChange([]);
+      return;
+    }
+    props.onChange([{ lot_no: lotNo, qty: props.expectedQty > 0 ? props.expectedQty : 0 }]);
   };
 
   const save = () => {
@@ -48,19 +69,47 @@ export function PurchaseLotCaptureCell(props: Props) {
 
   return (
     <>
-      <button
-        type="button"
-        class="w-full truncate text-left text-xs text-brand-700 hover:underline disabled:opacity-50"
-        disabled={props.disabled}
-        onClick={openEditor}
+      <Show
+        when={isMulti()}
+        fallback={
+          <div class="flex min-w-0 items-center gap-1">
+            <input
+              class={`${inputClass} min-w-0 flex-1`}
+              value={singleLotNo()}
+              placeholder={placeholder()}
+              disabled={props.disabled}
+              onInput={(e) => setSingleLot(e.currentTarget.value)}
+            />
+            <button
+              type="button"
+              class="shrink-0 text-[11px] text-brand-700 hover:underline disabled:opacity-50"
+              disabled={props.disabled}
+              title="Split across multiple lots"
+              onClick={openEditor}
+            >
+              + Lots
+            </button>
+          </div>
+        }
       >
-        {summary()}
-      </button>
+        <div class="flex min-w-0 items-center gap-1">
+          <button
+            type="button"
+            class="min-w-0 flex-1 truncate text-left text-xs text-brand-700 hover:underline disabled:opacity-50"
+            disabled={props.disabled}
+            onClick={openEditor}
+          >
+            {summary()}
+          </button>
+        </div>
+      </Show>
 
       <Modal open={open()} title="Receive lots" onClose={() => setOpen(false)} wide>
         <p class="mb-3 text-sm text-text-secondary">
           Enter supplier lot numbers and received quantities. Total lot quantity must equal {props.expectedQty.toFixed(4)}
-          {props.policy?.trim().toLowerCase() === "optional" ? " when lots are entered; leave all rows empty to receive quantity only." : "."}
+          {props.policy?.trim().toLowerCase() === "optional"
+            ? " when lots are entered; leave all rows empty to receive quantity only."
+            : "."}
         </p>
         <div class="space-y-2">
           <For each={draft()}>

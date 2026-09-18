@@ -379,8 +379,8 @@ export function InvoicePanel(props: Props) {
 
         <Show when={accountsLocked()}>
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            The linked journal entry is posted, so Acct I/II are locked. You can still update fees and remark.
-            To change accounts, void this invoice voucher and post again (void/repost) — stock is not reversed.{" "}
+            The linked journal entry is posted, so Purchases/COGS (or Sales) and Withdrawal/Deposit accounts are locked.
+            You can still update fees and remark. To change accounts, void this invoice voucher and post again (void/repost) — stock is not reversed.{" "}
             <Show when={jeId()}>
               <A
                 href={`/app/finance/acct-i/journal-entries?highlight=${jeId()}`}
