@@ -160,7 +160,7 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 				*before.SalesAccountID != body.SalesAccountID || *before.DepositAccountID != body.DepositAccountID
 			if accountsChanged {
 				response.Validation(w, map[string]string{
-					"journal_entry": "Accounts cannot be changed after the journal entry is posted. Update fees or remark only, or adjust the entry in Finance.",
+					"journal_entry": "Accounts cannot be changed after the journal entry is posted. Update fees or remark only, or void and repost the invoice to change accounts.",
 				})
 				return
 			}

@@ -324,20 +324,16 @@ export function InvoicePanel(props: Props) {
 
         <Show when={accountsLocked()}>
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            The linked journal entry is posted. You can still update fees and remark here; to change accounts, adjust the entry under{" "}
-            <Show
-              when={jeId()}
-              fallback={<>Finance → Journal entries</>}
-            >
+            The linked journal entry is posted, so Purchases/COGS (or Sales) and Withdrawal/Deposit accounts are locked.
+            You can still update fees and remark. To change accounts, void this invoice voucher and post again (void/repost) — do not edit the posted JE in place.{" "}
+            <Show when={jeId()}>
               <A
                 href={`/app/finance/acct-i/journal-entries?highlight=${jeId()}`}
                 class="font-medium text-brand-700 hover:underline"
               >
-                Finance → Journal entries
-              </A>{" "}
-              (entry #{jeId()})
+                View journal entry #{jeId()}
+              </A>
             </Show>
-            .
           </p>
         </Show>
 
