@@ -282,6 +282,12 @@ import {
   BankingAccountPage,
   FiscalYearsPage,
   BuyingWorkspacePage,
+  QuotationOverviewPage,
+  SalesOrderOverviewPage,
+  RfqOverviewPage,
+  PurchaseRequestOverviewPage,
+  PurchaseOrderOverviewPage,
+  ExpenseOverviewPage,
   PurchaseReceiveHubPage,
   PurchaseStatusPage,
   PurchasePreInvoicingPage,
@@ -630,6 +636,7 @@ export default function App() {
           <Route path="/quotation/quotations/outstanding" component={() => <Navigate href="/app/quotation/quotations?view=outstanding" />} />
           <Route path="/quotation/quotations/settings" component={QuotationSettingsPage} />
           <Route path="/quotation/quotations" component={QuotationHubPage} />
+          <Route path="/quotation" component={QuotationOverviewPage} />
           <Route path="/selling/setup" component={ModuleSetupHubPage} />
           <Route path="/selling/commissions" component={CommissionRulesPage} />
           <Route path="/selling/reports/receivable-status" component={ReceivableStatusReportPage} />
@@ -659,6 +666,7 @@ export default function App() {
           <Route path="/sales-order/shipping/rules" component={ShippingRulesPage} />
           <Route path="/sales-order/shipping/orders" component={ShippingOrdersPage} />
           <Route path="/sales-order/shipping/trips" component={DeliveryTripsPage} />
+          <Route path="/sales-order" component={SalesOrderOverviewPage} />
           <Route path="/purchase-order/setup" component={ModuleSetupHubPage} />
           <Route path="/purchase-order/reports/po-analysis" component={POAnalysisReportPage} />
           <Route path="/purchase-order/purchase-orders/status" component={() => <Navigate href="/app/purchase-order/purchase-orders?view=status" />} />
@@ -671,6 +679,8 @@ export default function App() {
           <Route path="/purchase-order/goods-receipt" component={() => <Navigate href="/app/purchases/purchase-receive?view=history&from=goods-receipt" />} />
           <Route path="/purchase-order/goods-receipt/settings" component={GoodsReceiptSettingsPage} />
           <Route path="/purchase-order/purchase-orders/settings" component={PurchaseOrderSettingsPage} />
+          <Route path="/purchase-order" component={PurchaseOrderOverviewPage} />
+          <Route path="/rfq" component={RfqOverviewPage} />
           <Route path="/purchase-request/setup" component={ModuleSetupHubPage} />
           <Route path="/purchase-request/purchase-orders" component={() => <Navigate href="/app/purchase-order/purchase-orders" />} />
           <Route path="/purchase-request/goods-receipt" component={() => <Navigate href="/app/purchases/purchase-receive?view=history&from=goods-receipt" />} />
@@ -678,6 +688,7 @@ export default function App() {
           <Route path="/purchase-request/purchase-requests/status" component={PurchaseRequestStatusPage} />
           <Route path="/purchase-request/purchase-requests/settings" component={PurchaseRequestSettingsPage} />
           <Route path="/purchase-request/purchase-requests" component={PurchaseRequestListPage} />
+          <Route path="/purchase-request" component={PurchaseRequestOverviewPage} />
           <Route path="/user-management/tenant-modules" component={() => (
             <AdminModuleRoute>
               <ModuleFeaturesPage />
@@ -767,6 +778,7 @@ export default function App() {
           <Route path="/purchases/purchases/:purchaseId/print-doc" component={SupplierInvoiceDocPrintPage} />
           <Route path="/purchases/purchases" component={() => <Navigate href="/app/purchases/purchase-receive" />} />
           <Route path="/purchases" component={BuyingWorkspacePage} />
+          <Route path="/expenses" component={ExpenseOverviewPage} />
           <Route path="/finance/supplier-invoices/new" component={() => <Navigate href="/app/purchases/purchase-receive/new" />} />
           <Route path="/finance/supplier-invoices/settings" component={() => <Navigate href="/app/purchases/purchase-receive/settings" />} />
           <Route path="/finance/supplier-invoices" component={() => <Navigate href="/app/purchases/purchase-receive" />} />

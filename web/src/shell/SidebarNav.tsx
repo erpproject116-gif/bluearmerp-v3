@@ -84,7 +84,16 @@ function NavAreaLink(props: {
   return (
     <A
       href={props.area.href}
-      end={props.area.id === "sell" || props.area.id === "buy"}
+      end={
+        props.area.id === "sell" ||
+        props.area.id === "buy" ||
+        props.area.id === "quotation" ||
+        props.area.id === "sales_order" ||
+        props.area.id === "rfq" ||
+        props.area.id === "purchase_request" ||
+        props.area.id === "purchase_order" ||
+        props.area.id === "expense"
+      }
       title={shell.collapsed() ? props.area.label : undefined}
       class="flex items-center rounded-lg text-sm font-medium transition-colors"
       classList={{
@@ -311,17 +320,87 @@ export function SidebarNav() {
     }
     if (area.id === "sales_list") {
       const norm = p.replace(/\/$/, "");
-      return norm === "/app/sales/sales" || (p.startsWith("/app/sales/sales/") && !p.startsWith("/app/sales/sales/new"));
+      const view = new URLSearchParams(loc.search).get("view");
+      return (
+        (norm === "/app/sales/sales" || (p.startsWith("/app/sales/sales/") && !p.startsWith("/app/sales/sales/new"))) &&
+        !view
+      );
+    }
+    if (area.id === "sales_outstanding" || area.id === "sales_invoices_status") {
+      return (
+        (p === "/app/sales/sales" || p === "/app/sales/sales/") &&
+        new URLSearchParams(loc.search).get("view") === "status"
+      );
+    }
+    if (area.id === "sales_history") {
+      return (
+        (p === "/app/sales/sales" || p === "/app/sales/sales/") &&
+        new URLSearchParams(loc.search).get("view") === "history"
+      );
     }
     if (area.id === "customers") {
       const kind = new URLSearchParams(loc.search).get("kind");
       return pathStarts(p, ["/app/inventory/partners"]) && kind !== "vendor";
     }
     if (area.id === "quotation") {
-      return pathStarts(p, ["/app/quotation"]) && !p.startsWith("/app/quotation/tax-mngt");
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/quotation";
+    }
+    if (area.id === "quotation_overview") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/quotation";
+    }
+    if (area.id === "quotation_list") {
+      const view = new URLSearchParams(loc.search).get("view");
+      return (
+        (p === "/app/quotation/quotations" || p === "/app/quotation/quotations/") &&
+        !view
+      );
+    }
+    if (area.id === "quotation_new") {
+      return pathStarts(p, ["/app/quotation/quotations/new"]);
+    }
+    if (area.id === "quotation_outstanding") {
+      return (
+        (p === "/app/quotation/quotations" || p === "/app/quotation/quotations/") &&
+        new URLSearchParams(loc.search).get("view") === "outstanding"
+      );
+    }
+    if (area.id === "quotation_history") {
+      return (
+        (p === "/app/quotation/quotations" || p === "/app/quotation/quotations/") &&
+        new URLSearchParams(loc.search).get("view") === "status"
+      );
     }
     if (area.id === "sales_order") {
-      return pathStarts(p, ["/app/sales-order"]);
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/sales-order";
+    }
+    if (area.id === "sales_order_overview") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/sales-order";
+    }
+    if (area.id === "sales_order_list") {
+      const view = new URLSearchParams(loc.search).get("view");
+      return (
+        (p === "/app/sales-order/sales-orders" || p === "/app/sales-order/sales-orders/") &&
+        !view
+      );
+    }
+    if (area.id === "sales_order_new") {
+      return pathStarts(p, ["/app/sales-order/sales-orders/new"]);
+    }
+    if (area.id === "sales_order_outstanding") {
+      return (
+        (p === "/app/sales-order/sales-orders" || p === "/app/sales-order/sales-orders/") &&
+        new URLSearchParams(loc.search).get("view") === "outstanding"
+      );
+    }
+    if (area.id === "sales_order_history") {
+      return (
+        (p === "/app/sales-order/sales-orders" || p === "/app/sales-order/sales-orders/") &&
+        new URLSearchParams(loc.search).get("view") === "status"
+      );
     }
     if (area.id === "accounts_receivable") {
       return (
@@ -367,27 +446,128 @@ export function SidebarNav() {
     }
     if (area.id === "purchase_receive_list") {
       const norm = p.replace(/\/$/, "");
+      const view = new URLSearchParams(loc.search).get("view");
       return (
-        norm === "/app/purchases/purchase-receive" ||
-        (p.startsWith("/app/purchases/purchase-receive/") &&
-          !p.startsWith("/app/purchases/purchase-receive/new") &&
-          !p.startsWith("/app/purchases/purchase-receive/settings") &&
-          !p.startsWith("/app/purchases/purchase-receive/pre-invoicing") &&
-          !p.startsWith("/app/purchases/purchase-receive/payment-status") &&
-          !p.startsWith("/app/purchases/purchase-receive/ap-by-vendor"))
+        (norm === "/app/purchases/purchase-receive" ||
+          (p.startsWith("/app/purchases/purchase-receive/") &&
+            !p.startsWith("/app/purchases/purchase-receive/new") &&
+            !p.startsWith("/app/purchases/purchase-receive/settings") &&
+            !p.startsWith("/app/purchases/purchase-receive/pre-invoicing") &&
+            !p.startsWith("/app/purchases/purchase-receive/payment-status") &&
+            !p.startsWith("/app/purchases/purchase-receive/ap-by-vendor"))) &&
+        !view
+      );
+    }
+    if (area.id === "purchase_outstanding") {
+      return (
+        (p === "/app/purchases/purchase-receive" || p === "/app/purchases/purchase-receive/") &&
+        new URLSearchParams(loc.search).get("view") === "status"
+      );
+    }
+    if (area.id === "purchase_history") {
+      return (
+        (p === "/app/purchases/purchase-receive" || p === "/app/purchases/purchase-receive/") &&
+        new URLSearchParams(loc.search).get("view") === "history"
       );
     }
     if (area.id === "vendors") {
       return pathStarts(p, ["/app/inventory/partners"]) && new URLSearchParams(loc.search).get("kind") === "vendor";
     }
+    if (area.id === "rfq") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/rfq";
+    }
+    if (area.id === "rfq_overview") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/rfq";
+    }
+    if (area.id === "rfq_list") {
+      return (
+        pathStarts(p, ["/app/purchase-order/rfq"]) &&
+        !p.startsWith("/app/purchase-order/rfq/") &&
+        new URLSearchParams(loc.search).get("new") !== "1" &&
+        new URLSearchParams(loc.search).get("new") !== "true"
+      );
+    }
+    if (area.id === "rfq_outstanding" || area.id === "rfq_history") {
+      return false;
+    }
+    if (area.id === "rfq_new") {
+      return (
+        pathStarts(p, ["/app/purchase-order/rfq"]) &&
+        !p.startsWith("/app/purchase-order/rfq/") &&
+        (new URLSearchParams(loc.search).get("new") === "1" ||
+          new URLSearchParams(loc.search).get("new") === "true")
+      );
+    }
     if (area.id === "purchase_request") {
-      return pathStarts(p, ["/app/purchase-request"]);
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/purchase-request";
+    }
+    if (area.id === "purchase_request_overview") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/purchase-request";
+    }
+    if (area.id === "purchase_request_list") {
+      return (
+        p === "/app/purchase-request/purchase-requests" ||
+        p === "/app/purchase-request/purchase-requests/"
+      );
+    }
+    if (area.id === "purchase_request_new") {
+      return pathStarts(p, ["/app/purchase-request/purchase-requests/new"]);
+    }
+    if (area.id === "purchase_request_outstanding" || area.id === "purchase_request_history") {
+      return pathStarts(p, ["/app/purchase-request/purchase-requests/status"]);
     }
     if (area.id === "purchase_rfq") {
       return pathStarts(p, ["/app/purchase-order/rfq"]);
     }
     if (area.id === "purchase_order") {
-      return pathStarts(p, ["/app/purchase-order"]) && !p.startsWith("/app/purchase-order/rfq");
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/purchase-order";
+    }
+    if (area.id === "purchase_order_overview") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/purchase-order";
+    }
+    if (area.id === "purchase_order_list") {
+      const view = new URLSearchParams(loc.search).get("view");
+      const isNew =
+        new URLSearchParams(loc.search).get("new") === "1" ||
+        new URLSearchParams(loc.search).get("new") === "true";
+      return (
+        (p === "/app/purchase-order/purchase-orders" || p === "/app/purchase-order/purchase-orders/") &&
+        !view &&
+        !isNew
+      );
+    }
+    if (area.id === "purchase_order_new") {
+      return (
+        (p === "/app/purchase-order/purchase-orders" || p === "/app/purchase-order/purchase-orders/") &&
+        (new URLSearchParams(loc.search).get("new") === "1" ||
+          new URLSearchParams(loc.search).get("new") === "true")
+      );
+    }
+    if (area.id === "purchase_order_outstanding") {
+      return (
+        (p === "/app/purchase-order/purchase-orders" || p === "/app/purchase-order/purchase-orders/") &&
+        new URLSearchParams(loc.search).get("view") === "outstanding"
+      );
+    }
+    if (area.id === "purchase_order_history") {
+      return (
+        (p === "/app/purchase-order/purchase-orders" || p === "/app/purchase-order/purchase-orders/") &&
+        new URLSearchParams(loc.search).get("view") === "status"
+      );
+    }
+    if (area.id === "expense") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/expenses";
+    }
+    if (area.id === "expense_overview") {
+      const norm = p.replace(/\/$/, "");
+      return norm === "/app/expenses";
     }
     if (area.id === "purchase_expenses") {
       return pathStarts(p, ["/app/purchases/expenses", "/app/purchases/recurring-expenses"]);
@@ -437,8 +617,8 @@ export function SidebarNav() {
           "/app/finance/disbursements",
           "/app/finance/payment-vouchers",
           "/app/finance/acct-ii",
-        ]) || p.startsWith("/app/purchases/expenses")
-      ) && !p.startsWith("/app/finance/banking");
+        ]) && !p.startsWith("/app/finance/banking")
+      );
     }
     if (area.id === "banking") {
       return pathStarts(p, ["/app/finance/banking"]);

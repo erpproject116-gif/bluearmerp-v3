@@ -307,6 +307,14 @@ export const BankingAccountPage = lazy(() => import("../modules/finance/banking/
 export const FiscalYearsPage = lazy(() => import("../modules/finance/FiscalYearsPage"));
 export const SellingWorkspacePage = lazy(() => import("../modules/selling/SellingWorkspacePage"));
 export const BuyingWorkspacePage = lazy(() => import("../modules/buying/BuyingWorkspacePage"));
+export const QuotationOverviewPage = lazy(() => import("../modules/quotation/QuotationOverviewPage"));
+export const SalesOrderOverviewPage = lazy(() => import("../modules/sales-order/SalesOrderOverviewPage"));
+export const RfqOverviewPage = lazy(() => import("../modules/purchase-request/purchase-order/RfqOverviewPage"));
+export const PurchaseRequestOverviewPage = lazy(
+  () => import("../modules/purchase-request/PurchaseRequestOverviewPage"),
+);
+export const PurchaseOrderOverviewPage = lazy(() => import("../modules/purchase-order/PurchaseOrderOverviewPage"));
+export const ExpenseOverviewPage = lazy(() => import("../modules/buying/ExpenseOverviewPage"));
 export const PurchaseStatusPage = lazy(() => import("../modules/buying/reports/PurchaseStatusPage"));
 export const PurchasePreInvoicingPage = lazy(() => import("../modules/buying/reports/PurchasePreInvoicingPage"));
 export const PayableStatusReportPage = lazy(() => import("../modules/buying/reports/PayableStatusReportPage"));

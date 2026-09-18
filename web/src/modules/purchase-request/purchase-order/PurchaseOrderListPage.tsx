@@ -310,6 +310,12 @@ export default function PurchaseOrderListPage() {
       setPoModalOpen(true);
       setSearchParams({ openId: undefined }, { replace: true });
     }
+    if (searchParams.new === "1" || searchParams.new === "true") {
+      setEditingPoId(null);
+      setViewingDeleted(false);
+      setPoModalOpen(true);
+      setSearchParams({ new: undefined }, { replace: true });
+    }
   });
 
   const lifecycle = useDocumentLifecycle({
