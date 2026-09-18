@@ -24,6 +24,7 @@ import { progressStatusLabel } from "./progressStatus";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { isTenantModuleEnabled } from "../../../shared/moduleAccess";
 import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
+import { keepProgressRowVisible } from "../../../shared/keepProgressRowVisible";
 
 type PageOptions = {
   openNewOnMount?: boolean;
@@ -40,7 +41,7 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
     "order_date",
     25,
-    { defaultOrder: "desc" },
+    { defaultOrder: "desc", defaultStatus: "" },
   );
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -127,6 +128,7 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
       showBlockerResult(res, toast, { fallbackTitle: "Couldn't update progress. Try again." });
       return;
     }
+    keepProgressRowVisible(statusFilter(), setStatusFilter, status);
     invalidate();
   };
 

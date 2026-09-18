@@ -29,6 +29,7 @@ import {
   listViewKey,
   useColumnLabelSettings,
 } from "../../../shared/useColumnLabelSettings";
+import { keepProgressRowVisible } from "../../../shared/keepProgressRowVisible";
 
 type PageOptions = { openNewOnMount?: boolean };
 
@@ -90,6 +91,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
       toast.error(res.message ?? "Could not update progress status.");
       return;
     }
+    keepProgressRowVisible(statusFilter(), setStatusFilter, status);
     invalidate();
   };
 

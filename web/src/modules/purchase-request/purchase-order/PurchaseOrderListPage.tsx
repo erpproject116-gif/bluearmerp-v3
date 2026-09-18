@@ -28,6 +28,7 @@ import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
 import { showBlockerResult, handleSaveResult } from "../../../shared/handleSaveResult";
 import { toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 import { InlineTip } from "../../../shared/inlineGuides";
+import { keepProgressRowVisible } from "../../../shared/keepProgressRowVisible";
 
 const OPERATIONAL_STATUS_TABS = [
   { value: "", label: "All statuses" },
@@ -362,6 +363,7 @@ export default function PurchaseOrderListPage() {
       return;
     }
     toast.success("Purchase order confirmed. Progress is now Completed — you can bill it from Purchases Load Slip.");
+    keepProgressRowVisible(statusFilter(), setStatusFilter, "completed");
     afterWrite();
   };
 
@@ -372,6 +374,7 @@ export default function PurchaseOrderListPage() {
       return;
     }
     toast.success("Purchase order unconfirmed. Open it to edit and Save changes.");
+    keepProgressRowVisible(statusFilter(), setStatusFilter, "unconfirmed");
     afterWrite();
   };
 
