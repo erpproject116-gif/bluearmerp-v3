@@ -1,4 +1,5 @@
 import { supabase, supabaseConfigured } from "../../shared/api";
+import { stashNextFromSearch } from "../../shared/authReturnTo";
 
 export async function signInWithGoogle(): Promise<{ error: string | null }> {
   if (!supabaseConfigured) {
@@ -6,6 +7,8 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
       error: "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in web/.env.local",
     };
   }
+  // Re-stash ?next= before leaving for Google so /auth/callback can restore it.
+  stashNextFromSearch(window.location.search);
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {

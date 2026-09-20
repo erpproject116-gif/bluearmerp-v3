@@ -1,4 +1,5 @@
 import { signOutApp } from "./signOut";
+import { buildSignInHref, captureReturnTo } from "./authReturnTo";
 
 let handling = false;
 
@@ -13,10 +14,15 @@ export function isIdleLogoutExemptPath(pathname: string): boolean {
 export async function handleServerSessionIdle() {
   if (handling) return;
   handling = true;
+  const returnPath =
+    typeof window !== "undefined"
+      ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+      : "";
   try {
+    captureReturnTo(returnPath);
     await signOutApp("idle_timeout");
   } finally {
-    window.location.href = "/signin?reason=idle";
+    window.location.href = buildSignInHref({ reason: "idle", next: returnPath });
   }
 }
 
