@@ -141,10 +141,11 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 		"purchase_order_no": "po.purchase_order_no",
 		"status":            "gr.status",
 		"created_at":        "gr.created_at",
+		"updated_at":        "gr.updated_at",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		p := httputil.ParseListParams(r, "receipt_date", allowed)
+		p := httputil.ParseListParamsWithDefaults(r, "updated_at", "desc", allowed)
 		offset := httputil.Offset(p)
 
 		where := "gr.tenant_id = $1"
@@ -193,11 +194,6 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		sortCol := allowed[p.Sort]
-		if sortCol == "" {
-			sortCol = "gr.receipt_date"
-		}
-
 		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
 			CustomerColumn:       "po.partner_id",
 			LocationColumn:       "gr.location_id",
@@ -221,8 +217,8 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.inv_locations loc on loc.id = gr.location_id
 			left join public.users u on u.id = gr.created_by_user_id
 			where %s
-			order by %s %s
-			limit $%d offset $%d`, where, sortCol, orderSQL(p.Order), argN, argN+1)
+			order by %s %s, gr.id %s
+			limit $%d offset $%d`, where, p.Sort, orderSQL(p.Order), orderSQL(p.Order), argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)

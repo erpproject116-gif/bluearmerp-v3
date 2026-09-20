@@ -4,7 +4,7 @@ import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
-import { useListState } from "../../../shared/useListState";
+import { useTransactionListState } from "../../../shared/useListState";
 import {
   useGoodsReceiptList,
   useInvalidateGoodsReceipts,
@@ -38,10 +38,9 @@ export default function GoodsReceiptListPage() {
   const canReverse = () => hasPermission(auth.me, "purchase_order.goods_receipts_reverse", "write");
   const toast = useToast();
   const invalidate = useInvalidateGoodsReceipts();
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
-    "receipt_date",
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+    "updated_at",
     25,
-    { defaultOrder: "desc", defaultStatus: "" },
   );
 
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
