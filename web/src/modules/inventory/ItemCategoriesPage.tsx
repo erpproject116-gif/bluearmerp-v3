@@ -131,11 +131,35 @@ export default function ItemCategoriesPage() {
       </div>
       <Show when={canWrite()}>
         <div class="mt-4 rounded-xl border border-stroke bg-white p-4">
-          <h2 class="mb-3 text-sm font-semibold">Add category</h2>
-          <div class="flex flex-wrap gap-3">
-            <input class={inputClass} placeholder="Code" value={code()} onInput={(e) => setCode(e.currentTarget.value)} />
-            <input class={inputClass} placeholder="Name" value={name()} onInput={(e) => setName(e.currentTarget.value)} />
-            <button type="button" class="rounded-lg bg-brand px-4 py-2 text-sm text-white" onClick={() => void addCategory()}>
+          <h2 class="mb-3 text-sm font-semibold text-text-primary">Add category</h2>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="block">
+              <span class="mb-1 block text-xs font-medium text-text-secondary">Code</span>
+              <input
+                class={inputClass}
+                value={code()}
+                onInput={(e) => setCode(e.currentTarget.value)}
+                placeholder="e.g. finished_goods"
+                aria-label="Category code"
+              />
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-xs font-medium text-text-secondary">Name</span>
+              <input
+                class={inputClass}
+                value={name()}
+                onInput={(e) => setName(e.currentTarget.value)}
+                placeholder="e.g. Finished Goods"
+                aria-label="Category name"
+              />
+            </label>
+          </div>
+          <div class="mt-3">
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              onClick={() => void addCategory()}
+            >
               Add
             </button>
           </div>
