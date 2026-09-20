@@ -4,7 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { showBlockerResult } from "../../../shared/handleSaveResult";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { SALES_SETTINGS_HREF } from "../../../shared/entityTypes";
-import { useListState } from "../../../shared/useListState";
+import { useTransactionListState } from "../../../shared/useListState";
 import {
   patchSalesInvoicing,
   patchSalesProgress,
@@ -39,10 +39,9 @@ export function SalesListPageInner(props: PageOptions = {}) {
   const auth = useAuth();
   const invalidate = useInvalidateSales();
 
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
-    "order_date",
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+    "updated_at",
     25,
-    { defaultOrder: "desc", defaultStatus: "" },
   );
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [checkedIds, setCheckedIds] = createSignal<Set<number>>(new Set());

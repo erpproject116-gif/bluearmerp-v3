@@ -537,10 +537,11 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 		"vendor_name":  "p.company_name",
 		"grand_total":  "si.grand_total",
 		"created_at":   "si.created_at",
+		"updated_at":   "si.updated_at",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		p := httputil.ParseListParams(r, "invoice_date", allowed)
+		p := httputil.ParseListParamsWithDefaults(r, "updated_at", "desc", allowed)
 		offset := httputil.Offset(p)
 
 		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "si")
@@ -634,8 +635,8 @@ func listSupplierInvoices(pool *pgxpool.Pool) http.HandlerFunc {
 			left join public.quo_tax_types tt on tt.id = si.tax_type_id
 			left join public.users u on u.id = si.created_by_user_id%s
 			where %s
-			order by %s %s
-			limit $%d offset $%d`, paymentJoin, where, p.Sort, orderSQL(p.Order), argN, argN+1)
+			order by %s %s, si.id %s
+			limit $%d offset $%d`, paymentJoin, where, p.Sort, orderSQL(p.Order), orderSQL(p.Order), argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)

@@ -67,9 +67,16 @@ func registerJournalEntryRoutes(r chi.Router, pool *pgxpool.Pool) {
 }
 
 func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
+	allowed := map[string]string{
+		"entry_no":   "entry_no",
+		"entry_date": "entry_date",
+		"created_at": "created_at",
+		"updated_at": "updated_at",
+		"id":         "id",
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		p := httputil.ParseListParams(r, "entry_date", map[string]string{"entry_no": "entry_no", "entry_date": "entry_date"})
+		p := httputil.ParseListParamsWithDefaults(r, "updated_at", "desc", allowed)
 		offset := httputil.Offset(p)
 		statusFilter := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("status")))
 		includeArchived := strings.TrimSpace(r.URL.Query().Get("include_archived")) == "1" ||
@@ -97,7 +104,7 @@ func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
 			  archived_at::text, reversed_at::text, reversal_of_entry_id, reversed_by_entry_id,
 			  count(*) over()
 			from public.fin_journal_entries where %s
-			order by entry_date desc, id desc limit $%d offset $%d`, where, limIdx, offIdx)
+			order by %s %s, id %s limit $%d offset $%d`, where, p.Sort, orderSQL(p.Order), orderSQL(p.Order), limIdx, offIdx)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list journal entries.", "ERR_INTERNAL")

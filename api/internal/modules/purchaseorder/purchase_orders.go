@@ -246,15 +246,12 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		// Default is last activity; keep sort_by_modified as an explicit force for older clients.
 		sortByModified := strings.EqualFold(r.URL.Query().Get("sort_by_modified"), "true") ||
 			r.URL.Query().Get("sort_by_modified") == "1"
-		defaultSort := "order_date"
+		p := httputil.ParseListParamsWithDefaults(r, "updated_at", "desc", allowed)
 		if sortByModified {
-			defaultSort = "updated_at"
-		}
-		p := httputil.ParseListParams(r, defaultSort, allowed)
-		if sortByModified {
-			p.Sort = "updated_at"
+			p.Sort = allowed["updated_at"]
 			p.Order = "desc"
 		}
 		offset := httputil.Offset(p)
@@ -371,11 +368,6 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		where += dsScope
 
-		sortCol := allowed[p.Sort]
-		if sortCol == "" {
-			sortCol = allowed[defaultSort]
-		}
-
 		q := fmt.Sprintf(`
 			select po.id, po.order_date, po.date_seq, po.purchase_order_no,
 			  po.purchase_request_id, po.rfq_id, po.supplier_quotation_id,
@@ -405,9 +397,9 @@ func listPurchaseOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.quo_currencies c on c.id = po.currency_id
 			left join public.users u on u.id = po.created_by_user_id
 			where %s
-			order by %s %s
+			order by %s %s, po.id %s
 			limit $%d offset $%d`,
-			hybridPartnerLateral, where, sortCol, orderSQL(p.Order), argN, argN+1)
+			hybridPartnerLateral, where, p.Sort, orderSQL(p.Order), orderSQL(p.Order), argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
