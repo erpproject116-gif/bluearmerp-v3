@@ -10,6 +10,7 @@ import {
   readLocalActivity,
   touchLocalActivity,
 } from "./sessionIdleClient";
+import { buildSignInHref, captureReturnTo } from "./authReturnTo";
 
 const ACTIVITY_EVENTS = ["mousedown", "keydown", "touchstart", "scroll"] as const;
 const THROTTLE_MS = 5_000;
@@ -66,8 +67,10 @@ export function useIdleLogout() {
   const doLogout = async () => {
     clearTimers();
     setShowWarning(false);
+    const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    captureReturnTo(returnPath);
     await signOutApp("idle_timeout");
-    window.location.href = "/signin?reason=idle";
+    window.location.href = buildSignInHref({ reason: "idle", next: returnPath });
   };
 
   const stayLoggedIn = () => bump();

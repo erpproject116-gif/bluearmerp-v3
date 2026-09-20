@@ -3,7 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { supabase, supabaseConfigured } from "../../shared/api";
 import { useAuth } from "../../shared/auth-context";
 import { SessionLoading } from "../../shared/AuthRedirect";
-import { resolveAppEntryPath } from "../../shared/resolveAppEntryPath";
+import { resolvePostLoginPath, stashNextFromSearch } from "../../shared/authReturnTo";
 import { AuthAlert, AuthShell, authInputClass } from "./AuthShell";
 import { GoogleAuthButton } from "./GoogleAuthButton";
 
@@ -19,6 +19,7 @@ export default function SignInPage() {
 
   onMount(() => {
     const params = new URLSearchParams(window.location.search);
+    stashNextFromSearch(window.location.search);
     if (params.get("reason") === "idle") {
       setError("Your session ended after 20 minutes of inactivity. Please sign in again.");
     }
@@ -28,7 +29,7 @@ export default function SignInPage() {
 
   createEffect(() => {
     if (!auth.bootstrapping && auth.me) {
-      void resolveAppEntryPath(auth.me).then((href) => navigate(href, { replace: true }));
+      void resolvePostLoginPath(auth.me).then((href) => navigate(href, { replace: true }));
     }
   });
 
@@ -50,7 +51,7 @@ export default function SignInPage() {
       return;
     }
     await auth.refresh();
-    const href = await resolveAppEntryPath(auth.me);
+    const href = await resolvePostLoginPath(auth.me);
     navigate(href, { replace: true });
     setLoading(false);
   };

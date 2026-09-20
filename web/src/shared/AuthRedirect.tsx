@@ -1,8 +1,8 @@
 import { Show, createEffect, type ParentComponent } from "solid-js";
-import { Navigate, useNavigate } from "@solidjs/router";
+import { Navigate, useLocation, useNavigate } from "@solidjs/router";
 import { useAuth } from "./auth-context";
 import { DEFAULT_BRAND_LOGO_URL } from "./branding/defaults";
-import { resolveAppEntryPath } from "./resolveAppEntryPath";
+import { buildSignInHref, captureReturnTo, resolvePostLoginPath } from "./authReturnTo";
 
 export function needsSignInRedirect(auth: {
   bootstrapping: boolean;
@@ -29,6 +29,14 @@ export const SessionLoading: ParentComponent = () => (
   </div>
 );
 
+/** Capture current app URL then send the user to /signin (session missing). */
+export function NavigateToSignIn() {
+  const loc = useLocation();
+  const path = `${loc.pathname}${loc.search}${loc.hash || ""}`;
+  captureReturnTo(path);
+  return <Navigate href={buildSignInHref({ next: path })} />;
+}
+
 /** Sends `/` (and unknown paths) to sign-in or the best app home for this user. */
 export function AuthEntryRedirect() {
   const auth = useAuth();
@@ -37,7 +45,7 @@ export function AuthEntryRedirect() {
   createEffect(() => {
     if (auth.bootstrapping) return;
     if (!auth.me) return;
-    void resolveAppEntryPath(auth.me).then((href) => navigate(href, { replace: true }));
+    void resolvePostLoginPath(auth.me).then((href) => navigate(href, { replace: true }));
   });
 
   return (

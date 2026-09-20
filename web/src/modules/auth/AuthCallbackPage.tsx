@@ -2,7 +2,7 @@ import { onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "../../shared/api";
 import { useAuth, type MeData } from "../../shared/auth-context";
-import { resolveAppEntryPath } from "../../shared/resolveAppEntryPath";
+import { resolvePostLoginPath } from "../../shared/authReturnTo";
 
 async function fetchMeWithRetry(maxAttempts = 4): Promise<Awaited<ReturnType<typeof apiFetch<MeData>>>> {
   let lastErr: unknown;
@@ -100,7 +100,7 @@ export default function AuthCallbackPage() {
       }
 
       await auth.refresh();
-      const href = await resolveAppEntryPath(auth.me);
+      const href = await resolvePostLoginPath(auth.me);
       navigate(href, { replace: true });
     } catch {
       navigate(

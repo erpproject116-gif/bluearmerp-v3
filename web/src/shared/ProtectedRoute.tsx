@@ -1,8 +1,8 @@
 import { type ParentComponent, Show, createSignal, onMount } from "solid-js";
-import { Navigate, useNavigate } from "@solidjs/router";
+import { useNavigate } from "@solidjs/router";
 import { supabase, apiNetworkErrorMessage } from "../shared/api";
 import { useAuth } from "../shared/auth-context";
-import { needsSignInRedirect, SessionLoading } from "./AuthRedirect";
+import { needsSignInRedirect, SessionLoading, NavigateToSignIn } from "./AuthRedirect";
 import { signOutApp } from "./signOut";
 
 export const ProtectedRoute: ParentComponent = (props) => {
@@ -104,7 +104,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
               </div>
             </Show>
           }>
-            <Navigate href="/signin" />
+            <NavigateToSignIn />
           </Show>
         }
       >

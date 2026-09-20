@@ -1,5 +1,6 @@
 import { supabase, apiFetch } from "./api";
 import { LAST_ACTIVITY_STORAGE_KEY } from "./sessionIdleClient";
+import { clearReturnTo } from "./authReturnTo";
 
 /** Clears presence, usage session, server idle tracking, local activity, then Supabase session. */
 export async function signOutApp(reason: "logout" | "idle_timeout" = "logout") {
@@ -24,6 +25,10 @@ export async function signOutApp(reason: "logout" | "idle_timeout" = "logout") {
     localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
   } catch {
     /* ignore */
+  }
+  // Intentional sign-out must not bounce back to the prior page after re-login.
+  if (reason === "logout") {
+    clearReturnTo();
   }
   await supabase.auth.signOut();
 }
