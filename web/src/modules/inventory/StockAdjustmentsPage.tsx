@@ -148,6 +148,12 @@ export default function StockAdjustmentsPage() {
     setPage(1);
   };
 
+  const clearDates = () => {
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  };
+
   const openNew = () => {
     setEditRequestId(null);
     setAdjustOpen(true);
@@ -155,17 +161,15 @@ export default function StockAdjustmentsPage() {
 
   const openRow = (row: StockAdjustmentRequestRow) => {
     setSelectedId(row.id);
-    if (row.status === "draft") {
-      setEditRequestId(row.id);
-      setAdjustOpen(true);
-    }
+    setEditRequestId(row.id);
+    setAdjustOpen(true);
   };
 
   return (
     <div class="space-y-4">
       <CollapsibleFilterPanel
         title="Stock adjustments"
-        description="All quantity change requests by item and location (branch), with From → To comparison, who submitted, and who approved or rejected. Inventory updates only after an approver confirms. Pending items also appear in Approvals. Search (F8)."
+        description="Quantity change requests by item and location. Stock updates only after approval. Pending items also appear in Approvals. Default range is the last 90 days — clear dates to see all. Search (F8)."
         actions={
           <>
             <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
@@ -174,11 +178,20 @@ export default function StockAdjustmentsPage() {
             <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
               Reset to 90 days
             </button>
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={clearDates}>
+              All dates
+            </button>
             <A
               href="/app/dashboard/approvals"
               class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
             >
               Approvals
+            </A>
+            <A
+              href="/app/inventory/items"
+              class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
+            >
+              Items
             </A>
             <A
               href="/app/inventory/stock-movements"
@@ -288,29 +301,18 @@ export default function StockAdjustmentsPage() {
             key: "actions",
             header: "Open",
             sortable: false,
-            render: (r) =>
-              r.status === "draft" ? (
-                <button
-                  type="button"
-                  class="text-xs font-medium text-brand-700 hover:underline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openRow(r);
-                  }}
-                >
-                  Edit draft
-                </button>
-              ) : r.status === "e_approval" ? (
-                <A
-                  href="/app/dashboard/approvals"
-                  class="text-xs font-medium text-brand-700 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Approvals
-                </A>
-              ) : (
-                <span class="text-xs text-text-secondary">—</span>
-              ),
+            render: (r) => (
+              <button
+                type="button"
+                class="text-xs font-medium text-brand-700 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openRow(r);
+                }}
+              >
+                {r.status === "draft" ? "Edit draft" : "View"}
+              </button>
+            ),
           },
         ]}
         rows={list.data?.rows ?? []}
@@ -348,9 +350,36 @@ export default function StockAdjustmentsPage() {
       />
 
       <Show when={!list.isFetching && (list.data?.total ?? 0) === 0}>
-        <p class="mt-3 text-center text-sm text-text-secondary">
-          No stock adjustment requests in this period. Create one with New adjustment, or widen the date range.
-        </p>
+        <div class="mt-4 rounded-xl border border-dashed border-stroke bg-slate-50/80 px-6 py-8 text-center">
+          <p class="text-sm font-medium text-text-primary">No stock adjustment requests in this view</p>
+          <p class="mx-auto mt-2 max-w-lg text-sm text-text-secondary">
+            The list defaults to the last 90 days. Use <span class="font-medium">All dates</span> if older requests
+            exist, or create a new request. You can also check items on the Items page and click Stock adjustment to
+            pre-fill lines.
+          </p>
+          <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              onClick={openNew}
+            >
+              New adjustment
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-white"
+              onClick={clearDates}
+            >
+              All dates
+            </button>
+            <A
+              href="/app/inventory/items"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-white"
+            >
+              Open Items
+            </A>
+          </div>
+        </div>
       </Show>
 
       <StockAdjustmentModal

@@ -14,10 +14,15 @@ import {
   type StockAdjustmentLineRow,
 } from "./StockAdjustmentLineGrid";
 
+export type StockAdjustmentInitialItem = { id: number; label: string };
+
 type Props = {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /** Prefill one or more item lines (from Items multi-select). */
+  initialItems?: StockAdjustmentInitialItem[];
+  /** @deprecated Prefer initialItems — kept for single-item callers. */
   initialItemId?: number | null;
   initialItemLabel?: string;
   requestId?: number | null;
@@ -31,6 +36,25 @@ function linesToPayload(lines: StockAdjustmentLineRow[]) {
   }));
 }
 
+function resolveInitialItems(props: Props): StockAdjustmentInitialItem[] {
+  if (props.initialItems?.length) {
+    return props.initialItems.filter((i) => i.id > 0);
+  }
+  if (props.initialItemId != null && props.initialItemId > 0) {
+    return [{ id: props.initialItemId, label: props.initialItemLabel ?? "" }];
+  }
+  return [];
+}
+
+function linesFromInitialItems(items: StockAdjustmentInitialItem[]): StockAdjustmentLineRow[] {
+  if (items.length === 0) return [emptyStockAdjustmentLine(1)];
+  return items.map((item, i) => ({
+    ...emptyStockAdjustmentLine(i + 1),
+    item_id: item.id,
+    item_label: item.label,
+  }));
+}
+
 export function StockAdjustmentModal(props: Props) {
   const toast = useToast();
   const [saving, setSaving] = createSignal(false);
@@ -39,6 +63,9 @@ export function StockAdjustmentModal(props: Props) {
   const [reason, setReason] = createSignal("");
   const [draftRequestId, setDraftRequestId] = createSignal<number | null>(null);
   const [requestStatus, setRequestStatus] = createSignal<string | null>(null);
+  /** Skip silent draft auto-apply when opening with prefilled items from Items. */
+  const [skipDraftAutoApply, setSkipDraftAutoApply] = createSignal(false);
+  let lastOpen = false;
 
   const reset = () => {
     setFieldErrors({});
@@ -49,18 +76,29 @@ export function StockAdjustmentModal(props: Props) {
   };
 
   createEffect(() => {
-    if (!props.open) return;
-    if (props.initialItemId && !props.requestId) {
-      setLines([
-        {
-          ...emptyStockAdjustmentLine(1),
-          item_id: props.initialItemId,
-          item_label: props.initialItemLabel ?? "",
-        },
-      ]);
+    const open = props.open;
+    if (!open) {
+      lastOpen = false;
+      setSkipDraftAutoApply(false);
+      return;
     }
+    if (lastOpen) return;
+    lastOpen = true;
+
     if (props.requestId) {
+      setSkipDraftAutoApply(false);
+      reset();
       void loadRequest(props.requestId);
+      return;
+    }
+
+    const initials = resolveInitialItems(props);
+    reset();
+    if (initials.length > 0) {
+      setSkipDraftAutoApply(true);
+      setLines(linesFromInitialItems(initials));
+    } else {
+      setSkipDraftAutoApply(false);
     }
   });
 
@@ -127,7 +165,8 @@ export function StockAdjustmentModal(props: Props) {
       if (payload.request_id) setDraftRequestId(payload.request_id);
     },
     enabled: () => props.open && !props.requestId,
-    autoApply: () => props.open && !props.requestId,
+    // When opening from Items with prefilled rows, show Restore banner instead of wiping them.
+    autoApply: () => props.open && !props.requestId && !skipDraftAutoApply(),
   });
 
   const validate = () => {
@@ -244,17 +283,25 @@ export function StockAdjustmentModal(props: Props) {
         reset();
         props.onClose();
       }}
-      onSave={() => void submitForApproval()}
+      onSave={() => {
+        if (readOnly()) {
+          reset();
+          props.onClose();
+          return;
+        }
+        void submitForApproval();
+      }}
       onSecondarySave={readOnly() ? undefined : () => void saveDraftThenClose()}
       secondarySaveLabel="Save draft"
-      saveLabel="Submit for approval"
+      saveLabel={readOnly() ? "Close" : "Submit for approval"}
       saving={saving()}
     >
       <draft.DraftBanner />
       <ModalFormGuide guideId="stock_adjustment" spanFull />
       <FormErrorSummary errors={fieldErrors} />
       <p class="col-span-full text-sm text-text-secondary">
-        Document with one or more item/location lines. Quantity on hand does not change until a store admin or owner approves.
+        Document with one or more item/location lines. Quantity on hand does not change until a store admin or owner
+        approves.
       </p>
       <Show when={requestStatus()}>
         <p class="col-span-full text-sm text-text-secondary">
@@ -278,7 +325,9 @@ export function StockAdjustmentModal(props: Props) {
         />
       </Field>
       <Show when={fieldErrors().lines}>
-        <p class="col-span-full text-sm text-red-700" role="alert">{fieldErrors().lines}</p>
+        <p class="col-span-full text-sm text-red-700" role="alert">
+          {fieldErrors().lines}
+        </p>
       </Show>
       <StockAdjustmentLineGrid lines={lines} onChange={setLines} disabled={readOnly()} />
       <Show when={draftRequestId()}>
