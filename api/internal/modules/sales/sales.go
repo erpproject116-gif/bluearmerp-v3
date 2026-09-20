@@ -247,10 +247,11 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 		"progress_status":  "s.progress_status",
 		"invoicing_status": "s.invoicing_status",
 		"created_at":       "s.created_at",
+		"updated_at":       "s.updated_at",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		p := httputil.ParseListParams(r, "order_date", allowed)
+		p := httputil.ParseListParamsWithDefaults(r, "updated_at", "desc", allowed)
 		offset := httputil.Offset(p)
 
 		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "s")
@@ -332,9 +333,9 @@ func listSales(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.inv_locations l on l.id = s.location_id
 			left join public.users u on u.id = s.created_by_user_id
 			where %s
-			order by %s %s
+			order by %s %s, s.id %s
 			limit $%d offset $%d`,
-			where, p.Sort, orderSQL(p.Order), argN, argN+1)
+			where, p.Sort, orderSQL(p.Order), orderSQL(p.Order), argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)

@@ -15,7 +15,15 @@ type ListParams struct {
 	Status   string
 }
 
+// ParseListParams parses pagination/sort query params. Missing order defaults to asc.
 func ParseListParams(r *http.Request, defaultSort string, allowedSort map[string]string) ListParams {
+	return ParseListParamsWithDefaults(r, defaultSort, "asc", allowedSort)
+}
+
+// ParseListParamsWithDefaults is like ParseListParams but uses defaultOrder when
+// the request omits order (or sends an invalid value). defaultOrder must be
+// "asc" or "desc"; anything else falls back to "asc".
+func ParseListParamsWithDefaults(r *http.Request, defaultSort, defaultOrder string, allowedSort map[string]string) ListParams {
 	q := r.URL.Query()
 	page := clampInt(q.Get("page"), 1, 1, 1_000_000)
 	pageSize := clampInt(q.Get("pageSize"), 50, 1, 100)
@@ -30,7 +38,10 @@ func ParseListParams(r *http.Request, defaultSort string, allowedSort map[string
 	}
 	order := strings.ToLower(q.Get("order"))
 	if order != "asc" && order != "desc" {
-		order = "asc"
+		order = strings.ToLower(strings.TrimSpace(defaultOrder))
+		if order != "asc" && order != "desc" {
+			order = "asc"
+		}
 	}
 	return ListParams{
 		Page:     page,

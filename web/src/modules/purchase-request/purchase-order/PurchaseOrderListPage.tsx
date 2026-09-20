@@ -6,7 +6,7 @@ import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { modalDismissClass } from "../../../shared/Modal";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
-import { useListState } from "../../../shared/useListState";
+import { useTransactionListState } from "../../../shared/useListState";
 import {
   confirmPurchaseOrder,
   createPurchaseOrderFromRequest,
@@ -283,10 +283,9 @@ export default function PurchaseOrderListPage() {
   const auth = useAuth();
   const invalidate = useInvalidatePurchaseOrders();
 
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
-    "order_date",
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+    "updated_at",
     25,
-    { defaultOrder: "desc", defaultStatus: "" },
   );
   const [operationalFilter, setOperationalFilter] = createSignal("");
 

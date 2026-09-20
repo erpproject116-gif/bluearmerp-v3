@@ -3,7 +3,7 @@ import { A, useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import { formatPeso } from "../../../shared/money";
 import { SpreadsheetGrid, type Column } from "../../../shared/SpreadsheetGrid";
 import { PURCHASES_ENTITY, PURCHASES_SETTINGS_HREF } from "../../../shared/entityTypes";
-import { useListState } from "../../../shared/useListState";
+import { useTransactionListState } from "../../../shared/useListState";
 import {
   patchSupplierInvoiceProgress,
   useInvalidateSupplierInvoices,
@@ -52,10 +52,10 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const invalidate = useInvalidateSupplierInvoices();
   const basePath = () => listBasePath(loc.pathname);
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("invoice_date", 25, {
-    defaultOrder: "desc",
-    defaultStatus: "",
-  });
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+    "updated_at",
+    25,
+  );
   const [paymentStatus, setPaymentStatus] = createSignal(typeof searchParams.payment === "string" ? searchParams.payment : "");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
