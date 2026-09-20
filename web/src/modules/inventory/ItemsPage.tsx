@@ -143,8 +143,7 @@ export default function ItemsPage() {
   const [moreOpen, setMoreOpen] = createSignal(false);
   const [serialLotMenuOpen, setSerialLotMenuOpen] = createSignal(false);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
-  const [adjustItemId, setAdjustItemId] = createSignal<number | null>(null);
-  const [adjustItemLabel, setAdjustItemLabel] = createSignal("");
+  const [adjustItems, setAdjustItems] = createSignal<{ id: number; label: string }[]>([]);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const lifecycle = useMasterLifecycle({
@@ -433,13 +432,16 @@ export default function ItemsPage() {
 
   const openStockAdjustment = () => {
     const rows = selectedItemsForBarcode();
-    if (rows.length !== 1) {
-      toast.warning("Select exactly one item to create a stock adjustment.");
+    if (rows.length === 0) {
+      toast.warning("Select one or more items to create a stock adjustment.");
       return;
     }
-    const item = rows[0]!;
-    setAdjustItemId(item.id);
-    setAdjustItemLabel(`${item.item_code} — ${item.item_name}`);
+    const MAX = 50;
+    if (rows.length > MAX) {
+      toast.warning(`Select at most ${MAX} items at a time (${rows.length} selected).`);
+      return;
+    }
+    setAdjustItems(rows.map((item) => ({ id: item.id, label: `${item.item_code} — ${item.item_name}` })));
     setAdjustOpen(true);
   };
 
@@ -693,11 +695,12 @@ export default function ItemsPage() {
               <button
                 type="button"
                 class="rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
-                disabled={lifecycle.selectedIds().size !== 1}
-                title="Create a stock adjustment for the selected item"
+                disabled={lifecycle.selectedIds().size === 0 && selectedId() == null}
+                title="Create a stock adjustment for the selected item(s)"
                 onClick={openStockAdjustment}
               >
                 Stock adjustment
+                {lifecycle.selectedIds().size > 0 ? ` (${lifecycle.selectedIds().size})` : ""}
               </button>
             </Show>
           </>
@@ -740,17 +743,14 @@ export default function ItemsPage() {
       />
       <StockAdjustmentModal
         open={adjustOpen()}
-        initialItemId={adjustItemId()}
-        initialItemLabel={adjustItemLabel()}
+        initialItems={adjustItems()}
         onClose={() => {
           setAdjustOpen(false);
-          setAdjustItemId(null);
-          setAdjustItemLabel("");
+          setAdjustItems([]);
         }}
         onSaved={() => {
           setAdjustOpen(false);
-          setAdjustItemId(null);
-          setAdjustItemLabel("");
+          setAdjustItems([]);
           invalidate("items");
         }}
       />
