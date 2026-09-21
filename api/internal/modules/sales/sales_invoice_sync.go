@@ -13,27 +13,26 @@ import (
 )
 
 // SyncSalesInvoiceJournalFromDefaultsTx creates/refreshes the sales A/R journal when
-// Chart of Accounts defaults (Sales + Receivable) are mapped. Soft-skips when defaults
-// are missing or a journal already exists. Auto-post follows accounts_auto_post_sales.
+// Chart of Accounts defaults (Sales + Receivable) are mapped.
+// Soft-skips when defaults are missing for non-confirming sales.
+// On confirming progress, missing CoA defaults return a hard error so Ledger/BS/P&L stay wired.
+// Auto-post follows accounts_auto_post_sales.
 func SyncSalesInvoiceJournalFromDefaultsTx(ctx context.Context, tx pgx.Tx, tenantID, userID, salesID int64) error {
 	return syncSalesInvoiceJournalFromDefaultsTx(ctx, tx, tenantID, userID, salesID)
 }
 
-// syncSalesInvoiceJournalFromDefaultsTx creates/refreshes the sales A/R journal when
-// Chart of Accounts defaults (Sales + Receivable) are mapped. Soft-skips when defaults
-// are missing or a journal already exists. Auto-post follows accounts_auto_post_sales.
 func syncSalesInvoiceJournalFromDefaultsTx(ctx context.Context, tx pgx.Tx, tenantID, userID, salesID int64) error {
 	var existingJE *int64
 	var orderDate time.Time
 	var partnerID int64
 	var subtotal, taxTotal, grandTotal float64
-	var salesNo string
+	var salesNo, progress string
 	err := tx.QueryRow(ctx, `
 		select order_date, partner_id, subtotal::float8, tax_total::float8, grand_total::float8,
-		  sales_no, invoice_journal_entry_id
+		  sales_no, coalesce(progress_status, 'unconfirmed'), invoice_journal_entry_id
 		from public.sa_sales
 		where id = $1 and tenant_id = $2 and deleted_at is null`,
-		salesID, tenantID).Scan(&orderDate, &partnerID, &subtotal, &taxTotal, &grandTotal, &salesNo, &existingJE)
+		salesID, tenantID).Scan(&orderDate, &partnerID, &subtotal, &taxTotal, &grandTotal, &salesNo, &progress, &existingJE)
 	if err != nil {
 		return fmt.Errorf("load sale for invoice sync: %w", err)
 	}
@@ -44,12 +43,20 @@ func syncSalesInvoiceJournalFromDefaultsTx(ctx context.Context, tx pgx.Tx, tenan
 		return nil
 	}
 
+	confirming := processpolicy.IsConfirmingProgress(processpolicy.DocSales, progress)
+
 	defs, err := financedefaults.Load(ctx, tx, tenantID)
 	if err != nil {
-		return nil // soft-skip if defaults table unavailable
+		if confirming {
+			return fmt.Errorf("map Sales and Accounts Receivable under Chart of Accounts defaults before confirming a Sale (/app/finance/acct-i/chart-of-accounts?focus=sales#default-account-mappings)")
+		}
+		return nil
 	}
 	if defs.SalesAccountID == nil || defs.ReceivableAccountID == nil ||
 		*defs.SalesAccountID <= 0 || *defs.ReceivableAccountID <= 0 {
+		if confirming {
+			return fmt.Errorf("map Sales and Accounts Receivable under Chart of Accounts defaults before confirming a Sale (/app/finance/acct-i/chart-of-accounts?focus=sales#default-account-mappings)")
+		}
 		return nil
 	}
 
