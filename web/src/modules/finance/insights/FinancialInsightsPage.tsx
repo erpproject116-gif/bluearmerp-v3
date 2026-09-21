@@ -12,6 +12,7 @@ import {
 import { defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
 import { ReportDateRangePicker } from "../../../shared/reports/ReportDateRangePicker";
 import { FinanceLayout } from "../FinanceLayout";
+import { InsightsMonthChart } from "./InsightsMonthChart";
 
 type MetricRow = {
   key: string;
@@ -78,8 +79,12 @@ type TrendBucket = {
   from: string;
   to: string;
   revenue: number;
+  gross_profit: number;
   operating_expenses: number;
   net_profit: number;
+  cash: number;
+  accounts_receivable: number;
+  accounts_payable: number;
   gross_margin_pct: number;
   net_margin_pct: number;
 };
@@ -223,11 +228,6 @@ export default function FinancialInsightsPage() {
   const primary = createMemo(() => (overview.data?.metrics ?? []).filter((m) => m.primary_kpi));
   const tableRows = createMemo(() => overview.data?.metrics ?? []);
   const trendLabels = createMemo(() => (trends.data?.buckets ?? []).map((b) => b.label));
-  const perfDatasets = createMemo(() => [
-    { label: "Revenue", data: (trends.data?.buckets ?? []).map((b) => b.revenue) },
-    { label: "Operating Expenses", data: (trends.data?.buckets ?? []).map((b) => b.operating_expenses) },
-    { label: "Net Profit", data: (trends.data?.buckets ?? []).map((b) => b.net_profit) },
-  ]);
   const marginDatasets = createMemo(() => [
     { label: "Gross Margin %", data: (trends.data?.buckets ?? []).map((b) => b.gross_margin_pct) },
     { label: "Net Margin %", data: (trends.data?.buckets ?? []).map((b) => b.net_margin_pct) },
@@ -362,13 +362,8 @@ export default function FinancialInsightsPage() {
                 </For>
               </section>
 
-              <section class="grid gap-4 lg:grid-cols-2">
-                <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
-                  <h2 class="mb-3 text-sm font-semibold text-text-primary">Revenue vs OpEx vs Net Profit</h2>
-                  <Show when={(trends.data?.buckets?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No trend points.</p>}>
-                    <BiChart type="bar" labels={trendLabels()} datasets={perfDatasets()} valueFormat="money" height={240} legend />
-                  </Show>
-                </div>
+              <section class="space-y-4">
+                <InsightsMonthChart dateFrom={range().from} dateTo={range().to} interval={interval()} height={280} />
                 <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
                   <h2 class="mb-3 text-sm font-semibold text-text-primary">Margins %</h2>
                   <Show when={(trends.data?.buckets?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No margin points.</p>}>
