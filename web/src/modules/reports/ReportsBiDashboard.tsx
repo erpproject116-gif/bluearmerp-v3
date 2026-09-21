@@ -10,6 +10,7 @@ import {
 } from "../../shared/reports/ReportDatePresets";
 import { ReportDateRangePicker } from "../../shared/reports/ReportDateRangePicker";
 import { OpsIntelligencePanel } from "../dashboard/OpsIntelligencePanel";
+import { InsightsMonthChart } from "../finance/insights/InsightsMonthChart";
 
 type NamedAmount = {
   label: string;
@@ -277,6 +278,14 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                 </div>
               </Show>
             </section>
+
+            <InsightsMonthChart
+              dateFrom={range().from}
+              dateTo={range().to}
+              interval="month"
+              height={280}
+              showInsightsLink
+            />
 
             <section class="grid gap-4 lg:grid-cols-2">
               <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
