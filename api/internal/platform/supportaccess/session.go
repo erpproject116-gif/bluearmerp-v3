@@ -570,5 +570,8 @@ func PublicMap(s *Session) map[string]any {
 	if s.SupportEmail != "" {
 		m["support_email"] = s.SupportEmail
 	}
+	if s.PreviousActiveTenantID != nil && *s.PreviousActiveTenantID > 0 {
+		m["previous_active_tenant_id"] = *s.PreviousActiveTenantID
+	}
 	return m
 }

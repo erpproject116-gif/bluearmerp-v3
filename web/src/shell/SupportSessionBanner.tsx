@@ -17,6 +17,7 @@ type SupportSession = {
   stealth?: boolean;
   extends_used?: number;
   can_extend?: boolean;
+  previous_active_tenant_id?: number | null;
 };
 
 function formatRemaining(endsAtMs: number, nowMs: number): string {
@@ -59,25 +60,46 @@ export function SupportSessionBanner() {
     return s ? Date.parse(s.ends_at) : 0;
   };
 
-  const endSession = async () => {
+  /**
+   * Shared remoting exit: end API → clear remoted X-Tenant-ID → refresh → platform customer.
+   * Used by End, stealth Exit, and bluearm:support-session-expired.
+   */
+  const exitSupportSession = async (opts?: { skipEndApi?: boolean }) => {
     const s = sess();
     if (!s || busy()) return;
+    const customerId = s.customer_id;
+    const previous =
+      s.previous_active_tenant_id && s.previous_active_tenant_id > 0
+        ? s.previous_active_tenant_id
+        : null;
     setBusy(true);
     try {
-      const res = await apiFetch(`/api/v1/platform/console/support-sessions/${s.id}/end`, {
-        method: "POST",
-        body: "{}",
-      });
-      if (!res.ok) {
-        getGlobalToast()?.error(res.message ?? "Could not end support session.");
-        return;
+      if (!opts?.skipEndApi) {
+        const res = await apiFetch(`/api/v1/platform/console/support-sessions/${s.id}/end`, {
+          method: "POST",
+          body: "{}",
+        });
+        if (!res.ok && res.code !== "ERR_SUPPORT_SESSION_EXPIRED") {
+          getGlobalToast()?.error(res.message ?? "Could not end support session.");
+          return;
+        }
       }
+      // Drop remoted X-Tenant-ID before refresh so subsequent calls are not pinned.
+      setActiveTenantId(previous);
       await auth.refresh();
-      navigate(`/app/platform-command/customers/${s.customer_id}`, { replace: true });
+      navigate(`/app/platform-command/customers/${customerId}`, { replace: true });
     } finally {
       setBusy(false);
     }
   };
+
+  createEffect(() => {
+    const onExpired = () => {
+      void exitSupportSession({ skipEndApi: true });
+    };
+    window.addEventListener("bluearm:support-session-expired", onExpired);
+    onCleanup(() => window.removeEventListener("bluearm:support-session-expired", onExpired));
+  });
 
   const extendSession = async () => {
     const s = sess();
@@ -99,7 +121,7 @@ export function SupportSessionBanner() {
     }
   };
 
-  // Keep X-Tenant-ID aligned with the support tenant.
+  // Keep X-Tenant-ID aligned with the support tenant while remoting.
   createEffect(() => {
     const s = visibleSession();
     if (s?.tenant_id) setActiveTenantId(s.tenant_id);
@@ -129,7 +151,7 @@ export function SupportSessionBanner() {
                   type="button"
                   class="rounded border border-stroke px-1.5 py-0.5 hover:bg-slate-50 disabled:opacity-50"
                   disabled={busy()}
-                  onClick={() => void endSession()}
+                  onClick={() => void exitSupportSession()}
                   title="Exit remoting"
                 >
                   Exit
@@ -175,7 +197,7 @@ export function SupportSessionBanner() {
                 type="button"
                 class="rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-950 disabled:opacity-50"
                 disabled={busy()}
-                onClick={() => void endSession()}
+                onClick={() => void exitSupportSession()}
               >
                 End support
               </button>

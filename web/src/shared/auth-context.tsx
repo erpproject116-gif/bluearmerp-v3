@@ -80,6 +80,7 @@ export type MeData = {
     stealth?: boolean;
     extends_used?: number;
     can_extend?: boolean;
+    previous_active_tenant_id?: number | null;
   } | null;
 };
 
