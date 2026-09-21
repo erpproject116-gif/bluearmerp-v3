@@ -69,6 +69,10 @@ export const recoveryHintFromError = (fieldError: string): string => {
 
   }
 
+  if (/typed but not picked|pick each (output|material|item) from the (search )?list|click each item|linked from the list|choose a uom|pick.*uom/i.test(t)) {
+    return "Click each item (or press Enter) so the line is linked, then choose UoM from the list if it is empty.";
+  }
+
   if (/attachment/i.test(t)) {
 
     return "Add the required file on the document, or ask an admin to change attachment settings.";

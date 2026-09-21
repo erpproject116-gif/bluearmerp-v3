@@ -483,27 +483,35 @@ export default function BomsPage() {
       errs.lines =
         mode === "disassembly"
           ? typedWithoutPick
-            ? "Pick each output from the search list (click or press Enter) — typing the name alone is not enough."
+            ? "Pick each output from the search list (click or press Enter) — typing the name alone does not link the line."
             : "Add at least one output piece."
           : typedWithoutPick
-            ? "Pick each material from the search list (click or press Enter) — typing the name alone is not enough."
+            ? "Pick each material from the search list (click or press Enter) — typing the name alone does not link the line."
             : "Add at least one raw material line.";
     } else {
-      const orphanLabels = lines().some((ln, i) => {
+      const orphanIdx = lines().findIndex((ln, i) => {
         const label = (lineLabels()[i] ?? "").trim();
         return label.length > 0 && !(Number(ln.component_item_id) > 0);
       });
-      if (orphanLabels) {
+      if (orphanIdx >= 0) {
         errs.lines =
           mode === "disassembly"
-            ? "Some output lines were typed but not picked from the list. Click each item (or press Enter) so every line is linked."
-            : "Some material lines were typed but not picked from the list. Click each item (or press Enter) so every line is linked.";
+            ? `Line ${orphanIdx + 1}: pick the output from the search list (click or Enter) so it is linked.`
+            : `Line ${orphanIdx + 1}: pick the material from the search list (click or Enter) so it is linked.`;
+        errs[`lines[${orphanIdx}].item`] = "Pick from the list.";
+      }
+      const missingUomIdx = lines().findIndex(
+        (ln) => ln.component_item_id > 0 && Number(ln.qty) > 0 && !(ln.unit_id && ln.unit_id > 0),
+      );
+      if (missingUomIdx >= 0 && !errs.lines) {
+        errs.lines = `Line ${missingUomIdx + 1}: choose a UoM from the list.`;
+        errs[`lines[${missingUomIdx}].unit_id`] = "UoM is required.";
       }
       const missingBase = bodyLines.some((ln) => {
         const full = lines().find((r) => r.component_item_id === ln.component_item_id);
         return full && !(full.base_unit_id && full.base_unit_id > 0);
       });
-      if (missingBase) {
+      if (missingBase && !errs.lines) {
         errs.lines =
           "A selected item has no base unit. Set Base unit under Inventory → Items, then pick the item again.";
       }
@@ -512,7 +520,7 @@ export default function BomsPage() {
         if (!ln.unit_id || !ln.base_unit_id || ln.unit_id === ln.base_unit_id) return false;
         return convertClient(ln.unit_id, ln.base_unit_id, 1, conversions() ?? []) == null;
       });
-      if (badUom) {
+      if (badUom && !errs.lines) {
         errs.lines = `add conversion ${badUom.unit_code || "unit"}→${badUom.base_unit_code || "base"} (or reverse) under Inventory → Units`;
       }
     }
@@ -885,10 +893,16 @@ export default function BomsPage() {
                         const lineIdx = idx();
                         const pick = await resolveItemPickMeta(o);
                         if (!pick.base_unit_id) {
-                          mfgWarn(
-                            null,
-                            `${pick.item_code || "That item"} has no base unit. Set Base unit under Inventory → Items, then pick it again.`,
-                          );
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            lines: `${pick.item_code || "That item"} has no base unit. Set Base unit under Inventory → Items, then pick it again.`,
+                          }));
+                        } else {
+                          setFieldErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.lines;
+                            return next;
+                          });
                         }
                         const unitCost = pick.purchase_price > 0 ? pick.purchase_price : 0;
                         setLines((prev) =>
@@ -1021,10 +1035,18 @@ export default function BomsPage() {
                         u.id !== row.base_unit_id &&
                         convertClient(u.id, row.base_unit_id, 1, conversions() ?? []) == null
                       ) {
-                        mfgWarn(
-                          `add conversion ${u.code}→${row.base_unit_code || "base"} (or reverse) under Inventory → Units`,
-                          "This UoM needs a conversion to the item base unit, or switch UoM back to the base unit.",
-                        );
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          lines: `add conversion ${u.code}→${row.base_unit_code || "base"} (or reverse) under Inventory → Units`,
+                          [`lines[${lineIdx}].unit_id`]: "Needs a conversion to the item base unit.",
+                        }));
+                      } else {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next[`lines[${lineIdx}].unit_id`];
+                          if (next.lines?.includes("add conversion")) delete next.lines;
+                          return next;
+                        });
                       }
                     }}
                     onClear={() => {
