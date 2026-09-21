@@ -752,6 +752,9 @@ export function SalesModal(props: Props) {
     setPaymentTerms(first.payment_terms ?? "");
     setNotes(first.notes ?? "");
     setDeliveryRemarks(first.delivery_remarks ?? "");
+    if (first.reference?.trim()) {
+      setSiDrNo(first.reference.trim());
+    }
     if (first.project_id) {
       setProjectId(first.project_id);
       setProjectLabel(first.project_name ?? "");

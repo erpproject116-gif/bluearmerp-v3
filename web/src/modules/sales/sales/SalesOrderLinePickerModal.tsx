@@ -27,6 +27,7 @@ export type OpenSalesOrderLineRow = {
   payment_terms?: string;
   notes?: string;
   delivery_remarks?: string;
+  reference?: string;
   source_quotation_id?: number | null;
   source_quotation_line_id?: number | null;
   quotation_id?: number | null;

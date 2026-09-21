@@ -48,6 +48,7 @@ type openSalesOrderLineRow struct {
 	PaymentTerms           string  `json:"payment_terms"`
 	Notes                  string  `json:"notes"`
 	DeliveryRemarks        string  `json:"delivery_remarks"`
+	Reference              string  `json:"reference"`
 	SourceQuotationID      *int64  `json:"source_quotation_id,omitempty"`
 	SourceQuotationLineID  *int64  `json:"source_quotation_line_id,omitempty"`
 	QuotationID            *int64  `json:"quotation_id,omitempty"`
@@ -115,6 +116,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  so.project_id, coalesce(so.project_name, ''),
 			  so.due_date,
 			  coalesce(so.payment_terms, ''), coalesce(so.notes, ''), coalesce(so.delivery_remarks, ''),
+			  coalesce(so.reference, ''),
 			  so.source_quotation_id, ln.source_quotation_line_id, ql.quotation_id,
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  coalesce(rel.released, 0)::float8,
@@ -171,6 +173,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ProjectID, &row.ProjectName, &dueDate, &row.PaymentTerms, &row.Notes, &row.DeliveryRemarks,
+				&row.Reference,
 				&row.SourceQuotationID, &row.SourceQuotationLineID, &row.QuotationID,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
 				&row.ReleasedQty, &row.DeliveredQty, &row.BalanceQty,
