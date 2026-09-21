@@ -275,6 +275,18 @@ export default function BookkeepingHubPage() {
               </Show>
             </section>
 
+            <Show when={(h().signoff_checklist ?? []).length > 0}>
+              <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+                <h2 class="text-sm font-semibold text-text-primary">Sale / Purchase Receive → books sign-off</h2>
+                <p class="mt-1 text-xs text-text-secondary">
+                  After a confirmed Sale or Purchase Receive, verify each surface before trusting BS / P&amp;L.
+                </p>
+                <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-text-primary">
+                  <For each={h().signoff_checklist!}>{(step) => <li>{step}</li>}</For>
+                </ol>
+              </section>
+            </Show>
+
             <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
               <h2 class="text-sm font-semibold text-text-primary">Month-close checklist</h2>
               <p class="mt-1 text-xs text-text-secondary">Live status from books health — not stored checkboxes.</p>

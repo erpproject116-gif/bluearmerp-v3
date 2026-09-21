@@ -1025,6 +1025,8 @@ export type BooksHealthSummary = {
   as_of: string;
   ready_to_close: boolean;
   draft_journal_entries: number;
+  confirmed_sales_draft_or_missing_je?: number;
+  confirmed_bills_draft_or_missing_je?: number;
   unmatched_bank_lines: number;
   audit_only_pending: number;
   credits_missing_je: number;
@@ -1052,6 +1054,7 @@ export type BooksHealthSummary = {
   };
   exceptions: BooksHealthException[];
   signoff_links: Record<string, string>;
+  signoff_checklist?: string[];
 };
 
 export function useBooksHealth(asOf?: () => string) {

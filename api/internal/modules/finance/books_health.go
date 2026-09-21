@@ -57,25 +57,29 @@ type booksHealthSignoffLinks struct {
 }
 
 type booksHealthResponse struct {
-	AsOf                      string                   `json:"as_of"`
-	ReadyToClose              bool                     `json:"ready_to_close"`
-	DraftJournalEntries       int64                    `json:"draft_journal_entries"`
-	UnmatchedBankLines        int64                    `json:"unmatched_bank_lines"`
-	AuditOnlyPending          int64                    `json:"audit_only_pending"`
-	CreditsMissingJE          int64                    `json:"credits_missing_je"`
-	CreditNotesMissingJE      int64                    `json:"credit_notes_missing_je"`
-	VendorCreditsMissingJE    int64                    `json:"vendor_credits_missing_je"`
-	ArCustomers               int64                    `json:"ar_customers"`
-	UnpaidSupplierInvoices    int64                    `json:"unpaid_supplier_invoices"`
-	ApOverApplication         int64                    `json:"ap_over_application"`
-	SalesUnbilledLines        int64                    `json:"sales_unbilled_lines"`
-	PurchaseUnbilledGRLines   int64                    `json:"purchase_unbilled_gr_lines"`
+	AsOf                       string                  `json:"as_of"`
+	ReadyToClose               bool                    `json:"ready_to_close"`
+	DraftJournalEntries        int64                   `json:"draft_journal_entries"`
+	ConfirmedSalesDraftOrMissingJE int64               `json:"confirmed_sales_draft_or_missing_je"`
+	ConfirmedBillsDraftOrMissingJE int64               `json:"confirmed_bills_draft_or_missing_je"`
+	UnmatchedBankLines         int64                   `json:"unmatched_bank_lines"`
+	AuditOnlyPending           int64                   `json:"audit_only_pending"`
+	CreditsMissingJE           int64                   `json:"credits_missing_je"`
+	CreditNotesMissingJE       int64                   `json:"credit_notes_missing_je"`
+	VendorCreditsMissingJE     int64                   `json:"vendor_credits_missing_je"`
+	ArCustomers                int64                   `json:"ar_customers"`
+	UnpaidSupplierInvoices     int64                   `json:"unpaid_supplier_invoices"`
+	ApOverApplication          int64                   `json:"ap_over_application"`
+	SalesUnbilledLines         int64                   `json:"sales_unbilled_lines"`
+	PurchaseUnbilledGRLines    int64                   `json:"purchase_unbilled_gr_lines"`
 	InventoryClosingDifference float64                 `json:"inventory_closing_difference"`
-	HybridInventoryUnmapped   bool                     `json:"hybrid_inventory_unmapped"`
-	Policies                  booksHealthPolicies      `json:"policies"`
-	Fiscal                    booksHealthFiscal        `json:"fiscal"`
-	Exceptions                []booksHealthException   `json:"exceptions"`
-	SignoffLinks              booksHealthSignoffLinks  `json:"signoff_links"`
+	HybridInventoryUnmapped    bool                    `json:"hybrid_inventory_unmapped"`
+	Policies                   booksHealthPolicies     `json:"policies"`
+	Fiscal                     booksHealthFiscal       `json:"fiscal"`
+	Exceptions                 []booksHealthException  `json:"exceptions"`
+	SignoffLinks               booksHealthSignoffLinks `json:"signoff_links"`
+	// SignoffChecklist is the Sale/PR → books verification matrix for operators.
+	SignoffChecklist           []string                `json:"signoff_checklist"`
 }
 
 func registerBooksHealthRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -129,6 +133,27 @@ func loadBooksHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64, as
 	_ = pool.QueryRow(ctx, `
 		select count(*) from public.fin_journal_entries
 		where tenant_id = $1 and status = 'draft'`, tenantID).Scan(&out.DraftJournalEntries)
+
+	// Confirmed sales whose A/R journal is missing or still draft — BS/P&L/Ledger won't move.
+	_ = pool.QueryRow(ctx, `
+		select count(*)
+		from public.sa_sales s
+		left join public.fin_journal_entries je on je.id = s.invoice_journal_entry_id
+		where s.tenant_id = $1 and s.deleted_at is null
+		  and s.grand_total > 0.0001
+		  and coalesce(s.progress_status, '') in ('completed', 'confirm', 'e_approval', 'confirmed', 'approved', 'released', 'shipped')
+		  and (s.invoice_journal_entry_id is null or coalesce(je.status, 'draft') = 'draft')`,
+		tenantID).Scan(&out.ConfirmedSalesDraftOrMissingJE)
+
+	_ = pool.QueryRow(ctx, `
+		select count(*)
+		from public.fin_supplier_invoices si
+		left join public.fin_journal_entries je on je.id = si.invoice_journal_entry_id
+		where si.tenant_id = $1 and si.deleted_at is null
+		  and si.grand_total > 0.0001
+		  and coalesce(si.progress_status, '') in ('completed', 'confirm', 'e_approval')
+		  and (si.invoice_journal_entry_id is null or coalesce(je.status, 'draft') = 'draft')`,
+		tenantID).Scan(&out.ConfirmedBillsDraftOrMissingJE)
 
 	_ = pool.QueryRow(ctx, `
 		select count(*) from public.fin_bank_statement_lines
@@ -251,8 +276,21 @@ func loadBooksHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64, as
 	}
 
 	out.Exceptions = buildBooksHealthExceptions(out)
+	out.SignoffChecklist = accountingSignoffChecklist()
 	out.ReadyToClose = booksHealthReady(out)
 	return out, nil
+}
+
+func accountingSignoffChecklist() []string {
+	return []string{
+		"After confirmed Sale / Purchase Receive: Inv. Book by Location shows the movement for item + location",
+		"Find Stock shows qty in the document location column (item track inventory / lot / serial)",
+		"Receivables or Payables hub shows an open partner balance",
+		"Journal Entries: linked JE exists and status is posted (not draft)",
+		"General Ledger moves for Receivable/Payable/Sales/Purchase (and Inventory/GRNI/COGS if hybrid GL on)",
+		"Customer/Vendor Book (SOA) invoice and accounting sides agree",
+		"Balance Sheet / Profit & Loss reflect the posted amounts for the period",
+	}
 }
 
 func buildBooksHealthExceptions(h booksHealthResponse) []booksHealthException {
@@ -263,7 +301,29 @@ func buildBooksHealthExceptions(h booksHealthResponse) []booksHealthException {
 		}
 		ex = append(ex, booksHealthException{Code: code, Severity: severity, Count: count, Label: label, Href: href})
 	}
-	add("draft_journals", "block", h.DraftJournalEntries, "Draft journal entries need review/post", h.SignoffLinks.JournalEntries)
+	draftLabel := "Draft journal entries need review/post — Ledger / BS / P&L only include posted JEs"
+	if !h.Policies.AccountsAutoPostSales || !h.Policies.AccountsAutoPostPurchase {
+		draftLabel += " (accounts auto-post sales/purchase is off for this tenant)"
+	}
+	add("draft_journals", "block", h.DraftJournalEntries, draftLabel, h.SignoffLinks.JournalEntries)
+	add("confirmed_sales_unposted_je", "block", h.ConfirmedSalesDraftOrMissingJE,
+		"Confirmed sales with missing or draft A/R journals", h.SignoffLinks.JournalEntries)
+	add("confirmed_bills_unposted_je", "block", h.ConfirmedBillsDraftOrMissingJE,
+		"Confirmed Purchase Receives with missing or draft A/P journals", h.SignoffLinks.JournalEntries)
+	if !h.Policies.AccountsAutoPostSales {
+		ex = append(ex, booksHealthException{
+			Code: "auto_post_sales_off", Severity: "warn", Count: 1,
+			Label: "accounts_auto_post_sales is off — confirmed sales may leave draft JEs until posted",
+			Href:  h.SignoffLinks.FinanceSetup,
+		})
+	}
+	if !h.Policies.AccountsAutoPostPurchase {
+		ex = append(ex, booksHealthException{
+			Code: "auto_post_purchase_off", Severity: "warn", Count: 1,
+			Label: "accounts_auto_post_purchase is off — confirmed bills may leave draft JEs until posted",
+			Href:  h.SignoffLinks.FinanceSetup,
+		})
+	}
 	add("audit_only", "block", h.AuditOnlyPending, "OR/PV recorded but not on Trial Balance (audit-only)", "/app/finance/official-receipts")
 	add("unmatched_bank", "block", h.UnmatchedBankLines, "Unmatched bank statement lines", h.SignoffLinks.BankReconciliation)
 	add("credits_missing_je", "block", h.CreditsMissingJE, "Open credit notes/vendor credits missing journals", h.SignoffLinks.CreditNotes)
