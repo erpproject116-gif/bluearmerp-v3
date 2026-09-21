@@ -93,16 +93,6 @@ export default function BankingPage() {
     },
   }));
 
-  const grouped = createMemo(() => {
-    const rows = list.data ?? [];
-    return {
-      bank: rows.filter((r) => r.account_type === "bank"),
-      credit_card: rows.filter((r) => r.account_type === "credit_card"),
-      e_wallet: rows.filter((r) => r.account_type === "e_wallet"),
-      other: rows.filter((r) => !["bank", "credit_card", "e_wallet"].includes(r.account_type)),
-    };
-  });
-
   const openCreate = (presetType = "bank") => {
     setEditing(null);
     setForm({ ...emptyForm(), account_type: presetType });
@@ -180,95 +170,26 @@ export default function BankingPage() {
     void client.invalidateQueries({ queryKey: ["banking-accounts"] });
   };
 
-  const AccountCard = (props: { row: BankAccount }) => (
-    <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
-      <div class="flex items-start justify-between gap-2">
-        <div>
-          <p class="text-xs font-medium uppercase tracking-wide text-text-secondary">{typeLabel(props.row.account_type)}</p>
-          <h3 class="mt-1 text-base font-semibold text-text-primary">
-            <A href={`/app/finance/banking/${props.row.id}`} class="hover:text-brand-600 hover:underline">
-              {props.row.bank_account_name}
-            </A>
-          </h3>
-          <p class="text-sm text-text-secondary">{props.row.bank_account_code}</p>
-        </div>
-        <Show when={!props.row.is_active}>
-          <span class="rounded bg-slate-100 px-2 py-0.5 text-xs text-text-secondary">Inactive</span>
-        </Show>
-      </div>
-      <dl class="mt-3 space-y-1 text-sm">
-        <Show when={props.row.institution_name}>
-          <div class="flex justify-between gap-2">
-            <dt class="text-text-secondary">Institution</dt>
-            <dd>{props.row.institution_name}</dd>
-          </div>
-        </Show>
-        <Show when={props.row.account_number}>
-          <div class="flex justify-between gap-2">
-            <dt class="text-text-secondary">Number</dt>
-            <dd class="font-mono text-xs">{props.row.account_number}</dd>
-          </div>
-        </Show>
-        <div class="flex justify-between gap-2">
-          <dt class="text-text-secondary">Opening</dt>
-          <dd>{formatPeso(props.row.opening_balance ?? 0)}</dd>
-        </div>
-        <div class="flex justify-between gap-2">
-          <dt class="text-text-secondary">GL</dt>
-          <dd class="text-right">
-            {props.row.gl_account_code}
-            <Show when={props.row.gl_account_name}>
-              <span class="block text-xs text-text-secondary">{props.row.gl_account_name}</span>
-            </Show>
-          </dd>
-        </div>
-      </dl>
-      <div class="mt-4 flex flex-wrap gap-2">
-        <A href={`/app/finance/banking/${props.row.id}`} class="text-sm text-brand-600 hover:underline">
-          Register
-        </A>
-        <button type="button" class="text-sm text-brand-600 hover:underline" onClick={() => openEdit(props.row)}>
-          Edit
-        </button>
-        <A
-          href={`/app/finance/acct-i/bank-reconciliation?bank_account_id=${props.row.id}`}
-          class="text-sm text-text-secondary hover:underline"
-        >
-          Reconcile
-        </A>
-        <A
-          href={`/app/finance/banking/${props.row.id}?transfer=1`}
-          class="text-sm text-text-secondary hover:underline"
-        >
-          Transfer
-        </A>
-        <Show when={props.row.is_active}>
-          <button type="button" class="text-sm text-red-600 hover:underline" onClick={() => void deactivate(props.row)}>
-            Deactivate
-          </button>
-        </Show>
-      </div>
-    </div>
-  );
-
-  const Section = (props: { title: string; rows: BankAccount[] }) => (
-    <Show when={props.rows.length > 0}>
-      <section class="space-y-3">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-text-secondary">{props.title}</h2>
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <For each={props.rows}>{(row) => <AccountCard row={row} />}</For>
-        </div>
-      </section>
-    </Show>
-  );
+  const allRows = createMemo(() => list.data ?? []);
 
   return (
     <div class="space-y-6 p-4 md:p-6">
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 class="text-xl font-semibold text-text-primary">Banking</h1>
-          <p class="mt-1 text-sm text-text-secondary">
-            Manage bank accounts, credit cards, and e-wallets (GCash, Maya, PayPal, and more). Use these accounts on receipts, payments, and reconciliation.
+          <p class="mt-1 max-w-3xl text-sm text-text-secondary">
+            Operational cash register for banks, cards, and e-wallets used on receipts, payments, and reconciliation.
+            Each account links to a <span class="font-medium text-text-primary">GL account</span> in the Chart of Accounts —
+            books and journals live under Ledger / CoA, not on this page.
+          </p>
+          <p class="mt-1 text-xs text-text-secondary">
+            <A href="/app/finance/acct-i/chart-of-accounts" class="text-brand-700 hover:underline">
+              Open Chart of accounts
+            </A>
+            {" · "}
+            <A href="/app/finance/acct-i/journal-entries" class="text-brand-700 hover:underline">
+              Journal entries
+            </A>
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -317,7 +238,7 @@ export default function BankingPage() {
           <p class="text-sm text-red-600">{(list.error as Error)?.message ?? "Failed to load."}</p>
         </Show>
         <Show
-          when={(list.data ?? []).length > 0}
+          when={allRows().length > 0}
           fallback={
             <div class="rounded-xl border border-dashed border-stroke bg-slate-50 px-6 py-10 text-center">
               <p class="text-sm font-medium text-text-primary">No banking accounts yet</p>
@@ -332,11 +253,72 @@ export default function BankingPage() {
             </div>
           }
         >
-          <div class="space-y-8">
-            <Section title="Banks" rows={grouped().bank} />
-            <Section title="Credit cards" rows={grouped().credit_card} />
-            <Section title="E-wallets" rows={grouped().e_wallet} />
-            <Section title="Other" rows={grouped().other} />
+          <div class="overflow-x-auto rounded-lg border border-stroke bg-white">
+            <table class="min-w-full text-left text-sm">
+              <thead class="bg-slate-50 text-xs uppercase text-text-secondary">
+                <tr>
+                  <th class="px-3 py-2">Name</th>
+                  <th class="px-3 py-2">Type</th>
+                  <th class="px-3 py-2">Institution</th>
+                  <th class="px-3 py-2">Linked GL</th>
+                  <th class="px-3 py-2 text-right">Opening</th>
+                  <th class="px-3 py-2">Status</th>
+                  <th class="px-3 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For each={allRows()}>
+                  {(row) => (
+                    <tr class="border-t border-stroke/70">
+                      <td class="px-3 py-2">
+                        <A href={`/app/finance/banking/${row.id}`} class="font-medium text-brand-700 hover:underline">
+                          {row.bank_account_name}
+                        </A>
+                        <p class="text-xs text-text-secondary">{row.bank_account_code}</p>
+                      </td>
+                      <td class="px-3 py-2 text-text-secondary">{typeLabel(row.account_type)}</td>
+                      <td class="px-3 py-2">{row.institution_name || "—"}</td>
+                      <td class="px-3 py-2">
+                        <span class="font-mono text-xs">{row.gl_account_code}</span>
+                        <Show when={row.gl_account_name}>
+                          <span class="block text-xs text-text-secondary">{row.gl_account_name}</span>
+                        </Show>
+                      </td>
+                      <td class="px-3 py-2 text-right tabular-nums">{formatPeso(row.opening_balance ?? 0)}</td>
+                      <td class="px-3 py-2">{row.is_active ? "Active" : "Inactive"}</td>
+                      <td class="px-3 py-2">
+                        <div class="flex flex-wrap gap-2 text-xs">
+                          <A href={`/app/finance/banking/${row.id}`} class="font-medium text-brand-700 hover:underline">
+                            Register
+                          </A>
+                          <button type="button" class="font-medium text-brand-700 hover:underline" onClick={() => openEdit(row)}>
+                            Edit
+                          </button>
+                          <A
+                            href={`/app/finance/acct-i/bank-reconciliation?bank_account_id=${row.id}`}
+                            class="text-text-secondary hover:underline"
+                          >
+                            Reconcile
+                          </A>
+                          <A href={`/app/finance/banking/${row.id}?transfer=1`} class="text-text-secondary hover:underline">
+                            Transfer
+                          </A>
+                          <Show when={row.is_active}>
+                            <button
+                              type="button"
+                              class="text-red-600 hover:underline"
+                              onClick={() => void deactivate(row)}
+                            >
+                              Deactivate
+                            </button>
+                          </Show>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
           </div>
         </Show>
       </Show>
