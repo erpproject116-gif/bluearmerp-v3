@@ -29,8 +29,19 @@ func validateSaleLotRequirements(ctx context.Context, q pgx.Tx, tenantID int64, 
 	return nil
 }
 
-// applySaleStock deducts inventory for direct (non-SO) lines with track_inventory_qty.
-// SO-linked lines rely on prior SO release for qty deduction.
+// salePostsQty matches goods receipt: quantity, lot, or serial tracking all move on-hand.
+func salePostsQty(trackInventory, trackLot, trackSerial bool) bool {
+	return trackInventory || trackLot || trackSerial
+}
+
+// saleLineShouldDeduct is false when the item does not post qty, this sale line
+// already wrote a sales movement (re-save), or an SO release already issued stock.
+func saleLineShouldDeduct(postsQty, hasSalesMovement, hasSORelease bool) bool {
+	return postsQty && !hasSalesMovement && !hasSORelease
+}
+
+// applySaleStock deducts on-hand for confirming sales. SO-linked lines are skipped
+// only when a legacy combined release already inserted an so_release movement.
 func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationID, userID int64) error {
 	rows, err := tx.Query(ctx, `
 		select ln.id, ln.item_id, ln.qty::float8, ln.unit_id, ln.source_sales_order_line_id
@@ -43,10 +54,11 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 	defer rows.Close()
 
 	type pendingLine struct {
-		lineID  int64
-		itemID  int64
-		unitID  *int64
-		lineQty float64
+		lineID   int64
+		itemID   int64
+		unitID   *int64
+		lineQty  float64
+		soLineID *int64
 	}
 	var pending []pendingLine
 	for rows.Next() {
@@ -58,10 +70,12 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 		if err := rows.Scan(&lineID, &itemID, &qty, &unitID, &soLineID); err != nil {
 			return err
 		}
-		if soLineID != nil || itemID == nil || qty <= 0 {
+		if itemID == nil || qty <= 0 {
 			continue
 		}
-		pending = append(pending, pendingLine{lineID: lineID, itemID: *itemID, unitID: unitID, lineQty: qty})
+		pending = append(pending, pendingLine{
+			lineID: lineID, itemID: *itemID, unitID: unitID, lineQty: qty, soLineID: soLineID,
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -70,11 +84,41 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 	var glLines []inventorygl.Line
 	for _, p := range pending {
 		lineID, itemID := p.lineID, p.itemID
-		var trackInventory bool
+		var trackInventory, trackLot, trackSerial bool
 		var unitCost float64
 		if err := tx.QueryRow(ctx, `
-			select track_inventory_qty, coalesce(purchase_price, 0)::float8
-			from public.inv_items where id = $1`, itemID).Scan(&trackInventory, &unitCost); err != nil || !trackInventory {
+			select coalesce(track_inventory_qty, false), coalesce(track_lot, false), coalesce(track_serial, false),
+			  coalesce(purchase_price, 0)::float8
+			from public.inv_items where id = $1`, itemID).Scan(&trackInventory, &trackLot, &trackSerial, &unitCost); err != nil {
+			continue
+		}
+		if !salePostsQty(trackInventory, trackLot, trackSerial) {
+			continue
+		}
+		var hasSalesMovement bool
+		if err := tx.QueryRow(ctx, `
+			select exists (
+			  select 1 from public.inv_stock_movements
+			  where tenant_id = $1 and movement_type = 'sales' and ref_type = 'sa_sales_line' and ref_id = $2
+			)`, tenantID, lineID).Scan(&hasSalesMovement); err != nil {
+			return err
+		}
+		hasSORelease := false
+		if p.soLineID != nil && *p.soLineID > 0 {
+			if err := tx.QueryRow(ctx, `
+				select exists (
+				  select 1
+				  from public.inv_stock_movements m
+				  join public.so_sales_order_release_lines rl on rl.id = m.ref_id
+				  where m.tenant_id = $1
+				    and m.movement_type = 'so_release'
+				    and m.ref_type = 'so_release_line'
+				    and rl.sales_order_line_id = $2
+				)`, tenantID, *p.soLineID).Scan(&hasSORelease); err != nil {
+				return err
+			}
+		}
+		if !saleLineShouldDeduct(true, hasSalesMovement, hasSORelease) {
 			continue
 		}
 		qty, err := inventory.BaseQtyForLine(ctx, tx, tenantID, itemID, p.unitID, p.lineQty)
@@ -111,12 +155,14 @@ func applySaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, locationI
 		if err != nil {
 			return err
 		}
-		glLines = append(glLines, inventorygl.Line{
-			ItemID:         itemID,
-			Qty:            qty,
-			UnitCost:       unitCost,
-			TrackInventory: true,
-		})
+		if trackInventory {
+			glLines = append(glLines, inventorygl.Line{
+				ItemID:         itemID,
+				Qty:            qty,
+				UnitCost:       unitCost,
+				TrackInventory: true,
+			})
+		}
 	}
 
 	if len(glLines) > 0 {
@@ -635,19 +681,20 @@ func applySalesReturnStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, lo
 	var itemID *int64
 	var unitID *int64
 	var lineQty float64
-	var soLineID *int64
 	err := tx.QueryRow(ctx, `
-		select item_id, unit_id, qty::float8, source_sales_order_line_id
+		select item_id, unit_id, qty::float8
 		from public.sa_sales_lines where id = $1 and sales_id = $2`,
-		salesLineID, salesID).Scan(&itemID, &unitID, &lineQty, &soLineID)
+		salesLineID, salesID).Scan(&itemID, &unitID, &lineQty)
 	if err != nil {
 		return fmt.Errorf("sales line not found")
 	}
 	if itemID == nil || lineQty <= 0 {
 		return nil
 	}
-	var trackInventory bool
-	if err := tx.QueryRow(ctx, `select track_inventory_qty from public.inv_items where id = $1`, *itemID).Scan(&trackInventory); err != nil || !trackInventory {
+	var trackInventory, trackLot, trackSerial bool
+	if err := tx.QueryRow(ctx, `
+		select coalesce(track_inventory_qty, false), coalesce(track_lot, false), coalesce(track_serial, false)
+		from public.inv_items where id = $1`, *itemID).Scan(&trackInventory, &trackLot, &trackSerial); err != nil || !salePostsQty(trackInventory, trackLot, trackSerial) {
 		return nil
 	}
 
@@ -655,35 +702,31 @@ func applySalesReturnStock(ctx context.Context, tx pgx.Tx, tenantID, salesID, lo
 	if err != nil {
 		return err
 	}
-	restoreQty := baseReturnQty
-	if soLineID == nil {
-		// Direct sale: prefer reversing proportional stock from original movement.
-		var movQty float64
-		err := tx.QueryRow(ctx, `
-			select -qty_delta::float8 from public.inv_stock_movements
-			where tenant_id = $1 and ref_type = 'sa_sales_line' and ref_id = $2 and movement_type = 'sales'
-			limit 1`, tenantID, salesLineID).Scan(&movQty)
-		if err == nil && movQty > 0 {
-			restoreQty = movQty * (returnQty / lineQty)
+	// Restore only quantity this sale posted. A release-only issue has no sales movement.
+	var movQty float64
+	movErr := tx.QueryRow(ctx, `
+		select -qty_delta::float8 from public.inv_stock_movements
+		where tenant_id = $1 and ref_type = 'sa_sales_line' and ref_id = $2 and movement_type = 'sales'
+		limit 1`, tenantID, salesLineID).Scan(&movQty)
+	if movErr == nil && movQty > 0 {
+		restoreQty := movQty * (returnQty / lineQty)
+		_, err = tx.Exec(ctx, `
+			insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
+			values ($1, $2, $3, $4)
+			on conflict (tenant_id, item_id, location_id)
+			do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
+			tenantID, *itemID, locationID, restoreQty)
+		if err != nil {
+			return err
 		}
-	}
-
-	_, err = tx.Exec(ctx, `
-		insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
-		values ($1, $2, $3, $4)
-		on conflict (tenant_id, item_id, location_id)
-		do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
-		tenantID, *itemID, locationID, restoreQty)
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `
-		insert into public.inv_stock_movements (
-		  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
-		) values ($1, $2, $3, $4, 'sales_return', 'sr_sales_return_line', $5, $6)`,
-		tenantID, *itemID, locationID, restoreQty, returnLineID, userID)
-	if err != nil {
-		return err
+		_, err = tx.Exec(ctx, `
+			insert into public.inv_stock_movements (
+			  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
+			) values ($1, $2, $3, $4, 'sales_return', 'sr_sales_return_line', $5, $6)`,
+			tenantID, *itemID, locationID, restoreQty, returnLineID, userID)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Lot batch: restore proportional qty when lot tracked on line.
