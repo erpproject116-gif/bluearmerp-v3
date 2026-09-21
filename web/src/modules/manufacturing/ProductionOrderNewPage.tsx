@@ -123,7 +123,7 @@ function NewCuttingOrderWizard() {
   const computedExtraWaste = createMemo(() => {
     const n = needs();
     if (!n) return 0;
-    const inputQty = n.input_line?.stock_to_issue ?? Number(qty()) || 0;
+    const inputQty = n.input_line?.stock_to_issue ?? (Number(qty()) || 0);
     let sellable = 0;
     let expectedWaste = 0;
     for (const ln of n.lines ?? []) {
