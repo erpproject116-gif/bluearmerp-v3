@@ -42,6 +42,19 @@ func TestBuildKeyChangesOrdersMaterial(t *testing.T) {
 	}
 }
 
+func TestTrendBucketEmbedsBalanceSeries(t *testing.T) {
+	// LoadTrendSeries copies WindowTotals into each bucket; JSON must expose
+	// gross_profit / cash / AR / AP for the shared month chart.
+	w := DeriveWindowTotals(100, 20, 10, 5, 6, 7, true)
+	b := TrendBucket{Label: "Jan 2026", WindowTotals: w}
+	if b.GrossProfit != 80 || b.Cash != 5 || b.AccountsReceivable != 6 || b.AccountsPayable != 7 {
+		t.Fatalf("bucket missing series fields: %+v", b)
+	}
+	if b.ValueFor(MetricAccountsPayable) != 7 {
+		t.Fatal("embedded ValueFor AP failed")
+	}
+}
+
 func TestPnLTotalsStillReconcile(t *testing.T) {
 	revenue, expense, net := PnLTotalsFromSignedMoves(-500, 200)
 	if math.Abs(revenue-500) > 1e-9 || math.Abs(net-300) > 1e-9 || expense != 200 {
