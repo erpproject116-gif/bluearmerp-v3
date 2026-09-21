@@ -102,6 +102,8 @@ export type UseDocumentDraftOptions<T> = {
   localOnly?: boolean;
   /** Extra key; bump (or vary) to force a reload even when entityType/draftKey resolve unchanged. */
   version?: number | string;
+  /** Called when the user discards a recovered draft, before the draft is deleted. */
+  onDiscard?: () => void;
 };
 
 export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
@@ -365,7 +367,10 @@ export function useDocumentDraft<T>(options: UseDocumentDraftOptions<T>) {
           <button
             type="button"
             class="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
-            onClick={() => void deleteDraft()}
+            onClick={() => {
+              options.onDiscard?.();
+              void deleteDraft();
+            }}
           >
             Discard
           </button>

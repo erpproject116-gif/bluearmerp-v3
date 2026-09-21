@@ -1132,8 +1132,13 @@ func validateSaleBody(b saleBody, create bool) map[string]string {
 		*b.TermsOfPayment != "30_days_terms" && *b.TermsOfPayment != "cash" {
 		errs["terms_of_payment"] = "Must be 30_days_terms or cash."
 	}
-	if b.SalesCategory != nil && strings.TrimSpace(*b.SalesCategory) == "" {
-		b.SalesCategory = nil
+	cat := ""
+	if b.SalesCategory != nil {
+		cat = strings.TrimSpace(*b.SalesCategory)
+		*b.SalesCategory = cat
+	}
+	if cat == "" {
+		errs["sales_category"] = "Sales category is required."
 	}
 	if len(errs) > 0 {
 		return errs

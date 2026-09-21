@@ -217,6 +217,10 @@ function linesFromDetail(lines?: SalesDetail["lines"]): SalesLineRow[] {
   }));
 }
 
+function defaultSalesCategoryCode(categories: Array<{ code: string; name: string }>): string {
+  return categories.find((c) => c.code === "general")?.code ?? categories[0]?.code ?? "";
+}
+
 export function SalesModal(props: Props) {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -304,8 +308,7 @@ export function SalesModal(props: Props) {
     void apiFetch<Array<{ code: string; name: string }>>("/api/v1/sales/categories").then((res) => {
       setSalesCategories(res.data ?? []);
       if (!salesCategory() && (res.data?.length ?? 0) > 0) {
-        const general = res.data!.find((c) => c.code === "general");
-        setSalesCategory(general?.code ?? res.data![0].code);
+        setSalesCategory(defaultSalesCategoryCode(res.data!));
       }
     });
   });
@@ -514,7 +517,7 @@ export function SalesModal(props: Props) {
     setNotes(payload.notes);
     setDeliveryRemarks(payload.delivery_remarks ?? "");
     setProgressStatus(payload.progress_status || "unconfirmed");
-    setSalesCategory(payload.sales_category);
+    setSalesCategory(payload.sales_category?.trim() || defaultSalesCategoryCode(salesCategories()));
     setSourceSalesOrderId(payload.source_sales_order_id);
     setLines(payload.lines);
     setCommissions((payload.commissions as SaleCommissionRow[] | undefined) ?? []);
@@ -527,6 +530,9 @@ export function SalesModal(props: Props) {
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
     enabled: () => props.open,
+    onDiscard: () => {
+      if (!salesCategory().trim()) setSalesCategory(defaultSalesCategoryCode(salesCategories()));
+    },
     // Banner-only: show Restore/Discard so the user chooses (ECOUNT-style recovery).
   });
   const fetchTaxTypeOptions = async (q: string): Promise<LookupOption[]> => {
@@ -596,7 +602,7 @@ export function SalesModal(props: Props) {
       setNotes("");
       setDeliveryRemarks("");
       setProgressStatus("unconfirmed");
-      setSalesCategory("");
+      setSalesCategory(defaultSalesCategoryCode(salesCategories()));
       setSourceSalesOrderId(null);
       setSourceAttachPreview(null);
       loadCustom({});
@@ -760,8 +766,7 @@ export function SalesModal(props: Props) {
       setProjectName("");
     }
     if (!salesCategory()) {
-      const general = salesCategories().find((c) => c.code === "general");
-      setSalesCategory(general?.code ?? salesCategories()[0]?.code ?? "");
+      setSalesCategory(defaultSalesCategoryCode(salesCategories()));
     }
 
     const meta = taxTypes().find((t) => t.id === first.tax_type_id);
@@ -1011,6 +1016,7 @@ export function SalesModal(props: Props) {
       }),
       collectRequiredFieldErrors(formValues, checks),
       collectCustomFieldErrors(customValues(), activeCustomFields()),
+      salesCategory().trim() ? {} : { sales_category: "Sales category is required." },
     );
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
@@ -1388,10 +1394,11 @@ export function SalesModal(props: Props) {
             />
           )}
         </ModalField>
-        <Field label="Sales category">
+        <Field label="Sales category" required error={fieldErrors().sales_category}>
           <select
             class={inputClass}
             value={salesCategory()}
+            disabled={props.readOnly || progressStatus() === "e_approval"}
             onChange={(e) => setSalesCategory(e.currentTarget.value)}
           >
             <option value="">Select…</option>
