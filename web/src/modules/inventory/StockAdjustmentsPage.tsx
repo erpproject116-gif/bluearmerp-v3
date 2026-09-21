@@ -3,8 +3,11 @@ import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
+import { hasPermission, useAuth, type MeData } from "../../shared/auth-context";
 import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
+import { showBlockerResult } from "../../shared/handleSaveResult";
 import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { useToast } from "../../shared/toast";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
 
@@ -28,6 +31,13 @@ export type StockAdjustmentRequestRow = {
   updated_at: string;
   line_count?: number;
 };
+
+/** Mirrors API canDecideStockAdjustment. */
+function canDecideStockAdjustment(me: MeData | null | undefined): boolean {
+  if (!me?.user) return false;
+  if (me.user.is_tenant_owner) return true;
+  return hasPermission(me, "inventory.stock_adjustment_approve", "write");
+}
 
 function formatWhen(iso: string) {
   try {
@@ -81,6 +91,8 @@ function defaultDateRange(): { from: string; to: string } {
 }
 
 export default function StockAdjustmentsPage() {
+  const auth = useAuth();
+  const toast = useToast();
   const qc = useQueryClient();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("created_at", 25, {
     defaultOrder: "desc",
@@ -93,6 +105,9 @@ export default function StockAdjustmentsPage() {
   const initialDates = defaultDateRange();
   const [dateFrom, setDateFrom] = createSignal(initialDates.from);
   const [dateTo, setDateTo] = createSignal(initialDates.to);
+  const [busyId, setBusyId] = createSignal<number | null>(null);
+
+  const canDecide = () => canDecideStockAdjustment(auth.me);
 
   onMount(() => {
     setDraftQ(q());
@@ -163,6 +178,38 @@ export default function StockAdjustmentsPage() {
     setSelectedId(row.id);
     setEditRequestId(row.id);
     setAdjustOpen(true);
+  };
+
+  const decide = async (row: StockAdjustmentRequestRow, approve: boolean) => {
+    if (row.status !== "e_approval" || !canDecide() || busyId() === row.id) return;
+    const promptLabel = approve
+      ? "Confirmation remarks (required to update inventory):"
+      : "Rejection remarks (required):";
+    const remarks = window.prompt(promptLabel);
+    if (remarks === null) return;
+    if (!remarks.trim()) {
+      toast.warning(approve ? "Add a short note explaining why you approve." : "Add a short note explaining why you reject.");
+      return;
+    }
+    setBusyId(row.id);
+    const res = await apiFetch(
+      `/api/v1/inventory/stock-adjustment-requests/${row.id}/${approve ? "approve" : "reject"}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ remarks: remarks.trim() }),
+      },
+    );
+    setBusyId(null);
+    if (!res.success) {
+      showBlockerResult(res, toast, {
+        fallbackTitle: approve
+          ? "Couldn't approve this request. Refresh and try again."
+          : "Couldn't reject this request. Refresh and try again.",
+      });
+      return;
+    }
+    toast.success(res.message ?? (approve ? "Stock adjustment approved." : "Stock adjustment rejected."));
+    invalidate();
   };
 
   return (
@@ -299,19 +346,46 @@ export default function StockAdjustmentsPage() {
           },
           {
             key: "actions",
-            header: "Open",
+            header: "Actions",
             sortable: false,
+            hideable: false,
             render: (r) => (
-              <button
-                type="button"
-                class="text-xs font-medium text-brand-700 hover:underline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openRow(r);
-                }}
-              >
-                {r.status === "draft" ? "Edit draft" : "View"}
-              </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <Show when={r.status === "e_approval" && canDecide()}>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-emerald-700 hover:underline disabled:opacity-50"
+                    disabled={busyId() === r.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void decide(r, true);
+                    }}
+                  >
+                    {busyId() === r.id ? "…" : "Approve"}
+                  </button>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50"
+                    disabled={busyId() === r.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void decide(r, false);
+                    }}
+                  >
+                    Reject
+                  </button>
+                </Show>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-brand-700 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openRow(r);
+                  }}
+                >
+                  {r.status === "draft" ? "Edit draft" : "View"}
+                </button>
+              </div>
             ),
           },
         ]}
