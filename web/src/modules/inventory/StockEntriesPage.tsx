@@ -372,7 +372,7 @@ export default function StockEntriesPage() {
                 <div>
                   <dt class="text-xs font-medium uppercase text-text-secondary">Requested by</dt>
                   <dd class="mt-0.5 font-medium">{row().requested_by_name || "—"}</dd>
-                  <dd class="text-xs text-text-secondary">{row().requested_at ? formatWhen(row().requested_at) : "—"}</dd>
+                  <dd class="text-xs text-text-secondary">{row().requested_at ? formatWhen(row().requested_at!) : "—"}</dd>
                 </div>
                 <div>
                   <dt class="text-xs font-medium uppercase text-text-secondary">Reason</dt>
@@ -396,7 +396,7 @@ export default function StockEntriesPage() {
                 <div>
                   <dt class="text-xs font-medium uppercase text-text-secondary">Approved by</dt>
                   <dd class="mt-0.5 font-medium">{row().approved_by_name || "—"}</dd>
-                  <dd class="text-xs text-text-secondary">{row().approved_at ? formatWhen(row().approved_at) : "Pending post"}</dd>
+                  <dd class="text-xs text-text-secondary">{row().approved_at ? formatWhen(row().approved_at!) : "Pending post"}</dd>
                 </div>
               </dl>
             </div>
