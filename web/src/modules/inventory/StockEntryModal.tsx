@@ -179,7 +179,6 @@ export function StockEntryModal(props: {
               >
                 <option value="receipt">Receipt</option>
                 <option value="issue">Issue</option>
-                <option value="transfer">Transfer</option>
               </select>
             </label>
           </Show>
