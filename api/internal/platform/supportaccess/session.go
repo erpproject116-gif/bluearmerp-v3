@@ -35,6 +35,7 @@ type Session struct {
 	CreatedGhost           bool
 	AccessMode             string
 	Reason                 string
+	Stealth                bool
 	ExtendsUsed            int
 	PreviousActiveTenantID *int64
 	PreviousFullName       *string
@@ -55,6 +56,9 @@ type StartInput struct {
 	Email          string
 	AccessMode     string
 	Reason         string
+	// Stealth skips the tenant-owner bell notice and hides the amber remoting banner
+	// (agent keeps a discreet Exit control). Default true when omitted by callers.
+	Stealth *bool
 }
 
 func NormalizeMode(raw string) string {
@@ -69,7 +73,7 @@ func NormalizeMode(raw string) string {
 func OpenSessionForAuth(ctx context.Context, pool *pgxpool.Pool, authUserID string) (*Session, error) {
 	s, err := scanSession(ctx, pool, `
 		select s.id, s.platform_user_id, s.auth_user_id::text, s.customer_id, s.tenant_id, s.ghost_user_id,
-		       s.created_ghost, s.access_mode, s.reason, s.extends_used, s.previous_active_tenant_id,
+		       s.created_ghost, s.access_mode, s.reason, coalesce(s.stealth, true), s.extends_used, s.previous_active_tenant_id,
 		       s.previous_full_name, s.previous_user_status, s.started_at, s.ends_at, s.ended_at, s.ended_by,
 		       coalesce(t.company_code,''), coalesce(t.company_name,''), ''
 		from public.platform_support_sessions s
@@ -85,7 +89,7 @@ func OpenSessionForAuth(ctx context.Context, pool *pgxpool.Pool, authUserID stri
 func GetByID(ctx context.Context, pool *pgxpool.Pool, id int64) (*Session, error) {
 	return scanSession(ctx, pool, `
 		select s.id, s.platform_user_id, s.auth_user_id::text, s.customer_id, s.tenant_id, s.ghost_user_id,
-		       s.created_ghost, s.access_mode, s.reason, s.extends_used, s.previous_active_tenant_id,
+		       s.created_ghost, s.access_mode, s.reason, coalesce(s.stealth, true), s.extends_used, s.previous_active_tenant_id,
 		       s.previous_full_name, s.previous_user_status, s.started_at, s.ends_at, s.ended_at, s.ended_by,
 		       coalesce(t.company_code,''), coalesce(t.company_name,''), ''
 		from public.platform_support_sessions s
@@ -99,7 +103,7 @@ func ListForCustomer(ctx context.Context, pool *pgxpool.Pool, customerID int64, 
 	}
 	rows, err := pool.Query(ctx, `
 		select s.id, s.platform_user_id, s.auth_user_id::text, s.customer_id, s.tenant_id, s.ghost_user_id,
-		       s.created_ghost, s.access_mode, s.reason, s.extends_used, s.previous_active_tenant_id,
+		       s.created_ghost, s.access_mode, s.reason, coalesce(s.stealth, true), s.extends_used, s.previous_active_tenant_id,
 		       s.previous_full_name, s.previous_user_status, s.started_at, s.ends_at, s.ended_at, s.ended_by,
 		       coalesce(t.company_code,''), coalesce(t.company_name,''), coalesce(pu.email, s.auth_user_id::text)
 		from public.platform_support_sessions s
@@ -117,7 +121,7 @@ func ListForCustomer(ctx context.Context, pool *pgxpool.Pool, customerID int64, 
 		var s Session
 		if err := rows.Scan(
 			&s.ID, &s.PlatformUserID, &s.AuthUserID, &s.CustomerID, &s.TenantID, &s.GhostUserID,
-			&s.CreatedGhost, &s.AccessMode, &s.Reason, &s.ExtendsUsed, &s.PreviousActiveTenantID,
+			&s.CreatedGhost, &s.AccessMode, &s.Reason, &s.Stealth, &s.ExtendsUsed, &s.PreviousActiveTenantID,
 			&s.PreviousFullName, &s.PreviousUserStatus, &s.StartedAt, &s.EndsAt, &s.EndedAt, &s.EndedBy,
 			&s.CompanyCode, &s.CompanyName, &s.SupportEmail,
 		); err != nil {
@@ -132,7 +136,7 @@ func scanSession(ctx context.Context, pool *pgxpool.Pool, q string, args ...any)
 	var s Session
 	err := pool.QueryRow(ctx, q, args...).Scan(
 		&s.ID, &s.PlatformUserID, &s.AuthUserID, &s.CustomerID, &s.TenantID, &s.GhostUserID,
-		&s.CreatedGhost, &s.AccessMode, &s.Reason, &s.ExtendsUsed, &s.PreviousActiveTenantID,
+		&s.CreatedGhost, &s.AccessMode, &s.Reason, &s.Stealth, &s.ExtendsUsed, &s.PreviousActiveTenantID,
 		&s.PreviousFullName, &s.PreviousUserStatus, &s.StartedAt, &s.EndsAt, &s.EndedAt, &s.EndedBy,
 		&s.CompanyCode, &s.CompanyName, &s.SupportEmail,
 	)
@@ -265,6 +269,10 @@ func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, er
 		return nil, fmt.Errorf("reason must be at least 5 characters")
 	}
 	mode := NormalizeMode(in.AccessMode)
+	stealth := true
+	if in.Stealth != nil {
+		stealth = *in.Stealth
+	}
 	email := strings.ToLower(strings.TrimSpace(in.Email))
 	if email == "" || in.AuthUserID == "" || in.CustomerID <= 0 {
 		return nil, fmt.Errorf("invalid start input")
@@ -331,10 +339,10 @@ func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, er
 	err = tx.QueryRow(ctx, `
 		insert into public.platform_support_sessions (
 		  platform_user_id, auth_user_id, customer_id, tenant_id,
-		  access_mode, reason, previous_active_tenant_id, started_at, ends_at
-		) values ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9)
+		  access_mode, reason, stealth, previous_active_tenant_id, started_at, ends_at
+		) values ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)
 		returning id`,
-		platformUID, in.AuthUserID, in.CustomerID, tenantID, mode, reason, prevActive, now, endsAt,
+		platformUID, in.AuthUserID, in.CustomerID, tenantID, mode, reason, stealth, prevActive, now, endsAt,
 	).Scan(&sessionID)
 	if err != nil {
 		return nil, err
@@ -405,9 +413,15 @@ func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, er
 		return nil, err
 	}
 
-	_ = notifyOwner(ctx, pool, tenantID, sessionID, reason, endsAt, companyCode)
+	if !stealth {
+		_ = notifyOwner(ctx, pool, tenantID, sessionID, reason, endsAt, companyCode)
+	}
+	noteMode := mode
+	if stealth {
+		noteMode = mode + ", stealth"
+	}
 	customerregistry.AppendCRMLeadNote(ctx, pool, in.CustomerID,
-		fmt.Sprintf("[support] Workspace opened (%s) until %s. Reason: %s", mode, endsAt.Format(time.RFC3339), reason))
+		fmt.Sprintf("[support] Workspace opened (%s) until %s. Reason: %s", noteMode, endsAt.Format(time.RFC3339), reason))
 
 	return GetByID(ctx, pool, sessionID)
 }
@@ -543,6 +557,7 @@ func PublicMap(s *Session) map[string]any {
 		"started_at":    s.StartedAt.UTC().Format(time.RFC3339),
 		"access_mode":   s.AccessMode,
 		"reason":        s.Reason,
+		"stealth":       s.Stealth,
 		"extends_used":  s.ExtendsUsed,
 		"can_extend":    s.ExtendsUsed < 1 && s.EndedAt == nil,
 	}

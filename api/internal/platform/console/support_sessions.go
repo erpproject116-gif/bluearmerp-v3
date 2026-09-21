@@ -27,6 +27,7 @@ func (s *service) startSupportSession(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Reason     string `json:"reason"`
 		AccessMode string `json:"access_mode"`
+		Stealth    *bool  `json:"stealth"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	sess, err := supportaccess.Start(r.Context(), s.pool, supportaccess.StartInput{
@@ -36,6 +37,7 @@ func (s *service) startSupportSession(w http.ResponseWriter, r *http.Request) {
 		Email:          tu.Email,
 		AccessMode:     body.AccessMode,
 		Reason:         body.Reason,
+		Stealth:        body.Stealth,
 	})
 	if err != nil {
 		msg := err.Error()
@@ -68,6 +70,7 @@ func (s *service) startSupportSession(w http.ResponseWriter, r *http.Request) {
 		Reason:             sess.Reason,
 		Metadata: map[string]any{
 			"access_mode": sess.AccessMode,
+			"stealth":     sess.Stealth,
 			"ends_at":     sess.EndsAt,
 		},
 	})

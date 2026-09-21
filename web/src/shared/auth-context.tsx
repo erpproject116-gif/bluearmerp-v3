@@ -77,6 +77,7 @@ export type MeData = {
     started_at?: string;
     access_mode: string;
     reason?: string;
+    stealth?: boolean;
     extends_used?: number;
     can_extend?: boolean;
   } | null;

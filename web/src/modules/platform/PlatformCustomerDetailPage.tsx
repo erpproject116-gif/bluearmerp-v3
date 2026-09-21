@@ -142,6 +142,8 @@ export default function PlatformCustomerDetailPage() {
   const [openWs, setOpenWs] = createSignal(false);
   const [wsReason, setWsReason] = createSignal("");
   const [wsMode, setWsMode] = createSignal<"read_only" | "read_write">("read_only");
+  /** Default on: no owner bell; no amber remoting strip (discreet Exit only). */
+  const [wsStealth, setWsStealth] = createSignal(true);
 
   const canOpenWorkspace = () => hasPlatformPermission(auth.me, "platform.support.access");
 
@@ -158,11 +160,12 @@ export default function PlatformCustomerDetailPage() {
       customer_id: number;
       ends_at: string;
       access_mode: string;
+      stealth?: boolean;
     }>(
       `/api/v1/platform/console/customers/${id()}/support-sessions`,
       {
         method: "POST",
-        body: JSON.stringify({ reason, access_mode: wsMode() }),
+        body: JSON.stringify({ reason, access_mode: wsMode(), stealth: wsStealth() }),
       },
       { silent: true },
     );
@@ -175,8 +178,10 @@ export default function PlatformCustomerDetailPage() {
     setOpenWs(false);
     setWsReason("");
     setWsMode("read_only");
+    const stealthOpened = res.data.stealth !== false;
+    setWsStealth(true);
     await auth.refresh();
-    toast.success("Support workspace opened.");
+    toast.success(stealthOpened ? "Workspace opened (stealth)." : "Support workspace opened.");
     navigate("/app/dashboard", { replace: true });
   };
 
@@ -487,7 +492,8 @@ export default function PlatformCustomerDetailPage() {
                     <div class="w-full max-w-md space-y-4 rounded-xl border border-stroke bg-white p-5 shadow-xl">
                       <h2 class="text-base font-semibold">Open customer workspace</h2>
                       <p class="text-xs text-text-secondary">
-                        Creates an audited support session (60 min, optional +30). The company owner gets a soft bell notice.
+                        Creates an audited support session (60 min, optional +30). Stealth mode (default) skips the
+                        owner bell notice and hides the amber remoting strip while you work.
                       </p>
                       <label class="block text-xs font-medium text-text-secondary">
                         Reason
@@ -520,6 +526,20 @@ export default function PlatformCustomerDetailPage() {
                           Read &amp; write
                         </label>
                       </fieldset>
+                      <label class="flex items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          class="mt-0.5"
+                          checked={wsStealth()}
+                          onChange={(e) => setWsStealth(e.currentTarget.checked)}
+                        />
+                        <span>
+                          <span class="font-medium">Stealth remoting</span>
+                          <span class="block text-xs text-text-secondary">
+                            No owner notification; no amber “Support session” banner (discreet Exit only).
+                          </span>
+                        </span>
+                      </label>
                       <div class="flex justify-end gap-2">
                         <button
                           type="button"
