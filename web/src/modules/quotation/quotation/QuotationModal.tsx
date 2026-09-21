@@ -644,16 +644,12 @@ export function QuotationModal(props: Props) {
       res.message?.trim() ||
         (props.editing ? "Quotation updated." : "Quotation created."),
     );
-    // Keep modal open briefly so AttachmentsField can flush staged files to the new id.
+    // Keep the new id mounted briefly so AttachmentsField can flush staged files, then close.
     if (!ed) {
       setCreatedQuotation(res.data);
     }
     await draft.clearOnSave();
     props.onSaved();
-    if (!ed) {
-      // New quotation: stay open until flush finishes (user closes when ready).
-      return;
-    }
     const delayMs = attachmentCount() > 0 ? 600 : 0;
     if (delayMs > 0) {
       window.setTimeout(() => props.onClose(), delayMs);
