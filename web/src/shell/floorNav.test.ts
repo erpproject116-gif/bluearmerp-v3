@@ -68,12 +68,20 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
     expect(HOME_SIDEBAR_AREAS.find((a) => a.id === "purchase_process")?.label).toBe("Purchase");
   });
 
-  it("Sales holds Quotation → Sales Order → Sales", () => {
+  it("Sales holds Quotation → SO → Sales → Other Invoices → Credit Notes → Customers → AR", () => {
     const sales = HOME_SIDEBAR_AREAS.find((a) => a.id === "sales_process");
-    expect(sales?.children?.map((c) => c.id)).toEqual(["quotation", "sales_order", "sell"]);
+    expect(sales?.children?.map((c) => c.id)).toEqual([
+      "quotation",
+      "sales_order",
+      "sell",
+      "sales_invoices",
+      "credit_notes",
+      "customers",
+      "accounts_receivable",
+    ]);
   });
 
-  it("Purchase holds RFQ → PR → PO → Purchase Receive → Expense", () => {
+  it("Purchase holds RFQ → PR → PO → Purchase Receive → Expense → Vendors → Vendor Credits → AP", () => {
     const purchase = HOME_SIDEBAR_AREAS.find((a) => a.id === "purchase_process");
     expect(purchase?.children?.map((c) => c.id)).toEqual([
       "rfq",
@@ -81,6 +89,9 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
       "purchase_order",
       "buy",
       "expense",
+      "vendors",
+      "vendor_credits",
+      "accounts_payable",
     ]);
     expect(purchase?.children?.find((c) => c.id === "buy")?.label).toBe("Purchase Receive");
   });
@@ -112,7 +123,7 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
     expect(quotation?.children?.[0]?.href).toBe(quotation?.href);
   });
 
-  it("Sales keeps Other Invoices nest plus Customers and AR", () => {
+  it("Sales keeps core nest; Other Invoices / Customers / AR are Sales siblings", () => {
     const sell = findArea("sell");
     expect(sell?.href).toBe("/app/sales");
     expect(sell?.children?.find((c) => c.id === "sales_overview")).toMatchObject({
@@ -124,12 +135,22 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
       href: "/app/sales/sales/new",
     });
     expect(sell?.children?.find((c) => c.id === "sales_list")?.href).toBe("/app/sales/sales");
-    expect(sell?.children?.find((c) => c.id === "customers")?.label).toBe("Customers");
-    expect(sell?.children?.find((c) => c.id === "sales_invoices")?.children?.map((c) => c.label)).toEqual([
-      "Retainer Invoice",
-      "Recurring Invoice",
-      "Combined Invoice",
+    expect(sell?.children?.map((c) => c.id)).toEqual([
+      "sales_overview",
+      "sales_list",
+      "sales",
+      "sales_outstanding",
+      "sales_history",
     ]);
+
+    const salesProcess = HOME_SIDEBAR_AREAS.find((a) => a.id === "sales_process");
+    expect(salesProcess?.children?.find((c) => c.id === "customers")?.label).toBe("Customers");
+    expect(salesProcess?.children?.find((c) => c.id === "accounts_receivable")?.href).toBe(
+      "/app/finance/receivables",
+    );
+    expect(
+      salesProcess?.children?.find((c) => c.id === "sales_invoices")?.children?.map((c) => c.label),
+    ).toEqual(["Retainer Invoice", "Recurring Invoice", "Combined Invoice"]);
   });
 
   it("separates core ERP from Manufacturing and More Apps", () => {
@@ -163,7 +184,7 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
     );
   });
 
-  it("RFQ New opens create via ?new=1; Expense holds vendors and AP", () => {
+  it("RFQ New opens create via ?new=1; Vendors and AP are Purchase siblings", () => {
     const rfq = findArea("rfq");
     expect(rfq?.href).toBe("/app/rfq");
     expect(rfq?.children?.find((c) => c.id === "rfq_new")?.href).toBe("/app/purchase-order/rfq?new=1");
@@ -177,8 +198,20 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
 
     const expense = findArea("expense");
     expect(expense?.href).toBe("/app/expenses");
-    expect(expense?.children?.find((c) => c.id === "vendors")?.label).toBe("Vendors");
-    expect(expense?.children?.find((c) => c.id === "accounts_payable")?.href).toBe("/app/finance/payables");
+    expect(expense?.children?.map((c) => c.id)).toEqual([
+      "expense_overview",
+      "expenses",
+      "recurring_expenses",
+    ]);
+
+    const purchase = HOME_SIDEBAR_AREAS.find((a) => a.id === "purchase_process");
+    expect(purchase?.children?.find((c) => c.id === "vendors")?.label).toBe("Vendors");
+    expect(purchase?.children?.find((c) => c.id === "vendor_credits")?.href).toBe(
+      "/app/purchases/vendor-credits",
+    );
+    expect(purchase?.children?.find((c) => c.id === "accounts_payable")?.href).toBe(
+      "/app/finance/payables",
+    );
   });
 
   it("Accounting sidebar exposes aging and Profit & Loss", () => {
