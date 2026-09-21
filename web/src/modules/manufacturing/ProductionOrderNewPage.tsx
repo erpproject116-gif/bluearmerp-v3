@@ -6,6 +6,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import { collectRequiredFieldErrors } from "../../shared/handleSaveResult";
 import type { FormErrors } from "../../shared/formValidation";
+import { RichTextEditor } from "../comms/RichTextEditor";
 import {
   canPostWithShortage,
   normalizeOutputClassification,
@@ -22,6 +23,13 @@ import NewAssemblyOrderWizard from "./NewAssemblyOrderWizard";
 import NewRecipeOrderWizard from "./NewRecipeOrderWizard";
 import { searchBomsForOrderType } from "./mfgBomLookup";
 import { buildManufacturingCostInput, totalManufacturingConversionCost } from "./manufacturingCostInput";
+
+/** Display/seed qty without float garbage (e.g. 0.30000000000000004). */
+function formatCuttingQty(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "0";
+  const rounded = Math.round(n * 1e6) / 1e6;
+  return String(parseFloat(rounded.toFixed(6)));
+}
 
 type WorkOrder = {
   id: number;
@@ -92,8 +100,9 @@ function NewCuttingOrderWizard() {
   const [otherCost, setOtherCost] = createSignal("");
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
   const [actualByItem, setActualByItem] = createSignal<Record<number, string>>({});
-  const [wasteQty, setWasteQty] = createSignal("");
+  const [wasteQtyOverride, setWasteQtyOverride] = createSignal<string | null>(null);
   const [wasteReasonId, setWasteReasonId] = createSignal<number | null>(null);
+  const [wasteNotes, setWasteNotes] = createSignal("");
   const [reasons, setReasons] = createSignal<WasteReason[]>([]);
   const [saving, setSaving] = createSignal(false);
   const [posting, setPosting] = createSignal(false);
@@ -110,6 +119,39 @@ function NewCuttingOrderWizard() {
     return (input.shortage ?? 0) > 0.0001;
   };
 
+  /** Extra waste = input − sellable actuals − expected waste-class template qty. */
+  const computedExtraWaste = createMemo(() => {
+    const n = needs();
+    if (!n) return 0;
+    const inputQty = n.input_line?.stock_to_issue ?? Number(qty()) || 0;
+    let sellable = 0;
+    let expectedWaste = 0;
+    for (const ln of n.lines ?? []) {
+      const cls = normalizeOutputClassification(ln.output_classification);
+      if (cls === "waste") {
+        expectedWaste += ln.stock_to_issue;
+        continue;
+      }
+      const raw = actualByItem()[ln.component_item_id];
+      const q = raw !== undefined && raw !== "" ? Number(raw) : ln.stock_to_issue;
+      if (q > 0) sellable += q;
+    }
+    return Math.max(0, Math.round((inputQty - sellable - expectedWaste) * 1e6) / 1e6);
+  });
+
+  const wasteQty = createMemo(() => {
+    if (wasteQtyOverride() !== null) {
+      const n = Number(wasteQtyOverride());
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+    return computedExtraWaste();
+  });
+
+  const wasteQtyDisplay = createMemo(() => {
+    if (wasteQtyOverride() !== null) return wasteQtyOverride()!;
+    return formatCuttingQty(computedExtraWaste());
+  });
+
   const buildWasteLinesPreview = () => {
     const lines: {
       component_item_id?: number;
@@ -117,6 +159,7 @@ function NewCuttingOrderWizard() {
       qty: number;
       expected_qty: number;
       waste_reason_id?: number;
+      notes?: string;
     }[] = [];
     for (const ln of needs()?.lines ?? []) {
       if (normalizeOutputClassification(ln.output_classification) !== "waste") continue;
@@ -128,15 +171,17 @@ function NewCuttingOrderWizard() {
         qty: q,
         expected_qty: ln.stock_to_issue,
         waste_reason_id: wasteReasonId() ?? undefined,
+        notes: wasteNotes().trim() || undefined,
       });
     }
-    const extra = Number(wasteQty());
+    const extra = wasteQty();
     if (extra > 0) {
       lines.push({
         classification: "waste",
         qty: extra,
         expected_qty: 0,
         waste_reason_id: wasteReasonId() ?? undefined,
+        notes: wasteNotes().trim() || undefined,
       });
     }
     return lines;
@@ -147,7 +192,7 @@ function NewCuttingOrderWizard() {
       hasInputShortage: hasInputShortage(),
       inputTracked: inputTracked(),
       wasteReasonId: wasteReasonId(),
-      wasteQty: Number(wasteQty()) || 0,
+      wasteQty: wasteQty(),
       wasteLines: buildWasteLinesPreview(),
       reasons: reasons(),
     }),
@@ -162,9 +207,11 @@ function NewCuttingOrderWizard() {
       const next: Record<number, string> = {};
       for (const ln of res.data.lines ?? []) {
         const staged = ln.staged_qty ?? 0;
-        next[ln.component_item_id] = String(staged > 0 ? staged : ln.stock_to_issue);
+        const seed = staged > 0 ? staged : ln.stock_to_issue;
+        next[ln.component_item_id] = formatCuttingQty(seed);
       }
       setActualByItem(next);
+      setWasteQtyOverride(null);
     } else setNeeds(null);
   };
 
@@ -256,12 +303,15 @@ function NewCuttingOrderWizard() {
   };
 
   const buildWasteLines = () => {
+    const notesHtml = wasteNotes().trim();
+    const notes = notesHtml && notesHtml !== "<br>" ? notesHtml : undefined;
     const lines: {
       component_item_id?: number;
       classification: string;
       qty: number;
       expected_qty: number;
       waste_reason_id?: number;
+      notes?: string;
     }[] = [];
     for (const ln of needs()?.lines ?? []) {
       if (normalizeOutputClassification(ln.output_classification) !== "waste") continue;
@@ -273,15 +323,17 @@ function NewCuttingOrderWizard() {
         qty: q,
         expected_qty: ln.stock_to_issue,
         waste_reason_id: wasteReasonId() ?? undefined,
+        notes,
       });
     }
-    const extra = Number(wasteQty());
+    const extra = wasteQty();
     if (extra > 0) {
       lines.push({
         classification: "waste",
         qty: extra,
         expected_qty: 0,
         waste_reason_id: wasteReasonId() ?? undefined,
+        notes,
       });
     }
     return lines;
@@ -380,7 +432,7 @@ function NewCuttingOrderWizard() {
       else if (c === "byproduct") byproduct += q;
       else finished += q;
     }
-    waste += Number(wasteQty()) || 0;
+    waste += wasteQty();
     return { finished, byproduct, waste };
   };
 
@@ -514,8 +566,8 @@ function NewCuttingOrderWizard() {
           <Show when={needs()?.input_line}>
             {(input) => (
               <p class="mb-3 text-sm">
-                Raw material: <strong>{input().component_name}</strong> — need {input().stock_to_issue}{" "}
-                {input().stock_unit_code}, on hand {input().qty_on_hand}
+                Raw material: <strong>{input().component_name}</strong> — need {formatCuttingQty(input().stock_to_issue)}{" "}
+                {input().stock_unit_code}, on hand {formatCuttingQty(input().qty_on_hand)}
                 <Show when={hasInputShortage()}>
                   <span class="ml-2 text-red-700">(short)</span>
                 </Show>
@@ -540,14 +592,14 @@ function NewCuttingOrderWizard() {
                 <th class="px-3 py-2">Class</th>
                 <th class="px-3 py-2">Expected</th>
                 <th class="px-3 py-2">Actual</th>
-                <th class="px-3 py-2">Variance</th>
+                <th class="px-3 py-2">Difference</th>
               </tr>
             </thead>
             <tbody>
               <For each={needs()?.lines ?? []}>
                 {(ln) => {
                   const actual = () => Number(actualByItem()[ln.component_item_id] ?? 0);
-                  const variance = () => actual() - ln.stock_to_issue;
+                  const difference = () => actual() - ln.stock_to_issue;
                   return (
                     <tr class="border-t border-stroke/80">
                       <td class="px-3 py-2">
@@ -556,7 +608,7 @@ function NewCuttingOrderWizard() {
                       </td>
                       <td class="px-3 py-2 text-xs">{normalizeOutputClassification(ln.output_classification)}</td>
                       <td class="px-3 py-2 tabular-nums">
-                        {ln.stock_to_issue} {ln.stock_unit_code}
+                        {formatCuttingQty(ln.stock_to_issue)} {ln.stock_unit_code}
                       </td>
                       <td class="px-3 py-2">
                         <input
@@ -571,7 +623,7 @@ function NewCuttingOrderWizard() {
                           aria-label={`Actual qty for ${ln.component_name}`}
                         />
                       </td>
-                      <td class="px-3 py-2 tabular-nums">{variance().toFixed(4)}</td>
+                      <td class="px-3 py-2 tabular-nums">{formatCuttingQty(difference())}</td>
                     </tr>
                   );
                 }}
@@ -579,8 +631,29 @@ function NewCuttingOrderWizard() {
             </tbody>
           </table>
           <div class="mt-4 grid gap-3 md:grid-cols-2">
-            <Field label="Extra waste qty (optional)">
-              <input class={inputClass} type="number" min="0" step="any" value={wasteQty()} onInput={(e) => setWasteQty(e.currentTarget.value)} />
+            <Field label="Extra waste qty">
+              <input
+                class={inputClass}
+                type="number"
+                min="0"
+                step="any"
+                value={wasteQtyDisplay()}
+                onInput={(e) => setWasteQtyOverride(e.currentTarget.value)}
+                aria-label="Extra waste quantity"
+              />
+              <p class="mt-1 text-[11px] text-text-secondary">
+                Auto: max(0, input − sellable actuals − expected waste-class). Override if needed
+                <Show when={wasteQtyOverride() !== null}>
+                  {" · "}
+                  <button
+                    type="button"
+                    class="font-medium text-brand-700 hover:underline"
+                    onClick={() => setWasteQtyOverride(null)}
+                  >
+                    Reset to auto ({formatCuttingQty(computedExtraWaste())})
+                  </button>
+                </Show>
+              </p>
             </Field>
             <Field label="Waste reason (required for extra / excess / abnormal)">
               <select
@@ -599,6 +672,28 @@ function NewCuttingOrderWizard() {
                   )}
                 </For>
               </select>
+            </Field>
+          </div>
+          <div class="mt-4">
+            <Field label="Waste notes">
+              <RichTextEditor
+                value={wasteNotes()}
+                onChange={setWasteNotes}
+                placeholder="Describe waste / scrap (paste image embeds inline for now)…"
+                minHeightClass="min-h-[6rem]"
+                onPasteImage={async (file) => {
+                  // TODO: persist via dedicated waste-line attachment API when available.
+                  // Until then, embed as data URL inside notes HTML (stored on waste_lines.notes).
+                  const dataUrl = await new Promise<string | null>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+                    reader.onerror = () => resolve(null);
+                    reader.readAsDataURL(file);
+                  });
+                  if (!dataUrl) return null;
+                  return { src: dataUrl, alt: file.name || "waste photo" };
+                }}
+              />
             </Field>
           </div>
         </section>
@@ -633,10 +728,10 @@ function NewCuttingOrderWizard() {
 
           <div class="space-y-2 rounded-xl border border-stroke bg-white p-4 text-sm">
             <h2 class="font-semibold">Production summary</h2>
-            <p>Input to consume: {qty()}</p>
-            <p>Finished / primary outputs: {summary().finished.toFixed(4)}</p>
-            <p>By-products: {summary().byproduct.toFixed(4)}</p>
-            <p>Waste: {summary().waste.toFixed(4)}</p>
+            <p>Input to consume: {formatCuttingQty(Number(qty()) || 0)}</p>
+            <p>Finished / primary outputs: {formatCuttingQty(summary().finished)}</p>
+            <p>By-products: {formatCuttingQty(summary().byproduct)}</p>
+            <p>Waste: {formatCuttingQty(summary().waste)}</p>
             <p class="text-xs text-text-secondary">Waste-classified lines do not increase sellable stock.</p>
             <div class="mt-3 border-t border-stroke pt-3">
               <h3 class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Journal preview</h3>
