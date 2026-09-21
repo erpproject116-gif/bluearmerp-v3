@@ -211,10 +211,11 @@ func listQuotations(pool *pgxpool.Pool) http.HandlerFunc {
 		"progress_status": "q.progress_status",
 		"valid_until":     "q.valid_until",
 		"created_at":      "q.created_at",
+		"updated_at":      "q.updated_at",
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		p := httputil.ParseListParams(r, "order_date", allowed)
+		p := httputil.ParseListParamsWithDefaults(r, "updated_at", "desc", allowed)
 		offset := httputil.Offset(p)
 
 		lifecycleWhere, err := documentlifecycle.ListPredicate(r, "q")

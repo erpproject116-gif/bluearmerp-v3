@@ -4,7 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { GenerateOtherSlipsMenu } from "../../../shared/GenerateOtherSlipsMenu";
 import { SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { QUOTATION_SETTINGS_HREF } from "../../../shared/entityTypes";
-import { useListState } from "../../../shared/useListState";
+import { useTransactionListState } from "../../../shared/useListState";
 import {
   patchQuotationProgress,
   useInvalidateQuotations,
@@ -48,10 +48,8 @@ export function QuotationListPageInner(props: PageOptions = {}) {
   const canSendEmail = () => hasPermission(auth.me, "comms.send", "write");
   const invalidate = useInvalidateQuotations();
 
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
-    "order_date",
-    25,
-    { defaultOrder: "desc" },
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+    "updated_at",
   );
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
