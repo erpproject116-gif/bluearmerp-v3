@@ -10,6 +10,7 @@ import {
 import { SerialLotLayout } from "./SerialLotLayout";
 import { SerialRegisterModal } from "./SerialRegisterModal";
 import { SerialGenerateModal } from "./SerialGenerateModal";
+import { SerialEditModal } from "./SerialEditModal";
 import {
   defaultSerialRegistryFilters,
   serialStatusLabel,
@@ -18,10 +19,13 @@ import {
 import { SerialRegistryListFilter } from "./SerialRegistryListFilter";
 import { InlineTip } from "../../../shared/inlineGuides";
 import { openSerialTrace } from "./openSerialTrace";
+import { apiFetch } from "../../../shared/api";
+import { useToast } from "../../../shared/toast";
 
 export default function SerialRegistryListPage() {
   const invalidate = useInvalidateSerialLotLists();
   const navigate = useNavigate();
+  const toast = useToast();
   const goTrace = (row: { serial_no: string }) => openSerialTrace(navigate, row.serial_no);
   const [searchParams] = useSearchParams();
 
@@ -33,6 +37,7 @@ export default function SerialRegistryListPage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [registerOpen, setRegisterOpen] = createSignal(false);
   const [generateOpen, setGenerateOpen] = createSignal(false);
+  const [editRow, setEditRow] = createSignal<SerialUnitRow | null>(null);
   const [urlFilterActive, setUrlFilterActive] = createSignal(false);
   const pageSize = 25;
 
@@ -115,22 +120,35 @@ export default function SerialRegistryListPage() {
 
   const coverageLabel = (r: SerialUnitRow) => (r.status === "sold" ? "Sold" : "Not sold");
 
+  const canEdit = (r: SerialUnitRow) => r.status === "in_stock" || r.status === "reserved";
+  const canArchive = (r: SerialUnitRow) => r.status === "in_stock" || r.status === "reserved";
+
+  const archiveRow = async (r: SerialUnitRow) => {
+    if (!canArchive(r)) return;
+    const ok = window.confirm(
+      `Archive serial ${r.serial_no}?\n\nThis voids the unit and reduces on-hand qty when the item tracks inventory. This cannot be undone from the list.`,
+    );
+    if (!ok) return;
+    const res = await apiFetch(`/api/v1/inventory/serial-units/${r.id}/archive`, {
+      method: "POST",
+      body: JSON.stringify({ reason: "Archived from serial registry" }),
+    });
+    if (!res.success) {
+      toast.error(res.message || "Could not archive serial.");
+      return;
+    }
+    toast.success("Serial archived (voided).");
+    invalidate();
+  };
+
   return (
     <SerialLotLayout>
       <InlineTip tipId="serials-list-warranty" class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
-        <p class="font-medium text-text-primary">Serials list → open a unit to manage warranty</p>
+        <p class="font-medium text-text-primary">Find units, then Register / Edit / Archive to keep serials aligned with stock</p>
         <p class="mt-1 text-slate-700/90">
-          <span class="font-medium">Unit dates</span> come from purchase/receive.{" "}
-          <span class="font-medium">Customer coverage</span> appears after sale — edit both on the serial detail.
-          Sold coverage across customers:{" "}
-          <A href="/app/after-sales/warranty" class="font-medium text-brand-700 hover:underline">
-            Customer Warranty
-          </A>
-          . Inbound stock: confirm{" "}
-          <A href="/app/purchases/purchase-receive/new" class="font-medium text-brand-700 hover:underline">
-            Purchase Receive
-          </A>
-          ; Generate allocates numbers only.
+          Use <span class="font-medium">Register serial</span> to add units, <span class="font-medium">Edit</span> to rename
+          in-stock serials, and <span class="font-medium">Archive</span> to void a unit (reduces on-hand when the item tracks
+          inventory). Open a serial for warranty dates and history. Search (F8).
         </p>
       </InlineTip>
       <Show when={urlFilterActive() && filterBannerText()}>
@@ -218,6 +236,49 @@ export default function SerialRegistryListPage() {
               ),
             },
             {
+              key: "actions",
+              header: "Actions",
+              sortable: false,
+              render: (r) => (
+                <div class="flex flex-wrap gap-2 text-xs">
+                  <Show when={canEdit(r)}>
+                    <button
+                      type="button"
+                      class="text-brand-700 hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditRow(r);
+                      }}
+                    >
+                      Edit
+                    </button>
+                  </Show>
+                  <Show when={canArchive(r)}>
+                    <button
+                      type="button"
+                      class="text-red-600 hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void archiveRow(r);
+                      }}
+                    >
+                      Archive
+                    </button>
+                  </Show>
+                  <button
+                    type="button"
+                    class="text-text-secondary hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goTrace(r);
+                    }}
+                  >
+                    Trace
+                  </button>
+                </div>
+              ),
+            },
+            {
               key: "history",
               header: "History",
               sortable: false,
@@ -242,13 +303,22 @@ export default function SerialRegistryListPage() {
           onRefresh={invalidate}
           onNew={() => setRegisterOpen(true)}
           newLabel="Register serial"
-          onEdit={goTrace}
+          onEdit={(r) => {
+            if (canEdit(r)) setEditRow(r);
+            else goTrace(r);
+          }}
         />
       </div>
 
       <SerialRegisterModal
         open={registerOpen()}
         onClose={() => setRegisterOpen(false)}
+        onSaved={invalidate}
+      />
+      <SerialEditModal
+        open={editRow() != null}
+        row={editRow()}
+        onClose={() => setEditRow(null)}
         onSaved={invalidate}
       />
       <SerialGenerateModal
