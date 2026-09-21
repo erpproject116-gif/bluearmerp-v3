@@ -1,19 +1,20 @@
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
 import { showBlockerResult } from "../../shared/handleSaveResult";
+import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { useTransactionListState } from "../../shared/useListState";
 import { useToast } from "../../shared/toast";
-import { uiLabel } from "../../shared/branding/uiLabel";
-import { Field, inputClass } from "../../shared/SpreadsheetGrid";
-import { StockEntryModal } from "./StockEntryModal";
 import {
   LocationTransferModal,
   type LocationTransferDetail,
 } from "./LocationTransferModal";
 
 type TransferLineRow = {
+  id: number;
   line_id: number;
   stock_entry_id: number;
   entry_no: string;
@@ -36,7 +37,7 @@ type TransferLineRow = {
   status: string;
 };
 
-type ListPayload = { rows: TransferLineRow[]; total: number };
+type ListPayload = { rows: Omit<TransferLineRow, "id">[]; total: number };
 
 function formatWhen(iso: string) {
   try {
@@ -46,22 +47,62 @@ function formatWhen(iso: string) {
   }
 }
 
+function formatQty(n: number | null | undefined) {
+  if (n == null || Number.isNaN(n)) return "—";
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+function statusLabel(status: string) {
+  switch (status) {
+    case "draft":
+      return "Draft";
+    case "posted":
+      return "Posted";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status;
+  }
+}
+
+function statusClass(status: string) {
+  switch (status) {
+    case "draft":
+      return "bg-slate-100 text-slate-700";
+    case "posted":
+      return "bg-emerald-50 text-emerald-800";
+    case "cancelled":
+      return "bg-red-50 text-red-700";
+    default:
+      return "bg-slate-50 text-text-secondary";
+  }
+}
+
 export default function StockEntriesPage() {
   const toast = useToast();
   const client = useQueryClient();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useTransactionListState("datetime", 25);
   const [createOpen, setCreateOpen] = createSignal(false);
-  const [otherOpen, setOtherOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<LocationTransferDetail | null>(null);
-  const [ledgerRow, setLedgerRow] = createSignal<TransferLineRow | null>(null);
-  const [auditRow, setAuditRow] = createSignal<TransferLineRow | null>(null);
-  const [auditAttachments, setAuditAttachments] = createSignal<
-    Array<{ id: number; file_name: string; size_bytes: number }>
-  >([]);
+  const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [status, setStatus] = createSignal("");
+  const [draftQ, setDraftQ] = createSignal("");
   const [postingId, setPostingId] = createSignal<number | null>(null);
 
+  onMount(() => {
+    setDraftQ(q());
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F8") {
+        e.preventDefault();
+        search();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    onCleanup(() => window.removeEventListener("keydown", onKey));
+  });
+
   const list = createQuery(() => ({
-    queryKey: ["stock-transfer-lines", page(), pageSize, q(), sort(), order()],
+    queryKey: ["stock-transfer-lines", page(), pageSize, q(), sort(), order(), status()],
     queryFn: async () => {
       const qs = new URLSearchParams({
         page: String(page()),
@@ -70,9 +111,14 @@ export default function StockEntriesPage() {
         order: order(),
       });
       if (q().trim()) qs.set("q", q().trim());
+      if (status().trim()) qs.set("status", status().trim());
       const res = await apiFetch<ListPayload>(`/api/v1/inventory/stock-entries/transfer-lines?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load");
-      return res.data ?? { rows: [], total: 0 };
+      const data = res.data ?? { rows: [], total: 0 };
+      return {
+        total: data.total,
+        rows: (data.rows ?? []).map((r) => ({ ...r, id: r.line_id })),
+      };
     },
   }));
 
@@ -80,6 +126,24 @@ export default function StockEntriesPage() {
     void client.invalidateQueries({ queryKey: ["stock-transfer-lines"] });
     void client.invalidateQueries({ queryKey: ["stock-entries"] });
     void client.invalidateQueries({ queryKey: ["stock-movements"] });
+  };
+
+  const search = () => {
+    setQ(draftQ().trim());
+    setPage(1);
+    invalidate();
+  };
+
+  const reset = () => {
+    setDraftQ("");
+    setQ("");
+    setStatus("");
+    setPage(1);
+  };
+
+  const openNew = () => {
+    setEditing(null);
+    setCreateOpen(true);
   };
 
   const openEntry = async (id: number) => {
@@ -92,14 +156,9 @@ export default function StockEntriesPage() {
     setCreateOpen(true);
   };
 
-  const openAudit = async (row: TransferLineRow) => {
-    setAuditRow(row);
-    const res = await apiFetch<Array<{ id: number; file_name: string; size_bytes: number }>>(
-      `/api/v1/inventory/stock-entries/${row.stock_entry_id}/attachments`,
-      {},
-      { silent: true },
-    );
-    setAuditAttachments(res.success ? res.data ?? [] : []);
+  const openRow = (row: TransferLineRow) => {
+    setSelectedId(row.id);
+    void openEntry(row.stock_entry_id);
   };
 
   const postEntry = async (row: TransferLineRow) => {
@@ -117,162 +176,202 @@ export default function StockEntriesPage() {
 
   return (
     <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-900">Location Transfer</h1>
-          <p class="mt-1 text-sm text-slate-600">
-            Move stock between locations. Qty out and Qty in are the same item quantity; Serial/Lot is a tracking count.
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
-            onClick={() => setOtherOpen(true)}
-          >
-            Issue / Receipt
-          </button>
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={() => {
-              setEditing(null);
-              setCreateOpen(true);
-            }}
-          >
-            New transfer
-          </button>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap items-end gap-3">
-        <Field label="Search">
-          <input
-            class={inputClass}
-            value={q()}
-            placeholder="TR no, item, location, reason…"
-            onInput={(e) => setQ(e.currentTarget.value)}
-          />
-        </Field>
-      </div>
-
-      <Show when={!list.isLoading} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
-        <div class="overflow-x-auto rounded-lg border border-slate-200">
-          <table class="min-w-full text-sm">
-            <thead class="bg-brand-50 text-left text-xs font-semibold uppercase text-brand-700">
-              <tr>
-                <th class="cursor-pointer px-3 py-2" onClick={() => toggleSort("datetime")}>
-                  Datetime {sort() === "datetime" ? (order() === "desc" ? "↓" : "↑") : ""}
-                </th>
-                <th class="px-3 py-2">TR No</th>
-                <th class="px-3 py-2">Item</th>
-                <th class="px-3 py-2">Location out</th>
-                <th class="px-3 py-2 text-right">Qty out</th>
-                <th class="px-3 py-2">Location in</th>
-                <th class="px-3 py-2 text-right">Qty in</th>
-                <th class="px-3 py-2 text-right">Serial/Lot</th>
-                <th class="px-3 py-2">Transferred by</th>
-                <th class="px-3 py-2">Reason</th>
-                <th class="px-3 py-2">Status</th>
-                <th class="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={list.data?.rows ?? []}>
-                {(row) => (
-                  <tr class="border-t border-slate-100 hover:bg-brand-50/30">
-                    <td class="px-3 py-2 whitespace-nowrap">
-                      <button
-                        type="button"
-                        class="text-left font-medium text-brand-700 hover:underline"
-                        onClick={() => setLedgerRow(row)}
-                      >
-                        {formatWhen(row.datetime)}
-                      </button>
-                    </td>
-                    <td class="px-3 py-2">
-                      <button type="button" class="text-brand-700 hover:underline" onClick={() => void openEntry(row.stock_entry_id)}>
-                        {row.entry_no}
-                      </button>
-                    </td>
-                    <td class="px-3 py-2">
-                      <button type="button" class="text-left hover:underline" onClick={() => void openEntry(row.stock_entry_id)}>
-                        {row.item_code} — {row.item_name}
-                      </button>
-                    </td>
-                    <td class="px-3 py-2">{row.from_location_name || "—"}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{row.qty_out}</td>
-                    <td class="px-3 py-2">{row.to_location_name || "—"}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{row.qty_in}</td>
-                    <td class="px-3 py-2 text-right tabular-nums text-text-secondary">
-                      {row.serial_lot_count > 0 ? row.serial_lot_count : "—"}
-                    </td>
-                    <td class="px-3 py-2">
-                      <button
-                        type="button"
-                        class="text-left text-brand-700 hover:underline"
-                        onClick={() => void openAudit(row)}
-                      >
-                        {row.transferred_by_name || "—"}
-                      </button>
-                    </td>
-                    <td class="max-w-[12rem] truncate px-3 py-2 text-text-secondary" title={row.reason}>
-                      {row.reason || "—"}
-                    </td>
-                    <td class="px-3 py-2 capitalize">{row.status}</td>
-                    <td class="px-3 py-2">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <Show when={row.status === "draft"}>
-                          <button
-                            type="button"
-                            class="text-brand-600 hover:underline disabled:opacity-50"
-                            disabled={postingId() === row.stock_entry_id}
-                            onClick={() => void postEntry(row)}
-                          >
-                            {postingId() === row.stock_entry_id ? "Posting…" : "Post"}
-                          </button>
-                        </Show>
-                        <ActivityHistoryLink
-                          module="inventory"
-                          targetType="inv_stock_entry"
-                          targetId={row.stock_entry_id}
-                          title={`History — ${row.entry_no}`}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-          <Show when={(list.data?.rows.length ?? 0) === 0}>
-            <p class="px-4 py-8 text-center text-sm text-text-secondary">No location transfers yet. Create one to move stock between branches.</p>
-          </Show>
-        </div>
-        <Show when={(list.data?.total ?? 0) > pageSize}>
-          <div class="flex items-center justify-end gap-2 text-sm">
-            <button
-              type="button"
-              class="rounded border border-stroke px-3 py-1 disabled:opacity-40"
-              disabled={page() <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
+      <CollapsibleFilterPanel
+        title="Location Transfer"
+        description="Move stock between locations. Qty out and Qty in are the same item quantity; Serial/Lot is a tracking count. Search (F8)."
+        actions={
+          <>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
+              Search (F8)
             </button>
-            <span class="text-text-secondary">
-              Page {page()} · {list.data?.total ?? 0} lines
-            </span>
-            <button
-              type="button"
-              class="rounded border border-stroke px-3 py-1 disabled:opacity-40"
-              disabled={page() * pageSize >= (list.data?.total ?? 0)}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
+            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
+              Reset
             </button>
-          </div>
-        </Show>
-      </Show>
+            <A href="/app/inventory/stock-movements" class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50">
+              Stock movements
+            </A>
+            <A href="/app/inventory/stock-adjustments" class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50">
+              Adjustments
+            </A>
+            <button type="button" class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={openNew}>
+              New transfer
+            </button>
+          </>
+        }
+      >
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Field label="Keyword">
+            <input
+              class={inputClass}
+              value={draftQ()}
+              onInput={(e) => setDraftQ(e.currentTarget.value)}
+              placeholder="TR no, item, location, reason…"
+            />
+          </Field>
+          <Field label="Status">
+            <select
+              class={inputClass}
+              value={status()}
+              onChange={(e) => {
+                setStatus(e.currentTarget.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All</option>
+              <option value="draft">Draft</option>
+              <option value="posted">Posted</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </Field>
+        </div>
+      </CollapsibleFilterPanel>
+
+      <SpreadsheetGrid<TransferLineRow>
+        columns={[
+          {
+            key: "datetime",
+            header: "Datetime",
+            render: (r) => (
+              <button
+                type="button"
+                class="text-left font-medium text-brand-700 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openRow(r);
+                }}
+              >
+                {formatWhen(r.datetime)}
+              </button>
+            ),
+          },
+          {
+            key: "entry_no",
+            header: "TR No",
+            render: (r) => (
+              <button
+                type="button"
+                class="text-brand-700 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openRow(r);
+                }}
+              >
+                {r.entry_no}
+              </button>
+            ),
+          },
+          {
+            key: "item_code",
+            header: "Item",
+            render: (r) => `${r.item_code} — ${r.item_name}`,
+          },
+          { key: "from_location_name", header: "Location out", render: (r) => r.from_location_name || "—" },
+          {
+            key: "qty_out",
+            header: "Qty out",
+            render: (r) => formatQty(r.qty_out),
+          },
+          { key: "to_location_name", header: "Location in", render: (r) => r.to_location_name || "—" },
+          {
+            key: "qty_in",
+            header: "Qty in",
+            render: (r) => formatQty(r.qty_in),
+          },
+          {
+            key: "serial_lot_count",
+            header: "Serial/Lot",
+            sortable: false,
+            render: (r) => (r.serial_lot_count > 0 ? String(r.serial_lot_count) : "—"),
+          },
+          {
+            key: "transferred_by_name",
+            header: "Transferred by",
+            sortable: false,
+            render: (r) => r.transferred_by_name || "—",
+          },
+          { key: "reason", header: "Reason", render: (r) => r.reason || "—" },
+          {
+            key: "status",
+            header: "Status",
+            render: (r) => (
+              <span class={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusClass(r.status)}`}>
+                {statusLabel(r.status)}
+              </span>
+            ),
+          },
+          {
+            key: "actions",
+            header: "Actions",
+            sortable: false,
+            hideable: false,
+            render: (r) => (
+              <div class="flex flex-wrap items-center gap-2">
+                <Show when={r.status === "draft"}>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-brand-700 hover:underline disabled:opacity-50"
+                    disabled={postingId() === r.stock_entry_id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void postEntry(r);
+                    }}
+                  >
+                    {postingId() === r.stock_entry_id ? "Posting…" : "Post"}
+                  </button>
+                </Show>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-brand-700 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openRow(r);
+                  }}
+                >
+                  {r.status === "draft" ? "Edit" : "View"}
+                </button>
+                <ActivityHistoryLink
+                  module="inventory"
+                  targetType="inv_stock_entry"
+                  targetId={r.stock_entry_id}
+                  title={`History — ${r.entry_no}`}
+                />
+              </div>
+            ),
+          },
+        ]}
+        rows={list.data?.rows ?? []}
+        loading={list.isFetching}
+        selectedId={selectedId()}
+        onSelect={(id) => {
+          setSelectedId(id);
+          const row = (list.data?.rows ?? []).find((r) => r.id === id);
+          if (row) openRow(row);
+        }}
+        onEdit={() => {
+          const id = selectedId();
+          const row = (list.data?.rows ?? []).find((r) => r.id === id);
+          if (row) openRow(row);
+        }}
+        onNew={openNew}
+        codeKey="entry_no"
+        nameKey="item_name"
+        sortKey={sort()}
+        sortOrder={order()}
+        onSort={toggleSort}
+        page={page()}
+        pageSize={pageSize}
+        total={list.data?.total ?? 0}
+        onPageChange={setPage}
+        search={q()}
+        onSearchChange={(v) => {
+          setQ(v);
+          setDraftQ(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search TR no, item, location, reason…"
+        onRefresh={invalidate}
+        newLabel="New transfer"
+      />
 
       <LocationTransferModal
         open={createOpen()}
@@ -283,126 +382,6 @@ export default function StockEntriesPage() {
         }}
         onSaved={invalidate}
       />
-
-      <StockEntryModal
-        open={otherOpen()}
-        onClose={() => setOtherOpen(false)}
-        onCreated={invalidate}
-        autoPost={false}
-      />
-
-      <Show when={ledgerRow()}>
-        {(row) => (
-          <div class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4" role="presentation">
-            <div class="my-8 w-full max-w-4xl rounded-2xl border border-stroke bg-white shadow-xl" role="dialog" aria-modal="true">
-              <div class="flex items-center justify-between border-b border-stroke px-5 py-4">
-                <h2 class="text-lg font-semibold">Transfer ledger — {row().entry_no}</h2>
-                <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setLedgerRow(null)}>
-                  Close
-                </button>
-              </div>
-              <div class="overflow-x-auto px-5 py-4">
-                <table class="min-w-full text-left text-sm">
-                  <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
-                    <tr>
-                      <th class="px-3 py-2">Datetime</th>
-                      <th class="px-3 py-2">Item</th>
-                      <th class="px-3 py-2">Location out</th>
-                      <th class="px-3 py-2 text-right">Qty out</th>
-                      <th class="px-3 py-2">Location in</th>
-                      <th class="px-3 py-2 text-right">Qty in</th>
-                      <th class="px-3 py-2 text-right">Serial/Lot</th>
-                      <th class="px-3 py-2">Remark</th>
-                      <th class="px-3 py-2">Posted by</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr class="border-t border-stroke/60">
-                      <td class="px-3 py-2">
-                        <button
-                          type="button"
-                          class="text-brand-700 hover:underline"
-                          onClick={() => {
-                            const id = row().stock_entry_id;
-                            setLedgerRow(null);
-                            void openEntry(id);
-                          }}
-                        >
-                          {formatWhen(row().datetime)}
-                        </button>
-                      </td>
-                      <td class="px-3 py-2">
-                        {row().item_code} — {row().item_name}
-                      </td>
-                      <td class="px-3 py-2">{row().from_location_name}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{row().qty_out}</td>
-                      <td class="px-3 py-2">{row().to_location_name}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{row().qty_in}</td>
-                      <td class="px-3 py-2 text-right tabular-nums">{row().serial_lot_count > 0 ? row().serial_lot_count : "—"}</td>
-                      <td class="px-3 py-2 text-text-secondary">{row().remark || "—"}</td>
-                      <td class="px-3 py-2">{row().approved_by_name || row().transferred_by_name || "—"}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p class="mt-3 text-xs text-text-secondary">Qty out and Qty in are the same item quantity for this transfer line.</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </Show>
-
-      <Show when={auditRow()}>
-        {(row) => (
-          <div class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4" role="presentation">
-            <div class="my-8 w-full max-w-lg rounded-2xl border border-stroke bg-white shadow-xl" role="dialog" aria-modal="true">
-              <div class="flex items-center justify-between border-b border-stroke px-5 py-4">
-                <h2 class="text-lg font-semibold">Transfer audit — {row().entry_no}</h2>
-                <button
-                  type="button"
-                  class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
-                  onClick={() => {
-                    setAuditRow(null);
-                    setAuditAttachments([]);
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-              <dl class="space-y-3 px-5 py-4 text-sm">
-                <div>
-                  <dt class="text-xs font-medium uppercase text-text-secondary">Requested by</dt>
-                  <dd class="mt-0.5 font-medium">{row().requested_by_name || "—"}</dd>
-                  <dd class="text-xs text-text-secondary">{row().requested_at ? formatWhen(row().requested_at!) : "—"}</dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase text-text-secondary">Reason</dt>
-                  <dd class="mt-0.5">{row().reason || "—"}</dd>
-                  <Show when={row().remark}>
-                    <dd class="text-xs text-text-secondary">Line: {row().remark}</dd>
-                  </Show>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase text-text-secondary">Attachments</dt>
-                  <Show when={auditAttachments().length > 0} fallback={<dd class="mt-0.5 text-text-secondary">None</dd>}>
-                    <ul class="mt-1 space-y-1">
-                      <For each={auditAttachments()}>
-                        {(f) => (
-                          <li class="text-text-primary">{f.file_name}</li>
-                        )}
-                      </For>
-                    </ul>
-                  </Show>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase text-text-secondary">Approved by</dt>
-                  <dd class="mt-0.5 font-medium">{row().approved_by_name || "—"}</dd>
-                  <dd class="text-xs text-text-secondary">{row().approved_at ? formatWhen(row().approved_at!) : "Pending post"}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-        )}
-      </Show>
     </div>
   );
 }
