@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -496,6 +497,10 @@ func createStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			entryDate = d
 		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, entryDate, "entry_date"); ferrs != nil {
+			response.Validation(w, ferrs)
+			return
+		}
 
 		picName := ""
 		if body.PicName != nil {
@@ -590,6 +595,10 @@ func updateStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			entryDate = d
 		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, entryDate, "entry_date"); ferrs != nil {
+			response.Validation(w, ferrs)
+			return
+		}
 
 		picName := ""
 		if body.PicName != nil {
@@ -667,6 +676,12 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 		if entry.Status != "draft" {
 			response.Validation(w, map[string]string{"status": "Only draft entries can be posted."})
 			return
+		}
+		if ed, err := parseDate(entry.EntryDate); err == nil {
+			if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, ed, "entry_date"); ferrs != nil {
+				response.Validation(w, ferrs)
+				return
+			}
 		}
 		if entry.EntryType == "transfer" {
 			notes := ""

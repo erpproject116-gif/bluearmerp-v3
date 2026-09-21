@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -26,27 +27,27 @@ const (
 )
 
 type stockAdjustmentRequestRow struct {
-	ID              int64                      `json:"id"`
-	ItemID          int64                      `json:"item_id"`
-	ItemCode        string                     `json:"item_code"`
-	ItemName        string                     `json:"item_name"`
-	LocationID      int64                      `json:"location_id"`
-	LocationName    string                     `json:"location_name"`
-	QtyBefore       *float64                   `json:"qty_before,omitempty"`
-	QtyDelta        float64                    `json:"qty_delta"`
-	QtyAfter        *float64                   `json:"qty_after,omitempty"`
-	Reason          string                     `json:"reason"`
-	Status          string                     `json:"status"`
-	LineCount       int                        `json:"line_count,omitempty"`
-	Lines           []stockAdjustmentLineRow     `json:"lines,omitempty"`
-	CreatedByUserID *int64                     `json:"created_by_user_id,omitempty"`
-	CreatedByName   string                     `json:"created_by_name,omitempty"`
-	DecidedByName   string                     `json:"decided_by_name,omitempty"`
-	DecidedAt       *string                    `json:"decided_at,omitempty"`
-	Decision        string                     `json:"decision,omitempty"` // approve | reject when decided
-	CreatedAt       string                     `json:"created_at"`
-	UpdatedAt       string                     `json:"updated_at"`
-	Actions         []any                      `json:"actions,omitempty"`
+	ID              int64                    `json:"id"`
+	ItemID          int64                    `json:"item_id"`
+	ItemCode        string                   `json:"item_code"`
+	ItemName        string                   `json:"item_name"`
+	LocationID      int64                    `json:"location_id"`
+	LocationName    string                   `json:"location_name"`
+	QtyBefore       *float64                 `json:"qty_before,omitempty"`
+	QtyDelta        float64                  `json:"qty_delta"`
+	QtyAfter        *float64                 `json:"qty_after,omitempty"`
+	Reason          string                   `json:"reason"`
+	Status          string                   `json:"status"`
+	LineCount       int                      `json:"line_count,omitempty"`
+	Lines           []stockAdjustmentLineRow `json:"lines,omitempty"`
+	CreatedByUserID *int64                   `json:"created_by_user_id,omitempty"`
+	CreatedByName   string                   `json:"created_by_name,omitempty"`
+	DecidedByName   string                   `json:"decided_by_name,omitempty"`
+	DecidedAt       *string                  `json:"decided_at,omitempty"`
+	Decision        string                   `json:"decision,omitempty"` // approve | reject when decided
+	CreatedAt       string                   `json:"created_at"`
+	UpdatedAt       string                   `json:"updated_at"`
+	Actions         []any                    `json:"actions,omitempty"`
 }
 
 type stockAdjActionRow struct {
@@ -267,6 +268,10 @@ func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 		lines := normalizedStockAdjLines(body)
 		if errs := ensureStockAdjLines(r.Context(), pool, tu.TenantID, lines); errs != nil {
 			response.Validation(w, errs)
+			return
+		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, time.Now(), "date"); ferrs != nil {
+			response.Validation(w, ferrs)
 			return
 		}
 

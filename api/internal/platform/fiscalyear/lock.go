@@ -50,21 +50,40 @@ func ClosedPeriodCode(ctx context.Context, q Querier, tenantID int64, entryDate 
 }
 
 // ErrIfClosed returns a user-facing error when entryDate falls in a closed
-// fiscal year or closed fiscal period.
+// fiscal year or closed fiscal period. Used for journal posts and (via
+// AssertDocDateOpen) for document create/update/confirm.
 func ErrIfClosed(ctx context.Context, q Querier, tenantID int64, entryDate time.Time) error {
 	yearCode, err := ClosedYearCode(ctx, q, tenantID, entryDate)
 	if err != nil {
 		return err
 	}
 	if yearCode != "" {
-		return fmt.Errorf("fiscal year %s is closed; reopen it under Fiscal years before posting to this date", yearCode)
+		return fmt.Errorf("fiscal year %s is closed; reopen it under Fiscal years before using this date", yearCode)
 	}
 	periodCode, err := ClosedPeriodCode(ctx, q, tenantID, entryDate)
 	if err != nil {
 		return err
 	}
 	if periodCode != "" {
-		return fmt.Errorf("fiscal period %s is closed; reopen it under Fiscal years before posting to this date", periodCode)
+		return fmt.Errorf("fiscal period %s is closed; reopen it under Fiscal years before using this date", periodCode)
+	}
+	return nil
+}
+
+// AssertDocDateOpen is the strict period lock for operational documents:
+// no create / mutate when the document date falls in a closed year or month.
+func AssertDocDateOpen(ctx context.Context, q Querier, tenantID int64, docDate time.Time) error {
+	return ErrIfClosed(ctx, q, tenantID, docDate)
+}
+
+// FieldErrorIfClosed returns a single-field validation map when the date is closed.
+func FieldErrorIfClosed(ctx context.Context, q Querier, tenantID int64, docDate time.Time, fieldKey string) map[string]string {
+	if err := AssertDocDateOpen(ctx, q, tenantID, docDate); err != nil {
+		key := fieldKey
+		if key == "" {
+			key = "date"
+		}
+		return map[string]string{key: err.Error()}
 	}
 	return nil
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -185,6 +186,11 @@ func previewQuotationSequences(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
 			return
 		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
+			return
+		}
+
 		var dateSeq int
 		var referenceNo string
 		err = pool.QueryRow(r.Context(),
@@ -458,6 +464,10 @@ func createQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
 			return
 		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
+			return
+		}
 
 		tt, err := loadTaxCalcType(r.Context(), pool, tu.TenantID, body.TaxTypeID)
 		if err != nil {
@@ -563,6 +573,10 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		orderDate, err := parseDate(body.OrderDate)
 		if err != nil {
 			response.Validation(w, map[string]string{"order_date": "Invalid date."})
+			return
+		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
 			return
 		}
 

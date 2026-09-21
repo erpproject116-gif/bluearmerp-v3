@@ -20,6 +20,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -94,22 +95,22 @@ type PurchaseOrder struct {
 }
 
 type purchaseOrderLineBody struct {
-	ID                    *int64   `json:"id"`
-	LineNo                int      `json:"line_no"`
-	PurchaseRequestLineID *int64   `json:"purchase_request_line_id"`
-	PartnerID             *int64   `json:"partner_id"`
-	PartnerCode           string   `json:"partner_code"`
-	PartnerName           string   `json:"partner_name"`
-	ItemID                *int64   `json:"item_id"`
-	ItemCode              string   `json:"item_code"`
-	ItemName              string   `json:"item_name"`
-	SpecName              *string  `json:"spec_name"`
-	Description           *string  `json:"description"`
-	Qty                   float64  `json:"qty"`
-	UnitID                *int64   `json:"unit_id"`
-	UnitCode              string   `json:"unit_code"`
-	UnitPrice             float64  `json:"unit_price"`
-	InputBasis            string   `json:"input_basis"`
+	ID                     *int64   `json:"id"`
+	LineNo                 int      `json:"line_no"`
+	PurchaseRequestLineID  *int64   `json:"purchase_request_line_id"`
+	PartnerID              *int64   `json:"partner_id"`
+	PartnerCode            string   `json:"partner_code"`
+	PartnerName            string   `json:"partner_name"`
+	ItemID                 *int64   `json:"item_id"`
+	ItemCode               string   `json:"item_code"`
+	ItemName               string   `json:"item_name"`
+	SpecName               *string  `json:"spec_name"`
+	Description            *string  `json:"description"`
+	Qty                    float64  `json:"qty"`
+	UnitID                 *int64   `json:"unit_id"`
+	UnitCode               string   `json:"unit_code"`
+	UnitPrice              float64  `json:"unit_price"`
+	InputBasis             string   `json:"input_basis"`
 	Remark                 *string  `json:"remark"`
 	PlannedSerialNos       []string `json:"planned_serial_nos"`
 	WarrantyDurationMonths *int     `json:"warranty_duration_months"`
@@ -216,6 +217,11 @@ func previewPurchaseOrderSequences(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
 			return
 		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
+			return
+		}
+
 		var dateSeq int
 		var purchaseOrderNo string
 		err = pool.QueryRow(r.Context(),
@@ -604,6 +610,10 @@ func createPurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		orderDate, err := parseDate(body.OrderDate)
 		if err != nil {
 			response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
+			return
+		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
 			return
 		}
 
@@ -996,6 +1006,10 @@ func updatePurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		orderDate, err := parseDate(body.OrderDate)
 		if err != nil {
 			response.Validation(w, map[string]string{"order_date": "Invalid date."})
+			return
+		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
 			return
 		}
 

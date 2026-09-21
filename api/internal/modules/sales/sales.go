@@ -21,6 +21,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -542,6 +543,10 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"order_date": "Invalid date. Use YYYY-MM-DD."})
 			return
 		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
+			return
+		}
 		dueDate, err := parseOptionalDate(body.DueDate)
 		if err != nil {
 			response.Validation(w, map[string]string{"due_date": "Invalid date."})
@@ -764,6 +769,10 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		orderDate, err := parseDate(body.OrderDate)
 		if err != nil {
 			response.Validation(w, map[string]string{"order_date": "Invalid date."})
+			return
+		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
 			return
 		}
 		dueDate, err := parseOptionalDate(body.DueDate)

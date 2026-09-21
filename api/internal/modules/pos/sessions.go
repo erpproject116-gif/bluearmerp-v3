@@ -18,6 +18,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/sales"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -40,20 +41,20 @@ type Session struct {
 }
 
 type CartLine struct {
-	ID            int64             `json:"id"`
-	LineNo        int               `json:"line_no"`
-	ItemID        int64             `json:"item_id"`
-	ItemCode      string            `json:"item_code"`
-	ItemName      string            `json:"item_name"`
-	Qty           float64           `json:"qty"`
-	UnitPrice     float64           `json:"unit_price"`
-	LineTotal     float64           `json:"line_total"`
-	Notes         *string           `json:"notes,omitempty"`
-	SizeLabel     *string           `json:"size_label,omitempty"`
-	GuestNo       int               `json:"guest_no"`
-	SerialUnitIDs []int64           `json:"serial_unit_ids,omitempty"`
-	LotBatchID    *int64            `json:"lot_batch_id,omitempty"`
-	LotNo         string            `json:"lot_no,omitempty"`
+	ID            int64              `json:"id"`
+	LineNo        int                `json:"line_no"`
+	ItemID        int64              `json:"item_id"`
+	ItemCode      string             `json:"item_code"`
+	ItemName      string             `json:"item_name"`
+	Qty           float64            `json:"qty"`
+	UnitPrice     float64            `json:"unit_price"`
+	LineTotal     float64            `json:"line_total"`
+	Notes         *string            `json:"notes,omitempty"`
+	SizeLabel     *string            `json:"size_label,omitempty"`
+	GuestNo       int                `json:"guest_no"`
+	SerialUnitIDs []int64            `json:"serial_unit_ids,omitempty"`
+	LotBatchID    *int64             `json:"lot_batch_id,omitempty"`
+	LotNo         string             `json:"lot_no,omitempty"`
 	Modifiers     []CartLineModifier `json:"modifiers,omitempty"`
 }
 
@@ -102,19 +103,19 @@ type cartLinePatch struct {
 }
 
 type checkoutBody struct {
-	PartnerID       *int64                     `json:"partner_id"`
-	Tenders         []tenderBody               `json:"tenders"`
-	DiscountAmount  float64                    `json:"discount_amount"`
-	VoucherCode     string                     `json:"voucher_code"`
-	VoucherAmount   float64                    `json:"voucher_amount"`
-	PrivilegeType   string                     `json:"privilege_type"`
-	PrivilegeIDNo   string                     `json:"privilege_id_no"`
-	PrivilegeName   string                     `json:"privilege_name"`
-	TipAmount       float64                    `json:"tip_amount"`
-	TableLabel      string                     `json:"table_label"`
-	OrderType       string                     `json:"order_type"`
-	Guests          []checkoutGuestBody        `json:"guests"`
-	Commissions     []sales.CommissionLineInput `json:"commissions"`
+	PartnerID      *int64                      `json:"partner_id"`
+	Tenders        []tenderBody                `json:"tenders"`
+	DiscountAmount float64                     `json:"discount_amount"`
+	VoucherCode    string                      `json:"voucher_code"`
+	VoucherAmount  float64                     `json:"voucher_amount"`
+	PrivilegeType  string                      `json:"privilege_type"`
+	PrivilegeIDNo  string                      `json:"privilege_id_no"`
+	PrivilegeName  string                      `json:"privilege_name"`
+	TipAmount      float64                     `json:"tip_amount"`
+	TableLabel     string                      `json:"table_label"`
+	OrderType      string                      `json:"order_type"`
+	Guests         []checkoutGuestBody         `json:"guests"`
+	Commissions    []sales.CommissionLineInput `json:"commissions"`
 }
 
 type tenderBody struct {
@@ -712,6 +713,10 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		orderDate := time.Now()
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), tx, tu.TenantID, orderDate, "order_date"); ferrs != nil {
+			response.Validation(w, ferrs)
+			return
+		}
 		var dateSeq int
 		var salesNo string
 		if err := tx.QueryRow(r.Context(), `select date_seq, sales_no from public.allocate_sales_sequences($1,$2::date)`, tu.TenantID, orderDate).Scan(&dateSeq, &salesNo); err != nil {

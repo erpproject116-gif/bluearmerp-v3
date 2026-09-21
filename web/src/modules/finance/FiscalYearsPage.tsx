@@ -128,7 +128,7 @@ export default function FiscalYearsPage() {
     if (
       close &&
       !window.confirm(
-        `Close fiscal year ${fy.year_code}? All months in ${fy.start_date}–${fy.end_date} will close and journal posting will be blocked until you reopen.`,
+        `Close fiscal year ${fy.year_code}? All months in ${fy.start_date}–${fy.end_date} will close. No new or edited documents (and no journal posting) will be allowed for those dates until you reopen.`,
       )
     ) {
       return;
@@ -194,7 +194,9 @@ export default function FiscalYearsPage() {
             </span>
           </p>
           <p class="text-xs text-slate-500">
-            Close a month to lock that period, or close the whole year. Closed years and months always block journal posting (including payroll and depreciation).
+            Close a month to lock that period, or close the whole year. Closed years and months block{" "}
+            <span class="font-medium">new and edited documents</span> dated in that period (Sales, purchases, stock,
+            POS, and more), and also block journal posting (including payroll and depreciation).
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">

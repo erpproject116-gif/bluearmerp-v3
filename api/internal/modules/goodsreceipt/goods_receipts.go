@@ -21,6 +21,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inventorygl"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -57,22 +58,22 @@ type GoodsReceiptLine struct {
 }
 
 type GoodsReceipt struct {
-	ID                int64              `json:"id"`
-	PurchaseOrderID   int64              `json:"purchase_order_id"`
-	PurchaseOrderNo   string             `json:"purchase_order_no,omitempty"`
-	ReceiptDate       string             `json:"receipt_date"`
-	LocationID        int64              `json:"location_id"`
-	LocationName      string             `json:"location_name,omitempty"`
-	Status            string             `json:"status"`
-	InspectionStatus  string             `json:"inspection_status"`
-	InspectionNotes   *string            `json:"inspection_notes,omitempty"`
-	Reference         *string            `json:"reference,omitempty"`
-	Notes             *string            `json:"notes,omitempty"`
-	CreatedByUserID   *int64             `json:"created_by_user_id,omitempty"`
-	CreatedByName     string             `json:"created_by_name,omitempty"`
-	CreatedAt         string             `json:"created_at"`
-	UpdatedAt         string             `json:"updated_at"`
-	Lines             []GoodsReceiptLine `json:"lines,omitempty"`
+	ID               int64              `json:"id"`
+	PurchaseOrderID  int64              `json:"purchase_order_id"`
+	PurchaseOrderNo  string             `json:"purchase_order_no,omitempty"`
+	ReceiptDate      string             `json:"receipt_date"`
+	LocationID       int64              `json:"location_id"`
+	LocationName     string             `json:"location_name,omitempty"`
+	Status           string             `json:"status"`
+	InspectionStatus string             `json:"inspection_status"`
+	InspectionNotes  *string            `json:"inspection_notes,omitempty"`
+	Reference        *string            `json:"reference,omitempty"`
+	Notes            *string            `json:"notes,omitempty"`
+	CreatedByUserID  *int64             `json:"created_by_user_id,omitempty"`
+	CreatedByName    string             `json:"created_by_name,omitempty"`
+	CreatedAt        string             `json:"created_at"`
+	UpdatedAt        string             `json:"updated_at"`
+	Lines            []GoodsReceiptLine `json:"lines,omitempty"`
 }
 
 type createGoodsReceiptBody struct {
@@ -195,8 +196,8 @@ func listGoodsReceipts(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		dsScope, argN, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
-			CustomerColumn:       "po.partner_id",
-			LocationColumn:       "gr.location_id",
+			CustomerColumn:     "po.partner_id",
+			LocationColumn:     "gr.location_id",
 			ExplicitLocationID: explicitLoc,
 		}, argN, &args)
 		if err != nil {
@@ -482,6 +483,10 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"receipt_date": "Invalid date. Use YYYY-MM-DD."})
 			return
 		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), pool, tu.TenantID, receiptDate, "receipt_date"); ferrs != nil {
+			response.Validation(w, ferrs)
+			return
+		}
 
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -542,10 +547,10 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		type openPOLine struct {
-			poLineID               int64
-			lineNo                 int
-			openQty                float64
-			trackSerial, trackLot  bool
+			poLineID              int64
+			lineNo                int
+			openQty               float64
+			trackSerial, trackLot bool
 		}
 		var openLines []openPOLine
 		for poLineRows.Next() {
@@ -1126,6 +1131,10 @@ func postGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if status != "draft" {
 			response.Validation(w, map[string]string{"status": "Only draft goods receipts can be posted."})
+			return
+		}
+		if ferrs := fiscalyear.FieldErrorIfClosed(r.Context(), tx, tu.TenantID, receiptDate, "receipt_date"); ferrs != nil {
+			response.Validation(w, ferrs)
 			return
 		}
 		if inspectionStatus != "released" {
