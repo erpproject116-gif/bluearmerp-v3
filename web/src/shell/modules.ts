@@ -85,7 +85,7 @@ export const appModules: AppModule[] = [
       { label: "Item categories", href: "/app/inventory/item-categories", settingsHref: "/app/inventory/item-categories", headerPriority: "overflow" },
       { label: "Stock Movements", href: "/app/inventory/stock-movements", settingsHref: "/app/inventory/stock-movements", headerPriority: "primary" },
       { label: "Stock Adjustments", href: "/app/inventory/stock-adjustments", settingsHref: "/app/inventory/stock-adjustments", headerPriority: "primary" },
-      { label: "Stock Entries", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries", headerPriority: "overflow" },
+      { label: "Location Transfer", href: "/app/inventory/stock-entries", settingsHref: "/app/inventory/stock-entries", headerPriority: "primary" },
       { label: "Stock Reconciliation", href: "/app/inventory/stock-reconciliation", settingsHref: "/app/inventory/stock-reconciliation", headerPriority: "overflow" },
       { label: "Inv. Balance by Location", href: "/app/inventory/find-stock", settingsHref: "/app/inventory/find-stock", headerPriority: "primary" },
       {
