@@ -279,6 +279,7 @@ export const InvBookReportPage = lazy(() => import("../modules/inventory/reports
 export const TrialBalanceReportPage = lazy(() => import("../modules/finance/reports/TrialBalanceReportPage"));
 export const GeneralLedgerReportPage = lazy(() => import("../modules/finance/reports/GeneralLedgerReportPage"));
 export const ProfitAndLossReportPage = lazy(() => import("../modules/finance/reports/ProfitAndLossReportPage"));
+export const FinancialInsightsPage = lazy(() => import("../modules/finance/insights/FinancialInsightsPage"));
 export const BalanceSheetReportPage = lazy(() => import("../modules/finance/reports/BalanceSheetReportPage"));
 export const CashFlowStatementPage = lazy(() => import("../modules/finance/reports/CashFlowStatementPage"));
 export const CashBookReportPage = lazy(() => import("../modules/finance/reports/CashBookReportPage"));

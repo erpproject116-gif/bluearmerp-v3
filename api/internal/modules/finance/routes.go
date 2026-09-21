@@ -25,6 +25,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerPaymentVoucherRoutes(fr, pool)
 		registerReportRoutes(fr, pool)
 		registerFinancialReportRoutes(fr, pool)
+		registerFinancialInsightsRoutes(fr, pool)
 		registerJournalEntryRoutes(fr, pool)
 		registerBankReconciliationRoutes(fr, pool)
 		registerPaymentEntryRoutes(fr, pool)

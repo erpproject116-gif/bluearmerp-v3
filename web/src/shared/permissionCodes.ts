@@ -247,6 +247,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/finance/acct-i/reports/trial-balance": "finance.journal_entries",
   "/app/finance/acct-i/reports/general-ledger": "finance.journal_entries",
   "/app/finance/acct-i/reports/profit-and-loss": "finance.journal_entries",
+  "/app/finance/acct-i/financial-insights": "finance.journal_entries",
   "/app/finance/acct-i/reports/balance-sheet": "finance.journal_entries",
   "/app/finance/acct-i/reports/cash-flow-statement": "finance.journal_entries",
   "/app/finance/acct-i/reports/cash-book": "finance.journal_entries",

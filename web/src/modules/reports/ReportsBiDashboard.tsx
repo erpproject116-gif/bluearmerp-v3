@@ -120,6 +120,13 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
         <div>
           <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Dashboard &amp; charts</p>
           <h2 class="text-xl font-bold text-text-primary">Business intelligence</h2>
+          <p class="mt-1 text-sm text-text-secondary">
+            Operational snapshot (booked sales, pipeline, stock). Accounting Revenue / Net Profit live under{" "}
+            <A href="/app/finance/acct-i/financial-insights" class="font-medium text-brand-700 hover:underline">
+              Financial Insights
+            </A>
+            .
+          </p>
           <Show when={q.data}>
             {(d) => (
               <p class="mt-1 text-sm text-text-secondary">
@@ -156,12 +163,12 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
         {(d) => (
           <>
             <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Kpi label="Sales in window" value={formatPeso(d().sales_in_window)} href="/app/sales/sales" />
-              <Kpi label="Sales MTD" value={formatPeso(d().sales_mtd)} href="/app/sales/sales" />
-              <Kpi label="Sales YTD" value={formatPeso(d().sales_ytd)} href="/app/sales/sales" />
-              <Kpi label="Cash net YTD" value={formatPeso(d().cash_net_ytd)} href="/app/finance/collections" />
+              <Kpi label="Booked sales (window)" value={formatPeso(d().sales_in_window)} href="/app/sales/sales" />
+              <Kpi label="Booked sales MTD" value={formatPeso(d().sales_mtd)} href="/app/sales/sales" />
+              <Kpi label="Booked sales YTD" value={formatPeso(d().sales_ytd)} href="/app/sales/sales" />
+              <Kpi label="Cash net YTD (ops)" value={formatPeso(d().cash_net_ytd)} href="/app/finance/collections" />
               <Kpi
-                label="Cash in / out MTD"
+                label="Cash in / out MTD (ops)"
                 value={`${formatPeso(d().cash_inflow_mtd)} / ${formatPeso(d().cash_outflow_mtd)}`}
                 href="/app/finance/disbursements"
               />
@@ -195,17 +202,25 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
 
             <section>
               <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold text-text-primary">Profit &amp; loss</h3>
-                <A
-                  href={withReportDateQuery(
-                    "/app/finance/acct-i/reports/profit-and-loss",
-                    range().from,
-                    range().to,
-                  )}
-                  class="text-xs font-medium text-brand-700 hover:underline"
-                >
-                  Open full P&amp;L
-                </A>
+                <h3 class="text-sm font-semibold text-text-primary">Posted P&amp;L (window)</h3>
+                <div class="flex flex-wrap gap-3 text-xs">
+                  <A
+                    href="/app/finance/acct-i/financial-insights"
+                    class="font-medium text-brand-700 hover:underline"
+                  >
+                    Financial Insights (compare periods)
+                  </A>
+                  <A
+                    href={withReportDateQuery(
+                      "/app/finance/acct-i/reports/profit-and-loss",
+                      range().from,
+                      range().to,
+                    )}
+                    class="font-medium text-brand-700 hover:underline"
+                  >
+                    Open full P&amp;L
+                  </A>
+                </div>
               </div>
               <Show
                 when={d().has_journal_pnl}

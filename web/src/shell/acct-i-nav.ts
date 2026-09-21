@@ -10,6 +10,7 @@ export const ACCT_I_PREFIX = "/app/finance/acct-i";
 
 export const acctINavLinks: AcctNavLink[] = [
   { label: "Journal entries", href: "/app/finance/acct-i/journal-entries", permissionCode: "finance.journal_entries", headerPriority: "primary" },
+  { label: "Financial Insights", href: "/app/finance/acct-i/financial-insights", permissionCode: "finance.journal_entries", headerPriority: "primary" },
   { label: "Chart of accounts", href: "/app/finance/acct-i/chart-of-accounts", permissionCode: "finance.journal_entries", headerPriority: "primary" },
   { label: "Reports", href: "/app/finance/reports", permissionCode: "finance.journal_entries", headerPriority: "primary" },
   { label: "Fiscal years & periods", href: "/app/finance/acct-i/fiscal-years", permissionCode: "finance.journal_entries" },

@@ -265,6 +265,7 @@ import {
   TrialBalanceReportPage,
   GeneralLedgerReportPage,
   ProfitAndLossReportPage,
+  FinancialInsightsPage,
   BalanceSheetReportPage,
   CashFlowStatementPage,
   CashBookReportPage,
@@ -746,6 +747,7 @@ export default function App() {
           <Route path="/buying/vendor-credits" component={VendorCreditsPage} />
           <Route path="/finance/acct-i/reports/balance-sheet" component={BalanceSheetReportPage} />
           <Route path="/finance/acct-i/reports/profit-and-loss" component={ProfitAndLossReportPage} />
+          <Route path="/finance/acct-i/financial-insights" component={FinancialInsightsPage} />
           <Route path="/finance/acct-i/reports/cash-flow-statement" component={CashFlowStatementPage} />
           <Route path="/finance/acct-i/reports/cash-book" component={() => <CashBookReportPage />} />
           {/* Keep <Route path=...> on one line — extract-app-routes.mjs parses line by line. */}
