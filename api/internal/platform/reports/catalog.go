@@ -222,6 +222,12 @@ func Catalog() []ReportDef {
 			Description: "Income and expense balances for a date range.",
 		},
 		{
+			Key: "financial_insights", Label: "Financial Insights", Module: "finance",
+			APIPath: "/api/v1/finance/insights/overview",
+			WebPath: "/app/finance/acct-i/financial-insights", Tier: "R5",
+			Description: "Owner cockpit: posted-GL KPIs, period comparison, trends, and account contributors.",
+		},
+		{
 			Key: "balance_sheet", Label: "Balance Sheet", Module: "finance",
 			APIPath:    "/api/v1/finance/reports/balance-sheet",
 			ExportPath: "/api/v1/finance/reports/balance-sheet/export",

@@ -1,7 +1,9 @@
 package finance
 
 import (
+	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,14 +16,23 @@ import (
 )
 
 type insightsMetricRow struct {
-	Key                string  `json:"key"`
-	Label              string  `json:"label"`
-	MetricType         string  `json:"metric_type"`
-	PreferredDirection string  `json:"preferred_direction"`
-	Format             string  `json:"format"`
-	PrimaryKPI         bool    `json:"primary_kpi"`
+	Key                string `json:"key"`
+	Label              string `json:"label"`
+	MetricType         string `json:"metric_type"`
+	PreferredDirection string `json:"preferred_direction"`
+	Format             string `json:"format"`
+	PrimaryKPI         bool   `json:"primary_kpi"`
 	MetricDelta
 	Href string `json:"href,omitempty"`
+}
+
+type insightsDataQuality struct {
+	DraftJournalEntries            int64 `json:"draft_journal_entries"`
+	ConfirmedSalesDraftOrMissingJE int64 `json:"confirmed_sales_draft_or_missing_je"`
+	ConfirmedBillsDraftOrMissingJE int64 `json:"confirmed_bills_draft_or_missing_je"`
+	Incomplete                     bool  `json:"incomplete"`
+	Message                        string `json:"message,omitempty"`
+	Href                           string `json:"href,omitempty"`
 }
 
 type insightsOverview struct {
@@ -36,11 +47,31 @@ type insightsOverview struct {
 	PriorYTDTo     string              `json:"prior_ytd_to"`
 	HasJournalData bool                `json:"has_journal_data"`
 	Metrics        []insightsMetricRow `json:"metrics"`
+	KeyChanges     []KeyChange         `json:"key_changes"`
+	DataQuality    insightsDataQuality `json:"data_quality"`
+}
+
+type insightsTrendsResponse struct {
+	Interval string        `json:"interval"`
+	From     string        `json:"from"`
+	To       string        `json:"to"`
+	Buckets  []TrendBucket `json:"buckets"`
+}
+
+type insightsContributorsResponse struct {
+	MetricKey   string                `json:"metric_key"`
+	CurrentFrom string                `json:"current_from"`
+	CurrentTo   string                `json:"current_to"`
+	CompareFrom string                `json:"compare_from"`
+	CompareTo   string                `json:"compare_to"`
+	Rows        []AccountContribution `json:"rows"`
 }
 
 func registerFinancialInsightsRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.With(auth.RequirePermission("finance.journal_entries", auth.AccessRead)).
-		Get("/insights/overview", financialInsightsOverview(pool))
+	perm := auth.RequirePermission("finance.journal_entries", auth.AccessRead)
+	r.With(perm).Get("/insights/overview", financialInsightsOverview(pool))
+	r.With(perm).Get("/insights/trends", financialInsightsTrends(pool))
+	r.With(perm).Get("/insights/contributors", financialInsightsContributors(pool))
 }
 
 func financialInsightsOverview(pool *pgxpool.Pool) http.HandlerFunc {
@@ -115,6 +146,8 @@ func financialInsightsOverview(pool *pgxpool.Pool) http.HandlerFunc {
 			})
 		}
 
+		dq := loadInsightsDataQuality(r.Context(), pool, tu.TenantID)
+
 		response.OK(w, insightsOverview{
 			CurrentFrom:    periods.CurrentFrom.Format("2006-01-02"),
 			CurrentTo:      periods.CurrentTo.Format("2006-01-02"),
@@ -127,6 +160,111 @@ func financialInsightsOverview(pool *pgxpool.Pool) http.HandlerFunc {
 			PriorYTDTo:     periods.PriorYTDTo.Format("2006-01-02"),
 			HasJournalData: cur.HasJournalData || prev.HasJournalData || ytd.HasJournalData,
 			Metrics:        metrics,
+			KeyChanges:     BuildKeyChanges(metrics, 6),
+			DataQuality:    dq,
+		}, "OK")
+	}
+}
+
+func financialInsightsTrends(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		dateFrom, dateTo, ok := reports.ValidationDateRange(w, r)
+		if !ok {
+			return
+		}
+		now := time.Now().UTC()
+		if dateTo == nil {
+			t := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+			dateTo = &t
+		}
+		if dateFrom == nil {
+			t := dateTo.AddDate(0, -9, 0)
+			t = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+			dateFrom = &t
+		}
+		interval := TrendInterval(strings.TrimSpace(strings.ToLower(r.URL.Query().Get("interval"))))
+		if interval == "" {
+			interval = TrendMonth
+		}
+		if interval != TrendMonth && interval != TrendQuarter && interval != TrendYear {
+			response.Validation(w, map[string]string{"interval": "Use month, quarter, or year."})
+			return
+		}
+		buckets, err := LoadTrendSeries(r.Context(), pool, tu.TenantID, *dateFrom, *dateTo, interval)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load trends.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, insightsTrendsResponse{
+			Interval: string(interval),
+			From:     dateFrom.Format("2006-01-02"),
+			To:       dateTo.Format("2006-01-02"),
+			Buckets:  buckets,
+		}, "OK")
+	}
+}
+
+func financialInsightsContributors(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		dateFrom, dateTo, ok := reports.ValidationDateRange(w, r)
+		if !ok {
+			return
+		}
+		now := time.Now().UTC()
+		if dateTo == nil {
+			t := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+			dateTo = &t
+		}
+		if dateFrom == nil {
+			t := time.Date(dateTo.Year(), dateTo.Month(), 1, 0, 0, 0, 0, time.UTC)
+			dateFrom = &t
+		}
+		cmp := ComparisonType(strings.TrimSpace(strings.ToLower(r.URL.Query().Get("comparison"))))
+		if cmp == "" {
+			cmp = ComparePreviousMonth
+		}
+		var customFrom, customTo *time.Time
+		if cf, ok := parseInsightsDate(r.URL.Query().Get("compare_from")); ok {
+			customFrom = &cf
+		}
+		if ct, ok := parseInsightsDate(r.URL.Query().Get("compare_to")); ok {
+			customTo = &ct
+		}
+		metricKey := MetricKey(strings.TrimSpace(strings.ToLower(r.URL.Query().Get("metric"))))
+		if metricKey == "" {
+			metricKey = MetricOperatingExpenses
+		}
+		fy, _ := FiscalYearStartContaining(r.Context(), pool, tu.TenantID, *dateTo)
+		periods, err := ResolveComparison(cmp, *dateFrom, *dateTo, fy, customFrom, customTo)
+		if err != nil {
+			response.Validation(w, map[string]string{"comparison": err.Error()})
+			return
+		}
+		limit := 8
+		if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
+			if n, e := strconv.Atoi(v); e == nil && n > 0 && n <= 25 {
+				limit = n
+			}
+		}
+		rows, err := LoadAccountContributors(
+			r.Context(), pool, tu.TenantID,
+			periods.CurrentFrom, periods.CurrentTo,
+			periods.CompareFrom, periods.CompareTo,
+			metricKey, limit,
+		)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load contributors.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, insightsContributorsResponse{
+			MetricKey:   string(metricKey),
+			CurrentFrom: periods.CurrentFrom.Format("2006-01-02"),
+			CurrentTo:   periods.CurrentTo.Format("2006-01-02"),
+			CompareFrom: periods.CompareFrom.Format("2006-01-02"),
+			CompareTo:   periods.CompareTo.Format("2006-01-02"),
+			Rows:        rows,
 		}, "OK")
 	}
 }
@@ -153,4 +291,51 @@ func insightsMetricHref(key MetricKey, from, to time.Time) string {
 	default:
 		return "/app/finance/acct-i/reports/profit-and-loss?" + qs
 	}
+}
+
+func loadInsightsDataQuality(ctx context.Context, pool *pgxpool.Pool, tenantID int64) insightsDataQuality {
+	var draft, salesMiss, billsMiss int64
+	_ = pool.QueryRow(ctx, `
+		select count(*) from public.fin_journal_entries
+		where tenant_id = $1 and status = 'draft'`, tenantID).Scan(&draft)
+	_ = pool.QueryRow(ctx, `
+		select count(*)
+		from public.sa_sales s
+		left join public.fin_journal_entries je on je.id = s.invoice_journal_entry_id
+		where s.tenant_id = $1 and s.deleted_at is null
+		  and s.grand_total > 0.0001
+		  and coalesce(s.progress_status, '') in ('completed', 'confirm', 'e_approval', 'confirmed', 'approved', 'released', 'shipped')
+		  and (s.invoice_journal_entry_id is null or coalesce(je.status, 'draft') = 'draft')`,
+		tenantID).Scan(&salesMiss)
+	_ = pool.QueryRow(ctx, `
+		select count(*)
+		from public.fin_supplier_invoices si
+		left join public.fin_journal_entries je on je.id = si.invoice_journal_entry_id
+		where si.tenant_id = $1 and si.deleted_at is null
+		  and si.grand_total > 0.0001
+		  and coalesce(si.progress_status, '') in ('completed', 'confirm', 'e_approval')
+		  and (si.invoice_journal_entry_id is null or coalesce(je.status, 'draft') = 'draft')`,
+		tenantID).Scan(&billsMiss)
+
+	dq := insightsDataQuality{
+		DraftJournalEntries:            draft,
+		ConfirmedSalesDraftOrMissingJE: salesMiss,
+		ConfirmedBillsDraftOrMissingJE: billsMiss,
+		Href:                           "/app/finance/bookkeeping",
+	}
+	parts := []string{}
+	if draft > 0 {
+		parts = append(parts, strconv.FormatInt(draft, 10)+" draft journal(s)")
+	}
+	if salesMiss > 0 {
+		parts = append(parts, strconv.FormatInt(salesMiss, 10)+" confirmed sale(s) without posted JE")
+	}
+	if billsMiss > 0 {
+		parts = append(parts, strconv.FormatInt(billsMiss, 10)+" confirmed bill(s) without posted JE")
+	}
+	if len(parts) > 0 {
+		dq.Incomplete = true
+		dq.Message = "Financial data may be incomplete: " + strings.Join(parts, "; ") + "."
+	}
+	return dq
 }

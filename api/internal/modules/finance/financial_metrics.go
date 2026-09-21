@@ -73,16 +73,16 @@ func MetricDictionary() []MetricDef {
 
 // WindowTotals are raw engine outputs for one date window / as-of.
 type WindowTotals struct {
-	Revenue            float64
-	COGS               float64
-	OperatingExpenses  float64
-	NetProfit          float64
-	GrossProfit        float64
-	GrossMarginPct     float64
-	NetMarginPct       float64
-	Cash               float64
-	AccountsReceivable float64
-	HasJournalData     bool
+	Revenue            float64 `json:"revenue"`
+	COGS               float64 `json:"cogs"`
+	OperatingExpenses  float64 `json:"operating_expenses"`
+	NetProfit          float64 `json:"net_profit"`
+	GrossProfit        float64 `json:"gross_profit"`
+	GrossMarginPct     float64 `json:"gross_margin_pct"`
+	NetMarginPct       float64 `json:"net_margin_pct"`
+	Cash               float64 `json:"cash"`
+	AccountsReceivable float64 `json:"accounts_receivable"`
+	HasJournalData     bool    `json:"has_journal_data"`
 }
 
 // DeriveWindowTotals fills computed fields from revenue/cogs/opex (+ optional balances).

@@ -12,6 +12,7 @@ const links = [
   { label: "Supplier payment status", href: "/app/finance/reports/supplier-payment-status", blurb: "Payments made to suppliers." },
   { label: "Budget vs actual", href: "/app/finance/reports/budget-vs-actual", blurb: "Compare budgets to posted amounts." },
   { label: "Trial balance", href: "/app/finance/acct-i/reports/trial-balance", blurb: "Account balances for the period." },
+  { label: "Financial Insights", href: "/app/finance/acct-i/financial-insights", blurb: "Owner KPIs, comparison, trends from posted books." },
   { label: "Profit and loss", href: "/app/finance/acct-i/reports/profit-and-loss", blurb: "Income and expenses." },
   { label: "Balance sheet", href: "/app/finance/acct-i/reports/balance-sheet", blurb: "Assets, liabilities, and equity." },
   { label: "General ledger", href: "/app/finance/acct-i/reports/general-ledger", blurb: "Detailed ledger movements." },

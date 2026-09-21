@@ -205,7 +205,11 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                 <h3 class="text-sm font-semibold text-text-primary">Posted P&amp;L (window)</h3>
                 <div class="flex flex-wrap gap-3 text-xs">
                   <A
-                    href="/app/finance/acct-i/financial-insights"
+                    href={withReportDateQuery(
+                      "/app/finance/acct-i/financial-insights",
+                      range().from,
+                      range().to,
+                    )}
                     class="font-medium text-brand-700 hover:underline"
                   >
                     Financial Insights (compare periods)
