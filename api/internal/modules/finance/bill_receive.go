@@ -459,35 +459,39 @@ func applyStockAndTracking(
 		}
 	}
 
-	if trackInventory && baseQty > 0 {
-		_, err = tx.Exec(ctx, `
-			insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
-			values ($1, $2, $3, $4)
-			on conflict (tenant_id, item_id, location_id)
-			do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
-			tenantID, *itemID, locationID, baseQty)
-		if err != nil {
-			return errors.New("failed to update stock on auto-receive")
+	if trackInventory || trackLot || trackSerial {
+		if baseQty > 0 {
+			_, err = tx.Exec(ctx, `
+				insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
+				values ($1, $2, $3, $4)
+				on conflict (tenant_id, item_id, location_id)
+				do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
+				tenantID, *itemID, locationID, baseQty)
+			if err != nil {
+				return errors.New("failed to update stock on auto-receive")
+			}
+			_, err = tx.Exec(ctx, `
+				insert into public.inv_stock_movements (
+				  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
+				) values ($1, $2, $3, $4, 'goods_receipt', 'goods_receipt', $5, $6)`,
+				tenantID, *itemID, locationID, baseQty, grID, userID)
+			if err != nil {
+				return errors.New("failed to record stock movement for auto-receive")
+			}
 		}
-		_, err = tx.Exec(ctx, `
-			insert into public.inv_stock_movements (
-			  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, created_by_user_id
-			) values ($1, $2, $3, $4, 'goods_receipt', 'goods_receipt', $5, $6)`,
-			tenantID, *itemID, locationID, baseQty, grID, userID)
-		if err != nil {
-			return errors.New("failed to record stock movement for auto-receive")
-		}
-		if _, err := inventorygl.PostReceiptTx(
-			ctx, tx, tenantID, userID, receiptDate,
-			"goods_receipt", grID, "Auto-receive on Bill",
-			[]inventorygl.Line{{
-				ItemID:         *itemID,
-				Qty:            baseQty,
-				UnitCost:       unitCost,
-				TrackInventory: true,
-			}},
-		); err != nil {
-			return fmt.Errorf("failed to post inventory GL for auto-receive: %w", err)
+		if trackInventory && baseQty > 0 {
+			if _, err := inventorygl.PostReceiptTx(
+				ctx, tx, tenantID, userID, receiptDate,
+				"goods_receipt", grID, "Auto-receive on Bill",
+				[]inventorygl.Line{{
+					ItemID:         *itemID,
+					Qty:            baseQty,
+					UnitCost:       unitCost,
+					TrackInventory: true,
+				}},
+			); err != nil {
+				return fmt.Errorf("failed to post inventory GL for auto-receive: %w", err)
+			}
 		}
 	}
 	return nil

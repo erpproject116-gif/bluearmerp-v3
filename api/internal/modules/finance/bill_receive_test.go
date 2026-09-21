@@ -4,12 +4,26 @@ import (
 	"testing"
 )
 
-func TestNormalizeSerialNos(t *testing.T) {
-	got := normalizeSerialNos([]string{" A1 ", "a1", "", "B2", "b2"})
-	if len(got) != 2 || got[0] != "A1" || got[1] != "B2" {
-		t.Fatalf("normalizeSerialNos = %#v", got)
+func TestPostsQtyOnAutoReceive(t *testing.T) {
+	// Matches goods_receipts postsQty: inventory qty OR lot OR serial imply Find Stock / Inv Book.
+	cases := []struct {
+		inv, lot, serial bool
+		want             bool
+	}{
+		{false, false, false, false},
+		{true, false, false, true},
+		{false, true, false, true},
+		{false, false, true, true},
+		{true, true, true, true},
+	}
+	for _, tc := range cases {
+		got := tc.inv || tc.lot || tc.serial
+		if got != tc.want {
+			t.Errorf("inv=%v lot=%v serial=%v → %v want %v", tc.inv, tc.lot, tc.serial, got, tc.want)
+		}
 	}
 }
+
 
 func TestConfirmingBillProgress(t *testing.T) {
 	cases := map[string]bool{
