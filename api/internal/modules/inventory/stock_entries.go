@@ -47,15 +47,22 @@ type StockEntry struct {
 }
 
 type StockEntryLine struct {
-	ID       int64   `json:"id,omitempty"`
-	LineNo   int     `json:"line_no"`
-	ItemID   int64   `json:"item_id"`
-	ItemCode string  `json:"item_code"`
-	ItemName string  `json:"item_name"`
-	Qty      float64 `json:"qty"`
-	Remark   string  `json:"remark,omitempty"`
-	// SerialLotCount is tracking attachments only (Wave 4 fills this; until then 0).
-	SerialLotCount int `json:"serial_lot_count"`
+	ID             int64             `json:"id,omitempty"`
+	LineNo         int               `json:"line_no"`
+	ItemID         int64             `json:"item_id"`
+	ItemCode       string            `json:"item_code"`
+	ItemName       string            `json:"item_name"`
+	Qty            float64           `json:"qty"`
+	Remark         string            `json:"remark,omitempty"`
+	SerialLotCount int               `json:"serial_lot_count"`
+	SerialUnitIDs  []int64           `json:"serial_unit_ids,omitempty"`
+	LotBatchID     *int64            `json:"lot_batch_id,omitempty"`
+	LotNo          string            `json:"lot_no,omitempty"`
+	Lots           []stockEntryLotIn `json:"lots,omitempty"`
+	TrackSerial    bool              `json:"track_serial,omitempty"`
+	TrackLot       bool              `json:"track_lot,omitempty"`
+	SerialPolicy   string            `json:"serial_policy,omitempty"`
+	LotPolicy      string            `json:"lot_policy,omitempty"`
 }
 
 // StockTransferLineRow is one item line on a transfer for the Location Transfer list.
@@ -103,9 +110,12 @@ type stockEntryBody struct {
 }
 
 type stockEntryLineIn struct {
-	ItemID int64   `json:"item_id"`
-	Qty    float64 `json:"qty"`
-	Remark string  `json:"remark"`
+	ItemID        int64             `json:"item_id"`
+	Qty           float64           `json:"qty"`
+	Remark        string            `json:"remark"`
+	SerialUnitIDs []int64           `json:"serial_unit_ids"`
+	LotBatchID    *int64            `json:"lot_batch_id"`
+	Lots          []stockEntryLotIn `json:"lots"`
 }
 
 func registerStockEntryRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -246,6 +256,7 @@ func listStockTransferLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  e.from_location_id, e.to_location_id,
 			  coalesce(fl.location_name, ''), coalesce(tl.location_name, ''),
 			  ln.qty::float8,
+			  %s as serial_lot_count,
 			  coalesce(ln.remark, ''),
 			  coalesce(e.notes, ''),
 			  e.status,
@@ -264,7 +275,7 @@ func listStockTransferLines(pool *pgxpool.Pool) http.HandlerFunc {
 			where %s
 			order by %s %s, ln.line_no asc
 			limit $%d offset $%d`,
-			where, p.Sort, orderSQL(p.Order), argN, argN+1)
+			stockEntryLineTrackingCountSQL("ln"), where, p.Sort, orderSQL(p.Order), argN, argN+1)
 		args = append(args, p.PageSize, offset)
 
 		rows, err := pool.Query(r.Context(), q, args...)
@@ -285,7 +296,7 @@ func listStockTransferLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.ItemID, &row.ItemCode, &row.ItemName,
 				&row.FromLocationID, &row.ToLocationID,
 				&row.FromLocationName, &row.ToLocationName,
-				&row.QtyOut, &row.Remark, &row.Reason, &row.Status,
+				&row.QtyOut, &row.SerialLotCount, &row.Remark, &row.Reason, &row.Status,
 				&row.RequestedByUserID, &row.RequestedByName, &requestedAt,
 				&row.ApprovedByUserID, &row.ApprovedByName, &approvedAt,
 				&total,
@@ -294,7 +305,6 @@ func listStockTransferLines(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			row.QtyIn = row.QtyOut
-			row.SerialLotCount = 0
 			row.Datetime = dt.Format(time.RFC3339)
 			row.RequestedAt = formatTSPtr(requestedAt)
 			row.ApprovedAt = formatTSPtr(approvedAt)
@@ -375,7 +385,9 @@ func loadStockEntry(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 	e.UpdatedAt = updatedAt.Format(time.RFC3339)
 
 	rows, err := pool.Query(ctx, `
-		select l.id, l.line_no, l.item_id, i.item_code, i.item_name, l.qty::float8, coalesce(l.remark, '')
+		select l.id, l.line_no, l.item_id, i.item_code, i.item_name, l.qty::float8, coalesce(l.remark, ''),
+		  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
+		  coalesce(i.serial_policy, 'required'), coalesce(i.lot_policy, 'required')
 		from public.inv_stock_entry_lines l
 		join public.inv_items i on i.id = l.item_id
 		where l.stock_entry_id = $1 order by l.line_no`, id)
@@ -385,10 +397,24 @@ func loadStockEntry(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 	defer rows.Close()
 	for rows.Next() {
 		var ln StockEntryLine
-		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.Remark); err != nil {
+		if err := rows.Scan(
+			&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.Remark,
+			&ln.TrackSerial, &ln.TrackLot, &ln.SerialPolicy, &ln.LotPolicy,
+		); err != nil {
 			return StockEntry{}, err
 		}
-		ln.SerialLotCount = 0
+		serialIDs, lots, lotNo, count, trackErr := loadStockEntryLineTracking(ctx, pool, ln.ID)
+		if trackErr != nil {
+			return StockEntry{}, trackErr
+		}
+		ln.SerialUnitIDs = serialIDs
+		ln.Lots = lots
+		ln.LotNo = lotNo
+		ln.SerialLotCount = count
+		if len(lots) == 1 {
+			idCopy := lots[0].LotBatchID
+			ln.LotBatchID = &idCopy
+		}
 		e.Lines = append(e.Lines, ln)
 	}
 	if e.Lines == nil {
@@ -506,7 +532,7 @@ func createStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := replaceStockEntryLines(r.Context(), tx, tu.TenantID, entryID, body.Lines); err != nil {
+		if err := replaceStockEntryLines(r.Context(), tx, tu.TenantID, entryID, body.FromLocationID, body.Lines); err != nil {
 			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
@@ -598,7 +624,7 @@ func updateStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		_, _ = tx.Exec(r.Context(), `delete from public.inv_stock_entry_lines where stock_entry_id = $1`, id)
-		if err := replaceStockEntryLines(r.Context(), tx, tu.TenantID, id, body.Lines); err != nil {
+		if err := replaceStockEntryLines(r.Context(), tx, tu.TenantID, id, body.FromLocationID, body.Lines); err != nil {
 			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
@@ -697,6 +723,13 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		if entry.EntryType == "transfer" {
+			if err := moveStockEntryTracking(r.Context(), tx, tu.TenantID, id, tu.AppUserID, *entry.FromLocationID, *entry.ToLocationID); err != nil {
+				response.ValidationSmart(w, map[string]string{"lines": err.Error()})
+				return
+			}
+		}
+
 		tag, err := tx.Exec(r.Context(), `
 			update public.inv_stock_entries set
 			  status = 'posted', posted_at = now(),
@@ -720,7 +753,7 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func replaceStockEntryLines(ctx context.Context, tx pgx.Tx, tenantID, entryID int64, lines []stockEntryLineIn) error {
+func replaceStockEntryLines(ctx context.Context, tx pgx.Tx, tenantID, entryID int64, fromLocationID *int64, lines []stockEntryLineIn) error {
 	for i, ln := range lines {
 		var exists bool
 		_ = tx.QueryRow(ctx, `
@@ -729,10 +762,16 @@ func replaceStockEntryLines(ctx context.Context, tx pgx.Tx, tenantID, entryID in
 		if !exists {
 			return fmt.Errorf("item %d not found", ln.ItemID)
 		}
-		_, err := tx.Exec(ctx, `
+		var lineID int64
+		err := tx.QueryRow(ctx, `
 			insert into public.inv_stock_entry_lines (stock_entry_id, line_no, item_id, qty, remark)
-			values ($1, $2, $3, $4, $5)`, entryID, i+1, ln.ItemID, ln.Qty, nullIfEmpty(strings.TrimSpace(ln.Remark)))
+			values ($1, $2, $3, $4, $5)
+			returning id`, entryID, i+1, ln.ItemID, ln.Qty, nullIfEmpty(strings.TrimSpace(ln.Remark))).Scan(&lineID)
 		if err != nil {
+			return err
+		}
+		lots := normalizeStockEntryLots(ln.Qty, ln.LotBatchID, ln.Lots)
+		if err := replaceStockEntryLineTracking(ctx, tx, tenantID, lineID, i+1, ln.ItemID, ln.Qty, fromLocationID, ln.SerialUnitIDs, lots); err != nil {
 			return err
 		}
 	}

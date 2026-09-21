@@ -76,3 +76,42 @@ func TestTransferQtyOutEqualsQtyIn(t *testing.T) {
 		t.Fatalf("qty out/in must match: %v vs %v", qtyOut, qtyIn)
 	}
 }
+
+func TestNormalizeStockEntryLots(t *testing.T) {
+	lotID := int64(9)
+	got := normalizeStockEntryLots(3, &lotID, nil)
+	if len(got) != 1 || got[0].LotBatchID != 9 || got[0].Qty != 3 {
+		t.Fatalf("expected single full-line lot, got %#v", got)
+	}
+	got = normalizeStockEntryLots(5, nil, []stockEntryLotIn{{LotBatchID: 1, Qty: 2}, {LotBatchID: 2, Qty: 3}})
+	if sumStockEntryLotQty(got) != 5 {
+		t.Fatalf("sum=%v", sumStockEntryLotQty(got))
+	}
+}
+
+func TestValidateTransferLineTracking(t *testing.T) {
+	serialReq := ItemTrackingSettings{TrackSerial: true, SerialPolicy: TrackingPolicyRequired}
+	if err := validateTransferLineTracking(1, serialReq, 2, 0, nil, true); err == nil {
+		t.Fatal("expected required serials on post")
+	}
+	if err := validateTransferLineTracking(1, serialReq, 2, 0, nil, false); err != nil {
+		t.Fatalf("draft may omit serials: %v", err)
+	}
+	if err := validateTransferLineTracking(1, serialReq, 2, 2, nil, true); err != nil {
+		t.Fatalf("matching serial count: %v", err)
+	}
+	if err := validateTransferLineTracking(1, serialReq, 2, 1, nil, true); err == nil {
+		t.Fatal("expected serial count mismatch")
+	}
+
+	lotReq := ItemTrackingSettings{TrackLot: true, LotPolicy: TrackingPolicyRequired}
+	if err := validateTransferLineTracking(1, lotReq, 4, 0, []stockEntryLotIn{{LotBatchID: 1, Qty: 2}, {LotBatchID: 2, Qty: 2}}, true); err != nil {
+		t.Fatalf("lot sum ok: %v", err)
+	}
+	if err := validateTransferLineTracking(1, lotReq, 4, 0, []stockEntryLotIn{{LotBatchID: 1, Qty: 1}}, true); err == nil {
+		t.Fatal("expected lot sum mismatch")
+	}
+	if got := serialLotAttachmentCount(3, 2); got != 5 {
+		t.Fatalf("count=%d", got)
+	}
+}

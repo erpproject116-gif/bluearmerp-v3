@@ -2,30 +2,80 @@ import { Index, Show } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { LotLineCell } from "../../shared/LotLineCell";
+import { SerialLineCell } from "../../shared/SerialLineCell";
 import { inputClass } from "../../shared/SpreadsheetGrid";
 
 export type LocationTransferLineRow = {
   line_no: number;
   item_id: number | null;
   item_label: string;
+  item_code?: string;
+  item_name?: string;
   qty: string;
   remark: string;
+  track_serial?: boolean;
+  track_lot?: boolean;
+  serial_policy?: string;
+  lot_policy?: string;
+  serial_unit_ids?: number[];
+  serial_labels?: string;
+  lot_batch_id?: number | null;
+  lot_no?: string;
 };
 
 export function emptyTransferLine(lineNo: number): LocationTransferLineRow {
-  return { line_no: lineNo, item_id: null, item_label: "", qty: "1", remark: "" };
+  return {
+    line_no: lineNo,
+    item_id: null,
+    item_label: "",
+    qty: "1",
+    remark: "",
+    serial_unit_ids: [],
+    serial_labels: "",
+    lot_batch_id: null,
+    lot_no: "",
+  };
 }
+
+type ItemLookup = {
+  id: number;
+  item_code: string;
+  item_name: string;
+  track_serial?: boolean;
+  track_lot?: boolean;
+  serial_policy?: string;
+  lot_policy?: string;
+};
 
 async function fetchItems(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
   if (q) qs.set("q", q);
-  const res = await apiFetch<{ id: number; item_code: string; item_name: string }[]>(`/api/v1/inventory/items?${qs}`);
-  return (res.data ?? []).map((i) => ({ id: i.id, label: `${i.item_code} — ${i.item_name}` }));
+  const res = await apiFetch<ItemLookup[]>(`/api/v1/inventory/items?${qs}`);
+  return (res.data ?? []).map((i) => ({
+    id: i.id,
+    label: `${i.item_code} — ${i.item_name}`,
+    meta: {
+      item_code: i.item_code,
+      item_name: i.item_name,
+      track_serial: Boolean(i.track_serial),
+      track_lot: Boolean(i.track_lot),
+      serial_policy: i.serial_policy ?? "required",
+      lot_policy: i.lot_policy ?? "required",
+    },
+  }));
+}
+
+function trackingCount(line: LocationTransferLineRow): number {
+  if (line.track_serial) return line.serial_unit_ids?.length ?? 0;
+  if (line.track_lot && line.lot_batch_id) return 1;
+  return 0;
 }
 
 type Props = {
   lines: Accessor<LocationTransferLineRow[]>;
   onChange: Setter<LocationTransferLineRow[]>;
+  fromLocationId: Accessor<number | null>;
   disabled?: boolean;
   errors?: Record<string, string | undefined>;
 };
@@ -50,7 +100,9 @@ export function LocationTransferLineGrid(props: Props) {
       <div class="flex items-center justify-between">
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Line items</h3>
-          <p class="text-xs text-text-secondary">Qty out and Qty in are the same item quantity.</p>
+          <p class="text-xs text-text-secondary">
+            Qty out and Qty in are the same item quantity. Serial/Lot is a tracking count only.
+          </p>
         </div>
         <Show when={!props.disabled}>
           <button type="button" class="rounded border border-stroke px-2 py-1 text-xs hover:bg-slate-50" onClick={addLine}>
@@ -66,8 +118,9 @@ export function LocationTransferLineGrid(props: Props) {
               <th class="px-2 py-2">Item</th>
               <th class="px-2 py-2 text-right">Qty out</th>
               <th class="px-2 py-2 text-right">Qty in</th>
+              <th class="px-2 py-2">Serial / Lot</th>
+              <th class="px-2 py-2 text-right">Count</th>
               <th class="px-2 py-2">Remark</th>
-              <th class="px-2 py-2 text-right">Serial/Lot</th>
               <th class="px-2 py-2" />
             </tr>
           </thead>
@@ -84,8 +137,35 @@ export function LocationTransferLineGrid(props: Props) {
                       error={props.errors?.[`lines[${index}].item_id`]}
                       disabled={props.disabled}
                       onInput={(v) => updateLine(index, { item_label: v })}
-                      onSelect={(o) => updateLine(index, { item_id: o.id, item_label: o.label })}
-                      onClear={() => updateLine(index, { item_id: null, item_label: "" })}
+                      onSelect={(o) => {
+                        const meta = o.meta ?? {};
+                        updateLine(index, {
+                          item_id: o.id,
+                          item_label: o.label,
+                          item_code: String(meta.item_code ?? ""),
+                          item_name: String(meta.item_name ?? ""),
+                          track_serial: Boolean(meta.track_serial),
+                          track_lot: Boolean(meta.track_lot),
+                          serial_policy: String(meta.serial_policy ?? "required"),
+                          lot_policy: String(meta.lot_policy ?? "required"),
+                          serial_unit_ids: [],
+                          serial_labels: "",
+                          lot_batch_id: null,
+                          lot_no: "",
+                        });
+                      }}
+                      onClear={() =>
+                        updateLine(index, {
+                          item_id: null,
+                          item_label: "",
+                          track_serial: false,
+                          track_lot: false,
+                          serial_unit_ids: [],
+                          serial_labels: "",
+                          lot_batch_id: null,
+                          lot_no: "",
+                        })
+                      }
                       fetchOptions={fetchItems}
                     />
                   </td>
@@ -104,6 +184,56 @@ export function LocationTransferLineGrid(props: Props) {
                     {line().qty || "—"}
                   </td>
                   <td class="min-w-[10rem] px-2 py-1.5">
+                    <Show when={line().item_id && line().track_serial}>
+                      <SerialLineCell
+                        mode="units"
+                        itemId={line().item_id}
+                        itemCode={line().item_code}
+                        itemName={line().item_name}
+                        locationId={props.fromLocationId()}
+                        qty={Number(line().qty) || 1}
+                        serialUnitIds={line().serial_unit_ids ?? []}
+                        serialLabels={line().serial_labels}
+                        disabled={props.disabled || !props.fromLocationId()}
+                        onChange={(ids, labels, qty) => {
+                          updateLine(index, {
+                            serial_unit_ids: ids,
+                            serial_labels: labels,
+                            qty: qty ?? String(ids.length || line().qty),
+                            lot_batch_id: null,
+                            lot_no: "",
+                          });
+                        }}
+                      />
+                    </Show>
+                    <Show when={line().item_id && line().track_lot && !line().track_serial}>
+                      <LotLineCell
+                        itemId={line().item_id!}
+                        locationId={props.fromLocationId()}
+                        lotBatchId={line().lot_batch_id}
+                        lotNo={line().lot_no}
+                        disabled={props.disabled || !props.fromLocationId()}
+                        onChange={(lotBatchId, lotNo) => {
+                          updateLine(index, {
+                            lot_batch_id: lotBatchId,
+                            lot_no: lotNo,
+                            serial_unit_ids: [],
+                            serial_labels: "",
+                          });
+                        }}
+                      />
+                    </Show>
+                    <Show when={line().item_id && !line().track_serial && !line().track_lot}>
+                      <span class="text-xs text-text-secondary">Not tracked</span>
+                    </Show>
+                    <Show when={!line().item_id}>
+                      <span class="text-xs text-text-secondary">—</span>
+                    </Show>
+                  </td>
+                  <td class="px-2 py-1.5 text-right tabular-nums text-text-secondary">
+                    {trackingCount(line()) > 0 ? trackingCount(line()) : "—"}
+                  </td>
+                  <td class="min-w-[10rem] px-2 py-1.5">
                     <input
                       class={inputClass}
                       value={line().remark}
@@ -112,7 +242,6 @@ export function LocationTransferLineGrid(props: Props) {
                       onInput={(e) => updateLine(index, { remark: e.currentTarget.value })}
                     />
                   </td>
-                  <td class="px-2 py-1.5 text-right tabular-nums text-text-secondary">—</td>
                   <td class="px-2 py-1.5">
                     <Show when={!props.disabled && props.lines().length > 1}>
                       <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeLine(index)}>

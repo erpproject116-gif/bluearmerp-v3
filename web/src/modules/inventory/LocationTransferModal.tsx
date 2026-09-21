@@ -47,6 +47,13 @@ export type LocationTransferDetail = {
     qty: number;
     remark?: string;
     serial_lot_count?: number;
+    serial_unit_ids?: number[];
+    lot_batch_id?: number | null;
+    lot_no?: string;
+    track_serial?: boolean;
+    track_lot?: boolean;
+    serial_policy?: string;
+    lot_policy?: string;
   }>;
 };
 
@@ -131,8 +138,18 @@ export function LocationTransferModal(props: Props) {
         line_no: ln.line_no || i + 1,
         item_id: ln.item_id,
         item_label: `${ln.item_code} — ${ln.item_name}`,
+        item_code: ln.item_code,
+        item_name: ln.item_name,
         qty: String(ln.qty),
         remark: ln.remark ?? "",
+        track_serial: Boolean(ln.track_serial),
+        track_lot: Boolean(ln.track_lot),
+        serial_policy: ln.serial_policy ?? "required",
+        lot_policy: ln.lot_policy ?? "required",
+        serial_unit_ids: ln.serial_unit_ids ?? [],
+        serial_labels: "",
+        lot_batch_id: ln.lot_batch_id ?? null,
+        lot_no: ln.lot_no ?? "",
       })) ?? [emptyTransferLine(1)];
     setLines(mapped.length ? mapped : [emptyTransferLine(1)]);
   };
@@ -181,6 +198,8 @@ export function LocationTransferModal(props: Props) {
         item_id: ln.item_id!,
         qty: Number(ln.qty),
         remark: ln.remark.trim(),
+        serial_unit_ids: ln.track_serial && ln.serial_unit_ids?.length ? ln.serial_unit_ids : undefined,
+        lot_batch_id: ln.track_lot && ln.lot_batch_id ? ln.lot_batch_id : undefined,
       })),
   });
 
@@ -396,7 +415,13 @@ export function LocationTransferModal(props: Props) {
             <AttachmentsField scope="inventory/stock-entries" docId={entryId()!} formOpen={props.open} />
           </div>
         </Show>
-        <LocationTransferLineGrid lines={lines} onChange={setLines} disabled={readOnly()} errors={fieldErrors()} />
+        <LocationTransferLineGrid
+          lines={lines}
+          onChange={setLines}
+          fromLocationId={fromLocId}
+          disabled={readOnly()}
+          errors={fieldErrors()}
+        />
       </div>
     </WideEntityModal>
   );
