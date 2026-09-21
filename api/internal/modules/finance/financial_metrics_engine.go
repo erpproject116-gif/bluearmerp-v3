@@ -84,35 +84,53 @@ func loadWindowTotals(ctx context.Context, q querier, tenantID int64, from, to t
 	if err != nil {
 		return WindowTotals{}, err
 	}
+	ap, err := loadBalanceClass(ctx, q, tenantID, to, "ap")
+	if err != nil {
+		return WindowTotals{}, err
+	}
 
-	return DeriveWindowTotals(revenue, cogs, opex, cash, ar, hasJE), nil
+	return DeriveWindowTotals(revenue, cogs, opex, cash, ar, ap, hasJE), nil
 }
 
 func loadBalanceClass(ctx context.Context, q querier, tenantID int64, asOf time.Time, class string) (float64, error) {
 	var role financedefaults.Role
-	var groupCode, leafFallback string
+	var groupCode, leafFallback, accountType, defaultsCol string
+	liability := false
 	switch class {
 	case "cash":
 		role = financedefaults.RoleCash
 		groupCode = "1005"
 		leafFallback = "1010"
+		accountType = "asset"
+		defaultsCol = "cash_account_id"
 	case "ar":
 		role = financedefaults.RoleReceivable
 		groupCode = "1095"
 		leafFallback = "1100"
+		accountType = "asset"
+		defaultsCol = "receivable_account_id"
+	case "ap":
+		role = financedefaults.RolePayable
+		groupCode = "2005"
+		leafFallback = "2010"
+		accountType = "liability"
+		defaultsCol = "payable_account_id"
+		liability = true
 	default:
 		return 0, nil
 	}
 
 	var roleID int64
-	col := "cash_account_id"
-	if class == "ar" {
-		col = "receivable_account_id"
-	}
 	_ = q.QueryRow(ctx, `
-		select coalesce(`+col+`, 0)
+		select coalesce(`+defaultsCol+`, 0)
 		from public.tenant_finance_defaults where tenant_id = $1 limit 1`, tenantID).Scan(&roleID)
-	_ = role // RoleCash / RoleReceivable documented; ID from tenant_finance_defaults
+	_ = role
+
+	sumExpr := "coalesce(sum(l.debit - l.credit), 0)::float8"
+	if liability {
+		// Normal credit balance → positive AP owed.
+		sumExpr = "coalesce(sum(l.credit - l.debit), 0)::float8"
+	}
 
 	var bal float64
 	err := q.QueryRow(ctx, `
@@ -131,15 +149,15 @@ func loadBalanceClass(ctx context.Context, q querier, tenantID int64, asOf time.
 		  join roots r on child.parent_id = r.id
 		  where child.tenant_id = $1 and child.deleted_at is null
 		)
-		select coalesce(sum(l.debit - l.credit), 0)::float8
+		select `+sumExpr+`
 		from public.fin_journal_entry_lines l
 		join public.fin_journal_entries je on je.id = l.journal_entry_id
 		join public.fin_accounts a on a.id = l.account_id
 		where je.tenant_id = $1 and je.status = 'posted'
 		  and je.entry_date <= $5::date
 		  and coalesce(a.is_group, false) = false
-		  and a.account_type = 'asset'
-		  and a.id in (select id from roots)`, tenantID, groupCode, leafFallback, roleID, asOf).Scan(&bal)
+		  and a.account_type = $6
+		  and a.id in (select id from roots)`, tenantID, groupCode, leafFallback, roleID, asOf, accountType).Scan(&bal)
 	return bal, err
 }
 

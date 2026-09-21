@@ -9,8 +9,9 @@ package finance
 //   net_profit     = revenue - total_expense
 // COGS vs OpEx: expense accounts under CoA group 5005 (Cost of Sales), account 5010,
 // or the tenant RoleCOGS default → COGS; all other expense → operating_expenses.
-// BALANCE metrics (cash, AR): ending balance as of date_to = sum(debit-credit) for
-// classified asset accounts with entry_date <= date_to (not period sum).
+// BALANCE metrics (cash, AR, AP): ending balance as of date_to.
+//   cash / AR (asset) = sum(debit-credit) for classified accounts with entry_date <= date_to
+//   AP (liability)    = sum(credit-debit) so a normal credit balance reads positive
 // Branch filter: deferred — fin_journal_entries has no branch_id.
 // Fiscal YTD: fin_fiscal_years.start_date containing date_to, else calendar Jan 1.
 
@@ -44,6 +45,7 @@ const (
 	MetricNetMarginPct        MetricKey = "net_margin_pct"
 	MetricCash                MetricKey = "cash"
 	MetricAccountsReceivable  MetricKey = "accounts_receivable"
+	MetricAccountsPayable     MetricKey = "accounts_payable"
 )
 
 // MetricDef is the reusable metric dictionary entry.
@@ -65,6 +67,7 @@ func MetricDictionary() []MetricDef {
 		{Key: MetricNetProfit, Label: "Net Profit", Type: MetricFlow, PreferredDirection: PreferUp, Format: "money", PrimaryKPI: true},
 		{Key: MetricCash, Label: "Cash", Type: MetricBalance, PreferredDirection: PreferUp, Format: "money", PrimaryKPI: true},
 		{Key: MetricAccountsReceivable, Label: "Accounts Receivable", Type: MetricBalance, PreferredDirection: PreferDown, Format: "money", PrimaryKPI: true},
+		{Key: MetricAccountsPayable, Label: "Accounts Payable", Type: MetricBalance, PreferredDirection: PreferDown, Format: "money", PrimaryKPI: true},
 		{Key: MetricCOGS, Label: "Cost of Goods Sold", Type: MetricFlow, PreferredDirection: PreferDown, Format: "money"},
 		{Key: MetricGrossMarginPct, Label: "Gross Margin %", Type: MetricRatio, PreferredDirection: PreferUp, Format: "percent"},
 		{Key: MetricNetMarginPct, Label: "Net Profit Margin %", Type: MetricRatio, PreferredDirection: PreferUp, Format: "percent"},
@@ -82,11 +85,12 @@ type WindowTotals struct {
 	NetMarginPct       float64 `json:"net_margin_pct"`
 	Cash               float64 `json:"cash"`
 	AccountsReceivable float64 `json:"accounts_receivable"`
+	AccountsPayable    float64 `json:"accounts_payable"`
 	HasJournalData     bool    `json:"has_journal_data"`
 }
 
 // DeriveWindowTotals fills computed fields from revenue/cogs/opex (+ optional balances).
-func DeriveWindowTotals(revenue, cogs, opex, cash, ar float64, hasJE bool) WindowTotals {
+func DeriveWindowTotals(revenue, cogs, opex, cash, ar, ap float64, hasJE bool) WindowTotals {
 	gp := revenue - cogs
 	net := revenue - cogs - opex
 	w := WindowTotals{
@@ -97,6 +101,7 @@ func DeriveWindowTotals(revenue, cogs, opex, cash, ar float64, hasJE bool) Windo
 		NetProfit:          net,
 		Cash:               cash,
 		AccountsReceivable: ar,
+		AccountsPayable:    ap,
 		HasJournalData:     hasJE,
 	}
 	if revenue != 0 {
@@ -127,6 +132,8 @@ func (w WindowTotals) ValueFor(key MetricKey) float64 {
 		return w.Cash
 	case MetricAccountsReceivable:
 		return w.AccountsReceivable
+	case MetricAccountsPayable:
+		return w.AccountsPayable
 	default:
 		return 0
 	}

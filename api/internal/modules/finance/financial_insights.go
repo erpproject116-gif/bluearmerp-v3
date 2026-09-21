@@ -288,6 +288,8 @@ func insightsMetricHref(key MetricKey, from, to time.Time) string {
 		return "/app/finance/acct-i/reports/balance-sheet?" + qs
 	case MetricAccountsReceivable:
 		return "/app/finance/reports/ar-aging"
+	case MetricAccountsPayable:
+		return "/app/finance/reports/ap-aging"
 	default:
 		return "/app/finance/acct-i/reports/profit-and-loss?" + qs
 	}

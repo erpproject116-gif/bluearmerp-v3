@@ -21,7 +21,7 @@ func TestPnLTotalsReconcileToStatementConvention(t *testing.T) {
 }
 
 func TestDeriveWindowTotalsGrossAndMargins(t *testing.T) {
-	w := DeriveWindowTotals(1000, 300, 200, 50, 80, true)
+	w := DeriveWindowTotals(1000, 300, 200, 50, 80, 40, true)
 	if w.GrossProfit != 700 || w.NetProfit != 500 {
 		t.Fatalf("gp=%.2f net=%.2f", w.GrossProfit, w.NetProfit)
 	}
@@ -30,6 +30,9 @@ func TestDeriveWindowTotalsGrossAndMargins(t *testing.T) {
 	}
 	if w.ValueFor(MetricRevenue) != 1000 || w.ValueFor(MetricCash) != 50 {
 		t.Fatalf("ValueFor mismatch")
+	}
+	if w.ValueFor(MetricAccountsPayable) != 40 || w.AccountsPayable != 40 {
+		t.Fatalf("AP ValueFor mismatch: %+v", w)
 	}
 }
 
@@ -123,14 +126,24 @@ func TestResolveComparisonCustom(t *testing.T) {
 	}
 }
 
-func TestMetricDictionaryHasSixPrimaryKPIs(t *testing.T) {
+func TestMetricDictionaryHasSevenPrimaryKPIs(t *testing.T) {
 	n := 0
+	var hasAP bool
 	for _, d := range MetricDictionary() {
 		if d.PrimaryKPI {
 			n++
 		}
+		if d.Key == MetricAccountsPayable {
+			hasAP = true
+			if d.Type != MetricBalance || d.PreferredDirection != PreferDown {
+				t.Fatalf("AP def %+v", d)
+			}
+		}
 	}
-	if n != 6 {
-		t.Fatalf("want 6 primary KPIs, got %d", n)
+	if n != 7 {
+		t.Fatalf("want 7 primary KPIs, got %d", n)
+	}
+	if !hasAP {
+		t.Fatal("missing accounts_payable in dictionary")
 	}
 }
