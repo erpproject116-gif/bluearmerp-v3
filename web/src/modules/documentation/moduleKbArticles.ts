@@ -748,7 +748,7 @@ export const moduleKbArticles: KbArticle[] = [
       },
       {
         type: "tip",
-        text: "If the journal is already posted, account pickers on the Invoice tab lock — adjust GL under Finance → Journal entries instead.",
+        text: "If the journal is already posted, you can still change Acct I/II on the Invoice tab — Save reverses and rebuilds the journal (stock unchanged). Fees and remark can be edited without rebuilding.",
       },
     ],
     primaryHref: "/app/sales/sales/new",

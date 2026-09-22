@@ -156,15 +156,10 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load journal entry.", "ERR_INTERNAL")
 			return
 		}
-		if jeStatus == "posted" {
-			accountsChanged := before.SalesAccountID == nil || before.DepositAccountID == nil ||
-				*before.SalesAccountID != body.SalesAccountID || *before.DepositAccountID != body.DepositAccountID
-			if accountsChanged {
-				response.Validation(w, map[string]string{
-					"journal_entry": "Accounts cannot be changed after the journal entry is posted. Update fees or remark only, or void and repost the invoice to change accounts.",
-				})
-				return
-			}
+		accountsChanged := before.SalesAccountID == nil || before.DepositAccountID == nil ||
+			*before.SalesAccountID != body.SalesAccountID || *before.DepositAccountID != body.DepositAccountID
+		// Posted JE + fees/remark only: keep voucher accounts and JE as-is.
+		if jeStatus == "posted" && !accountsChanged {
 			if _, err := pool.Exec(r.Context(), `
 				update public.sa_sales
 				set invoice_fees = $2, invoice_remark = $3, updated_at = now()
@@ -190,7 +185,16 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		autoPost := readAutoPost(r.Context(), pool, tu.TenantID, "accounts_auto_post_sales")
-		jeID, err := invoicejournal.Sync(r.Context(), pool, tu.TenantID, tu.AppUserID, orderDate, "Sales "+salesNo, existingJE, lines, autoPost)
+		var jeID int64
+		if jeStatus == "posted" && accountsChanged {
+			// Reverse archived JE, then Sync a fresh entry with the new accounts (stock unchanged).
+			jeID, err = invoicejournal.Resync(
+				r.Context(), pool, tu.TenantID, tu.AppUserID, orderDate, "Sales "+salesNo,
+				existingJE, lines, autoPost, "Repost sales "+salesNo+" (account change)",
+			)
+		} else {
+			jeID, err = invoicejournal.Sync(r.Context(), pool, tu.TenantID, tu.AppUserID, orderDate, "Sales "+salesNo, existingJE, lines, autoPost)
+		}
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to build journal entry.", "ERR_INTERNAL")
 			return

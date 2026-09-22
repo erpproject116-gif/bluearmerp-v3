@@ -161,15 +161,10 @@ func putPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load journal entry.", "ERR_INTERNAL")
 			return
 		}
-		if jeStatus == "posted" {
-			accountsChanged := before.PurchaseAccountID == nil || before.WithdrawalAccountID == nil ||
-				*before.PurchaseAccountID != body.PurchaseAccountID || *before.WithdrawalAccountID != body.WithdrawalAccountID
-			if accountsChanged {
-				response.Validation(w, map[string]string{
-					"journal_entry": "Accounts cannot be changed after the journal entry is posted. Update fees or remark only, or void and repost the invoice to change accounts.",
-				})
-				return
-			}
+		accountsChanged := before.PurchaseAccountID == nil || before.WithdrawalAccountID == nil ||
+			*before.PurchaseAccountID != body.PurchaseAccountID || *before.WithdrawalAccountID != body.WithdrawalAccountID
+		// Posted JE + fees/remark only: keep voucher accounts and JE as-is.
+		if jeStatus == "posted" && !accountsChanged {
 			if _, err := pool.Exec(r.Context(), `
 				update public.fin_supplier_invoices
 				set invoice_fees = $2, invoice_remark = $3, updated_at = now()
@@ -253,7 +248,15 @@ func putPurchaseInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		autoPost := siReadAutoPost(r.Context(), pool, tu.TenantID, "accounts_auto_post_purchase")
-		jeID, err := invoicejournal.Sync(r.Context(), pool, tu.TenantID, tu.AppUserID, invoiceDate, "Purchase "+invoiceNo, existingJE, lines, autoPost)
+		var jeID int64
+		if jeStatus == "posted" && accountsChanged {
+			jeID, err = invoicejournal.Resync(
+				r.Context(), pool, tu.TenantID, tu.AppUserID, invoiceDate, "Purchase "+invoiceNo,
+				existingJE, lines, autoPost, "Repost purchase "+invoiceNo+" (account change)",
+			)
+		} else {
+			jeID, err = invoicejournal.Sync(r.Context(), pool, tu.TenantID, tu.AppUserID, invoiceDate, "Purchase "+invoiceNo, existingJE, lines, autoPost)
+		}
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to build journal entry.", "ERR_INTERNAL")
 			return

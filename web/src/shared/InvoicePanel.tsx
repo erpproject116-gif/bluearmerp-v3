@@ -107,7 +107,8 @@ export function InvoicePanel(props: Props) {
   const [purchaseCogsHint, setPurchaseCogsHint] = createSignal(false);
   const [ensuringPurchaseCogs, setEnsuringPurchaseCogs] = createSignal(false);
 
-  const accountsLocked = () => jeStatus() === "posted";
+  /** Posted JE: account edits on Save reverse/rebuild the journal (pickers stay enabled). */
+  const jePosted = () => jeStatus() === "posted";
   const invoiceSaved = () => Boolean(acctIId() && acctIIId());
   const canVoid = () => hasPermission(auth.me, VOID_PERMISSION[props.kind], "write");
 
@@ -377,10 +378,11 @@ export function InvoicePanel(props: Props) {
           </Show>
         </div>
 
-        <Show when={accountsLocked()}>
+        <Show when={jePosted()}>
           <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            The linked journal entry is posted, so Purchases/COGS (or Sales) and Withdrawal/Deposit accounts are locked.
-            You can still update fees and remark. To change accounts, void this invoice voucher and post again (void/repost) — stock is not reversed.{" "}
+            The linked journal entry is posted. You can still change Sales/Purchases and Deposit/Withdrawal accounts —
+            Save will reverse the current journal and rebuild it with the new accounts (stock is not reversed). Fees and
+            remark can be updated without rebuilding.{" "}
             <Show when={jeId()}>
               <A
                 href={`/app/finance/acct-i/journal-entries?highlight=${jeId()}`}
@@ -445,9 +447,8 @@ export function InvoicePanel(props: Props) {
               fetchOptions={(q) => fetchAccountOptions(q, cfg().acctIType)}
               placeholder={props.kind === "purchase" ? "Search expense / COGS…" : "Search account…"}
               required
-              disabled={accountsLocked()}
             />
-            <Show when={props.kind === "purchase" && purchaseCogsHint() && !accountsLocked()}>
+            <Show when={props.kind === "purchase" && purchaseCogsHint()}>
               <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
                 <p class="font-medium">No Purchases / COGS expense account found</p>
                 <p class="mt-0.5 text-amber-900/80">
@@ -472,7 +473,7 @@ export function InvoicePanel(props: Props) {
                 </div>
               </div>
             </Show>
-            <Show when={props.kind === "purchase" && !purchaseCogsHint() && !acctIId() && !accountsLocked()}>
+            <Show when={props.kind === "purchase" && !purchaseCogsHint() && !acctIId()}>
               <p class="text-xs text-slate-500">
                 Prefer the mapped Purchases / COGS default (5010).{" "}
                 <A href="/app/finance/acct-i/chart-of-accounts?focus=purchase#default-account-mappings" class="underline">
@@ -491,7 +492,6 @@ export function InvoicePanel(props: Props) {
             fetchOptions={(q) => fetchAccountOptions(q)}
             placeholder="Search account…"
             required
-            disabled={accountsLocked()}
           />
           <Field label="Fees">
             <input class={inputClass} inputmode="decimal" value={fees()} onInput={(e) => bindDecimalInput(e.currentTarget, setFees)} />
@@ -501,7 +501,7 @@ export function InvoicePanel(props: Props) {
           </Field>
         </div>
 
-        <Show when={jeNo() && !accountsLocked()}>
+        <Show when={jeNo() && !jePosted()}>
           <div class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm">
             Draft journal entry{" "}
             <Show when={jeId()} fallback={<span class="font-medium">{jeNo()}</span>}>
@@ -516,7 +516,7 @@ export function InvoicePanel(props: Props) {
           </div>
         </Show>
 
-        <Show when={jeNo() && accountsLocked()}>
+        <Show when={jeNo() && jePosted()}>
           <div class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm">
             Journal entry:{" "}
             <Show
