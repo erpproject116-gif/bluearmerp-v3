@@ -1,5 +1,6 @@
 import { createSignal, For, onMount, Show } from "solid-js";
-import { createQuery } from "@tanstack/solid-query";
+import { useSearchParams } from "@solidjs/router";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { defaultReportDateRange, ReportPageLayout } from "../../shared/reports/ReportPageLayout";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
@@ -96,6 +97,13 @@ const TAB_LABELS: Record<ReportTab, string> = {
   "waste-variance": "Waste & variance",
 };
 
+const VALID_TABS = Object.keys(TAB_LABELS) as ReportTab[];
+
+function parseReportTab(raw: string | undefined | null): ReportTab {
+  if (raw && (VALID_TABS as string[]).includes(raw)) return raw as ReportTab;
+  return "work-order-status";
+}
+
 function reportPath(tab: ReportTab): string {
   switch (tab) {
     case "work-order-status":
@@ -112,8 +120,10 @@ function reportPath(tab: ReportTab): string {
 }
 
 export default function ProductionReportsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const client = useQueryClient();
   const defaults = defaultReportDateRange();
-  const [tab, setTab] = createSignal<ReportTab>("work-order-status");
+  const tab = () => parseReportTab(typeof searchParams.tab === "string" ? searchParams.tab : null);
   const [draftFilters, setDraftFilters] = createSignal<DateFilters>(defaults);
   const [filters, setFilters] = createSignal<DateFilters>(defaults);
   const [submitted, setSubmitted] = createSignal(true);
@@ -121,8 +131,16 @@ export default function ProductionReportsPage() {
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const pageSize = 50;
 
+  const selectTab = (t: ReportTab) => {
+    setSearchParams({ tab: t }, { replace: true });
+    setPage(1);
+    setGeneratedAt(new Date());
+    void client.invalidateQueries({ queryKey: ["mfg-report"] });
+  };
+
   const report = createQuery(() => {
     const f = filters();
+    const activeTab = tab();
     const qs = new URLSearchParams({
       page: String(page()),
       pageSize: String(pageSize),
@@ -133,9 +151,9 @@ export default function ProductionReportsPage() {
     if (f.bom_type) qs.set("bom_type", f.bom_type);
     if (f.work_order_id) qs.set("work_order_id", String(f.work_order_id));
     return {
-      queryKey: ["mfg-report", tab(), page(), pageSize, f],
+      queryKey: ["mfg-report", activeTab, page(), pageSize, f],
       queryFn: async () => {
-        const res = await apiFetch<unknown[]>(`${reportPath(tab())}?${qs}`);
+        const res = await apiFetch<unknown[]>(`${reportPath(activeTab)}?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load report");
         return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
       },
@@ -153,6 +171,10 @@ export default function ProductionReportsPage() {
   const patch = (p: Partial<DateFilters>) => setDraftFilters((prev) => ({ ...prev, ...p }));
 
   onMount(() => {
+    // Normalize missing/invalid ?tab= so refresh and deep-links stay consistent.
+    if (parseReportTab(typeof searchParams.tab === "string" ? searchParams.tab : null) !== searchParams.tab) {
+      setSearchParams({ tab: tab() }, { replace: true });
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
         e.preventDefault();
@@ -167,16 +189,15 @@ export default function ProductionReportsPage() {
 
   return (
     <>
-      <div class="mb-4 flex flex-wrap gap-2">
-        <For each={(["work-order-status", "progress", "stock-movements", "disassembly-yield", "waste-variance"] as ReportTab[])}>
+      <div class="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Production reports">
+        <For each={VALID_TABS}>
           {(t) => (
             <button
               type="button"
+              role="tab"
+              aria-selected={tab() === t}
               class={`rounded-lg px-3 py-1.5 text-sm ${tab() === t ? "bg-brand-600 text-white" : "border border-stroke text-text-secondary"}`}
-              onClick={() => {
-                setTab(t);
-                setPage(1);
-              }}
+              onClick={() => selectTab(t)}
             >
               {TAB_LABELS[t]}
             </button>
@@ -186,7 +207,7 @@ export default function ProductionReportsPage() {
 
       <ReportPageLayout
         title={TAB_LABELS[tab()]}
-        description="Production reports for jobs (work orders): status, progress (planned vs weighed lots), and stock movements. Set date range and filters, then Search (F8)."
+        description="Production reports for jobs (work orders): status, progress (planned vs weighed lots), stock movements, cutting yield, and waste. Set date range and filters, then Search (F8)."
         dateFrom={() => draftFilters().date_from}
         dateTo={() => draftFilters().date_to}
         onDateFromChange={(v) => patch({ date_from: v })}
@@ -252,6 +273,12 @@ export default function ProductionReportsPage() {
           </div>
         }
       >
+        <Show when={report.isError}>
+          <p class="mx-5 my-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+            {(report.error as Error)?.message ?? "Failed to load report."} Try Search (F8) again or widen the date range.
+          </p>
+        </Show>
+
         <Show when={tab() === "work-order-status"}>
           <table class="erp-grid min-w-full text-left text-sm">
             <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
@@ -466,8 +493,10 @@ export default function ProductionReportsPage() {
           </table>
         </Show>
 
-        <Show when={submitted() && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
-          <p class="px-5 py-8 text-center text-sm text-text-secondary">No rows in this date range.</p>
+        <Show when={submitted() && !report.isError && (report.data?.rows?.length ?? 0) === 0 && !report.isFetching}>
+          <p class="px-5 py-8 text-center text-sm text-text-secondary">
+            No {TAB_LABELS[tab()]} rows in this date range.
+          </p>
         </Show>
       </ReportPageLayout>
     </>

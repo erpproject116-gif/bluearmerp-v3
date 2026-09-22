@@ -291,6 +291,15 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         moduleId: "production",
       },
       {
+        id: "production_waste",
+        label: "Waste & variance",
+        href: "/app/production/reports?tab=waste-variance",
+        iconId: "reports",
+        topId: "inv1",
+        expandGroupId: "production_process",
+        moduleId: "production",
+      },
+      {
         id: "production_setup",
         label: "Setup",
         href: "/app/production/setup",

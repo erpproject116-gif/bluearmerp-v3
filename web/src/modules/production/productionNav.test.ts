@@ -24,6 +24,7 @@ describe("production nav", () => {
       "production_disassembly",
       "production_recipe",
       "production_reports",
+      "production_waste",
       "production_setup",
     ]);
     expect(production!.children?.find((c) => c.id === "production_disassembly")?.label).toBe("Cutting");
@@ -40,6 +41,10 @@ describe("production nav", () => {
     expect(production!.children?.find((c) => c.id === "production_all")?.href).toBe(
       "/app/production/all/jobs",
     );
+    expect(production!.children?.find((c) => c.id === "production_waste")?.href).toBe(
+      "/app/production/reports?tab=waste-variance",
+    );
+    expect(production!.children?.find((c) => c.id === "production_waste")?.label).toBe("Waste & variance");
   });
 
   it("does not render duplicate header feature tabs for empty features", () => {

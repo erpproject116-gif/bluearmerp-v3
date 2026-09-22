@@ -319,7 +319,16 @@ export function SidebarNav() {
       );
     }
     if (area.id === "production_reports") {
-      return pathStarts(p, ["/app/production/reports"]);
+      return (
+        pathStarts(p, ["/app/production/reports"]) &&
+        new URLSearchParams(loc.search).get("tab") !== "waste-variance"
+      );
+    }
+    if (area.id === "production_waste") {
+      return (
+        pathStarts(p, ["/app/production/reports"]) &&
+        new URLSearchParams(loc.search).get("tab") === "waste-variance"
+      );
     }
     if (area.id === "production_setup") {
       return pathStarts(p, ["/app/production/setup"]);
