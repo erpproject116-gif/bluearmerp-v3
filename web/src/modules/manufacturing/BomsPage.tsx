@@ -162,7 +162,7 @@ async function fetchItems(q: string): Promise<LookupOption[]> {
   }));
 }
 
-/** Resolve code / base UoM / cost for a picked item (refetch when list meta is thin). */
+/** Resolve code / base UoM / cost for a picked item (always detail-fetch so cost/UoM are reliable). */
 async function resolveItemPickMeta(opt: LookupOption): Promise<ItemPickMeta> {
   const meta = (opt.meta ?? {}) as Partial<ItemPickMeta>;
   const fromLabel = opt.label.split("—").map((s) => s.trim());
@@ -174,8 +174,7 @@ async function resolveItemPickMeta(opt: LookupOption): Promise<ItemPickMeta> {
   let purchase = Number(meta.purchase_price);
   if (!Number.isFinite(purchase) || purchase < 0) purchase = 0;
 
-  const needsDetail = !itemCode || !baseUnitId || !baseUnitCode;
-  if (needsDetail && opt.id > 0) {
+  if (opt.id > 0) {
     const res = await apiFetch<{
       item_code?: string;
       item_name?: string;
@@ -191,7 +190,7 @@ async function resolveItemPickMeta(opt: LookupOption): Promise<ItemPickMeta> {
       }
       baseUnitCode = (res.data.base_unit_code ?? baseUnitCode).trim();
       const p = Number(res.data.purchase_price);
-      if (Number.isFinite(p) && p > 0) purchase = p;
+      if (Number.isFinite(p) && p >= 0) purchase = p;
     }
   }
 
@@ -889,9 +888,52 @@ export default function BomsPage() {
                     selectedId={() => lines()[idx()]?.component_item_id || null}
                     onInput={(v) => setLineLabels((p) => ({ ...p, [idx()]: v }))}
                     onSelect={(o) => {
+                      const lineIdx = idx();
+                      const meta = (o.meta ?? {}) as Partial<ItemPickMeta>;
+                      // Lock id + label immediately so LookupCombo selectedId sticks during detail fetch.
+                      setLines((prev) =>
+                        prev.map((row, i) => {
+                          if (i !== lineIdx) return row;
+                          const qty = Number(row.qty) > 0 ? Number(row.qty) : 1;
+                          const optimisticCost =
+                            meta.purchase_price != null && Number(meta.purchase_price) > 0
+                              ? Number(meta.purchase_price)
+                              : row.unit_cost ?? 0;
+                          return {
+                            ...row,
+                            component_item_id: o.id,
+                            component_code: (meta.item_code ?? "").trim() || row.component_code,
+                            component_name: (meta.item_name ?? "").trim() || row.component_name,
+                            qty,
+                            unit_id:
+                              meta.base_unit_id != null && Number(meta.base_unit_id) > 0
+                                ? Number(meta.base_unit_id)
+                                : row.unit_id,
+                            unit_code: (meta.base_unit_code ?? "").trim() || row.unit_code,
+                            base_unit_id:
+                              meta.base_unit_id != null && Number(meta.base_unit_id) > 0
+                                ? Number(meta.base_unit_id)
+                                : row.base_unit_id,
+                            base_unit_code: (meta.base_unit_code ?? "").trim() || row.base_unit_code,
+                            unit_cost: optimisticCost,
+                            line_total: optimisticCost * qty,
+                          };
+                        }),
+                      );
+                      setLineLabels((p) => ({ ...p, [lineIdx]: o.label }));
+                      if (meta.base_unit_code) {
+                        setLineUnitLabels((p) => ({
+                          ...p,
+                          [lineIdx]: formatUnitLabel({
+                            code: String(meta.base_unit_code),
+                            name: String(meta.base_unit_code),
+                          }),
+                        }));
+                      }
                       void (async () => {
-                        const lineIdx = idx();
                         const pick = await resolveItemPickMeta(o);
+                        // Stale pick if user changed the line while detail was loading.
+                        if (lines()[lineIdx]?.component_item_id !== o.id) return;
                         if (!pick.base_unit_id) {
                           setFieldErrors((prev) => ({
                             ...prev,
@@ -907,7 +949,7 @@ export default function BomsPage() {
                         const unitCost = pick.purchase_price > 0 ? pick.purchase_price : 0;
                         setLines((prev) =>
                           prev.map((row, i) => {
-                            if (i !== lineIdx) return row;
+                            if (i !== lineIdx || row.component_item_id !== o.id) return row;
                             const qty = Number(row.qty) > 0 ? Number(row.qty) : 1;
                             return {
                               ...row,
@@ -965,6 +1007,7 @@ export default function BomsPage() {
                             : row,
                         ),
                       );
+                      setLineLabels((p) => ({ ...p, [lineIdx]: "" }));
                       setLineUnitLabels((p) => ({ ...p, [lineIdx]: "" }));
                     }}
                     fetchOptions={fetchItems}

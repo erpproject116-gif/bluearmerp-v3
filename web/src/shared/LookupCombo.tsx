@@ -209,6 +209,7 @@ export function LookupCombo(props: Props) {
                 (opts.length === 1 ? opts[0] : undefined);
               if (hit) {
                 props.onSelect(hit);
+                props.onInput(hit.label);
                 setDraft(hit.label);
                 setOpen(false);
               }
@@ -228,6 +229,7 @@ export function LookupCombo(props: Props) {
                 });
               if (hit) {
                 props.onSelect(hit);
+                props.onInput(hit.label);
                 setDraft(hit.label);
               }
             }
@@ -291,6 +293,7 @@ export function LookupCombo(props: Props) {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           props.onSelect(opt);
+                          props.onInput(opt.label);
                           setDraft(opt.label);
                           setOpen(false);
                         }}

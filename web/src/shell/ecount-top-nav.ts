@@ -257,7 +257,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "production_assembly",
         label: "Assembly",
-        href: "/app/production/assembly/jobs",
+        href: "/app/production/assembly/recipes",
         iconId: "production_assembly",
         topId: "inv1",
         expandGroupId: "production_process",
@@ -266,7 +266,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "production_disassembly",
         label: "Cutting",
-        href: "/app/production/disassembly/jobs",
+        href: "/app/production/disassembly/recipes",
         iconId: "production_cutting",
         topId: "inv1",
         expandGroupId: "production_process",
@@ -275,7 +275,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "production_recipe",
         label: "Recipe",
-        href: "/app/production/recipe/jobs",
+        href: "/app/production/recipe/recipes",
         iconId: "production_recipe",
         topId: "inv1",
         expandGroupId: "production_process",
