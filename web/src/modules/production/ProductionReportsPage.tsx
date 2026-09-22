@@ -99,6 +99,16 @@ const TAB_LABELS: Record<ReportTab, string> = {
 
 const VALID_TABS = Object.keys(TAB_LABELS) as ReportTab[];
 
+function rawTab(params: { tab?: string | string[] }): string | null {
+  const t = params.tab;
+  if (Array.isArray(t)) {
+    const first = t.find((x) => typeof x === "string" && x.trim().length > 0);
+    return first?.trim() || null;
+  }
+  if (typeof t === "string" && t.trim().length > 0) return t.trim();
+  return null;
+}
+
 function parseReportTab(raw: string | undefined | null): ReportTab {
   if (raw && (VALID_TABS as string[]).includes(raw)) return raw as ReportTab;
   return "work-order-status";
@@ -123,7 +133,7 @@ export default function ProductionReportsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const client = useQueryClient();
   const defaults = defaultReportDateRange();
-  const tab = () => parseReportTab(typeof searchParams.tab === "string" ? searchParams.tab : null);
+  const tab = () => parseReportTab(rawTab(searchParams));
   const [draftFilters, setDraftFilters] = createSignal<DateFilters>(defaults);
   const [filters, setFilters] = createSignal<DateFilters>(defaults);
   const [submitted, setSubmitted] = createSignal(true);
@@ -171,9 +181,11 @@ export default function ProductionReportsPage() {
   const patch = (p: Partial<DateFilters>) => setDraftFilters((prev) => ({ ...prev, ...p }));
 
   onMount(() => {
-    // Normalize missing/invalid ?tab= so refresh and deep-links stay consistent.
-    if (parseReportTab(typeof searchParams.tab === "string" ? searchParams.tab : null) !== searchParams.tab) {
-      setSearchParams({ tab: tab() }, { replace: true });
+    // Only rewrite invalid ?tab= values. Never invent a default when tab is missing —
+    // that raced with sidebar deep-links (?tab=waste-variance) and wiped them.
+    const raw = rawTab(searchParams);
+    if (raw && !(VALID_TABS as string[]).includes(raw)) {
+      setSearchParams({ tab: parseReportTab(raw) }, { replace: true });
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F8") {
