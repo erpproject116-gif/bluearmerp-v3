@@ -153,16 +153,6 @@ export default function StockAdjustmentsPage() {
     invalidate();
   };
 
-  const reset = () => {
-    const d = defaultDateRange();
-    setDateFrom(d.from);
-    setDateTo(d.to);
-    setStatus("");
-    setDraftQ("");
-    setQ("");
-    setPage(1);
-  };
-
   const clearDates = () => {
     setDateFrom("");
     setDateTo("");
@@ -216,41 +206,7 @@ export default function StockAdjustmentsPage() {
     <div class="space-y-4">
       <CollapsibleFilterPanel
         title="Stock adjustments"
-        description="Quantity change requests by item and location. Stock updates only after approval. Pending items also appear in Approvals. Default range is the last 90 days — clear dates to see all. Search (F8)."
-        actions={
-          <>
-            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
-              Search (F8)
-            </button>
-            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
-              Reset to 90 days
-            </button>
-            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={clearDates}>
-              All dates
-            </button>
-            <A
-              href="/app/dashboard/approvals"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
-            >
-              Approvals
-            </A>
-            <A
-              href="/app/inventory/items"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
-            >
-              Items
-            </A>
-            <A
-              href="/app/inventory/stock-movements"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50"
-            >
-              Stock movements
-            </A>
-            <button type="button" class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={openNew}>
-              New adjustment
-            </button>
-          </>
-        }
+        description="Quantity change requests by item and location. Stock updates only after approval. Pending items also appear in Approvals. Default range is the last 90 days — clear the date filters to see all. Press F8 to search."
       >
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Field label="Keyword">
@@ -427,9 +383,8 @@ export default function StockAdjustmentsPage() {
         <div class="mt-4 rounded-xl border border-dashed border-stroke bg-slate-50/80 px-6 py-8 text-center">
           <p class="text-sm font-medium text-text-primary">No stock adjustment requests in this view</p>
           <p class="mx-auto mt-2 max-w-lg text-sm text-text-secondary">
-            The list defaults to the last 90 days. Use <span class="font-medium">All dates</span> if older requests
-            exist, or create a new request. You can also check items on the Items page and click Stock adjustment to
-            pre-fill lines.
+            The list defaults to the last 90 days. Clear the date filters below if older requests exist, or create a new
+            request. You can also open Items and click Stock adjustment to pre-fill lines.
           </p>
           <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
             <button

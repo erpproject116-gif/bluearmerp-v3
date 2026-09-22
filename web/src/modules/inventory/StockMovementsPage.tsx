@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { A, useSearchParams } from "@solidjs/router";
+import { useSearchParams } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
@@ -8,7 +8,6 @@ import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
-import { StockEntryModal, type StockEntryReasonPreset, type StockEntryType } from "./StockEntryModal";
 
 export type StockMovementRow = {
   id: number;
@@ -47,9 +46,6 @@ export default function StockMovementsPage() {
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("created_at", 25, { defaultOrder: "desc" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
-  const [entryOpen, setEntryOpen] = createSignal(false);
-  const [entryType, setEntryType] = createSignal<StockEntryType>("transfer");
-  const [entryReason, setEntryReason] = createSignal<StockEntryReasonPreset>("");
   const [movementType, setMovementType] = createSignal("");
   const [draftQ, setDraftQ] = createSignal("");
   const initialDates = defaultDateRange();
@@ -104,60 +100,11 @@ export default function StockMovementsPage() {
     invalidate();
   };
 
-  const reset = () => {
-    const d = defaultDateRange();
-    setDateFrom(d.from);
-    setDateTo(d.to);
-    setMovementType("");
-    setDraftQ("");
-    setQ("");
-    setPage(1);
-  };
-
-  const openEntry = (type: StockEntryType, reason: StockEntryReasonPreset = "") => {
-    setEntryType(type);
-    setEntryReason(reason);
-    setEntryOpen(true);
-  };
-
   return (
     <div class="space-y-4">
       <CollapsibleFilterPanel
         title="Stock Movements"
-        description="Showing the last 90 days by default. Clear dates to see all history. Movements appear after Purchases (auto-receive), Purchase Receive, Stock Entry, Sales, or adjustments. Search (F8)."
-        actions={
-          <>
-            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
-              Search (F8)
-            </button>
-            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
-              Reset to 90 days
-            </button>
-            <A href="/app/inventory/stock-entries" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50">
-              Location Transfer
-            </A>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
-              onClick={() => openEntry("issue", "internal_use")}
-            >
-              Internal use
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50"
-              onClick={() => openEntry("issue", "product_defect")}
-            >
-              Product defect
-            </button>
-            <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50" onClick={() => setAdjustOpen(true)}>
-              Stock adjustment
-            </button>
-            <A href="/app/inventory/stock-adjustments" class="rounded-lg border border-stroke px-3 py-2 text-sm hover:bg-slate-50">
-              Adjustment history
-            </A>
-          </>
-        }
+        description="Showing the last 90 days by default. Clear dates to see all history. Movements appear after Purchases (auto-receive), Purchase Receive, Stock Entry, Sales, or adjustments. Press F8 to search."
       >
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Field label="Keyword">
@@ -239,15 +186,6 @@ export default function StockMovementsPage() {
       </Show>
 
       <StockAdjustmentModal open={adjustOpen()} onClose={() => setAdjustOpen(false)} onSaved={invalidate} />
-      <StockEntryModal
-        open={entryOpen()}
-        onClose={() => setEntryOpen(false)}
-        onCreated={invalidate}
-        initialType={entryType()}
-        initialReason={entryReason()}
-        lockType
-        autoPost
-      />
     </div>
   );
 }

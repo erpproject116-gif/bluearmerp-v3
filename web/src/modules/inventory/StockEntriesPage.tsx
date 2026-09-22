@@ -1,5 +1,4 @@
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
-import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
@@ -134,13 +133,6 @@ export default function StockEntriesPage() {
     invalidate();
   };
 
-  const reset = () => {
-    setDraftQ("");
-    setQ("");
-    setStatus("");
-    setPage(1);
-  };
-
   const openNew = () => {
     setEditing(null);
     setCreateOpen(true);
@@ -178,26 +170,7 @@ export default function StockEntriesPage() {
     <div class="space-y-4">
       <CollapsibleFilterPanel
         title="Location Transfer"
-        description="Move stock between locations. Qty out and Qty in are the same item quantity; Serial/Lot is a tracking count. Search (F8)."
-        actions={
-          <>
-            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={search}>
-              Search (F8)
-            </button>
-            <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50" onClick={reset}>
-              Reset
-            </button>
-            <A href="/app/inventory/stock-movements" class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50">
-              Stock movements
-            </A>
-            <A href="/app/inventory/stock-adjustments" class="rounded-lg border border-stroke px-3 py-2 text-sm text-text-secondary hover:bg-slate-50">
-              Adjustments
-            </A>
-            <button type="button" class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={openNew}>
-              New transfer
-            </button>
-          </>
-        }
+        description="Move stock between locations. Qty out and Qty in are the same item quantity; Serial/Lot is a tracking count. Press F8 to search."
       >
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Field label="Keyword">
