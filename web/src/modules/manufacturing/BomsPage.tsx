@@ -267,6 +267,7 @@ export default function BomsPage() {
   const [outputQty, setOutputQty] = createSignal("1");
   const [outputUnitId, setOutputUnitId] = createSignal<number | null>(null);
   const [outputUnitLabel, setOutputUnitLabel] = createSignal("");
+  const [headerMissingBaseUnit, setHeaderMissingBaseUnit] = createSignal(false);
   const [yieldPct, setYieldPct] = createSignal("100");
   const [expectedYieldMin, setExpectedYieldMin] = createSignal("");
   const [expectedYieldMax, setExpectedYieldMax] = createSignal("");
@@ -349,6 +350,7 @@ export default function BomsPage() {
     setOutputQty("1");
     setOutputUnitId(null);
     setOutputUnitLabel("");
+    setHeaderMissingBaseUnit(false);
     setYieldPct("100");
     setExpectedYieldMin("");
     setExpectedYieldMax("");
@@ -388,6 +390,7 @@ export default function BomsPage() {
     setOutputQty(String(detail.output_qty ?? 1));
     setOutputUnitId(detail.output_unit_id ?? null);
     setOutputUnitLabel(detail.output_unit_code ?? "");
+    setHeaderMissingBaseUnit(false);
     setYieldPct(String(detail.yield_pct ?? 100));
     setExpectedYieldMin(detail.expected_yield_pct_min != null ? String(detail.expected_yield_pct_min) : "");
     setExpectedYieldMax(detail.expected_yield_pct_max != null ? String(detail.expected_yield_pct_max) : "");
@@ -756,15 +759,50 @@ export default function BomsPage() {
             onSelect={(o) => {
               setFinishedItemId(o.id);
               setFinishedItemLabel(o.label);
-              const meta = o.meta as { base_unit_id?: number; base_unit_code?: string } | undefined;
-              if (meta?.base_unit_id) {
-                setOutputUnitId(meta.base_unit_id);
-                setOutputUnitLabel(meta.base_unit_code ? formatUnitLabel({ code: meta.base_unit_code, name: meta.base_unit_code }) : "");
+              const meta = (o.meta ?? {}) as Partial<ItemPickMeta>;
+              const listUnitId = meta.base_unit_id != null && Number(meta.base_unit_id) > 0 ? Number(meta.base_unit_id) : null;
+              if (listUnitId) {
+                setOutputUnitId(listUnitId);
+                setOutputUnitLabel(
+                  meta.base_unit_code ? formatUnitLabel({ code: meta.base_unit_code, name: meta.base_unit_code }) : "",
+                );
+                setHeaderMissingBaseUnit(false);
               }
+              void (async () => {
+                const pick = await resolveItemPickMeta(o);
+                if (finishedItemId() !== o.id) return;
+                if (pick.base_unit_id && pick.base_unit_id > 0) {
+                  setOutputUnitId(pick.base_unit_id);
+                  setOutputUnitLabel(
+                    pick.base_unit_code
+                      ? formatUnitLabel({ code: pick.base_unit_code, name: pick.base_unit_code })
+                      : "",
+                  );
+                  setHeaderMissingBaseUnit(false);
+                } else {
+                  setOutputUnitId(null);
+                  setOutputUnitLabel("");
+                  setHeaderMissingBaseUnit(true);
+                }
+              })();
             }}
-            onClear={() => { setFinishedItemId(null); setFinishedItemLabel(""); }}
+            onClear={() => {
+              setFinishedItemId(null);
+              setFinishedItemLabel("");
+              setOutputUnitId(null);
+              setOutputUnitLabel("");
+              setHeaderMissingBaseUnit(false);
+            }}
             fetchOptions={fetchItems}
           />
+          <Show when={headerMissingBaseUnit() && (finishedItemId() ?? 0) > 0}>
+            <p class="mt-1 text-xs text-amber-800">
+              This item has no base unit, so Batch UoM was left empty.{" "}
+              <A class="font-medium text-brand-700 hover:underline" href={`/app/inventory/items?open=${finishedItemId()}`}>
+                Set the base unit on the item
+              </A>
+            </p>
+          </Show>
         </div>
         <LookupCombo
           label={isAssembly() ? "Warehouse" : "Default production location"}
