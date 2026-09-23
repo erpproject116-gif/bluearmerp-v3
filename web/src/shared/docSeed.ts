@@ -41,6 +41,15 @@ export function docSeedKey(kind: DocSeedKind): string {
   return `bluearm.docSeed.${kind}`;
 }
 
+/** Stage a seed so the next visit to that document's create form prefills lines. Nothing is saved. */
+export function stageDocSeed(kind: DocSeedKind, seed: DocSeed): void {
+  try {
+    sessionStorage.setItem(docSeedKey(kind), JSON.stringify(seed));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 /** Non-destructive check, e.g. for list pages that auto-open their create modal. */
 export function hasDocSeed(kind: DocSeedKind): boolean {
   try {

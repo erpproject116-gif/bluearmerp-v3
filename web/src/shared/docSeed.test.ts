@@ -3,6 +3,7 @@ import {
   docSeedKey,
   docSeedLinePatch,
   hasDocSeed,
+  stageDocSeed,
   takeDocSeed,
   takeSerialLotSeed,
   SERIAL_LOT_SEED_KEY,
@@ -12,6 +13,17 @@ import { takeMigImportSeed, MIG_IMPORT_SEED_KEY } from "./migrationCsvImport";
 describe("docSeed", () => {
   beforeEach(() => {
     sessionStorage.clear();
+  });
+
+  it("stageDocSeed is consumed once by takeDocSeed", () => {
+    stageDocSeed("purchase_order", {
+      lines: [{ item_id: 4, item_code: "S17BL", qty: 9.7, remarks: "Work order WO-1" }],
+    });
+    expect(hasDocSeed("purchase_order")).toBe(true);
+    const seed = takeDocSeed("purchase_order");
+    expect(seed?.lines?.[0]?.qty).toBe(9.7);
+    expect(seed?.lines?.[0]?.remarks).toBe("Work order WO-1");
+    expect(hasDocSeed("purchase_order")).toBe(false);
   });
 
   it("takeDocSeed consumes the seed exactly once", () => {

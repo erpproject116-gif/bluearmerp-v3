@@ -19,6 +19,8 @@ import { jobsHref, newRecipeOrderHref } from "../production/mfgProductionMode";
 import { submitBusyLabel } from "../../shared/submitCopy";
 import { lookupBomsForOrderType, type BomMismatch } from "./mfgBomLookup";
 import { formatPeso } from "../../shared/money";
+import { hasPermission, useAuth } from "../../shared/auth-context";
+import { stageDocSeed } from "../../shared/docSeed";
 
 type WorkOrder = {
   id: number;
@@ -74,6 +76,7 @@ const STEPS = [
 
 export default function NewAssemblyOrderWizard() {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [step, setStep] = createSignal(1);
   const [woId, setWoId] = createSignal<number | null>(null);
   const [woNo, setWoNo] = createSignal("");
@@ -106,6 +109,28 @@ export default function NewAssemblyOrderWizard() {
   const estimatedTotalCost = () => (journalPreview()?.costs.material_cost ?? 0) + additionalCost();
 
   const hasShortage = () => materialNeedsHasShortage(needs()?.lines ?? []);
+  const canDraftShortagePo = () =>
+    hasPermission(auth.me, "purchase_order.purchase_orders", "write") &&
+    (needs()?.lines ?? []).some((ln) => ln.shortage > 0);
+
+  const draftShortagePurchaseOrder = () => {
+    const lines = (needs()?.lines ?? []).filter((ln) => ln.shortage > 0);
+    if (lines.length === 0 || !hasPermission(auth.me, "purchase_order.purchase_orders", "write")) return;
+    const wo = woNo().trim();
+    stageDocSeed("purchase_order", {
+      lines: lines.map((ln) => ({
+        item_id: ln.component_item_id,
+        item_code: ln.component_code,
+        item_name: ln.component_name,
+        qty: ln.shortage,
+        unit: ln.stock_unit_code,
+        unit_code: ln.stock_unit_code,
+        unit_price: 0,
+        remarks: wo ? `Work order ${wo}` : undefined,
+      })),
+    });
+    navigate("/app/purchase-order/purchase-orders");
+  };
 
   const stepGuidance = createMemo(() =>
     recipeAssemblyStepGuidance(step(), {
@@ -488,13 +513,24 @@ export default function NewAssemblyOrderWizard() {
         <section class="rounded-xl border border-stroke bg-white p-4">
           <div class="mb-3 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Components required</h2>
-            <button
-              type="button"
-              class="text-xs font-medium text-brand-700 hover:underline"
-              onClick={() => woId() && void loadNeeds(woId()!)}
-            >
-              Refresh availability
-            </button>
+            <div class="flex items-center gap-3">
+              <Show when={canDraftShortagePo()}>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-brand-700 hover:underline"
+                  onClick={draftShortagePurchaseOrder}
+                >
+                  Create purchase order for shortages
+                </button>
+              </Show>
+              <button
+                type="button"
+                class="text-xs font-medium text-brand-700 hover:underline"
+                onClick={() => woId() && void loadNeeds(woId()!)}
+              >
+                Refresh availability
+              </button>
+            </div>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full text-left text-sm">
