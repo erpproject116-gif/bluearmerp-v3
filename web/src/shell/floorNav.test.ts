@@ -103,10 +103,12 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
     expect(byId.production_all).toBe("production_wo");
     expect(byId.production_assembly).toBe("production_assembly");
     expect(byId.production_disassembly).toBe("production_cutting");
-    expect(byId.production_recipe).toBe("production_recipe");
     expect(byId.production_reports).toBe("reports");
+    expect(byId.production_waste).toBe("reports");
     expect(byId.production_setup).toBe("setup");
-    const iconIds = (mfg?.children ?? []).map((c) => c.iconId);
+    const iconIds = (mfg?.children ?? [])
+      .filter((c) => c.id !== "production_waste")
+      .map((c) => c.iconId);
     expect(new Set(iconIds).size).toBe(iconIds.length);
   });
 

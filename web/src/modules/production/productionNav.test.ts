@@ -22,21 +22,16 @@ describe("production nav", () => {
       "production_all",
       "production_assembly",
       "production_disassembly",
-      "production_recipe",
       "production_reports",
       "production_waste",
       "production_setup",
     ]);
     expect(production!.children?.find((c) => c.id === "production_disassembly")?.label).toBe("Cutting");
-    expect(production!.children?.find((c) => c.id === "production_recipe")?.label).toBe("Recipe");
     expect(production!.children?.find((c) => c.id === "production_assembly")?.href).toBe(
       "/app/production/assembly/recipes",
     );
     expect(production!.children?.find((c) => c.id === "production_disassembly")?.href).toBe(
       "/app/production/disassembly/recipes",
-    );
-    expect(production!.children?.find((c) => c.id === "production_recipe")?.href).toBe(
-      "/app/production/recipe/recipes",
     );
     expect(production!.children?.find((c) => c.id === "production_all")?.href).toBe(
       "/app/production/all/jobs",

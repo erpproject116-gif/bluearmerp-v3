@@ -273,15 +273,6 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         moduleId: "production",
       },
       {
-        id: "production_recipe",
-        label: "Recipe",
-        href: "/app/production/recipe/recipes",
-        iconId: "production_recipe",
-        topId: "inv1",
-        expandGroupId: "production_process",
-        moduleId: "production",
-      },
-      {
         id: "production_reports",
         label: "Reports",
         href: "/app/production/reports",
