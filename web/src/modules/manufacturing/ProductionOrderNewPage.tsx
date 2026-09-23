@@ -7,6 +7,7 @@ import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import { collectRequiredFieldErrors } from "../../shared/handleSaveResult";
 import type { FormErrors } from "../../shared/formValidation";
 import { RichTextEditor } from "../comms/RichTextEditor";
+import { AttachmentsField } from "../../shared/AttachmentsField";
 import {
   canPostWithShortage,
   normalizeOutputClassification,
@@ -695,6 +696,14 @@ function NewCuttingOrderWizard() {
                 }}
               />
             </Field>
+            <div class="mt-3">
+              <AttachmentsField
+                scope="manufacturing/work-orders"
+                docId={woId() ?? undefined}
+                label="Attach files"
+                emptyUnsavedHint="Save the draft first, then attach files to this job."
+              />
+            </div>
           </div>
         </section>
         <div class="flex justify-between">
