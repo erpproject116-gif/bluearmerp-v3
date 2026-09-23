@@ -2,7 +2,7 @@ import { createSignal, For, Show, createResource, createMemo } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
-import { UnitLookupCombo, formatUnitLabel } from "../../shared/UnitLookupCombo";
+import { sanitizeQtyInput } from "../../shared/money";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
@@ -25,6 +25,8 @@ type BomLine = {
   component_code?: string;
   component_name?: string;
   qty: number;
+  /** What the user typed, including a trailing decimal point. Parsed into qty. */
+  qty_input?: string;
   unit_id?: number | null;
   unit_code?: string;
   /** Textbox value; parsed safely for stock math (blank/invalid → 0). */
@@ -71,7 +73,19 @@ type Bom = {
 
 type Conversion = { from_unit_id: number; to_unit_id: number; factor: number };
 
-/** Parse qty from a free textbox without breaking calc (empty / non-numeric → 0). */
+/** Digits and one decimal point. A slash is cut off so "1/2" cannot become 12. */
+function recipeQtyText(raw: string): string {
+  const slash = raw.indexOf("/");
+  const cut = slash >= 0 ? raw.slice(0, slash) : raw;
+  return sanitizeQtyInput(cut);
+}
+
+function lineQtyText(ln: BomLine): string {
+  if (ln.qty_input != null) return ln.qty_input;
+  if (!ln.qty) return "";
+  return String(ln.qty);
+}
+
 function parseQtyInput(raw: string | number | undefined | null): number {
   if (raw == null || raw === "") return 0;
   if (typeof raw === "number") return Number.isFinite(raw) && raw >= 0 ? raw : 0;
@@ -402,15 +416,24 @@ export default function BomsPage() {
     setNotes(detail.notes ?? "");
     const loaded = detail.lines?.length ? detail.lines : [emptyLine()];
     setLines(
-      loaded.map((ln) => ({
-        ...ln,
-        scrap_input: ln.scrap_qty != null && ln.scrap_qty !== 0 ? String(ln.scrap_qty) : ln.scrap_input ?? "",
-        unit_cost: ln.unit_cost ?? 0,
-        line_total: ln.line_total ?? (ln.unit_cost ?? 0) * Number(ln.qty || 0),
-      })),
+      loaded.map((ln) => {
+        const baseId = ln.base_unit_id != null && ln.base_unit_id > 0 ? ln.base_unit_id : null;
+        const baseCode = (ln.base_unit_code || "").trim();
+        return {
+          ...ln,
+          unit_id: baseId ?? ln.unit_id,
+          unit_code: baseCode || ln.unit_code,
+          base_unit_code: baseCode || ln.base_unit_code,
+          scrap_input: ln.scrap_qty != null && ln.scrap_qty !== 0 ? String(ln.scrap_qty) : ln.scrap_input ?? "",
+          unit_cost: ln.unit_cost ?? 0,
+          line_total: ln.line_total ?? (ln.unit_cost ?? 0) * Number(ln.qty || 0),
+        };
+      }),
     );
     setLineLabels(Object.fromEntries(loaded.map((ln, i) => [i, [ln.component_code, ln.component_name].filter(Boolean).join(" — ")])));
-    setLineUnitLabels(Object.fromEntries(loaded.map((ln, i) => [i, ln.unit_code ? formatUnitLabel({ code: ln.unit_code, name: ln.unit_code }) : ""])));
+    setLineUnitLabels(
+      Object.fromEntries(loaded.map((ln, i) => [i, (ln.base_unit_code || ln.unit_code || "").trim()])),
+    );
     setModalOpen(true);
   };
 
@@ -525,7 +548,7 @@ export default function BomsPage() {
         (ln) => ln.component_item_id > 0 && Number(ln.qty) > 0 && !(ln.unit_id && ln.unit_id > 0),
       );
       if (missingUomIdx >= 0 && !errs.lines) {
-        errs.lines = `Line ${missingUomIdx + 1}: choose a UoM from the list.`;
+        errs.lines = `Line ${missingUomIdx + 1}: this item has no base unit. Set it on the item, then pick the line again.`;
         errs[`lines[${missingUomIdx}].unit_id`] = "UoM is required.";
       }
       const missingBase = bodyLines.some((ln) => {
@@ -763,9 +786,7 @@ export default function BomsPage() {
               const listUnitId = meta.base_unit_id != null && Number(meta.base_unit_id) > 0 ? Number(meta.base_unit_id) : null;
               if (listUnitId) {
                 setOutputUnitId(listUnitId);
-                setOutputUnitLabel(
-                  meta.base_unit_code ? formatUnitLabel({ code: meta.base_unit_code, name: meta.base_unit_code }) : "",
-                );
+                setOutputUnitLabel((meta.base_unit_code ?? "").trim());
                 setHeaderMissingBaseUnit(false);
               }
               void (async () => {
@@ -773,11 +794,7 @@ export default function BomsPage() {
                 if (finishedItemId() !== o.id) return;
                 if (pick.base_unit_id && pick.base_unit_id > 0) {
                   setOutputUnitId(pick.base_unit_id);
-                  setOutputUnitLabel(
-                    pick.base_unit_code
-                      ? formatUnitLabel({ code: pick.base_unit_code, name: pick.base_unit_code })
-                      : "",
-                  );
+                  setOutputUnitLabel((pick.base_unit_code ?? "").trim());
                   setHeaderMissingBaseUnit(false);
                 } else {
                   setOutputUnitId(null);
@@ -815,23 +832,18 @@ export default function BomsPage() {
         />
         <Show when={!isAssembly()}>
           <Field label={`${copy.batchQtyLabel} *`}>
-            <input class={inputClass} type="text" inputMode="decimal" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
+            <input
+              class={inputClass}
+              type="text"
+              inputMode="decimal"
+              value={outputQty()}
+              onInput={(e) => setOutputQty(recipeQtyText(e.currentTarget.value))}
+            />
           </Field>
-          <UnitLookupCombo
-            label="Batch UoM"
-            selectedId={outputUnitId}
-            value={outputUnitLabel}
-            onInput={setOutputUnitLabel}
-            onSelect={(u) => {
-              setOutputUnitId(u.id);
-              setOutputUnitLabel(formatUnitLabel(u));
-              refreshConversions();
-            }}
-            onClear={() => {
-              setOutputUnitId(null);
-              setOutputUnitLabel("");
-            }}
-          />
+          <label class="block">
+            <span class="mb-1 block text-sm font-medium text-text-primary">Batch UoM</span>
+            <input class={inputClass} readOnly aria-readonly="true" tabindex={0} value={outputUnitLabel()} aria-label="Batch UoM" />
+          </label>
         </Show>
         <div class="col-span-full sm:col-span-2 lg:col-span-3">
           <Field label="Notes">
@@ -858,23 +870,18 @@ export default function BomsPage() {
             </Show>
             <Show when={isAssembly()}>
               <Field label={copy.batchQtyLabel}>
-                <input class={inputClass} type="text" inputMode="decimal" value={outputQty()} onInput={(e) => setOutputQty(e.currentTarget.value)} />
+                <input
+                  class={inputClass}
+                  type="text"
+                  inputMode="decimal"
+                  value={outputQty()}
+                  onInput={(e) => setOutputQty(recipeQtyText(e.currentTarget.value))}
+                />
               </Field>
-              <UnitLookupCombo
-                label="Batch UoM"
-                selectedId={outputUnitId}
-                value={outputUnitLabel}
-                onInput={setOutputUnitLabel}
-                onSelect={(u) => {
-                  setOutputUnitId(u.id);
-                  setOutputUnitLabel(formatUnitLabel(u));
-                  refreshConversions();
-                }}
-                onClear={() => {
-                  setOutputUnitId(null);
-                  setOutputUnitLabel("");
-                }}
-              />
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium text-text-primary">Batch UoM</span>
+                <input class={inputClass} readOnly aria-readonly="true" tabindex={0} value={outputUnitLabel()} aria-label="Batch UoM" />
+              </label>
             </Show>
             <Field label={copy.yieldLabel} description={copy.yieldDescription}>
               <input class={inputClass} type="text" inputMode="decimal" value={yieldPct()} onInput={(e) => setYieldPct(e.currentTarget.value)} />
@@ -921,30 +928,17 @@ export default function BomsPage() {
                   class={`grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 ${
                     isAssembly()
                       ? showScrapColumn()
-                        ? "sm:grid-cols-[4.5rem_minmax(0,1.1fr)_4.5rem_minmax(7rem,0.75fr)_5rem_5rem_5.5rem_auto]"
-                        : "sm:grid-cols-[4.5rem_minmax(0,1.1fr)_4.5rem_minmax(7rem,0.75fr)_5rem_5rem_auto]"
+                        ? "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(7rem,0.75fr)_5rem_5rem_5.5rem_auto]"
+                        : "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(7rem,0.75fr)_5rem_5rem_auto]"
                       : showScrapColumn()
                         ? "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_7rem_5.5rem_auto]"
                         : "sm:grid-cols-[minmax(0,1.1fr)_4.5rem_minmax(8rem,0.85fr)_7rem_auto]"
                   }`}
                 >
-                  <Show when={isAssembly()}>
-                    <label class="text-sm">
-                      <span class="text-text-secondary">Part no</span>
-                      <input
-                        class={`${inputClass} mt-1`}
-                        value={lines()[idx()]?.component_code ?? ""}
-                        readOnly
-                        aria-readonly="true"
-                        aria-label={`Part number line ${idx() + 1}`}
-                        tabindex={0}
-                      />
-                    </label>
-                  </Show>
                   <LookupCombo
                     label={isAssembly() ? "Item" : `Line ${idx() + 1}`}
                     required
-                    description={isAssembly() ? `Line ${idx() + 1} — pick from search so Part no, UoM, and cost fill in.` : undefined}
+                    description={isAssembly() ? `Line ${idx() + 1} — pick from search so UoM and cost fill in.` : undefined}
                     value={() => lineLabels()[idx()] ?? ""}
                     selectedId={() => lines()[idx()]?.component_item_id || null}
                     onInput={(v) => setLineLabels((p) => ({ ...p, [idx()]: v }))}
@@ -985,10 +979,7 @@ export default function BomsPage() {
                       if (meta.base_unit_code) {
                         setLineUnitLabels((p) => ({
                           ...p,
-                          [lineIdx]: formatUnitLabel({
-                            code: String(meta.base_unit_code),
-                            name: String(meta.base_unit_code),
-                          }),
+                          [lineIdx]: String(meta.base_unit_code).trim(),
                         }));
                       }
                       void (async () => {
@@ -1037,10 +1028,7 @@ export default function BomsPage() {
                         if (pick.base_unit_code) {
                           setLineUnitLabels((p) => ({
                             ...p,
-                            [lineIdx]: formatUnitLabel({
-                              code: pick.base_unit_code,
-                              name: pick.base_unit_code,
-                            }),
+                            [lineIdx]: pick.base_unit_code.trim(),
                           }));
                         } else {
                           setLineUnitLabels((p) => ({ ...p, [lineIdx]: "" }));
@@ -1080,19 +1068,16 @@ export default function BomsPage() {
                       type="text"
                       inputMode="decimal"
                       class={`${inputClass} mt-1`}
-                      value={(() => {
-                        const q = lines()[idx()]?.qty;
-                        return q == null || q === 0 ? "" : String(q);
-                      })()}
+                      value={lineQtyText(lines()[idx()] ?? ln)}
+                      aria-label={`${copy.lineQtyLabel} line ${idx() + 1}`}
                       onInput={(e) => {
-                        const raw = e.currentTarget.value.trim();
-                        const v = raw === "" ? 0 : Number(raw);
+                        const text = recipeQtyText(e.currentTarget.value);
+                        const parsed = text === "" || text === "." ? 0 : Number(text);
+                        const qty = Number.isFinite(parsed) ? parsed : 0;
                         setLines((prev) =>
                           prev.map((row, i) => {
                             if (i !== idx()) return row;
-                            const qty = Number.isFinite(v) ? v : row.qty;
-                            const unitCost = lineUnitCost(row);
-                            return { ...row, qty, line_total: unitCost * qty };
+                            return { ...row, qty_input: text, qty, line_total: lineUnitCost(row) * qty };
                           }),
                         );
                       }}
@@ -1120,46 +1105,17 @@ export default function BomsPage() {
                       </select>
                     </label>
                   </Show>
-                  <UnitLookupCombo
-                    label="UoM"
-                    fieldKey={`bom-line-uom-${idx()}`}
-                    selectedId={() => lines()[idx()]?.unit_id ?? null}
-                    value={() => lineUnitLabels()[idx()] ?? lines()[idx()]?.unit_code ?? ""}
-                    onInput={(v) => setLineUnitLabels((p) => ({ ...p, [idx()]: v }))}
-                    onSelect={(u) => {
-                      const lineIdx = idx();
-                      const row = lines()[lineIdx];
-                      setLines((prev) =>
-                        prev.map((r, i) => (i === lineIdx ? { ...r, unit_id: u.id, unit_code: u.code } : r)),
-                      );
-                      setLineUnitLabels((p) => ({ ...p, [lineIdx]: formatUnitLabel(u) }));
-                      void refreshConversions();
-                      if (
-                        row?.base_unit_id &&
-                        u.id !== row.base_unit_id &&
-                        convertClient(u.id, row.base_unit_id, 1, conversions() ?? []) == null
-                      ) {
-                        setFieldErrors((prev) => ({
-                          ...prev,
-                          lines: `add conversion ${u.code}→${row.base_unit_code || "base"} (or reverse) under Inventory → Units`,
-                          [`lines[${lineIdx}].unit_id`]: "Needs a conversion to the item base unit.",
-                        }));
-                      } else {
-                        setFieldErrors((prev) => {
-                          const next = { ...prev };
-                          delete next[`lines[${lineIdx}].unit_id`];
-                          if (next.lines?.includes("add conversion")) delete next.lines;
-                          return next;
-                        });
-                      }
-                    }}
-                    onClear={() => {
-                      setLines((prev) =>
-                        prev.map((row, i) => (i === idx() ? { ...row, unit_id: null, unit_code: "" } : row)),
-                      );
-                      setLineUnitLabels((p) => ({ ...p, [idx()]: "" }));
-                    }}
-                  />
+                  <label class="text-sm">
+                    <span class="text-text-secondary">UoM</span>
+                    <input
+                      class={`${inputClass} mt-1`}
+                      readOnly
+                      aria-readonly="true"
+                      tabindex={0}
+                      value={(lines()[idx()]?.base_unit_code || lines()[idx()]?.unit_code || "").trim()}
+                      aria-label={`UoM line ${idx() + 1}`}
+                    />
+                  </label>
                   <Show when={isAssembly()}>
                     <label class="text-sm">
                       <span class="text-text-secondary">Unit cost</span>
@@ -1210,6 +1166,17 @@ export default function BomsPage() {
                     );
                   })()}
                 </div>
+                <Show when={(row().component_item_id ?? 0) > 0 && !(row().base_unit_code || row().unit_code)}>
+                  <p class="text-xs text-amber-800">
+                    No base unit on this item.{" "}
+                    <A
+                      class="font-medium text-brand-700 hover:underline"
+                      href={`/app/inventory/items?open=${row().component_item_id}`}
+                    >
+                      Set the base unit on the item
+                    </A>
+                  </p>
+                </Show>
                 <Show when={missingItemCost()}>
                   <p class="text-xs text-amber-800">
                     No purchase price or standard cost on this item.{" "}
@@ -1230,7 +1197,7 @@ export default function BomsPage() {
           </button>
           <p class="text-xs text-text-secondary">
             {isAssembly()
-              ? "Pick each item from the list (don’t only type the name). Part no, UoM (base unit), and cost fill in automatically. Costs are estimates from purchase price, or standard cost when purchase price is blank; open Advanced for spare qty and batch settings."
+              ? "Pick each item from the list (don’t only type the name). UoM is the item’s base unit, and cost fills in automatically. Costs are estimates from purchase price, or standard cost when purchase price is blank; open Advanced for spare qty and batch settings. Quantities are decimals (half a unit is 0.5)."
               : copy.stockHint}
           </p>
         </div>
