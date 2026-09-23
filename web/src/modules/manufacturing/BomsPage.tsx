@@ -141,7 +141,20 @@ type ItemPickMeta = {
   base_unit_id: number | null;
   base_unit_code: string;
   purchase_price: number;
+  standard_costs?: Record<string, number> | null;
 };
+
+/** Same rule as api resolveItemUnitCost: purchase price, else sum of standard costs. */
+function resolveItemUnitCost(purchasePrice: number, standardCosts?: Record<string, number> | null): number {
+  if (Number.isFinite(purchasePrice) && purchasePrice > 0) return purchasePrice;
+  if (!standardCosts) return 0;
+  let sum = 0;
+  for (const v of Object.values(standardCosts)) {
+    const n = Number(v);
+    if (Number.isFinite(n)) sum += n;
+  }
+  return sum > 0 ? sum : 0;
+}
 
 async function fetchItems(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", sort: "item_code", order: "asc" });
@@ -173,6 +186,7 @@ async function resolveItemPickMeta(opt: LookupOption): Promise<ItemPickMeta> {
   let baseUnitCode = (meta.base_unit_code ?? "").trim();
   let purchase = Number(meta.purchase_price);
   if (!Number.isFinite(purchase) || purchase < 0) purchase = 0;
+  let standardCosts = meta.standard_costs ?? null;
 
   if (opt.id > 0) {
     const res = await apiFetch<{
@@ -181,6 +195,7 @@ async function resolveItemPickMeta(opt: LookupOption): Promise<ItemPickMeta> {
       base_unit_id?: number | null;
       base_unit_code?: string;
       purchase_price?: number;
+      standard_costs?: Record<string, number> | null;
     }>(`/api/v1/inventory/items/${opt.id}`, undefined, { silent: true });
     if (res.success && res.data) {
       itemCode = (res.data.item_code ?? itemCode).trim();
@@ -191,6 +206,9 @@ async function resolveItemPickMeta(opt: LookupOption): Promise<ItemPickMeta> {
       baseUnitCode = (res.data.base_unit_code ?? baseUnitCode).trim();
       const p = Number(res.data.purchase_price);
       if (Number.isFinite(p) && p >= 0) purchase = p;
+      if (res.data.standard_costs && typeof res.data.standard_costs === "object") {
+        standardCosts = res.data.standard_costs;
+      }
     }
   }
 
@@ -200,6 +218,7 @@ async function resolveItemPickMeta(opt: LookupOption): Promise<ItemPickMeta> {
     base_unit_id: baseUnitId,
     base_unit_code: baseUnitCode,
     purchase_price: purchase,
+    standard_costs: standardCosts,
   };
 }
 
@@ -855,7 +874,11 @@ export default function BomsPage() {
           <For each={lines()}>
             {(ln, idx) => {
               const preview = () => liveStockPreview(ln, conversions() ?? []);
+              const row = () => lines()[idx()] ?? ln;
+              const missingItemCost = () =>
+                isAssembly() && (row().component_item_id ?? 0) > 0 && lineUnitCost(row()) === 0;
               return (
+                <div class="space-y-1">
                 <div
                   class={`grid grid-cols-1 items-end gap-2 rounded border border-stroke p-2 ${
                     isAssembly()
@@ -895,10 +918,10 @@ export default function BomsPage() {
                         prev.map((row, i) => {
                           if (i !== lineIdx) return row;
                           const qty = Number(row.qty) > 0 ? Number(row.qty) : 1;
-                          const optimisticCost =
-                            meta.purchase_price != null && Number(meta.purchase_price) > 0
-                              ? Number(meta.purchase_price)
-                              : row.unit_cost ?? 0;
+                          const optimisticCost = resolveItemUnitCost(
+                            Number(meta.purchase_price) || 0,
+                            meta.standard_costs,
+                          );
                           return {
                             ...row,
                             component_item_id: o.id,
@@ -946,7 +969,7 @@ export default function BomsPage() {
                             return next;
                           });
                         }
-                        const unitCost = pick.purchase_price > 0 ? pick.purchase_price : 0;
+                        const unitCost = resolveItemUnitCost(pick.purchase_price, pick.standard_costs);
                         setLines((prev) =>
                           prev.map((row, i) => {
                             if (i !== lineIdx || row.component_item_id !== o.id) return row;
@@ -1149,6 +1172,18 @@ export default function BomsPage() {
                     );
                   })()}
                 </div>
+                <Show when={missingItemCost()}>
+                  <p class="text-xs text-amber-800">
+                    No purchase price or standard cost on this item.{" "}
+                    <A
+                      class="font-medium text-brand-700 hover:underline"
+                      href={`/app/inventory/items?open=${row().component_item_id}`}
+                    >
+                      Set price on the item
+                    </A>
+                  </p>
+                </Show>
+                </div>
               );
             }}
           </For>
@@ -1157,7 +1192,7 @@ export default function BomsPage() {
           </button>
           <p class="text-xs text-text-secondary">
             {isAssembly()
-              ? "Pick each item from the list (don’t only type the name). Part no, UoM (base unit), and cost fill in automatically. Costs are estimates from purchase price; open Advanced for spare qty and batch settings."
+              ? "Pick each item from the list (don’t only type the name). Part no, UoM (base unit), and cost fill in automatically. Costs are estimates from purchase price, or standard cost when purchase price is blank; open Advanced for spare qty and batch settings."
               : copy.stockHint}
           </p>
         </div>
