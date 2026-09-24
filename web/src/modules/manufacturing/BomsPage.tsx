@@ -1,4 +1,4 @@
-import { createSignal, Index, Show, createResource, createMemo } from "solid-js";
+import { createEffect, createSignal, Index, on, Show, untrack, createResource, createMemo } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
@@ -491,7 +491,7 @@ export default function BomsPage() {
 
   const addLine = () => setLines((prev) => [...prev, { ...emptyLine(), line_no: prev.length + 1 }]);
 
-  const save = async () => {
+  const collectSaveErrors = (): FormErrors => {
     const requiredValues: Record<string, unknown> = {
       bom_name: bomName(),
       finished_item_id: finishedItemId(),
@@ -597,12 +597,41 @@ export default function BomsPage() {
         errs.lines = `add conversion ${badUom.unit_code || "unit"}→${badUom.base_unit_code || "base"} (or reverse) under Inventory → Units`;
       }
     }
+    return errs;
+  };
+
+  createEffect(on(
+    [bomName, bomCode, finishedItemId, outputQty, outputUnitId, lines, lineLabels],
+    () => {
+      if (Object.keys(untrack(fieldErrors)).length === 0) return;
+      setFieldErrors(collectSaveErrors());
+    },
+    { defer: true },
+  ));
+
+  const save = async () => {
+    const errs = collectSaveErrors();
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       showClientValidationBlocker(errs, toast);
       return;
     }
     setFieldErrors({});
+    const batchQty = Number(outputQty());
+    const bodyLines = lines()
+      .map((ln) => ({
+        ...ln,
+        component_item_id: Number(ln.component_item_id) || 0,
+        qty: Number(ln.qty) || 0,
+      }))
+      .filter((ln) => ln.component_item_id > 0 && ln.qty > 0)
+      .map((ln) => ({
+        component_item_id: ln.component_item_id,
+        qty: ln.qty,
+        unit_id: ln.unit_id || null,
+        scrap_qty: copy().showScrap ? lineScrapQty(ln) : 0,
+        output_classification: !isAssembly() ? ln.output_classification || "finished" : undefined,
+      }));
     const ed = editing();
     const payload: Record<string, unknown> = {
       bom_name: bomName().trim(),
