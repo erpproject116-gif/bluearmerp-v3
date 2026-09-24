@@ -48,9 +48,24 @@ const invBookSlipPartnerNameSQL = `coalesce(nullif(trim(
       where po.id = p.ref_id and po.tenant_id = p.tenant_id
       limit 1
     )
+    when p.ref_type = 'mfg_work_order' and p.ref_id is not null then (
+      select coalesce(wo.work_order_no, '')
+      from public.mfg_work_orders wo
+      where wo.id = p.ref_id and wo.tenant_id = p.tenant_id
+      limit 1
+    )
     else ''
   end
 ), ''), '')`
+
+// Remark for stock-movement slips: the stored reason, else the job number for manufacturing moves.
+const invBookSlipRemarkSQL = `coalesce(nullif(sm.reason, ''),
+  case when sm.ref_type = 'mfg_work_order' and sm.ref_id is not null then (
+    select coalesce(wo.work_order_no, '')
+    from public.mfg_work_orders wo
+    where wo.id = sm.ref_id and wo.tenant_id = sm.tenant_id
+    limit 1
+  ) else '' end, '')`
 
 const invBookSlipSerialLotSQL = `trim(both ', ' from concat_ws(', ',
   nullif((
@@ -110,7 +125,7 @@ func invBookSlipsSQL(tenantID, itemID int64, dateFrom, dateTo time.Time, locatio
 		  select sm.id, sm.created_at, sm.tenant_id, sm.item_id, sm.location_id,
 		    sm.qty_delta::float8 as qty_delta,
 		    sm.movement_type, sm.ref_type, sm.ref_id,
-		    coalesce(sm.reason, '') as remark
+		    %s as remark
 		  from public.inv_stock_movements sm
 		  where sm.tenant_id = $1 and sm.item_id = $2
 		    and sm.created_at >= $3::date
@@ -143,7 +158,7 @@ func invBookSlipsSQL(tenantID, itemID int64, dateFrom, dateTo time.Time, locatio
 		from period p
 		join public.inv_items i on i.id = p.item_id
 		left join public.inv_locations l on l.id = p.location_id
-	`, locFilter, locFilter, invBookSlipPartnerNameSQL, partition, invBookSlipSerialLotSQL)
+	`, invBookSlipRemarkSQL, locFilter, locFilter, invBookSlipPartnerNameSQL, partition, invBookSlipSerialLotSQL)
 	return q, args
 }
 
@@ -251,14 +266,14 @@ func listInvBookSlips(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 type invBookSource struct {
-	Kind    string `json:"kind"` // sales | purchase
+	Kind    string `json:"kind"` // sales | purchase | manufacturing
 	DocID   int64  `json:"doc_id"`
 	Label   string `json:"label,omitempty"`
 	RefType string `json:"ref_type,omitempty"`
 	RefID   int64  `json:"ref_id,omitempty"`
 }
 
-// resolveInvBookSource maps a stock-movement ref to a Sale or Purchase Receive document.
+// resolveInvBookSource maps a stock-movement ref to a Sale, Purchase Receive, or manufacturing job.
 func resolveInvBookSource(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -329,8 +344,21 @@ func resolveInvBookSource(pool *pgxpool.Pool) http.HandlerFunc {
 			response.OK(w, invBookSource{Kind: "purchase", DocID: id, Label: no, RefType: refType, RefID: refID}, "")
 			return
 
+		case "mfg_work_order":
+			var id int64
+			var no string
+			err := pool.QueryRow(r.Context(), `
+				select id, coalesce(work_order_no, '') from public.mfg_work_orders
+				where id = $1 and tenant_id = $2`, refID, tu.TenantID).Scan(&id, &no)
+			if err != nil {
+				response.Err(w, http.StatusNotFound, "Manufacturing job not found.", "ERR_NOT_FOUND")
+				return
+			}
+			response.OK(w, invBookSource{Kind: "manufacturing", DocID: id, Label: no, RefType: refType, RefID: refID}, "")
+			return
+
 		default:
-			response.Err(w, http.StatusBadRequest, "This movement type cannot open a Sale or Purchase Receive.", "ERR_UNSUPPORTED")
+			response.Err(w, http.StatusBadRequest, "This movement type cannot open a Sale, Purchase Receive, or job.", "ERR_UNSUPPORTED")
 			return
 		}
 	}

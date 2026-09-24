@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { PageJumpControl } from "../../../shared/PageJumpControl";
 import { defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
@@ -32,10 +33,16 @@ type Props = {
 };
 
 type InvBookSource = {
-  kind: "sales" | "purchase";
+  kind: "sales" | "purchase" | "manufacturing";
   doc_id: number;
   label?: string;
 };
+
+/** Jobs list filtered to one job number. */
+export function manufacturingJobHref(workOrderNo: string): string {
+  const qs = new URLSearchParams({ q: workOrderNo });
+  return `/app/production/all/jobs?${qs}`;
+}
 
 function fmtQty(n: number | undefined) {
   if (n == null || !Number.isFinite(n) || Math.abs(n) < 0.0000001) return "";
@@ -47,7 +54,7 @@ function fmtQtyOrZero(n: number | undefined) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-/** Ref types the Inv. Book source resolver can open as Sale / Purchase Receive. */
+/** Ref types the Inv. Book source resolver can open as Sale / Purchase Receive / manufacturing job. */
 const DRILLABLE_REF_TYPES = new Set([
   "sales",
   "sa_sales",
@@ -55,6 +62,7 @@ const DRILLABLE_REF_TYPES = new Set([
   "supplier_invoice",
   "fin_supplier_invoice",
   "goods_receipt",
+  "mfg_work_order",
 ]);
 
 function canDrill(row: InvBookSlipRow) {
@@ -66,6 +74,7 @@ function canDrill(row: InvBookSlipRow) {
 
 export function InvBookLedgerModal(props: Props) {
   const toast = useToast();
+  const navigate = useNavigate();
   const [page, setPage] = createSignal(1);
   const [runId, setRunId] = createSignal(0);
   const [openingSource, setOpeningSource] = createSignal(false);
@@ -163,7 +172,17 @@ export function InvBookLedgerModal(props: Props) {
       });
       const src = await apiFetch<InvBookSource>(`/api/v1/inventory/reports/inv-book/source?${qs}`, {}, { silent: true });
       if (!src.success || !src.data?.doc_id) {
-        toast.warning(src.message?.trim() || "No Sale or Purchase Receive is linked to this movement.");
+        toast.warning(src.message?.trim() || "No Sale, Purchase Receive, or job is linked to this movement.");
+        return;
+      }
+      if (src.data.kind === "manufacturing") {
+        const jobNo = (src.data.label ?? "").trim();
+        if (!jobNo) {
+          toast.warning("This job has no number to look up.");
+          return;
+        }
+        props.onClose();
+        navigate(manufacturingJobHref(jobNo));
         return;
       }
       if (src.data.kind === "sales") {
@@ -190,7 +209,7 @@ export function InvBookLedgerModal(props: Props) {
         setPurchaseDoc(detail.data);
         return;
       }
-      toast.warning("This movement type cannot open a Sale or Purchase Receive.");
+      toast.warning("This movement type cannot open a Sale, Purchase Receive, or job.");
     } finally {
       setOpeningSource(false);
     }
@@ -225,7 +244,7 @@ export function InvBookLedgerModal(props: Props) {
                   {period().date_from} → {period().date_to}
                 </p>
                 <p class="mt-1 text-xs text-text-secondary">
-                  Click a Sale or Purchase date to open the source document (read-only). Manufacturing and other movements stay plain text.
+                  Click a Sale or Purchase date to open the source document (read-only). Click a job date to open that job on the Jobs list. Manufacturing rows show the job number as Customer/Vendor.
                 </p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
