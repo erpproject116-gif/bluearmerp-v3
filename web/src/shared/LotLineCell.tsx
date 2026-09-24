@@ -46,6 +46,7 @@ export function LotLineCell(props: Props) {
   });
 
   const label = () => props.lotNo || (props.lotBatchId ? `Lot #${props.lotBatchId}` : (props.emptyLabel ?? "—"));
+  const prominent = () => Boolean(props.emptyLabel);
   const displayQty = (row: LotBatchRow) =>
     row.qty_available != null && Number.isFinite(row.qty_available) ? row.qty_available : row.qty_on_hand;
 
@@ -53,7 +54,11 @@ export function LotLineCell(props: Props) {
     <>
       <button
         type="button"
-        class="w-full truncate text-left text-xs text-brand-700 hover:underline disabled:opacity-50"
+        class={
+          prominent()
+            ? "w-full truncate rounded-lg border border-stroke px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+            : "w-full truncate text-left text-xs text-brand-700 hover:underline disabled:opacity-50"
+        }
         disabled={props.disabled}
         onClick={() => setOpen(true)}
       >
