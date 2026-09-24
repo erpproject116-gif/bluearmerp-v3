@@ -39,16 +39,19 @@ type ScanContext = {
   components: ScanComponent[];
 };
 
+type NeedLine = {
+  component_item_id: number;
+  component_code: string;
+  component_name: string;
+  stock_to_issue: number;
+  stock_unit_code: string;
+  qty_on_hand: number;
+  shortage: number;
+};
+
 type MaterialNeeds = {
-  lines: {
-    component_item_id: number;
-    component_code: string;
-    component_name: string;
-    stock_to_issue: number;
-    stock_unit_code: string;
-    qty_on_hand: number;
-    shortage: number;
-  }[];
+  input_line?: NeedLine;
+  lines: NeedLine[];
 };
 
 async function fetchReleasedWorkOrders(q: string): Promise<LookupOption[]> {
@@ -351,13 +354,15 @@ export default function ProductionIssueStationPage() {
                   {(m) => (
                     <div class="mt-3 space-y-2">
                       <p class="text-xs text-text-secondary">
-                        Tap a row to select it, then enter the serial (or lot) in the panel below.
+                        {mode() === "disassembly"
+                          ? "Take this whole from stock, then enter its lot in the panel below. The cuts are what you will get later."
+                          : "Tap a row to select it, then enter the serial (or lot) in the panel below."}
                       </p>
                       <div class="overflow-x-auto rounded border border-stroke">
                         <table class="min-w-full text-left text-xs">
                           <thead class="bg-slate-50 text-text-secondary">
                             <tr>
-                              <th class="px-2 py-1.5">Component</th>
+                              <th class="px-2 py-1.5">{mode() === "disassembly" ? "Whole to take" : "Component"}</th>
                               <th class="px-2 py-1.5">To issue</th>
                               <th class="px-2 py-1.5">On hand</th>
                               <th class="px-2 py-1.5">Staged</th>
@@ -365,7 +370,23 @@ export default function ProductionIssueStationPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            <For each={m().lines}>
+                            <For
+                              each={
+                                mode() === "disassembly"
+                                  ? m().input_line
+                                    ? [m().input_line]
+                                    : ctx().components.map((c) => ({
+                                        component_item_id: c.component_item_id,
+                                        component_code: c.component_code,
+                                        component_name: c.component_name,
+                                        stock_to_issue: c.stock_to_issue,
+                                        stock_unit_code: "",
+                                        qty_on_hand: 0,
+                                        shortage: 0,
+                                      }))
+                                  : m().lines
+                              }
+                            >
                               {(ln) => {
                                 const staged = ctx().components.find((c) => c.component_item_id === ln.component_item_id);
                                 const hint = rowActionHint(staged);
@@ -453,6 +474,41 @@ export default function ProductionIssueStationPage() {
                           </tbody>
                         </table>
                       </div>
+                      <Show when={mode() === "disassembly" && m().lines.length > 0}>
+                        <div class="space-y-2 pt-2">
+                          <p class="text-sm font-medium text-text-primary">Cuts you will get</p>
+                          <p class="text-xs text-text-secondary">
+                            These pieces are received when you finish the job. They are not taken from stock on this screen.
+                          </p>
+                          <div class="overflow-x-auto rounded border border-stroke">
+                            <table class="min-w-full text-left text-xs">
+                              <thead class="bg-slate-50 text-text-secondary">
+                                <tr>
+                                  <th class="px-2 py-1.5">Cut</th>
+                                  <th class="px-2 py-1.5">Expected</th>
+                                  <th class="px-2 py-1.5">On hand</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <For each={m().lines}>
+                                  {(ln) => (
+                                    <tr class="border-t border-stroke">
+                                      <td class="px-2 py-2">
+                                        <span class="font-medium">{ln.component_code}</span>
+                                        <span class="text-text-secondary"> — {ln.component_name}</span>
+                                      </td>
+                                      <td class="px-2 py-2">
+                                        {ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}
+                                      </td>
+                                      <td class="px-2 py-2">{ln.qty_on_hand.toFixed(4)}</td>
+                                    </tr>
+                                  )}
+                                </For>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </Show>
                     </div>
                   )}
                 </Show>
@@ -501,6 +557,7 @@ export default function ProductionIssueStationPage() {
                             lotBatchId={lotBatchId()}
                             lotNo={lotNo()}
                             freeOnly
+                            emptyLabel="Choose lot"
                             onChange={(id, no, qtyAvailable) => {
                               setLotBatchId(id);
                               setLotNo(no);

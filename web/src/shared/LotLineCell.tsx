@@ -13,6 +13,8 @@ type Props = {
   disabled?: boolean;
   /** Prefer lots with free qty (not already staged on open jobs). */
   freeOnly?: boolean;
+  /** Shown when no lot is selected. Other screens keep the dash. */
+  emptyLabel?: string;
   onChange: (lotBatchId: number | null, lotNo: string, qtyAvailable?: number) => void;
 };
 
@@ -43,7 +45,7 @@ export function LotLineCell(props: Props) {
     if (open()) void load();
   });
 
-  const label = () => props.lotNo || (props.lotBatchId ? `Lot #${props.lotBatchId}` : "—");
+  const label = () => props.lotNo || (props.lotBatchId ? `Lot #${props.lotBatchId}` : (props.emptyLabel ?? "—"));
   const displayQty = (row: LotBatchRow) =>
     row.qty_available != null && Number.isFinite(row.qty_available) ? row.qty_available : row.qty_on_hand;
 
