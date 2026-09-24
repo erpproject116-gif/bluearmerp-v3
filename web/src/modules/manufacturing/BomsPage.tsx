@@ -1,4 +1,4 @@
-import { createSignal, For, Show, createResource, createMemo } from "solid-js";
+import { createSignal, Index, Show, createResource, createMemo } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
@@ -925,10 +925,10 @@ export default function BomsPage() {
         </Show>
         <div class="col-span-full space-y-2">
           <p class="text-sm font-medium text-text-primary">{copy.lineSectionTitle}</p>
-          <For each={lines()}>
-            {(ln, idx) => {
-              const preview = () => liveStockPreview(ln, conversions() ?? []);
-              const row = () => lines()[idx()] ?? ln;
+          <Index each={lines()}>
+            {(lineAt, lineNo) => {
+              const row = () => lineAt();
+              const preview = () => liveStockPreview(row(), conversions() ?? []);
               const missingItemCost = () =>
                 isAssembly() && (row().component_item_id ?? 0) > 0 && lineUnitCost(row()) === 0;
               return (
@@ -945,14 +945,14 @@ export default function BomsPage() {
                   }`}
                 >
                   <LookupCombo
-                    label={isAssembly() ? "Item" : `Line ${idx() + 1}`}
+                    label={isAssembly() ? "Item" : `Line ${lineNo + 1}`}
                     required
-                    description={isAssembly() ? `Line ${idx() + 1} — pick from search so UoM and cost fill in.` : undefined}
-                    value={() => lineLabels()[idx()] ?? ""}
-                    selectedId={() => lines()[idx()]?.component_item_id || null}
-                    onInput={(v) => setLineLabels((p) => ({ ...p, [idx()]: v }))}
+                    description={isAssembly() ? `Line ${lineNo + 1} — pick from search so UoM and cost fill in.` : undefined}
+                    value={() => lineLabels()[lineNo] ?? ""}
+                    selectedId={() => lines()[lineNo]?.component_item_id || null}
+                    onInput={(v) => setLineLabels((p) => ({ ...p, [lineNo]: v }))}
                     onSelect={(o) => {
-                      const lineIdx = idx();
+                      const lineIdx = lineNo;
                       const meta = (o.meta ?? {}) as Partial<ItemPickMeta>;
                       // Lock id + label immediately so LookupCombo selectedId sticks during detail fetch.
                       setLines((prev) =>
@@ -1046,7 +1046,7 @@ export default function BomsPage() {
                       })();
                     }}
                     onClear={() => {
-                      const lineIdx = idx();
+                      const lineIdx = lineNo;
                       setLines((prev) =>
                         prev.map((row, i) =>
                           i === lineIdx
@@ -1077,15 +1077,15 @@ export default function BomsPage() {
                       type="text"
                       inputMode="decimal"
                       class={`${inputClass} mt-1`}
-                      value={lineQtyText(lines()[idx()] ?? ln)}
-                      aria-label={`${copy.lineQtyLabel} line ${idx() + 1}`}
+                      value={lineQtyText(row())}
+                      aria-label={`${copy.lineQtyLabel} line ${lineNo + 1}`}
                       onInput={(e) => {
                         const text = recipeQtyText(e.currentTarget.value);
                         const parsed = text === "" || text === "." ? 0 : Number(text);
                         const qty = Number.isFinite(parsed) ? parsed : 0;
                         setLines((prev) =>
                           prev.map((row, i) => {
-                            if (i !== idx()) return row;
+                            if (i !== lineNo) return row;
                             return { ...row, qty_input: text, qty, line_total: lineUnitCost(row) * qty };
                           }),
                         );
@@ -1097,15 +1097,15 @@ export default function BomsPage() {
                       <span class="text-text-secondary">Class</span>
                       <select
                         class={`${inputClass} mt-1`}
-                        value={ln.output_classification || "finished"}
+                        value={row().output_classification || "finished"}
                         onChange={(e) =>
                           setLines((prev) =>
                             prev.map((row, i) =>
-                              i === idx() ? { ...row, output_classification: e.currentTarget.value } : row,
+                              i === lineNo ? { ...row, output_classification: e.currentTarget.value } : row,
                             ),
                           )
                         }
-                        aria-label={`Output classification line ${idx() + 1}`}
+                        aria-label={`Output classification line ${lineNo + 1}`}
                       >
                         <option value="finished">Finished</option>
                         <option value="byproduct">By-product</option>
@@ -1121,8 +1121,8 @@ export default function BomsPage() {
                       readOnly
                       aria-readonly="true"
                       tabindex={0}
-                      value={(lines()[idx()]?.base_unit_code || lines()[idx()]?.unit_code || "").trim()}
-                      aria-label={`UoM line ${idx() + 1}`}
+                      value={(lines()[lineNo]?.base_unit_code || lines()[lineNo]?.unit_code || "").trim()}
+                      aria-label={`UoM line ${lineNo + 1}`}
                     />
                   </label>
                   <Show when={isAssembly()}>
@@ -1130,10 +1130,10 @@ export default function BomsPage() {
                       <span class="text-text-secondary">Unit cost</span>
                       <input
                         class={`${inputClass} mt-1`}
-                        value={formatCost(lineUnitCost(lines()[idx()] ?? ln))}
+                        value={formatCost(lineUnitCost(row()))}
                         readOnly
                         aria-readonly="true"
-                        aria-label={`Unit cost line ${idx() + 1}`}
+                        aria-label={`Unit cost line ${lineNo + 1}`}
                         tabindex={0}
                       />
                     </label>
@@ -1141,10 +1141,10 @@ export default function BomsPage() {
                       <span class="text-text-secondary">Line total</span>
                       <input
                         class={`${inputClass} mt-1`}
-                        value={formatCost(lineTotalDisplay(lines()[idx()] ?? ln))}
+                        value={formatCost(lineTotalDisplay(row()))}
                         readOnly
                         aria-readonly="true"
-                        aria-label={`Line total line ${idx() + 1}`}
+                        aria-label={`Line total line ${lineNo + 1}`}
                         tabindex={0}
                       />
                     </label>
@@ -1157,10 +1157,10 @@ export default function BomsPage() {
                         inputMode="decimal"
                         class={`${inputClass} mt-1`}
                         placeholder="0"
-                        value={ln.scrap_input ?? ""}
+                        value={row().scrap_input ?? ""}
                         onInput={(e) => {
                           const v = e.currentTarget.value;
-                          setLines((prev) => prev.map((row, i) => (i === idx() ? { ...row, scrap_input: v } : row)));
+                          setLines((prev) => prev.map((row, i) => (i === lineNo ? { ...row, scrap_input: v } : row)));
                         }}
                       />
                     </label>
@@ -1200,7 +1200,7 @@ export default function BomsPage() {
                 </div>
               );
             }}
-          </For>
+          </Index>
           <button type="button" class="text-sm text-brand-600 hover:underline" onClick={addLine}>
             + {copy.addLineLabel}
           </button>
