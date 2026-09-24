@@ -519,6 +519,26 @@ export default function BomsPage() {
       errs.lines = `Line ${zeroQtyIdx + 1}: ${copy.lineQtyLabel} must be greater than zero.`;
       errs[`lines[${zeroQtyIdx}].qty`] = `${copy.lineQtyLabel} must be greater than zero.`;
     }
+    if (isCutting() && !errs.lines && Number.isFinite(batchQty) && batchQty > 0) {
+      const batchUnitId = outputUnitId();
+      if (batchUnitId && batchUnitId > 0) {
+        const convs = conversions() ?? [];
+        const unit = outputUnitLabel().trim() || "units";
+        for (let i = 0; i < parsedLines.length; i++) {
+          const ln = parsedLines[i];
+          if (!(ln.component_item_id > 0) || !(ln.qty > 0) || !(ln.unit_id && ln.unit_id > 0)) continue;
+          const converted = convertClient(ln.unit_id, batchUnitId, ln.qty, convs);
+          if (converted == null) continue;
+          if (converted > batchQty + 1e-6) {
+            const shown = String(Math.round(converted * 10000) / 10000);
+            const batchShown = String(Math.round(batchQty * 10000) / 10000);
+            errs.lines = `Line ${i + 1}: ${shown} ${unit} is more than the ${batchShown} ${unit} batch. Lower this quantity or raise ${copy.batchQtyLabel}.`;
+            errs[`lines[${i}].qty`] = `More than the ${batchShown} ${unit} batch.`;
+            break;
+          }
+        }
+      }
+    }
     const bodyLines = parsedLines
       .filter((ln) => ln.component_item_id > 0 && ln.qty > 0)
       .map((ln) => ({
