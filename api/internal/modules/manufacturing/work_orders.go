@@ -728,13 +728,30 @@ func completeWorkOrder(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Validation(w, map[string]string{"stock": err.Error()})
 					return
 				}
+				// Parts recorded on Record parts went into stock when they were recorded.
+				// Count them toward the job and do not receive them again.
+				postedWeighs, err := loadComponentOutputWeighsByStatus(r.Context(), tx, tu.TenantID, id, ln.ComponentItemID, "posted")
+				if err != nil {
+					response.Validation(w, map[string]string{"stock": err.Error()})
+					return
+				}
+				for _, ow := range postedWeighs {
+					cutPostedTotal += outputWeighQty(ow)
+				}
 				weighs := filterOutputWeighs(completeBody.OutputWeighs, ln.ComponentItemID)
+				if len(postedWeighs) > 0 {
+					// Recorded parts are the truth for this cut; the wizard's Actual column does not post a second time.
+					weighs = nil
+				}
 				if len(weighs) == 0 {
 					weighs, err = loadStagedComponentOutputWeighs(r.Context(), tx, tu.TenantID, id, ln.ComponentItemID)
 					if err != nil {
 						response.Validation(w, map[string]string{"stock": err.Error()})
 						return
 					}
+				}
+				if len(postedWeighs) > 0 && len(weighs) == 0 {
+					continue
 				}
 				if compSettings.TrackLot {
 					if len(weighs) == 0 {
@@ -1151,12 +1168,25 @@ func filterOutputWeighs(weighs []woOutputWeigh, componentItemID int64) []woOutpu
 	return out
 }
 
+// outputWeighQty is the weight that counts for a recorded cut: catch weight when present, else qty.
+func outputWeighQty(ow woOutputWeigh) float64 {
+	if ow.CatchWeight != nil && *ow.CatchWeight > 0 {
+		return *ow.CatchWeight
+	}
+	return ow.Qty
+}
+
+// loadStagedComponentOutputWeighs returns recorded cuts that have not moved stock yet.
 func loadStagedComponentOutputWeighs(ctx context.Context, tx pgx.Tx, tenantID, woID, componentItemID int64) ([]woOutputWeigh, error) {
+	return loadComponentOutputWeighsByStatus(ctx, tx, tenantID, woID, componentItemID, "staged")
+}
+
+func loadComponentOutputWeighsByStatus(ctx context.Context, tx pgx.Tx, tenantID, woID, componentItemID int64, status string) ([]woOutputWeigh, error) {
 	rows, err := tx.Query(ctx, `
 		select lot_no, qty::float8, catch_weight::float8, expiry_date::text
 		from public.mfg_wo_output_lots
-		where tenant_id = $1 and work_order_id = $2 and component_item_id = $3 and status = 'staged'
-		order by id`, tenantID, woID, componentItemID)
+		where tenant_id = $1 and work_order_id = $2 and component_item_id = $3 and status = $4
+		order by id`, tenantID, woID, componentItemID, status)
 	if err != nil {
 		// Column may be missing before migration 279 — treat as no staged cuts.
 		if strings.Contains(err.Error(), "component_item_id") {
@@ -1280,19 +1310,20 @@ func receiveDisassemblyCutLot(
 }
 
 func stagedAssemblyOutputQty(ctx context.Context, tx pgx.Tx, woID int64, trackSerial, trackLot bool) (float64, error) {
+	// Recorded finished goods are in stock already (posted); older rows may still be staged.
 	if trackSerial {
 		var n int64
 		err := tx.QueryRow(ctx, `
 			select count(*) from public.mfg_wo_output_serials
-			where work_order_id = $1 and status = 'staged'`, woID).Scan(&n)
+			where work_order_id = $1 and status in ('staged', 'posted')`, woID).Scan(&n)
 		return float64(n), err
 	}
 	if trackLot {
 		var qty float64
 		err := tx.QueryRow(ctx, `
-			select coalesce(sum(coalesce(catch_weight, qty)), 0)::float8
+			select coalesce(sum(coalesce(nullif(catch_weight, 0), qty)), 0)::float8
 			from public.mfg_wo_output_lots
-			where work_order_id = $1 and status = 'staged' and component_item_id is null`, woID).Scan(&qty)
+			where work_order_id = $1 and status in ('staged', 'posted') and component_item_id is null`, woID).Scan(&qty)
 		if err != nil {
 			return 0, err
 		}
@@ -1301,9 +1332,9 @@ func stagedAssemblyOutputQty(ctx context.Context, tx pgx.Tx, woID int64, trackSe
 		}
 		// Older rows may omit null component_item_id filter.
 		err = tx.QueryRow(ctx, `
-			select coalesce(sum(coalesce(catch_weight, qty)), 0)::float8
+			select coalesce(sum(coalesce(nullif(catch_weight, 0), qty)), 0)::float8
 			from public.mfg_wo_output_lots
-			where work_order_id = $1 and status = 'staged'`, woID).Scan(&qty)
+			where work_order_id = $1 and status in ('staged', 'posted')`, woID).Scan(&qty)
 		return qty, err
 	}
 	return 0, nil

@@ -477,7 +477,7 @@ export default function ProductionIssueStationPage() {
                         <div class="space-y-2 pt-2">
                           <p class="text-sm font-medium text-text-primary">Cuts you will get</p>
                           <p class="text-xs text-text-secondary">
-                            These pieces are received when you finish the job. They are not taken from stock on this screen.
+                            These pieces go into stock when you record them on Record parts, or when you finish the job.
                           </p>
                           <div class="overflow-x-auto rounded border border-stroke">
                             <table class="min-w-full text-left text-xs">

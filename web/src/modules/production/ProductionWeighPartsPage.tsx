@@ -36,6 +36,19 @@ type WorkOrderDetail = {
   finished_item_name?: string;
 };
 
+type RecordedPart = {
+  id: number;
+  component_item_id?: number;
+  component_code?: string;
+  component_name?: string;
+  lot_no: string;
+  qty: number;
+  expiry_date?: string;
+  status: string;
+  in_stock: boolean;
+  created_at: string;
+};
+
 function newClientScanId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return `scan-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -64,8 +77,37 @@ export default function ProductionWeighPartsPage() {
   const [expiry, setExpiry] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
+  const [recorded, setRecorded] = createSignal<RecordedPart[]>([]);
+  const [removingId, setRemovingId] = createSignal<number | null>(null);
 
   const cutLines = () => (bom()?.lines ?? []).filter((l) => l.component_item_id > 0);
+  const recordedTotal = () => recorded().reduce((sum, p) => sum + (Number(p.qty) || 0), 0);
+
+  const loadRecorded = async (id: number) => {
+    const res = await apiFetch<RecordedPart[]>(`/api/v1/manufacturing/work-orders/${id}/output-lots`);
+    setRecorded(res.success && res.data ? res.data : []);
+  };
+
+  const handleRemovePart = async (part: RecordedPart) => {
+    const id = woId();
+    if (!id || removingId() !== null) return;
+    const label = `${part.component_code ?? ""} ${part.lot_no}`.trim();
+    const warning = part.in_stock
+      ? `Remove ${label} (${part.qty})? It goes back out of stock.`
+      : `Remove ${label} (${part.qty})?`;
+    if (!window.confirm(warning)) return;
+    setRemovingId(part.id);
+    const res = await apiFetch<{ id: number }>(`/api/v1/manufacturing/work-orders/${id}/output-lots/${part.id}`, {
+      method: "DELETE",
+    });
+    setRemovingId(null);
+    if (!res.success) {
+      mfgWarn(res.message, "Could not remove that part. Try again.");
+      return;
+    }
+    mfgSuccess(res.message || "Part removed.");
+    await loadRecorded(id);
+  };
 
   const loadWo = async (id: number) => {
     setLoading(true);
@@ -88,6 +130,7 @@ export default function ProductionWeighPartsPage() {
     }
     const first = bomRes.data.lines?.[0];
     setCutId(first?.component_item_id ?? null);
+    await loadRecorded(id);
   };
 
   createEffect(() => {
@@ -136,9 +179,10 @@ export default function ProductionWeighPartsPage() {
       mfgWarn(r.message, "Could not record that part. Try again.");
       return;
     }
-    mfgSuccess("Part recorded. Record the rest, then Finish.");
+    mfgSuccess("Part recorded and put in stock. Record the rest, then Finish.");
     setLotNo("");
     setWeight("");
+    await loadRecorded(id);
   };
 
   return (
@@ -150,7 +194,7 @@ export default function ProductionWeighPartsPage() {
           </A>
           <h2 class="mt-2 text-lg font-semibold text-text-primary">Record parts</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            Enter how many of each part you got. Finish the job to put them in stock.
+            Enter how many of each part you got. Each part goes into stock as soon as you record it. Remove a part here if you made a mistake.
           </p>
           <div class="mt-4 max-w-lg">
             <LookupCombo
@@ -224,6 +268,72 @@ export default function ProductionWeighPartsPage() {
             >
               Record this part
             </button>
+          </section>
+
+          <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+            <div class="flex items-baseline justify-between gap-3">
+              <h3 class="text-sm font-semibold text-text-primary">Recorded parts</h3>
+              <Show when={recorded().length > 0}>
+                <p class="text-xs text-text-secondary">
+                  {recorded().length} row(s) · total {recordedTotal()}
+                </p>
+              </Show>
+            </div>
+            <Show
+              when={recorded().length > 0}
+              fallback={<p class="mt-2 text-sm text-text-secondary">Nothing recorded yet on this job.</p>}
+            >
+              <div class="mt-3 overflow-x-auto rounded border border-stroke">
+                <table class="min-w-full text-left text-xs">
+                  <thead class="bg-surface-muted text-text-secondary">
+                    <tr>
+                      <th class="px-3 py-2 font-medium">Part</th>
+                      <th class="px-3 py-2 font-medium">Lot no.</th>
+                      <th class="px-3 py-2 text-right font-medium">Qty</th>
+                      <th class="px-3 py-2 font-medium">Expiry</th>
+                      <th class="px-3 py-2 font-medium">Stock</th>
+                      <th class="px-3 py-2 font-medium" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={recorded()}>
+                      {(p) => (
+                        <tr class="border-t border-stroke">
+                          <td class="px-3 py-2 text-text-primary">
+                            {p.component_code ? `${p.component_code} — ${p.component_name ?? ""}` : "Finished item"}
+                          </td>
+                          <td class="px-3 py-2 font-mono">{p.lot_no}</td>
+                          <td class="px-3 py-2 text-right">{p.qty}</td>
+                          <td class="px-3 py-2">{p.expiry_date ?? "—"}</td>
+                          <td class="px-3 py-2">
+                            <span
+                              class="rounded px-1.5 py-0.5 text-[11px] font-medium"
+                              classList={{
+                                "bg-green-50 text-green-700": p.in_stock,
+                                "bg-surface-muted text-text-secondary": !p.in_stock,
+                              }}
+                            >
+                              {p.in_stock ? "In stock" : "Recorded only"}
+                            </span>
+                          </td>
+                          <td class="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              class="rounded border border-stroke px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              disabled={removingId() !== null}
+                              aria-label={`Remove ${p.lot_no}`}
+                              onClick={() => void handleRemovePart(p)}
+                            >
+                              {removingId() === p.id ? "Removing…" : "Remove"}
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Show>
           </section>
         </Show>
       </div>

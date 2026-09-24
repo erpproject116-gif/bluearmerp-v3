@@ -349,7 +349,7 @@ export default function ProductionReceiveStationPage() {
                 </Show>
               </p>
               <p class="mt-2 text-xs text-amber-800">
-                Staging does not update stock until you Finish build on the Jobs list.
+                Each serial or lot you record here goes into stock right away. Finish build on the Jobs list closes the job.
               </p>
 
               <Show when={ctx().track_serial}>

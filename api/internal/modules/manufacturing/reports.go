@@ -191,12 +191,12 @@ func listWorkOrderProgressReport(pool *pgxpool.Pool) http.HandlerFunc {
 			) iss_l on iss_l.work_order_id = wo.id
 			left join (
 			  select work_order_id, count(*)::int as cnt
-			  from public.mfg_wo_output_serials where status = 'staged'
+			  from public.mfg_wo_output_serials where status in ('staged', 'posted')
 			  group by work_order_id
 			) out_s on out_s.work_order_id = wo.id
 			left join (
-			  select work_order_id, coalesce(sum(qty), 0)::float8 as qty
-			  from public.mfg_wo_output_lots where status = 'staged'
+			  select work_order_id, coalesce(sum(coalesce(nullif(catch_weight, 0), qty)), 0)::float8 as qty
+			  from public.mfg_wo_output_lots where status in ('staged', 'posted')
 			  group by work_order_id
 			) out_l on out_l.work_order_id = wo.id
 			where %s

@@ -246,11 +246,18 @@ func reverseWorkOrderTrace(ctx context.Context, tx pgx.Tx, tenantID, workOrderID
 }
 
 func reverseWorkOrderSerials(ctx context.Context, tx pgx.Tx, tenantID, workOrderID, reversalID, userID int64) error {
+	// A finished serial that was recorded and then removed on the same job is already void; skip it.
 	rows, err := tx.Query(ctx, `
 		select se.serial_unit_id, se.event_type, coalesce(se.from_location_id, se.to_location_id)
 		from public.inv_serial_events se
 		where se.tenant_id=$1 and se.ref_type='mfg_work_order' and se.ref_id=$2
 		  and se.event_type in ('received','adjusted')
+		  and not exists (
+		    select 1 from public.inv_serial_events v
+		    where v.serial_unit_id = se.serial_unit_id
+		      and v.ref_type = 'mfg_work_order' and v.ref_id = $2
+		      and v.event_type = 'voided'
+		  )
 		order by se.id`, tenantID, workOrderID)
 	if err != nil {
 		return err

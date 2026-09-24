@@ -342,10 +342,10 @@ func woReturnStockReason(workOrderNo string) string {
 func loadOpenWorkOrderForUnstage(ctx context.Context, tx pgx.Tx, tenantID, woID int64) (WorkOrder, error) {
 	var wo WorkOrder
 	err := tx.QueryRow(ctx, `
-		select wo.id, wo.work_order_no, wo.location_id, wo.status
+		select wo.id, wo.work_order_no, wo.location_id, wo.finished_item_id, wo.status
 		from public.mfg_work_orders wo
 		where wo.id = $1 and wo.tenant_id = $2
-		for update`, woID, tenantID).Scan(&wo.ID, &wo.WorkOrderNo, &wo.LocationID, &wo.Status)
+		for update`, woID, tenantID).Scan(&wo.ID, &wo.WorkOrderNo, &wo.LocationID, &wo.FinishedItemID, &wo.Status)
 	if err != nil {
 		return WorkOrder{}, err
 	}
@@ -397,6 +397,142 @@ func returnIssueSerialStock(ctx context.Context, tx pgx.Tx, tenantID, woID, loca
 		return err
 	}
 	return inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, 1, userID, "mfg_work_order", woID, "wo_trace_return", woReturnStockReason(workOrderNo))
+}
+
+// woReceiveStockReason labels the Inv. Book row for a recorded output that went into stock.
+func woReceiveStockReason(workOrderNo string) string {
+	return strings.TrimSpace(workOrderNo) + " received"
+}
+
+// woVoidStockReason labels the Inv. Book row when a recorded output is removed again.
+func woVoidStockReason(workOrderNo string) string {
+	return strings.TrimSpace(workOrderNo) + " removed from stock"
+}
+
+// receiveWoOutputLotStock puts a recorded output lot into stock as soon as it is recorded.
+// Lot-tracked items also get a lot batch and a produced event.
+func receiveWoOutputLotStock(ctx context.Context, tx pgx.Tx, tenantID, woID, locationID, itemID int64, lotNo string, qty float64, expiry *time.Time, trackLot bool, movementType string, userID int64, workOrderNo string) error {
+	if qty <= 0.0001 {
+		return fmt.Errorf("lot qty must be greater than zero")
+	}
+	if trackLot {
+		var lotBatchID int64
+		err := tx.QueryRow(ctx, `
+			insert into public.inv_lot_batches (
+			  tenant_id, item_id, lot_no, location_id, qty_on_hand, expiry_date
+			) values ($1, $2, $3, $4, $5, $6)
+			on conflict (tenant_id, item_id, lot_no, location_id)
+			do update set
+			  qty_on_hand = inv_lot_batches.qty_on_hand + excluded.qty_on_hand,
+			  expiry_date = coalesce(excluded.expiry_date, inv_lot_batches.expiry_date),
+			  updated_at = now()
+			returning id`,
+			tenantID, itemID, lotNo, locationID, qty, expiry).Scan(&lotBatchID)
+		if err != nil {
+			return fmt.Errorf("failed to receive lot %s: %w", lotNo, err)
+		}
+		loc := locationID
+		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+			TenantID:        tenantID,
+			LotBatchID:      lotBatchID,
+			EventType:       "produced",
+			ToLocationID:    &loc,
+			Qty:             qty,
+			RefType:         "mfg_work_order",
+			RefID:           &woID,
+			Notes:           woReceiveStockReason(workOrderNo),
+			CreatedByUserID: &userID,
+		}); err != nil {
+			return err
+		}
+	}
+	return inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, qty, userID, "mfg_work_order", woID, movementType, woReceiveStockReason(workOrderNo))
+}
+
+// voidWoOutputLotStock takes a recorded output lot back out of stock.
+func voidWoOutputLotStock(ctx context.Context, tx pgx.Tx, tenantID, woID, locationID, itemID int64, lotNo string, qty float64, trackLot bool, userID int64, workOrderNo string) error {
+	if qty <= 0.0001 {
+		return nil
+	}
+	if trackLot {
+		var lotBatchID int64
+		err := tx.QueryRow(ctx, `
+			select id from public.inv_lot_batches
+			where tenant_id = $1 and item_id = $2 and lot_no = $3 and location_id = $4
+			for update`, tenantID, itemID, lotNo, locationID).Scan(&lotBatchID)
+		if err != nil {
+			return fmt.Errorf("lot %s is no longer at this warehouse", lotNo)
+		}
+		tag, err := tx.Exec(ctx, `
+			update public.inv_lot_batches
+			set qty_on_hand = qty_on_hand - $1, updated_at = now()
+			where id = $2 and qty_on_hand >= $1`, qty, lotBatchID)
+		if err != nil || tag.RowsAffected() == 0 {
+			return fmt.Errorf("lot %s no longer has %.4f on hand; part of it already left stock", lotNo, qty)
+		}
+		loc := locationID
+		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
+			TenantID:        tenantID,
+			LotBatchID:      lotBatchID,
+			EventType:       "voided",
+			FromLocationID:  &loc,
+			Qty:             qty,
+			RefType:         "mfg_work_order",
+			RefID:           &woID,
+			Notes:           woVoidStockReason(workOrderNo),
+			CreatedByUserID: &userID,
+		}); err != nil {
+			return err
+		}
+	}
+	return inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, -qty, userID, "mfg_work_order", woID, "wo_trace_void", woVoidStockReason(workOrderNo))
+}
+
+// receiveWoOutputSerialStock creates the finished serial in stock as soon as it is recorded.
+func receiveWoOutputSerialStock(ctx context.Context, tx pgx.Tx, tenantID, woID, locationID, itemID int64, serialNo string, userID int64, workOrderNo string) error {
+	recvAt := time.Now()
+	var warrantyMonths int
+	_ = tx.QueryRow(ctx, `select coalesce(warranty_duration_months, 0) from public.inv_items where id = $1`, itemID).Scan(&warrantyMonths)
+	var wStart *time.Time
+	wEnd := warrantyEndFromMonths(recvAt, warrantyMonths)
+	if warrantyMonths > 0 {
+		wStart = &recvAt
+	}
+	var unitID int64
+	err := tx.QueryRow(ctx, `
+		insert into public.inv_serial_units (
+		  tenant_id, item_id, serial_no, status, location_id,
+		  warranty_start, warranty_end, received_at
+		) values ($1, $2, $3, 'in_stock', $4, $5::date, $6::date, $7::timestamptz)
+		returning id`,
+		tenantID, itemID, serialNo, locationID, wStart, wEnd,
+		recvAt.Format("2006-01-02")+" 12:00:00+00").Scan(&unitID)
+	if err != nil {
+		return fmt.Errorf("failed to post serial %s: %w", serialNo, err)
+	}
+	loc := locationID
+	if err := inventory.InsertSerialEvent(ctx, tx, tenantID, unitID, "received", nil, &loc, "mfg_work_order", woID, &userID); err != nil {
+		return err
+	}
+	return inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, 1, userID, "mfg_work_order", woID, "wo_trace_receipt", woReceiveStockReason(workOrderNo))
+}
+
+// voidWoOutputSerialStock removes a recorded finished serial from stock again.
+func voidWoOutputSerialStock(ctx context.Context, tx pgx.Tx, tenantID, woID, locationID, itemID int64, serialNo string, userID int64, workOrderNo string) error {
+	var unitID int64
+	err := tx.QueryRow(ctx, `
+		update public.inv_serial_units
+		set status = 'void', location_id = null, updated_at = now()
+		where tenant_id = $1 and item_id = $2 and serial_no = $3 and location_id = $4 and status = 'in_stock'
+		returning id`, tenantID, itemID, serialNo, locationID).Scan(&unitID)
+	if err != nil {
+		return fmt.Errorf("serial %s is no longer in stock at this warehouse", serialNo)
+	}
+	loc := locationID
+	if err := inventory.InsertSerialEvent(ctx, tx, tenantID, unitID, "voided", &loc, nil, "mfg_work_order", woID, &userID); err != nil {
+		return err
+	}
+	return inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, -1, userID, "mfg_work_order", woID, "wo_trace_void", woVoidStockReason(workOrderNo))
 }
 
 // unstageWorkOrderLot puts a taken lot line back in stock while the job is still open.
@@ -552,9 +688,9 @@ func batchWorkOrderOutputSerials(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		results, err := processWoOutputSerialScans(r.Context(), tx, tu.TenantID, woID, body.Scans)
+		results, err := processWoOutputSerialScans(r.Context(), tx, tu.TenantID, wo, tu.AppUserID, body.Scans)
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to stage output serials.", "ERR_INTERNAL")
+			response.ValidationSmart(w, map[string]string{"stock": err.Error()})
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
@@ -562,7 +698,7 @@ func batchWorkOrderOutputSerials(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.wo_output_serial_batch", "mfg_work_order", &woID, nil, map[string]any{"count": len(body.Scans)})
-		response.OK(w, map[string]any{"results": results}, "Batch processed.")
+		response.OK(w, map[string]any{"results": results}, "Recorded and put in stock.")
 	}
 }
 
@@ -619,8 +755,13 @@ func batchWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			allowed := map[int64]BomLine{}
+			recordOnly := map[int64]bool{}
 			for _, ln := range bom.Lines {
 				allowed[ln.ComponentItemID] = ln
+				// Waste-class cuts are recorded for the variance report but never receive sellable stock.
+				if !ReceivesStockForClassification(NormalizeOutputClassification(ln.OutputClassification)) {
+					recordOnly[ln.ComponentItemID] = true
+				}
 			}
 			for _, sc := range body.Scans {
 				if sc.ComponentItemID == nil || *sc.ComponentItemID <= 0 {
@@ -632,9 +773,9 @@ func batchWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 			}
-			results, err := processWoOutputLotScans(r.Context(), tx, tu.TenantID, woID, wo.FinishedItemCode, nil, body.Scans)
+			results, err := processWoOutputLotScans(r.Context(), tx, tu.TenantID, wo, tu.AppUserID, wo.FinishedItemCode, nil, recordOnly, body.Scans)
 			if err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to stage output lots.", "ERR_INTERNAL")
+				response.ValidationSmart(w, map[string]string{"stock": err.Error()})
 				return
 			}
 			if err := tx.Commit(r.Context()); err != nil {
@@ -642,7 +783,7 @@ func batchWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.wo_output_lot_batch", "mfg_work_order", &woID, nil, map[string]any{"count": len(body.Scans), "cut": true})
-			response.OK(w, map[string]any{"results": results}, "Batch processed.")
+			response.OK(w, map[string]any{"results": results}, "Recorded and put in stock.")
 			return
 		}
 
@@ -652,9 +793,9 @@ func batchWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		results, err := processWoOutputLotScans(r.Context(), tx, tu.TenantID, woID, wo.FinishedItemCode, fgSettings.DefaultShelfLifeDays, body.Scans)
+		results, err := processWoOutputLotScans(r.Context(), tx, tu.TenantID, wo, tu.AppUserID, wo.FinishedItemCode, fgSettings.DefaultShelfLifeDays, nil, body.Scans)
 		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to stage output lots.", "ERR_INTERNAL")
+			response.ValidationSmart(w, map[string]string{"stock": err.Error()})
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
@@ -662,7 +803,7 @@ func batchWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.wo_output_lot_batch", "mfg_work_order", &woID, nil, map[string]any{"count": len(body.Scans)})
-		response.OK(w, map[string]any{"results": results}, "Batch processed.")
+		response.OK(w, map[string]any{"results": results}, "Recorded and put in stock.")
 	}
 }
 
@@ -788,7 +929,9 @@ func defaultWoExpiry(shelfDays *int) *time.Time {
 	return &t
 }
 
-func processWoOutputSerialScans(ctx context.Context, tx pgx.Tx, tenantID, woID int64, scans []woOutputSerialScan) ([]woOutputSerialScanResult, error) {
+// processWoOutputSerialScans records finished serials and puts each one into stock at once.
+func processWoOutputSerialScans(ctx context.Context, tx pgx.Tx, tenantID int64, wo WorkOrder, userID int64, scans []woOutputSerialScan) ([]woOutputSerialScanResult, error) {
+	woID := wo.ID
 	seen := map[string]bool{}
 	results := make([]woOutputSerialScanResult, 0, len(scans))
 	for _, sc := range scans {
@@ -806,7 +949,7 @@ func processWoOutputSerialScans(ctx context.Context, tx pgx.Tx, tenantID, woID i
 			var existingNo string
 			err := tx.QueryRow(ctx, `
 				select id, serial_no from public.mfg_wo_output_serials
-				where tenant_id = $1 and work_order_id = $2 and client_scan_id = $3 and status = 'staged'`,
+				where tenant_id = $1 and work_order_id = $2 and client_scan_id = $3 and status in ('staged', 'posted')`,
 				tenantID, woID, sc.ClientScanID).Scan(&existingID, &existingNo)
 			if err == nil {
 				res.Status = "idempotent_replay"
@@ -845,13 +988,17 @@ func processWoOutputSerialScans(ctx context.Context, tx pgx.Tx, tenantID, woID i
 		var rowID int64
 		err := tx.QueryRow(ctx, `
 			insert into public.mfg_wo_output_serials (tenant_id, work_order_id, serial_no, client_scan_id, status)
-			values ($1, $2, $3, $4, 'staged')
+			values ($1, $2, $3, $4, 'posted')
 			returning id`, tenantID, woID, serialNo, clientScanArg).Scan(&rowID)
 		if err != nil {
 			res.Status = "duplicate"
 			res.Message = "Failed to record serial."
 			results = append(results, res)
 			continue
+		}
+		// Stock moves now: the finished serial is in stock as soon as it is recorded.
+		if err := receiveWoOutputSerialStock(ctx, tx, tenantID, woID, wo.LocationID, wo.FinishedItemID, serialNo, userID, wo.WorkOrderNo); err != nil {
+			return nil, err
 		}
 		res.Status = "accepted"
 		res.ID = &rowID
@@ -860,7 +1007,10 @@ func processWoOutputSerialScans(ctx context.Context, tx pgx.Tx, tenantID, woID i
 	return results, nil
 }
 
-func processWoOutputLotScans(ctx context.Context, tx pgx.Tx, tenantID, woID int64, itemCode string, shelfDays *int, scans []woOutputLotScan) ([]woOutputLotScanResult, error) {
+// processWoOutputLotScans records output lots and puts each sellable one into stock at once.
+// recordOnly lists cut items (waste class) that are recorded without receiving stock.
+func processWoOutputLotScans(ctx context.Context, tx pgx.Tx, tenantID int64, wo WorkOrder, userID int64, itemCode string, shelfDays *int, recordOnly map[int64]bool, scans []woOutputLotScan) ([]woOutputLotScanResult, error) {
+	woID := wo.ID
 	seen := map[string]bool{}
 	results := make([]woOutputLotScanResult, 0, len(scans))
 	seq := 0
@@ -872,7 +1022,7 @@ func processWoOutputLotScans(ctx context.Context, tx pgx.Tx, tenantID, woID int6
 			var existingQty float64
 			err := tx.QueryRow(ctx, `
 				select id, lot_no, qty::float8 from public.mfg_wo_output_lots
-				where tenant_id = $1 and work_order_id = $2 and client_scan_id = $3 and status = 'staged'`,
+				where tenant_id = $1 and work_order_id = $2 and client_scan_id = $3 and status in ('staged', 'posted')`,
 				tenantID, woID, sc.ClientScanID).Scan(&existingID, &existingNo, &existingQty)
 			if err == nil {
 				res.Status = "idempotent_replay"
@@ -896,11 +1046,22 @@ func processWoOutputLotScans(ctx context.Context, tx pgx.Tx, tenantID, woID int6
 		res.Qty = qty
 		codeForLot := itemCode
 		var shelfForScan = shelfDays
+		// Assembly: the finished item, always lot-tracked here. Cutting: the cut SKU, which may not track lots.
+		stockItemID := wo.FinishedItemID
+		stockTrackLot := true
+		movementType := "wo_trace_receipt"
+		receiveStock := true
 		if sc.ComponentItemID != nil && *sc.ComponentItemID > 0 {
+			stockItemID = *sc.ComponentItemID
+			movementType = "wo_disassembly_receipt"
+			receiveStock = !recordOnly[stockItemID]
 			_ = tx.QueryRow(ctx, `select coalesce(item_code, '') from public.inv_items where id = $1`, *sc.ComponentItemID).Scan(&codeForLot)
 			st, errSt := inventory.LoadItemTrackingSettings(ctx, tx, tenantID, *sc.ComponentItemID)
-			if errSt == nil && st.DefaultShelfLifeDays != nil {
-				shelfForScan = st.DefaultShelfLifeDays
+			if errSt == nil {
+				stockTrackLot = st.TrackLot
+				if st.DefaultShelfLifeDays != nil {
+					shelfForScan = st.DefaultShelfLifeDays
+				}
 			}
 		}
 		lotNo := normalizeWoLotNo(sc.LotNo)
@@ -963,11 +1124,211 @@ func processWoOutputLotScans(ctx context.Context, tx pgx.Tx, tenantID, woID int6
 				continue
 			}
 		}
+		// Stock moves now for sellable outputs. Waste-class cuts stay recorded only.
+		if receiveStock {
+			if err := receiveWoOutputLotStock(ctx, tx, tenantID, woID, wo.LocationID, stockItemID, lotNo, qty, expiry, stockTrackLot, movementType, userID, wo.WorkOrderNo); err != nil {
+				return nil, err
+			}
+			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'posted' where id = $1`, rowID); err != nil {
+				return nil, err
+			}
+		}
 		res.Status = "accepted"
 		res.ID = &rowID
 		results = append(results, res)
 	}
 	return results, nil
+}
+
+type woRecordedOutputLot struct {
+	ID              int64   `json:"id"`
+	ComponentItemID *int64  `json:"component_item_id,omitempty"`
+	ComponentCode   string  `json:"component_code,omitempty"`
+	ComponentName   string  `json:"component_name,omitempty"`
+	LotNo           string  `json:"lot_no"`
+	Qty             float64 `json:"qty"`
+	ExpiryDate      *string `json:"expiry_date,omitempty"`
+	Status          string  `json:"status"`
+	InStock         bool    `json:"in_stock"`
+	CreatedAt       string  `json:"created_at"`
+}
+
+// listWorkOrderOutputLots returns the parts or finished lots recorded on a job (not voided).
+func listWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		woID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select ol.id, ol.component_item_id, coalesce(i.item_code, ''), coalesce(i.item_name, ''),
+			  ol.lot_no, coalesce(nullif(ol.catch_weight, 0), ol.qty)::float8, ol.expiry_date::text, ol.status, ol.created_at::text
+			from public.mfg_wo_output_lots ol
+			join public.mfg_work_orders wo on wo.id = ol.work_order_id
+			left join public.inv_items i on i.id = ol.component_item_id
+			where ol.tenant_id = $1 and ol.work_order_id = $2 and wo.tenant_id = $1
+			  and ol.status in ('staged', 'posted')
+			order by ol.id desc`, tu.TenantID, woID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list recorded parts.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		out := []woRecordedOutputLot{}
+		for rows.Next() {
+			var row woRecordedOutputLot
+			if err := rows.Scan(&row.ID, &row.ComponentItemID, &row.ComponentCode, &row.ComponentName, &row.LotNo, &row.Qty, &row.ExpiryDate, &row.Status, &row.CreatedAt); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to list recorded parts.", "ERR_INTERNAL")
+				return
+			}
+			row.InStock = row.Status == "posted"
+			out = append(out, row)
+		}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list recorded parts.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+// removeWorkOrderOutputLot removes a recorded part or finished lot while the job is still open.
+// A row that already went into stock leaves stock again.
+func removeWorkOrderOutputLot(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		woID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		lotRowID, err := strconv.ParseInt(chi.URLParam(r, "lotId"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"lotId": "Invalid lot id."})
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove the part.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		wo, err := loadOpenWorkOrderForUnstage(r.Context(), tx, tu.TenantID, woID)
+		if err != nil {
+			respondReleasedWOLoadError(w, err, "Only open jobs can remove a recorded part. This job is already finished.")
+			return
+		}
+		var componentItemID *int64
+		var lotNo, status string
+		var qty float64
+		err = tx.QueryRow(r.Context(), `
+			select component_item_id, lot_no, coalesce(nullif(catch_weight, 0), qty)::float8, status
+			from public.mfg_wo_output_lots
+			where id = $1 and work_order_id = $2 and tenant_id = $3
+			for update`, lotRowID, woID, tu.TenantID).Scan(&componentItemID, &lotNo, &qty, &status)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Recorded part not found on this job.", "ERR_NOT_FOUND")
+			return
+		}
+		if status == "void" {
+			response.Validation(w, map[string]string{"status": "This part was already removed."})
+			return
+		}
+		if status == "posted" {
+			itemID := wo.FinishedItemID
+			if componentItemID != nil && *componentItemID > 0 {
+				itemID = *componentItemID
+			}
+			settings, err := inventory.LoadItemTrackingSettings(r.Context(), tx, tu.TenantID, itemID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load item settings.", "ERR_INTERNAL")
+				return
+			}
+			if err := voidWoOutputLotStock(r.Context(), tx, tu.TenantID, woID, wo.LocationID, itemID, lotNo, qty, settings.TrackLot, tu.AppUserID, wo.WorkOrderNo); err != nil {
+				response.ValidationSmart(w, map[string]string{"stock": err.Error()})
+				return
+			}
+		}
+		if _, err := tx.Exec(r.Context(), `delete from public.mfg_wo_output_lots where id = $1`, lotRowID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove the part.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove the part.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.wo_output_lot_remove", "mfg_work_order", &woID, nil, map[string]any{"output_lot_id": lotRowID, "lot_no": lotNo, "qty": qty, "was_in_stock": status == "posted"})
+		msg := "Part removed."
+		if status == "posted" {
+			msg = "Part removed and taken back out of stock."
+		}
+		response.OK(w, map[string]any{"id": lotRowID, "lot_no": lotNo, "qty": qty}, msg)
+	}
+}
+
+// removeWorkOrderOutputSerial removes a recorded finished serial while the job is still open.
+func removeWorkOrderOutputSerial(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		woID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		rowID, err := strconv.ParseInt(chi.URLParam(r, "serialId"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"serialId": "Invalid serial id."})
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove the serial.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		wo, err := loadOpenWorkOrderForUnstage(r.Context(), tx, tu.TenantID, woID)
+		if err != nil {
+			respondReleasedWOLoadError(w, err, "Only open jobs can remove a recorded serial. This job is already finished.")
+			return
+		}
+		var serialNo, status string
+		err = tx.QueryRow(r.Context(), `
+			select serial_no, status from public.mfg_wo_output_serials
+			where id = $1 and work_order_id = $2 and tenant_id = $3
+			for update`, rowID, woID, tu.TenantID).Scan(&serialNo, &status)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Recorded serial not found on this job.", "ERR_NOT_FOUND")
+			return
+		}
+		if status == "void" {
+			response.Validation(w, map[string]string{"status": "This serial was already removed."})
+			return
+		}
+		if status == "posted" {
+			if err := voidWoOutputSerialStock(r.Context(), tx, tu.TenantID, woID, wo.LocationID, wo.FinishedItemID, serialNo, tu.AppUserID, wo.WorkOrderNo); err != nil {
+				response.ValidationSmart(w, map[string]string{"stock": err.Error()})
+				return
+			}
+		}
+		if _, err := tx.Exec(r.Context(), `delete from public.mfg_wo_output_serials where id = $1`, rowID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove the serial.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to remove the serial.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "manufacturing.wo_output_serial_remove", "mfg_work_order", &woID, nil, map[string]any{"output_serial_id": rowID, "serial_no": serialNo, "was_in_stock": status == "posted"})
+		msg := "Serial removed."
+		if status == "posted" {
+			msg = "Serial removed and taken back out of stock."
+		}
+		response.OK(w, map[string]any{"id": rowID, "serial_no": serialNo}, msg)
+	}
 }
 
 func loadWorkOrderScanContext(ctx context.Context, pool *pgxpool.Pool, tenantID, woID int64) (woScanContextPayload, error) {
@@ -1043,8 +1404,9 @@ func loadWorkOrderScanContext(ctx context.Context, pool *pgxpool.Pool, tenantID,
 		}
 	}
 
-	_ = pool.QueryRow(ctx, `select count(*) from public.mfg_wo_output_serials where work_order_id = $1 and status = 'staged'`, woID).Scan(&out.OutputSerials)
-	_ = pool.QueryRow(ctx, `select coalesce(sum(qty), 0)::float8 from public.mfg_wo_output_lots where work_order_id = $1 and status = 'staged'`, woID).Scan(&out.OutputLotQty)
+	// Recorded outputs are in stock already (posted); older rows may still be staged.
+	_ = pool.QueryRow(ctx, `select count(*) from public.mfg_wo_output_serials where work_order_id = $1 and status in ('staged', 'posted')`, woID).Scan(&out.OutputSerials)
+	_ = pool.QueryRow(ctx, `select coalesce(sum(coalesce(nullif(catch_weight, 0), qty)), 0)::float8 from public.mfg_wo_output_lots where work_order_id = $1 and status in ('staged', 'posted')`, woID).Scan(&out.OutputLotQty)
 	return out, nil
 }
 
@@ -1248,75 +1610,67 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 	if !settings.TrackSerial && !settings.TrackLot {
 		return fmt.Errorf("item %d is not trace-tracked", itemID)
 	}
+	var workOrderNo string
+	_ = tx.QueryRow(ctx, `select work_order_no from public.mfg_work_orders where id = $1`, woID).Scan(&workOrderNo)
+
 	if settings.TrackSerial {
 		needCount := int(math.Round(outputQty))
 		if math.Abs(float64(needCount)-outputQty) > 0.0001 {
 			return fmt.Errorf("serial-tracked output qty must be a whole number")
 		}
+		// Rows recorded on the Receive station are already in stock (posted). Rows from before that
+		// change are still staged and post here. Posted rows are used first.
 		rows, err := tx.Query(ctx, `
-			select id, serial_no from public.mfg_wo_output_serials
-			where work_order_id = $1 and status = 'staged'
-			order by id`, woID)
+			select id, serial_no, status from public.mfg_wo_output_serials
+			where work_order_id = $1 and status in ('staged', 'posted')
+			order by (status = 'posted') desc, id`, woID)
 		if err != nil {
 			return err
 		}
-		type stagedSerial struct {
+		type recordedSerial struct {
 			id       int64
 			serialNo string
+			posted   bool
 		}
-		var staged []stagedSerial
+		var recorded []recordedSerial
 		for rows.Next() {
-			var s stagedSerial
-			if err := rows.Scan(&s.id, &s.serialNo); err != nil {
+			var s recordedSerial
+			var status string
+			if err := rows.Scan(&s.id, &s.serialNo, &status); err != nil {
 				rows.Close()
 				return err
 			}
-			staged = append(staged, s)
+			s.posted = status == "posted"
+			recorded = append(recorded, s)
 		}
 		err = rows.Err()
 		rows.Close()
 		if err != nil {
 			return err
 		}
-		if len(staged) < needCount {
-			return fmt.Errorf("staged output serial count %d is less than required %d", len(staged), needCount)
+		if len(recorded) < needCount {
+			return fmt.Errorf("staged output serial count %d is less than required %d", len(recorded), needCount)
 		}
-		extra := staged[needCount:]
-		staged = staged[:needCount]
-		recvAt := time.Now()
-		var warrantyMonths int
-		_ = tx.QueryRow(ctx, `select coalesce(warranty_duration_months, 0) from public.inv_items where id = $1`, itemID).Scan(&warrantyMonths)
-		var wStart *time.Time
-		wEnd := warrantyEndFromMonths(recvAt, warrantyMonths)
-		if warrantyMonths > 0 {
-			wStart = &recvAt
-		}
-		for _, s := range staged {
-			var unitID int64
-			err := tx.QueryRow(ctx, `
-				insert into public.inv_serial_units (
-				  tenant_id, item_id, serial_no, status, location_id,
-				  warranty_start, warranty_end, received_at
-				) values ($1, $2, $3, 'in_stock', $4, $5::date, $6::date, $7::timestamptz)
-				returning id`,
-				tenantID, itemID, s.serialNo, locationID, wStart, wEnd,
-				recvAt.Format("2006-01-02")+" 12:00:00+00").Scan(&unitID)
-			if err != nil {
-				return fmt.Errorf("failed to post serial %s: %w", s.serialNo, err)
+		extra := recorded[needCount:]
+		use := recorded[:needCount]
+		for _, s := range use {
+			if s.posted {
+				continue
 			}
-			loc := locationID
-			if err := inventory.InsertSerialEvent(ctx, tx, tenantID, unitID, "received", nil, &loc, "mfg_work_order", woID, &userID); err != nil {
+			if err := receiveWoOutputSerialStock(ctx, tx, tenantID, woID, locationID, itemID, s.serialNo, userID, workOrderNo); err != nil {
 				return err
 			}
-			if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, 1, userID, "mfg_work_order", woID, "wo_trace_receipt"); err != nil {
-				return err
-			}
-			_, err = tx.Exec(ctx, `update public.mfg_wo_output_serials set status = 'posted' where id = $1`, s.id)
-			if err != nil {
+			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_serials set status = 'posted' where id = $1`, s.id); err != nil {
 				return err
 			}
 		}
+		// Recorded but not produced: take them back out of stock instead of leaving ghosts.
 		for _, s := range extra {
+			if s.posted {
+				if err := voidWoOutputSerialStock(ctx, tx, tenantID, woID, locationID, itemID, s.serialNo, userID, workOrderNo); err != nil {
+					return err
+				}
+			}
 			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_serials set status = 'void' where id = $1`, s.id); err != nil {
 				return err
 			}
@@ -1324,39 +1678,42 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 		return nil
 	}
 
-	var stagedQty float64
+	var recordedQty float64
 	err = tx.QueryRow(ctx, `
 		select coalesce(sum(coalesce(nullif(catch_weight, 0), qty)), 0)::float8
 		from public.mfg_wo_output_lots
-		where work_order_id = $1 and status = 'staged'`, woID).Scan(&stagedQty)
+		where work_order_id = $1 and status in ('staged', 'posted')`, woID).Scan(&recordedQty)
 	if err != nil {
 		return fmt.Errorf("failed to read staged output lots: %w", err)
 	}
-	if stagedQty+0.0001 < outputQty {
-		return fmt.Errorf("staged output lot qty %.4f is less than required %.4f", stagedQty, outputQty)
+	if recordedQty+0.0001 < outputQty {
+		return fmt.Errorf("staged output lot qty %.4f is less than required %.4f", recordedQty, outputQty)
 	}
 	rows, err := tx.Query(ctx, `
-		select id, lot_no, coalesce(nullif(catch_weight, 0), qty)::float8, expiry_date
+		select id, lot_no, coalesce(nullif(catch_weight, 0), qty)::float8, expiry_date, status
 		from public.mfg_wo_output_lots
-		where work_order_id = $1 and status = 'staged'
-		order by id`, woID)
+		where work_order_id = $1 and status in ('staged', 'posted')
+		order by (status = 'posted') desc, id`, woID)
 	if err != nil {
 		return fmt.Errorf("failed to list staged output lots: %w", err)
 	}
-	type stagedOutputLot struct {
+	type recordedOutputLot struct {
 		id      int64
 		lotNo   string
 		lineQty float64
 		expiry  *time.Time
+		posted  bool
 	}
-	var stagedLots []stagedOutputLot
+	var recordedLots []recordedOutputLot
 	for rows.Next() {
-		var ln stagedOutputLot
-		if err := rows.Scan(&ln.id, &ln.lotNo, &ln.lineQty, &ln.expiry); err != nil {
+		var ln recordedOutputLot
+		var status string
+		if err := rows.Scan(&ln.id, &ln.lotNo, &ln.lineQty, &ln.expiry, &status); err != nil {
 			rows.Close()
 			return fmt.Errorf("failed to scan staged output lot: %w", err)
 		}
-		stagedLots = append(stagedLots, ln)
+		ln.posted = status == "posted"
+		recordedLots = append(recordedLots, ln)
 	}
 	err = rows.Err()
 	rows.Close()
@@ -1364,8 +1721,14 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 		return fmt.Errorf("failed reading staged output lots: %w", err)
 	}
 	remaining := outputQty
-	for _, ln := range stagedLots {
+	for _, ln := range recordedLots {
 		if remaining <= 0.0001 {
+			// Nothing more was produced: a posted row leaves stock again, a staged row is only voided.
+			if ln.posted {
+				if err := voidWoOutputLotStock(ctx, tx, tenantID, woID, locationID, itemID, ln.lotNo, ln.lineQty, true, userID, workOrderNo); err != nil {
+					return err
+				}
+			}
 			if _, err := tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'void' where id = $1`, ln.id); err != nil {
 				return fmt.Errorf("failed to void extra staged lot: %w", err)
 			}
@@ -1375,35 +1738,21 @@ func postWoOutputTrace(ctx context.Context, tx pgx.Tx, tenantID, woID, locationI
 		if take > remaining {
 			take = remaining
 		}
-		var lotBatchID int64
-		err = tx.QueryRow(ctx, `
-			insert into public.inv_lot_batches (
-			  tenant_id, item_id, lot_no, location_id, qty_on_hand, expiry_date
-			) values ($1, $2, $3, $4, $5, $6)
-			on conflict (tenant_id, item_id, lot_no, location_id)
-			do update set
-			  qty_on_hand = inv_lot_batches.qty_on_hand + excluded.qty_on_hand,
-			  expiry_date = coalesce(excluded.expiry_date, inv_lot_batches.expiry_date),
-			  updated_at = now()
-			returning id`,
-			tenantID, itemID, ln.lotNo, locationID, take, ln.expiry).Scan(&lotBatchID)
-		if err != nil {
+		if ln.posted {
+			// Already in stock when it was recorded. Only the part above Actual produced goes back out.
+			if excess := ln.lineQty - take; excess > 0.0001 {
+				if err := voidWoOutputLotStock(ctx, tx, tenantID, woID, locationID, itemID, ln.lotNo, excess, true, userID, workOrderNo); err != nil {
+					return err
+				}
+				if _, err := tx.Exec(ctx, `update public.mfg_wo_output_lots set qty = $1, catch_weight = null where id = $2`, take, ln.id); err != nil {
+					return err
+				}
+			}
+			remaining -= take
+			continue
+		}
+		if err := receiveWoOutputLotStock(ctx, tx, tenantID, woID, locationID, itemID, ln.lotNo, take, ln.expiry, true, "wo_trace_receipt", userID, workOrderNo); err != nil {
 			return fmt.Errorf("failed to post finished lot %s: %w", ln.lotNo, err)
-		}
-		if err := inventory.InsertLotEvent(ctx, tx, inventory.LotEventInput{
-			TenantID:        tenantID,
-			LotBatchID:      lotBatchID,
-			EventType:       "produced",
-			ToLocationID:    &locationID,
-			Qty:             take,
-			RefType:         "mfg_work_order",
-			RefID:           &woID,
-			CreatedByUserID: &userID,
-		}); err != nil {
-			return fmt.Errorf("failed to record finished lot event: %w", err)
-		}
-		if err := inventory.ApplyStockDelta(ctx, tx, tenantID, itemID, locationID, take, userID, "mfg_work_order", woID, "wo_trace_receipt"); err != nil {
-			return fmt.Errorf("failed to receive finished lot stock: %w", err)
 		}
 		_, err = tx.Exec(ctx, `update public.mfg_wo_output_lots set status = 'posted' where id = $1`, ln.id)
 		if err != nil {

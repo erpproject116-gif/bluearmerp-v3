@@ -87,7 +87,7 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       label: "Record finished",
       short: "If tracked",
       description: "Only needed when the finished product uses serial or lot numbers.",
-      detail: "Staging does not update stock until Finish build. Then Finish writes actual produced.",
+      detail: "Each recorded serial or lot goes into stock right away. Finish build closes the job and writes actual produced.",
       href: "/app/production/receive-station",
       routePrefixes: ["/app/production/receive-station"],
       optional: true,
