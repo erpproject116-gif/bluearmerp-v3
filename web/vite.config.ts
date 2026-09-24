@@ -30,6 +30,10 @@ export default defineConfig(({ mode }) => {
   const demoUserPassword =
     pickEnv(merged, "DEMO_USER_PASSWORD", "VITE_DEMO_USER_PASSWORD") || "DemoBluearm2026!";
 
+  const fullBuildSha = process.env.VERCEL_GIT_COMMIT_SHA || "";
+  const buildSha = fullBuildSha.slice(0, 7) || "dev";
+  const buildTime = new Date().toISOString();
+
   if (mode === "production" && !apiBase) {
     console.warn(
       "[vite] VITE_API_BASE_URL is empty — set it in Vercel Environment Variables and redeploy.",
@@ -152,6 +156,9 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_DEMO_SIGNIN_ENABLED": JSON.stringify(demoSignInEnabled),
       "import.meta.env.VITE_DEMO_USER_EMAIL": JSON.stringify(demoUserEmail),
       "import.meta.env.VITE_DEMO_USER_PASSWORD": JSON.stringify(demoUserPassword),
+      "import.meta.env.VITE_BUILD_SHA": JSON.stringify(buildSha),
+      "import.meta.env.VITE_BUILD_SHA_FULL": JSON.stringify(fullBuildSha || buildSha),
+      "import.meta.env.VITE_BUILD_TIME": JSON.stringify(buildTime),
     },
     server: {
       port: 5173,

@@ -343,6 +343,14 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         <div class="mt-4 shrink-0 space-y-2 border-t border-stroke pt-3">
           <BusinessBranchSwitcher />
           <UserAccountMenu />
+          <Show when={!shell.collapsed()}>
+            <p
+              class="px-2 text-xs text-text-secondary"
+              title={import.meta.env.VITE_BUILD_SHA_FULL || import.meta.env.VITE_BUILD_SHA}
+            >
+              {`Build ${import.meta.env.VITE_BUILD_SHA || "dev"} · ${new Date(import.meta.env.VITE_BUILD_TIME || Date.now()).toLocaleString()}`}
+            </p>
+          </Show>
           <Show when={!shell.viewport.useDrawer()}>
             <button
               type="button"
