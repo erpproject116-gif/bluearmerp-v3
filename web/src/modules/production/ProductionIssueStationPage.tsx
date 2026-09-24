@@ -371,21 +371,20 @@ export default function ProductionIssueStationPage() {
                           </thead>
                           <tbody>
                             <For
-                              each={
-                                mode() === "disassembly"
-                                  ? m().input_line
-                                    ? [m().input_line]
-                                    : ctx().components.map((c) => ({
-                                        component_item_id: c.component_item_id,
-                                        component_code: c.component_code,
-                                        component_name: c.component_name,
-                                        stock_to_issue: c.stock_to_issue,
-                                        stock_unit_code: "",
-                                        qty_on_hand: 0,
-                                        shortage: 0,
-                                      }))
-                                  : m().lines
-                              }
+                              each={(() => {
+                                if (mode() !== "disassembly") return m().lines;
+                                const input = m().input_line;
+                                if (input) return [input];
+                                return ctx().components.map((c) => ({
+                                  component_item_id: c.component_item_id,
+                                  component_code: c.component_code,
+                                  component_name: c.component_name,
+                                  stock_to_issue: c.stock_to_issue,
+                                  stock_unit_code: "",
+                                  qty_on_hand: 0,
+                                  shortage: 0,
+                                }));
+                              })()}
                             >
                               {(ln) => {
                                 const staged = ctx().components.find((c) => c.component_item_id === ln.component_item_id);
