@@ -324,6 +324,9 @@ export function SidebarNav() {
         new URLSearchParams(loc.search).get("tab") !== "waste-variance"
       );
     }
+    if (area.id === "production_costs") {
+      return pathStarts(p, ["/app/production/costs"]);
+    }
     if (area.id === "production_waste") {
       return (
         pathStarts(p, ["/app/production/reports"]) &&

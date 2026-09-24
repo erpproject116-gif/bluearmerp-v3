@@ -362,6 +362,7 @@ import { BookingRoute } from "./shared/BookingRoute";
 import { FixedAssetsRoute } from "./shared/FixedAssetsRoute";
 import { JobCostingRoute } from "./shared/JobCostingRoute";
 import { ManufacturingRoute } from "./shared/ManufacturingRoute";
+import ProductionCostsPage from "./modules/production/ProductionCostsPage";
 import { ProductionModeLayout } from "./modules/production/ProductionModeLayout";
 import { ProductionHubPage } from "./modules/production/ProductionHubPage";
 import ProductionOrderNewPage from "./modules/manufacturing/ProductionOrderNewPage";
@@ -596,6 +597,9 @@ export default function App() {
           )} />
           <Route path="/production/reports" component={() => (
             <ManufacturingRoute><ProductionReportsPage /></ManufacturingRoute>
+          )} />
+          <Route path="/production/costs" component={() => (
+            <ManufacturingRoute><ProductionCostsPage /></ManufacturingRoute>
           )} />
           <Route path="/production/setup" component={() => (
             <ManufacturingRoute><ModuleSetupHubPage /></ManufacturingRoute>

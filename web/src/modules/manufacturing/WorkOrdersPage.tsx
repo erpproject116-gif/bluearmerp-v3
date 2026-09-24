@@ -155,6 +155,8 @@ export default function WorkOrdersPage() {
     });
 
   createEffect(() => {
+    const rawQ = String(searchParams.q ?? "").trim();
+    if (rawQ && q() !== rawQ) setQ(rawQ);
     const st = String(searchParams.status ?? "").trim().toLowerCase();
     if (isAssembly()) {
       const allowed = ["open", "completed", "cancelled", "draft", "released", ""];

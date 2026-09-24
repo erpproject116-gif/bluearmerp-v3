@@ -65,6 +65,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/production/receive-station": "manufacturing.work_orders",
   "/app/production/weigh-parts": "manufacturing.work_orders",
   "/app/production/reports": "manufacturing.work_orders",
+  "/app/production/costs": "manufacturing.work_orders",
   "/app/inventory/boms": "manufacturing.boms",
   "/app/inventory/work-orders": "manufacturing.work_orders",
   "/app/after-sales/repair-orders": "after_sales.repair_orders",

@@ -23,6 +23,7 @@ describe("production nav", () => {
       "production_assembly",
       "production_disassembly",
       "production_reports",
+      "production_costs",
       "production_waste",
       "production_setup",
     ]);
