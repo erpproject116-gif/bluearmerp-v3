@@ -52,5 +52,6 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/stock-movements", listWorkOrderStockMovementsReport(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/disassembly-yield", listDisassemblyYieldReport(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/waste-variance", listWasteVarianceReport(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/reports/production-costs", listProductionCosts(pool))
 	})
 }
