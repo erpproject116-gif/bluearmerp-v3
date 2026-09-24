@@ -559,7 +559,8 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 		freeOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("free_only")), "true") ||
 			r.URL.Query().Get("free_only") == "1"
 		if freeOnly {
-			// Free qty = on hand minus qty already staged on any open manufacturing job.
+			// Free qty = on hand minus qty staged on open jobs before stock moved at take time.
+			// Rows with stock_posted already reduced qty_on_hand, so they are not subtracted again.
 			where += ` and (
 			  lb.qty_on_hand - coalesce((
 			    select sum(wil.qty)::float8
@@ -568,6 +569,7 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 			    where wil.lot_batch_id = lb.id
 			      and wo.tenant_id = $1
 			      and wo.status in ('draft', 'released')
+			      and not wil.stock_posted
 			  ), 0)
 			) > 0.0001`
 		}
@@ -604,6 +606,7 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 			    where wil.lot_batch_id = lb.id
 			      and wo.tenant_id = $1
 			      and wo.status in ('draft', 'released')
+			      and not wil.stock_posted
 			  ), 0))::float8`
 		}
 

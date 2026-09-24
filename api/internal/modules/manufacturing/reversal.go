@@ -178,14 +178,25 @@ func reverseWorkOrderTrace(ctx context.Context, tx pgx.Tx, tenantID, workOrderID
 	if err := reverseWorkOrderSerials(ctx, tx, tenantID, workOrderID, reversalID, userID); err != nil {
 		return err
 	}
+	// Net each lot: a lot taken then partly put back only reverses the part that stayed consumed;
+	// a produced lot that was later voided only reverses what is still in stock.
 	rows, err := tx.Query(ctx, `
-		select le.lot_batch_id, le.event_type, sum(le.qty)::float8, lb.location_id
-		from public.inv_lot_events le
-		join public.inv_lot_batches lb on lb.id=le.lot_batch_id and lb.tenant_id=le.tenant_id
-		where le.tenant_id=$1 and le.ref_type='mfg_work_order' and le.ref_id=$2
-		  and le.event_type in ('consumed','produced')
-		group by le.lot_batch_id, le.event_type, lb.location_id
-		order by le.lot_batch_id`, tenantID, workOrderID)
+		select lot_batch_id, event_type, qty, location_id
+		from (
+		  select le.lot_batch_id,
+		    case when le.event_type in ('consumed','returned') then 'consumed' else 'produced' end as event_type,
+		    sum(case when le.event_type in ('consumed','produced') then le.qty else -le.qty end)::float8 as qty,
+		    lb.location_id
+		  from public.inv_lot_events le
+		  join public.inv_lot_batches lb on lb.id=le.lot_batch_id and lb.tenant_id=le.tenant_id
+		  where le.tenant_id=$1 and le.ref_type='mfg_work_order' and le.ref_id=$2
+		    and le.event_type in ('consumed','returned','produced','voided')
+		  group by le.lot_batch_id,
+		    case when le.event_type in ('consumed','returned') then 'consumed' else 'produced' end,
+		    lb.location_id
+		) net
+		where qty > 0.0001
+		order by lot_batch_id`, tenantID, workOrderID)
 	if err != nil {
 		return err
 	}

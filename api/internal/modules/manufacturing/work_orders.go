@@ -488,11 +488,14 @@ func revertWorkOrderToDraft(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Taken lots or serials that were all put back net to zero and do not block the revert.
 		var hasMoves bool
 		_ = pool.QueryRow(r.Context(), `
 			select exists(
 			  select 1 from public.inv_stock_movements
 			  where tenant_id=$1 and ref_type='mfg_work_order' and ref_id=$2
+			  group by item_id, location_id
+			  having abs(sum(qty_delta)) > 0.0001
 			)`, tu.TenantID, id).Scan(&hasMoves)
 		if hasMoves {
 			response.Validation(w, map[string]string{"status": "Cannot revert — stock was already posted for this job."})

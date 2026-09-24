@@ -36,6 +36,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Patch("/work-orders/{id}", updateWorkOrder(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/issue-serials", issueWorkOrderSerials(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/issue-lots", issueWorkOrderLots(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Delete("/work-orders/{id}/issue-serials/{lineId}", unstageWorkOrderSerial(pool))
+		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Delete("/work-orders/{id}/issue-lots/{lineId}", unstageWorkOrderLot(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/output-serials/batch", batchWorkOrderOutputSerials(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessWrite)).Post("/work-orders/{id}/output-lots/batch", batchWorkOrderOutputLots(pool))
 		mr.With(auth.RequireSubmit("manufacturing.work_orders_release")).Post("/work-orders/{id}/release", releaseWorkOrder(pool))
