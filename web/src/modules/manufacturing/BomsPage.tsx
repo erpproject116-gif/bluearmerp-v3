@@ -505,12 +505,21 @@ export default function BomsPage() {
       requiredFields.unshift({ key: "bom_code", label: "Recipe code" });
     }
     const errs = collectRequiredFieldErrors(requiredValues, requiredFields);
-    const bodyLines = lines()
-      .map((ln) => ({
-        ...ln,
-        component_item_id: Number(ln.component_item_id) || 0,
-        qty: Number(ln.qty) || 0,
-      }))
+    const batchQty = Number(outputQty());
+    if (!(Number.isFinite(batchQty) && batchQty > 0)) {
+      errs.output_qty = `${copy.batchQtyLabel} must be greater than zero.`;
+    }
+    const parsedLines = lines().map((ln) => ({
+      ...ln,
+      component_item_id: Number(ln.component_item_id) || 0,
+      qty: Number(ln.qty) || 0,
+    }));
+    const zeroQtyIdx = parsedLines.findIndex((ln) => ln.component_item_id > 0 && !(ln.qty > 0));
+    if (zeroQtyIdx >= 0) {
+      errs.lines = `Line ${zeroQtyIdx + 1}: ${copy.lineQtyLabel} must be greater than zero.`;
+      errs[`lines[${zeroQtyIdx}].qty`] = `${copy.lineQtyLabel} must be greater than zero.`;
+    }
+    const bodyLines = parsedLines
       .filter((ln) => ln.component_item_id > 0 && ln.qty > 0)
       .map((ln) => ({
         component_item_id: ln.component_item_id,
@@ -519,7 +528,7 @@ export default function BomsPage() {
         scrap_qty: copy.showScrap ? lineScrapQty(ln) : 0,
         output_classification: !isAssembly() ? ln.output_classification || "finished" : undefined,
       }));
-    if (bodyLines.length === 0) {
+    if (!errs.lines && bodyLines.length === 0) {
       const typedWithoutPick = lines().some((ln, i) => {
         const label = (lineLabels()[i] ?? "").trim();
         return label.length > 0 && !(Number(ln.component_item_id) > 0);
@@ -532,7 +541,7 @@ export default function BomsPage() {
           : typedWithoutPick
             ? "Pick each material from the search list (click or press Enter) — typing the name alone does not link the line."
             : "Add at least one raw material line.";
-    } else {
+    } else if (!errs.lines) {
       const orphanIdx = lines().findIndex((ln, i) => {
         const label = (lineLabels()[i] ?? "").trim();
         return label.length > 0 && !(Number(ln.component_item_id) > 0);
@@ -579,7 +588,7 @@ export default function BomsPage() {
       bom_name: bomName().trim(),
       finished_item_id: finishedItemId(),
       default_location_id: locationId() ?? null,
-      output_qty: Number(outputQty()) || 1,
+      output_qty: batchQty,
       output_unit_id: outputUnitId(),
       yield_pct: Number(yieldPct()) || 100,
       bom_type: mode === "all" ? "assembly" : mode,
