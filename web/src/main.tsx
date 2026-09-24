@@ -3,20 +3,49 @@ import { registerSW } from "virtual:pwa-register";
 import "./index.css";
 import App from "./App";
 import { applyResolvedTheme } from "./shared/theme-preference";
+import { noteUpdateWaiting, promptUpdateIfWaiting, registerAcceptUpdate } from "./shell/appUpdate";
 
 applyResolvedTheme();
+
+function consumeResumePath() {
+  const resume = sessionStorage.getItem("bluearm:resume-path");
+  if (!resume) return;
+  sessionStorage.removeItem("bluearm:resume-path");
+  if (!resume.startsWith("/app/") || resume.startsWith("//")) return;
+  const here = `${window.location.pathname}${window.location.search}`;
+  const onHub = window.location.pathname === "/app/production" || window.location.pathname === "/app/production/";
+  if (onHub && here !== resume) window.location.replace(resume);
+}
+
+consumeResumePath();
 
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    // Auto-activate new shell so paywall/route fixes are not stuck behind an old SW.
-    void updateSW(true);
+    noteUpdateWaiting();
   },
   onRegisteredSW(_url, registration) {
     if (!registration) return;
-    void registration.update();
-    window.setInterval(() => void registration.update(), 60_000);
+    const check = () => void registration.update();
+    check();
+    window.setInterval(check, 60_000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      promptUpdateIfWaiting();
+      check();
+    });
   },
+});
+
+registerAcceptUpdate(async () => {
+  window.dispatchEvent(new Event("bluearm:before-update"));
+  const path = `${window.location.pathname}${window.location.search}`;
+  sessionStorage.setItem("bluearm:resume-path", path);
+  if ("caches" in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+  }
+  await updateSW(true);
 });
 
 render(() => <App />, document.getElementById("root")!);

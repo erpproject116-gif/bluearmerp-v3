@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Index, on, Show, untrack, createResource, createMemo } from "solid-js";
+import { createEffect, createSignal, Index, on, onCleanup, onMount, Show, untrack, createResource, createMemo } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
@@ -270,6 +270,7 @@ export default function BomsPage() {
   const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = createSignal(false);
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [resumeDraft, setResumeDraft] = createSignal(false);
   const [editing, setEditing] = createSignal<Bom | null>(null);
   const [bomCode, setBomCode] = createSignal("");
   const [bomName, setBomName] = createSignal("");
@@ -437,6 +438,30 @@ export default function BomsPage() {
     setModalOpen(true);
   };
 
+  onMount(() => {
+    const onBeforeUpdate = () => {
+      if (!modalOpen()) return;
+      const id = editing()?.id;
+      sessionStorage.setItem("bluearm:resume-form", id ? `mfg-bom:edit-${id}` : "mfg-bom:new");
+    };
+    window.addEventListener("bluearm:before-update", onBeforeUpdate);
+    onCleanup(() => window.removeEventListener("bluearm:before-update", onBeforeUpdate));
+
+    const resume = sessionStorage.getItem("bluearm:resume-form");
+    if (!resume) return;
+    sessionStorage.removeItem("bluearm:resume-form");
+    if (resume === "mfg-bom:new") {
+      openNew();
+      return;
+    }
+    if (resume.startsWith("mfg-bom:edit-")) {
+      const id = Number(resume.slice("mfg-bom:edit-".length));
+      if (!(id > 0)) return;
+      setResumeDraft(true);
+      void openEdit({ id } as Bom).finally(() => setResumeDraft(false));
+    }
+  });
+
   const draft = useDocumentDraft({
     entityType: DRAFT_ENTITY.mfgBom,
     draftKey: () => (editing() ? `edit-${editing()!.id}` : "new"),
@@ -486,7 +511,7 @@ export default function BomsPage() {
       setLineUnitLabels(payload.line_unit_labels ?? {});
     },
     enabled: () => modalOpen(),
-    autoApply: () => modalOpen() && !editing(),
+    autoApply: () => modalOpen() && (!editing() || resumeDraft()),
   });
 
   const addLine = () => setLines((prev) => [...prev, { ...emptyLine(), line_no: prev.length + 1 }]);

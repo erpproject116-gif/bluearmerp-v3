@@ -10,6 +10,7 @@ import { PresenceAvatars } from "../shared/PresenceAvatars";
 import { PresenceHeartbeat } from "../shared/PresenceHeartbeat";
 import { IdleLogoutGuard } from "../shared/IdleLogoutGuard";
 import { ShellProvider, useShell } from "./shell-context";
+import { dismissUpdateUntilVisible, runAcceptUpdate, updateReady } from "./appUpdate";
 import { resolveFeature, resolveModule, resolveSubBranch, splitHeaderFeatures } from "./modules";
 import type { ModuleFeature } from "./modules";
 import {
@@ -537,6 +538,39 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     <HelpAssistantProvider>
       {layout}
       <CommandPalette open={paletteOpen()} onClose={() => setPaletteOpen(false)} />
+      <Show when={updateReady()}>
+        <div
+          class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="app-update-title"
+        >
+          <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-6 shadow-xl">
+            <h2 id="app-update-title" class="text-lg font-semibold text-text-primary">
+              A new version of Bluearm is ready.
+            </h2>
+            <p class="mt-2 text-sm text-text-secondary">
+              Update now reloads this window on the same page. Your sign-in and unsaved recipe stay.
+            </p>
+            <div class="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-stroke px-4 py-2 text-sm"
+                onClick={() => dismissUpdateUntilVisible()}
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white"
+                onClick={() => void runAcceptUpdate()}
+              >
+                Update now
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
       <Show when={auth.me}>
         <JoinCompanyConfirm />
         <OnboardingProminentPanel />
