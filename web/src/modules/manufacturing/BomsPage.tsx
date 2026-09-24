@@ -901,7 +901,15 @@ export default function BomsPage() {
           </Field>
           <label class="block">
             <span class="mb-1 block text-sm font-medium text-text-primary">Batch UoM</span>
-            <input class={inputClass} readOnly aria-readonly="true" tabindex={0} value={outputUnitLabel()} aria-label="Batch UoM" />
+            <input
+              class={`${inputClass} bg-slate-50 text-text-secondary`}
+              readOnly
+              aria-readonly="true"
+              tabindex={-1}
+              placeholder="From the whole item's base unit"
+              value={outputUnitLabel()}
+              aria-label="Batch UoM"
+            />
           </label>
         </Show>
         <div class="col-span-full sm:col-span-2 lg:col-span-3">
@@ -939,7 +947,15 @@ export default function BomsPage() {
               </Field>
               <label class="block">
                 <span class="mb-1 block text-sm font-medium text-text-primary">Batch UoM</span>
-                <input class={inputClass} readOnly aria-readonly="true" tabindex={0} value={outputUnitLabel()} aria-label="Batch UoM" />
+                <input
+                  class={`${inputClass} bg-slate-50 text-text-secondary`}
+                  readOnly
+                  aria-readonly="true"
+                  tabindex={-1}
+                  placeholder="From the finished item's base unit"
+                  value={outputUnitLabel()}
+                  aria-label="Batch UoM"
+                />
               </label>
             </Show>
             <Field label={copy().yieldLabel} description={copy().yieldDescription}>
