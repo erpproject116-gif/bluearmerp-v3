@@ -4,8 +4,8 @@ import { ProductionLayout } from "./ProductionLayout";
 import { MFG_COPY, parseMfgMode, type MfgMode } from "./mfgProductionMode";
 
 export type ProductionModeContext = {
-  mode: MfgMode;
-  copy: (typeof MFG_COPY)[MfgMode];
+  mode: () => MfgMode;
+  copy: () => (typeof MFG_COPY)[MfgMode];
 };
 
 export function useProductionMode(): ProductionModeContext {
@@ -16,12 +16,8 @@ export function useProductionMode(): ProductionModeContext {
     return m;
   });
   return {
-    get mode() {
-      return mode();
-    },
-    get copy() {
-      return MFG_COPY[mode()];
-    },
+    mode,
+    copy: () => MFG_COPY[mode()],
   };
 }
 

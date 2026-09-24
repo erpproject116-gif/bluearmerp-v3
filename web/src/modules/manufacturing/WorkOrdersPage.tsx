@@ -138,14 +138,14 @@ const ASSEMBLY_STATUS_TABS = [
 
 export default function WorkOrdersPage() {
   const { mode, copy } = useProductionMode();
-  const isAssembly = () => mode === "assembly" || mode === "recipe" || mode === "all";
+  const isAssembly = () => mode() === "assembly" || mode() === "recipe" || mode() === "all";
   const auth = useAuth();
   const [searchParams] = useSearchParams();
   const canRelease = () => hasPermission(auth.me, "manufacturing.work_orders_release", "write");
   const canBulkWo = () => hasPermission(auth.me, "manufacturing.work_orders_bulk", "write");
   const canComplete = () => hasPermission(auth.me, "manufacturing.work_orders_complete", "write");
   const canInspect = () => hasPermission(auth.me, "quality.wo_inspection", "write");
-  const processPolicy = useProcessPolicy(() => mode === "assembly" || mode === "recipe");
+  const processPolicy = useProcessPolicy(() => mode() === "assembly" || mode() === "recipe");
   const requireFgQc = () => Boolean(processPolicy.data?.manufacturing_require_fg_qc);
 
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
@@ -207,10 +207,10 @@ export default function WorkOrdersPage() {
     });
     if (q()) qs.set("q", q());
     if (apiStatus) qs.set("status", apiStatus);
-    const bomType = bomTypeForMode(mode);
+    const bomType = bomTypeForMode(mode());
     if (bomType) qs.set("bom_type", bomType);
     return {
-      queryKey: ["mfg-work-orders", mode, page(), pageSize, sort(), order(), q(), statusFilter()],
+      queryKey: ["mfg-work-orders", mode(), page(), pageSize, sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<WorkOrder[]>(`/api/v1/manufacturing/work-orders?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -236,15 +236,15 @@ export default function WorkOrdersPage() {
   };
 
   const openNew = () => {
-    if (mode === "assembly" || mode === "all") {
+    if (mode() === "assembly" || mode() === "all") {
       window.location.assign(newAssemblyOrderHref());
       return;
     }
-    if (mode === "recipe") {
+    if (mode() === "recipe") {
       window.location.assign(newRecipeOrderHref());
       return;
     }
-    if (mode === "disassembly") {
+    if (mode() === "disassembly") {
       window.location.assign(newCuttingOrderHref());
       return;
     }
@@ -304,12 +304,12 @@ export default function WorkOrdersPage() {
       return;
     }
     const errs = editing()
-      ? collectRequiredFieldErrors({ qty_to_produce: qty() }, [{ key: "qty_to_produce", label: copy.jobQtyLabel }])
+      ? collectRequiredFieldErrors({ qty_to_produce: qty() }, [{ key: "qty_to_produce", label: copy().jobQtyLabel }])
       : collectRequiredFieldErrors(
           { bom_id: bomId(), qty_to_produce: qty() },
           [
             { key: "bom_id", label: "Recipe" },
-            { key: "qty_to_produce", label: copy.jobQtyLabel },
+            { key: "qty_to_produce", label: copy().jobQtyLabel },
           ],
         );
     if (Object.keys(errs).length > 0) {
@@ -513,7 +513,7 @@ export default function WorkOrdersPage() {
   };
 
   const stationQuery = (woId: number, r?: WorkOrder) => {
-    const m = r ? woType(r) : mode === "all" ? "assembly" : mode;
+    const m = r ? woType(r) : mode() === "all" ? "assembly" : mode();
     return `?woId=${woId}&mode=${m}`;
   };
 
@@ -539,7 +539,7 @@ export default function WorkOrdersPage() {
       const cols: Column<WorkOrder>[] = [
         { key: "work_order_no", header: "Job no.", clickable: true },
         { key: "bom_code", header: "Recipe" },
-        { key: "finished_item_name", header: copy.headerItemLabel },
+        { key: "finished_item_name", header: copy().headerItemLabel },
         { key: "location_name", header: "Location" },
         {
           key: "qty_to_produce",
@@ -741,7 +741,7 @@ export default function WorkOrdersPage() {
       { key: "work_order_no", header: "Job no.", clickable: true },
       { key: "order_date", header: "Date" },
       { key: "bom_code", header: "Recipe" },
-      { key: "finished_item_name", header: copy.headerItemLabel },
+      { key: "finished_item_name", header: copy().headerItemLabel },
       { key: "location_name", header: "Location" },
       {
         key: "qty_to_produce",
@@ -957,7 +957,7 @@ export default function WorkOrdersPage() {
 
       <EntityModal
         open={modalOpen()}
-        title={editing() ? `Job ${editing()!.work_order_no}` : copy.newJobTitle}
+        title={editing() ? `Job ${editing()!.work_order_no}` : copy().newJobTitle}
         onClose={() => setModalOpen(false)}
         onSave={() => {
           if (editing() && editing()!.status !== "draft") {
@@ -980,7 +980,7 @@ export default function WorkOrdersPage() {
           <draft.DraftBanner />
         </Show>
         <FormErrorSummary errors={fieldErrors} />
-        <ModalFormGuide guideId={copy.jobGuideId} spanFull />
+        <ModalFormGuide guideId={copy().jobGuideId} spanFull />
         <LookupCombo
           label="Recipe"
           required
@@ -989,7 +989,7 @@ export default function WorkOrdersPage() {
           onInput={setBomLabel}
           onSelect={(o) => { setBomId(o.id); setBomLabel(o.label); }}
           onClear={() => { setBomId(null); setBomLabel(""); }}
-          fetchOptions={makeFetchBoms(mode)}
+          fetchOptions={makeFetchBoms(mode())}
           disabled={!!editing()}
         />
         <div class="mt-3">
@@ -1004,7 +1004,7 @@ export default function WorkOrdersPage() {
             disabled={!!editing() && editing()!.status !== "draft"}
           />
         </div>
-        <Field label={`${copy.jobQtyLabel} *${finishedUnit() ? ` (${finishedUnit()})` : ""}`}>
+        <Field label={`${copy().jobQtyLabel} *${finishedUnit() ? ` (${finishedUnit()})` : ""}`}>
           <input
             class={inputClass}
             type="text"
@@ -1021,7 +1021,7 @@ export default function WorkOrdersPage() {
               <Show when={m().input_line}>
                 {(input) => (
                   <div class="rounded border border-stroke p-2 text-xs">
-                    <p class="font-medium text-text-primary">{copy.materialsInputLabel}</p>
+                    <p class="font-medium text-text-primary">{copy().materialsInputLabel}</p>
                     <p>
                       {input().component_code}: {input().stock_to_issue.toFixed(4)} {input().stock_unit_code}
                     </p>
@@ -1029,10 +1029,10 @@ export default function WorkOrdersPage() {
                 )}
               </Show>
               <p class="text-sm font-medium text-text-primary">
-                {mode === "disassembly" ? copy.materialsOutputLabel : "Materials needed"}
+                {mode() === "disassembly" ? copy().materialsOutputLabel : "Materials needed"}
               </p>
               <p class="text-xs text-text-secondary">
-                {mode === "disassembly"
+                {mode() === "disassembly"
                   ? `Batch ${m().output_qty} · yield ${m().yield_pct}%`
                   : `Will receive ${m().receive_qty} ${m().finished_base_unit_code || finishedUnit()} · batch ${m().output_qty} · yield ${m().yield_pct}%`}
               </p>
@@ -1042,10 +1042,10 @@ export default function WorkOrdersPage() {
                     <tr>
                       <th class="px-2 py-1.5">Item</th>
                       <th class="px-2 py-1.5">Recipe qty</th>
-                      <Show when={mode === "assembly"}>
+                      <Show when={mode() === "assembly"}>
                         <th class="px-2 py-1.5">Scrap/spare</th>
                       </Show>
-                      <th class="px-2 py-1.5">{mode === "disassembly" ? "Expected" : "To issue"}</th>
+                      <th class="px-2 py-1.5">{mode() === "disassembly" ? "Expected" : "To issue"}</th>
                       <th class="px-2 py-1.5">On hand</th>
                     </tr>
                   </thead>
@@ -1055,7 +1055,7 @@ export default function WorkOrdersPage() {
                         <tr class={ln.shortage > 0 ? "bg-red-50 text-red-800" : ""}>
                           <td class="px-2 py-1.5">{ln.component_code} — {ln.component_name}</td>
                           <td class="px-2 py-1.5">{ln.bom_qty} {ln.bom_unit_code}</td>
-                          <Show when={mode === "assembly"}>
+                          <Show when={mode() === "assembly"}>
                             <td class="px-2 py-1.5">{ln.scrap_qty} {ln.bom_unit_code}</td>
                           </Show>
                           <td class="px-2 py-1.5">{ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}</td>
@@ -1078,7 +1078,7 @@ export default function WorkOrdersPage() {
       <CompleteWorkOrderModal
         open={!!completeTarget()}
         workOrder={completeTarget()}
-        mode={completeTarget() ? woType(completeTarget()!) : mode === "all" ? "assembly" : mode}
+        mode={completeTarget() ? woType(completeTarget()!) : mode() === "all" ? "assembly" : mode()}
         releaseFirst={
           completeTarget()
             ? woType(completeTarget()!) === "assembly" || woType(completeTarget()!) === "recipe"
