@@ -28,7 +28,27 @@ type Props = {
   /** When provided, shows a create row in the dropdown with the current typed text. */
   onCreate?: (query: string) => void;
   createLabel?: string;
+  /** Shown when the field has text but nothing is selected. Opt-in. */
+  unlinkedHint?: string;
 };
+
+function exactLookupHit(opts: LookupOption[], text: string): LookupOption | undefined {
+  const lower = text.trim().toLowerCase();
+  if (!lower) return undefined;
+  return (
+    opts.find((o) => o.label.toLowerCase() === lower) ??
+    opts.find((o) => {
+      const code = o.label.split("—")[0]?.trim().toLowerCase() ?? "";
+      return code === lower || o.label.toLowerCase().startsWith(lower + " —");
+    })
+  );
+}
+
+function lookupCodeQuery(text: string): string {
+  const raw = text.trim();
+  const code = raw.split("—")[0]?.trim() ?? "";
+  return code || raw;
+}
 
 const MENU_MAX_H = 192; // max-h-48
 /** Above EntityModal (z-50) and stacked EntityModal (z-[70]). */
@@ -128,6 +148,27 @@ export function LookupCombo(props: Props) {
   const showClear = () =>
     !props.disabled && (props.selectedId() != null || displayValue().trim().length > 0);
 
+  const applyHit = (hit: LookupOption) => {
+    props.onSelect(hit);
+    props.onInput(hit.label);
+    setDraft(hit.label);
+    setOpen(false);
+  };
+
+  const resolveExact = async (text: string): Promise<LookupOption | undefined> => {
+    const local = exactLookupHit(options(), text);
+    if (local) return local;
+    clearTimeout(debounce);
+    const code = lookupCodeQuery(text);
+    if (!code) return undefined;
+    try {
+      const fetched = await props.fetchOptions(code);
+      return exactLookupHit(fetched, text) ?? exactLookupHit(fetched, code);
+    } catch {
+      return undefined;
+    }
+  };
+
   onMount(() => {
     void search("");
   });
@@ -197,41 +238,28 @@ export function LookupCombo(props: Props) {
             if (props.disabled) return;
             if (e.key === "Enter") {
               e.preventDefault();
-              const text = draft().trim().toLowerCase();
-              const opts = options();
-              const hit =
-                opts.find((o) => o.label.toLowerCase() === text) ??
-                opts.find((o) => {
-                  const code = o.label.split("—")[0]?.trim().toLowerCase() ?? "";
-                  return code === text || o.label.toLowerCase().startsWith(text + " —");
-                }) ??
-                opts.find((o) => o.label.toLowerCase().startsWith(text) && text.length >= 2) ??
-                (opts.length === 1 ? opts[0] : undefined);
-              if (hit) {
-                props.onSelect(hit);
-                props.onInput(hit.label);
-                setDraft(hit.label);
-                setOpen(false);
-              }
+              const text = draft().trim();
+              void resolveExact(text).then((hit) => {
+                if (hit) {
+                  applyHit(hit);
+                  return;
+                }
+                const lower = text.toLowerCase();
+                const opts = options();
+                const loose =
+                  opts.find((o) => o.label.toLowerCase().startsWith(lower) && lower.length >= 2) ??
+                  (opts.length === 1 ? opts[0] : undefined);
+                if (loose) applyHit(loose);
+              });
             }
           }}
           onBlur={() => {
             setFocused(false);
             const text = draft().trim();
             if (props.selectedId() == null && text) {
-              const opts = options();
-              const lower = text.toLowerCase();
-              const hit =
-                opts.find((o) => o.label.toLowerCase() === lower) ??
-                opts.find((o) => {
-                  const code = o.label.split("—")[0]?.trim().toLowerCase() ?? "";
-                  return code === lower || o.label.toLowerCase().startsWith(lower + " —");
-                });
-              if (hit) {
-                props.onSelect(hit);
-                props.onInput(hit.label);
-                setDraft(hit.label);
-              }
+              void resolveExact(text).then((hit) => {
+                if (hit && props.selectedId() == null) applyHit(hit);
+              });
             }
             setTimeout(() => setOpen(false), 150);
           }}
@@ -335,6 +363,9 @@ export function LookupCombo(props: Props) {
         <p id={aria().errorId} class="mt-1 text-xs text-red-600" role="alert">
           {props.error}
         </p>
+      </Show>
+      <Show when={props.unlinkedHint && props.selectedId() == null && displayValue().trim() && !props.error}>
+        <p class="mt-1 text-xs text-amber-800">{props.unlinkedHint}</p>
       </Show>
     </div>
   );

@@ -840,6 +840,7 @@ export default function BomsPage() {
               setHeaderMissingBaseUnit(false);
             }}
             fetchOptions={fetchItems}
+            unlinkedHint="Not linked — pick it from the list or press Enter."
           />
           <Show when={headerMissingBaseUnit() && (finishedItemId() ?? 0) > 0}>
             <p class="mt-1 text-xs text-amber-800">
@@ -968,6 +969,7 @@ export default function BomsPage() {
                     label={isAssembly() ? "Item" : `Line ${lineNo + 1}`}
                     required
                     description={isAssembly() ? `Line ${lineNo + 1} — pick from search so UoM and cost fill in.` : undefined}
+                    unlinkedHint="Not linked — pick it from the list or press Enter."
                     value={() => lineLabels()[lineNo] ?? ""}
                     selectedId={() => lines()[lineNo]?.component_item_id || null}
                     onInput={(v) => setLineLabels((p) => ({ ...p, [lineNo]: v }))}
