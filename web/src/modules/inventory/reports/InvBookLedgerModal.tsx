@@ -306,7 +306,9 @@ export function InvBookLedgerModal(props: Props) {
                           <td class="px-3 py-2 text-text-secondary">{row.remark}</td>
                           <td class="px-3 py-2 text-right tabular-nums">{fmtQty(row.increase_qty)}</td>
                           <td class="px-3 py-2 text-right tabular-nums">{fmtQty(row.release_qty)}</td>
-                          <td class="px-3 py-2 text-right tabular-nums font-medium">{fmtQty(row.inventory_qty)}</td>
+                          <td class="px-3 py-2 text-right tabular-nums font-medium">
+                            {row.is_beginning ? fmtQtyOrZero(row.inventory_qty) : fmtQty(row.inventory_qty)}
+                          </td>
                           <td class="max-w-[14rem] px-3 py-2 text-xs break-words">{row.serial_lot_nos}</td>
                           <td class="px-3 py-2 whitespace-nowrap">{row.location_name}</td>
                         </tr>
@@ -352,6 +354,9 @@ export function InvBookLedgerModal(props: Props) {
                   Net +{fmtQtyOrZero(pageTotals().increase - pageTotals().release)} this page
                   {" · Ending "}
                   {fmtQtyOrZero(pageTotals().ending)}
+                  <Show when={pageTotals().ending < -0.0000001}>
+                    {" · Issued more than received in this book."}
+                  </Show>
                 </Show>
               </span>
               <div class="flex flex-wrap items-center gap-2">

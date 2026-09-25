@@ -160,6 +160,10 @@ export default function WorkOrdersPage() {
     if (rawQ && q() !== rawQ) setQ(rawQ);
     const st = String(searchParams.status ?? "").trim().toLowerCase();
     if (isAssembly()) {
+      if (rawQ && !st && statusFilter() === "open") {
+        setStatusFilter("");
+        return;
+      }
       const allowed = ["open", "completed", "cancelled", "draft", "released", ""];
       if (st && allowed.includes(st) && statusFilter() !== st) {
         setStatusFilter(st);
