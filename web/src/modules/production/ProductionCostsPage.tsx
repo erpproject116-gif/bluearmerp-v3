@@ -2,9 +2,11 @@ import { createSignal, For, onMount, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
+import { hasPermission, useAuth } from "../../shared/auth-context";
 import { formatMoney } from "../../shared/money";
 import { defaultReportDateRange, ReportPageLayout } from "../../shared/reports/ReportPageLayout";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { RecordCostsModal } from "./RecordCostsModal";
 
 type CostRow = {
   work_order_id: number;
@@ -50,6 +52,9 @@ function journalHref(id: number): string {
 }
 
 export default function ProductionCostsPage() {
+  const auth = useAuth();
+  const canRecord = () => hasPermission(auth.me, "manufacturing.work_orders", "write");
+  const [recordWorkOrderId, setRecordWorkOrderId] = createSignal<number | null>(null);
   const defaults = defaultReportDateRange();
   const [draftFilters, setDraftFilters] = createSignal<DateFilters>(defaults);
   const [filters, setFilters] = createSignal<DateFilters>(defaults);
@@ -210,6 +215,15 @@ export default function ProductionCostsPage() {
                           Reversal
                         </A>
                       </Show>
+                      <Show when={canRecord() && row.total_cost > 0 && (row.books_status === "not_posted" || row.books_status === "draft")}>
+                        <button
+                          type="button"
+                          class="rounded-md border border-brand-300 px-2 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-50"
+                          onClick={() => setRecordWorkOrderId(row.work_order_id)}
+                        >
+                          {row.books_status === "draft" ? "Edit accounts" : "Record in books"}
+                        </button>
+                      </Show>
                     </div>
                   </td>
                 </tr>
@@ -218,6 +232,12 @@ export default function ProductionCostsPage() {
           </Show>
         </tbody>
       </table>
+      <RecordCostsModal
+        workOrderId={recordWorkOrderId()}
+        open={recordWorkOrderId() !== null}
+        onClose={() => setRecordWorkOrderId(null)}
+        onSaved={() => void report.refetch()}
+      />
     </ReportPageLayout>
   );
 }
