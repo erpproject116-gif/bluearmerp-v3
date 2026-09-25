@@ -24,6 +24,27 @@ export type StockMovementRow = {
   created_at: string;
 };
 
+/** Map movement source refs to audit target types that actually write audit_logs. */
+function auditTargetForMovement(
+  refType: string,
+  refId: number,
+): { targetType: string; targetId: number } | null {
+  if (!Number.isFinite(refId) || refId <= 0) return null;
+  switch (refType) {
+    case "sa_sales":
+    case "pos_checkout":
+      return { targetType: "sa_sales", targetId: refId };
+    case "goods_receipt":
+      return { targetType: "gr_goods_receipt", targetId: refId };
+    case "stock_entry":
+      return { targetType: "inv_stock_entry", targetId: refId };
+    case "mfg_work_order":
+      return { targetType: "mfg_work_order", targetId: refId };
+    default:
+      return null;
+  }
+}
+
 function formatWhen(iso: string) {
   try {
     return new Date(iso).toLocaleString();
@@ -152,7 +173,17 @@ export default function StockMovementsPage() {
             key: "history",
             header: "History",
             sortable: false,
-            render: (r) => <ActivityHistoryLink module="inventory" targetType="inv_stock_movement" targetId={r.id} />,
+            render: (r) => {
+              const target = auditTargetForMovement(r.ref_type, r.ref_id);
+              if (!target) return null;
+              return (
+                <ActivityHistoryLink
+                  module="inventory"
+                  targetType={target.targetType}
+                  targetId={target.targetId}
+                />
+              );
+            },
           },
         ]}
         rows={list.data?.rows ?? []}

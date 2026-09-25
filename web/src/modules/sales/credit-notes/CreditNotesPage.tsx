@@ -14,6 +14,7 @@ import {
   type PartnerSearchRow,
 } from "../../purchase-request/purchase-request/PartnerSearchModal";
 import { openCreditNotePrint } from "./creditNotePrint";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 
 type CreditNote = {
   id: number;
@@ -286,8 +287,13 @@ export default function CreditNotesPage() {
                         </button>
                       </Show>
                       <button type="button" class="text-brand-600 hover:underline" onClick={() => void openHistory(row)}>
-                        History
+                        Applications
                       </button>
+                      <RecordHistoryButton
+                        targetType="credit_note"
+                        targetId={row.id}
+                        title={`History — ${row.credit_no}`}
+                      />
                       <Show when={(row.status === "open" || row.status === "applied") && row.remaining_amount > 0}>
                         <button
                           type="button"

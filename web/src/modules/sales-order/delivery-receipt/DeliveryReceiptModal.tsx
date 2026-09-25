@@ -11,6 +11,7 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { useOpenDeliveryLines, type OpenDeliveryLine } from "../../../shared/useDeliveryReceiptList";
 import { uiLabel } from "../../../shared/branding/uiLabel";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 
 type LineRow = {
   sales_order_line_id: number;
@@ -184,6 +185,14 @@ export function DeliveryReceiptModal(props: Props) {
       onClose={props.onClose}
       onSave={save}
       saving={saving()}
+      headerActions={
+        <RecordHistoryButton
+          variant="button"
+          targetType="dr_delivery_receipt"
+          targetId={null}
+          title="History — Delivery Receipt"
+        />
+      }
     >
       <draft.DraftBanner />
       <ModalFormGuide guideId="delivery_receipt" />

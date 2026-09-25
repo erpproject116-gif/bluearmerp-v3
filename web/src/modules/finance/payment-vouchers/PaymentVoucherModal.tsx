@@ -16,6 +16,7 @@ import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import type { PaymentVoucherDetail } from "../../../shared/usePaymentVoucherList";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 
 type AppRow = {
   supplier_invoice_id: number | null;
@@ -251,7 +252,21 @@ export function PaymentVoucherModal(props: Props) {
 
   return (
     <>
-    <WideEntityModal open={props.open} title="New Payment Voucher" onClose={props.onClose} onSave={() => void save()} saving={saving()}>
+    <WideEntityModal
+      open={props.open}
+      title="New Payment Voucher"
+      onClose={props.onClose}
+      onSave={() => void save()}
+      saving={saving()}
+      headerActions={
+        <RecordHistoryButton
+          variant="button"
+          targetType="fin_payment_voucher"
+          targetId={null}
+          title="History — Payment Voucher"
+        />
+      }
+    >
       <ModalFormGuide guideId="payment_voucher" />
       <FormErrorSummary errors={fieldErrors} />
       <draft.DraftBanner />

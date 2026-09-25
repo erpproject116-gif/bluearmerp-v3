@@ -12,6 +12,7 @@ import {
   PartnerSearchModal,
   type PartnerSearchRow,
 } from "../../purchase-request/purchase-request/PartnerSearchModal";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 
 type Retainer = {
   id: number;
@@ -290,8 +291,13 @@ export default function RetainerInvoicesPage() {
                         </button>
                       </Show>
                       <button type="button" class="text-brand-600 hover:underline" onClick={() => void openHistory(row)}>
-                        History
+                        Applications
                       </button>
+                      <RecordHistoryButton
+                        targetType="retainer_invoice"
+                        targetId={row.id}
+                        title={`History — ${row.retainer_no}`}
+                      />
                       <Show when={(row.status === "open" || row.status === "applied") && row.remaining_amount > 0}>
                         <button
                           type="button"
