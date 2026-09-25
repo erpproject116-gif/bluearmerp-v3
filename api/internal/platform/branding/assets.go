@@ -86,6 +86,46 @@ func uploadUserAvatar(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+type avatarVisibilityBody struct {
+	AvatarHiddenFromOthers bool `json:"avatar_hidden_from_others"`
+}
+
+// patchAvatarVisibility lets tenant owners and platform superadmins hide their
+// photo from everyone else. They still see it themselves in /me and the menu.
+func patchAvatarVisibility(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !tu.IsTenantOwner && !tu.IsPlatformSuperadmin {
+			response.Err(w, http.StatusForbidden, "Only business owners and superadmins can hide their photo.", "ERR_FORBIDDEN")
+			return
+		}
+		var body avatarVisibilityBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			update public.users
+			set avatar_hidden_from_others = $3, updated_at = now()
+			where id = $1 and tenant_id = $2`,
+			tu.AppUserID, tu.TenantID, body.AvatarHiddenFromOthers)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update photo visibility.", "ERR_INTERNAL")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "User not found.", "ERR_NOT_FOUND")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "users.avatar_visibility", "user", &tu.AppUserID, nil, body)
+		response.OK(w, map[string]any{"avatar_hidden_from_others": body.AvatarHiddenFromOthers}, "Saved.")
+	}
+}
+
 type uploadErr struct {
 	status int
 	fields map[string]string

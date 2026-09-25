@@ -88,7 +88,13 @@ func heartbeatHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		if avatarURL != "" {
+		var hidden bool
+		_ = pool.QueryRow(ctx,
+			`select coalesce(avatar_hidden_from_others, false) from public.users where id = $1 and tenant_id = $2`,
+			tu.AppUserID, tu.TenantID).Scan(&hidden)
+		// Prefer the DB flag: do not overwrite avatar_url from presence when the
+		// user chose to hide their photo (keeps the stored photo for self).
+		if avatarURL != "" && !hidden {
 			_, _ = pool.Exec(ctx, `
 				update public.users
 				set avatar_url = $1, updated_at = now()
@@ -131,7 +137,9 @@ func onlineHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		rows, err := pool.Query(r.Context(), `
-			select u.id, u.full_name, u.email, u.avatar_url,
+			select u.id, u.full_name, u.email,
+			       case when coalesce(u.avatar_hidden_from_others, false) and u.id is distinct from $3
+			            then null else u.avatar_url end,
 			       p.current_path, p.current_label, p.activity, p.last_seen_at
 			from public.tenant_user_presence p
 			join public.users u on u.id = p.user_id and u.tenant_id = p.tenant_id
@@ -139,7 +147,7 @@ func onlineHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			  and u.status = 'active'
 			  and p.last_seen_at >= now() - ($2::int * interval '1 second')
 			order by p.last_seen_at desc`,
-			tu.TenantID, staleSec)
+			tu.TenantID, staleSec, tu.AppUserID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load presence.", "ERR_INTERNAL")
 			return

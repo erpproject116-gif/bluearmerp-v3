@@ -25,6 +25,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		br.Delete("/assets/{assetId}", deleteAsset(pool))
 	})
 	r.Post("/users/me/avatar", uploadUserAvatar(pool))
+	r.Patch("/users/me/avatar-visibility", patchAvatarVisibility(pool))
 }
 
 func requireManageBranding(next http.Handler) http.Handler {

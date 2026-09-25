@@ -146,7 +146,10 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 	}
 
 	var avatarURL *string
-	_ = pool.QueryRow(ctx, `select avatar_url from public.users where id = $1`, tu.AppUserID).Scan(&avatarURL)
+	var avatarHidden bool
+	_ = pool.QueryRow(ctx,
+		`select avatar_url, coalesce(avatar_hidden_from_others, false) from public.users where id = $1`,
+		tu.AppUserID).Scan(&avatarURL, &avatarHidden)
 
 	user := map[string]any{
 			"id":                       tu.AppUserID,
@@ -173,6 +176,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 			"platform_role":                 tu.PlatformRole,
 			"platform_only":                 tu.PlatformOnly,
 			"platform_permissions":          tu.PlatformPermissions,
+			"avatar_hidden_from_others":     avatarHidden,
 	}
 	if avatarURL != nil && strings.TrimSpace(*avatarURL) != "" {
 		user["avatar_url"] = resolveBrandingAvatarURL(strings.TrimSpace(*avatarURL))

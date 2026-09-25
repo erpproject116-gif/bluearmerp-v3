@@ -1,6 +1,7 @@
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { useAuth, canManageBranding } from "../shared/auth-context";
+import { apiFetch } from "../shared/api";
 import { AvatarUploadButton } from "../shared/AvatarUploadButton";
 import { signOutWithPresenceClear } from "../shared/PresenceHeartbeat";
 import { UserAvatar } from "../shared/UserAvatar";
@@ -11,6 +12,7 @@ import { ThemeSwitcher } from "../shared/ThemeSwitcher";
 import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
 import { useToast } from "../shared/toast";
 import { resolveWorkflowForPath } from "../shared/workflowGuides";
+import { handleSaveResult } from "../shared/handleSaveResult";
 
 function BookIcon() {
   return (
@@ -44,8 +46,13 @@ export function UserAccountMenu() {
   const guides = useInlineGuides();
   const toast = useToast();
   const [open, setOpen] = createSignal(false);
+  const [avatarSaving, setAvatarSaving] = createSignal(false);
 
   const hasWorkflowGuide = () => Boolean(resolveWorkflowForPath(loc.pathname, auth.me));
+  const canHideAvatar = () => {
+    const u = auth.me?.user;
+    return Boolean(u?.is_tenant_owner || u?.is_platform_superadmin);
+  };
 
   // Owners / superadmins: tips stay on until they hide them (no visit-count auto-off).
   createEffect(() => {
@@ -66,6 +73,25 @@ export function UserAccountMenu() {
     const next = !guides.enabled();
     guides.setEnabled(next);
     toast.success(next ? "Tips shown" : "Tips hidden");
+  };
+
+  const handleAvatarVisibilityToggle = async () => {
+    if (!canHideAvatar() || avatarSaving()) return;
+    const next = !Boolean(auth.me?.user.avatar_hidden_from_others);
+    setAvatarSaving(true);
+    try {
+      const res = await apiFetch<{ avatar_hidden_from_others: boolean }>(
+        "/api/v1/users/me/avatar-visibility",
+        { method: "PATCH", body: JSON.stringify({ avatar_hidden_from_others: next }) },
+        { silent: true },
+      );
+      if (!handleSaveResult(res, toast, next ? "Photo hidden from others" : "Photo visible to others")) return;
+      await auth.refresh({ background: true });
+    } catch {
+      toast.error("Could not update photo visibility.");
+    } finally {
+      setAvatarSaving(false);
+    }
   };
 
   onMount(() => {
@@ -141,6 +167,21 @@ export function UserAccountMenu() {
                     <p class="truncate text-sm font-medium text-text-primary">{me().user.full_name}</p>
                     <p class="truncate text-xs text-text-secondary">{me().tenant.company_name}</p>
                     <AvatarUploadButton class="mt-0.5" />
+                    <Show when={canHideAvatar()}>
+                      <button
+                        type="button"
+                        class="mt-1.5 block text-left text-xs text-brand-600 hover:underline disabled:opacity-50"
+                        disabled={avatarSaving()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleAvatarVisibilityToggle();
+                        }}
+                      >
+                        {me().user.avatar_hidden_from_others
+                          ? "Show my photo to others"
+                          : "Hide my photo from others"}
+                      </button>
+                    </Show>
                   </div>
                 </div>
               </div>

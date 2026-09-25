@@ -36,7 +36,8 @@ export function PresenceHeartbeat() {
       current_path: path,
       current_label: describePresencePath(path),
       activity: path.includes("/new") || path.endsWith("/settings") ? "editing" : "viewing",
-      avatar_url: avatarUrl(),
+      // Prefer DB flag on the API side; still avoid pushing a URL when the user hid their photo.
+      avatar_url: auth.me.user.avatar_hidden_from_others ? undefined : avatarUrl(),
     });
   };
 

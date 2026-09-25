@@ -17,6 +17,7 @@ export type MeData = {
     email: string;
     full_name: string;
     avatar_url?: string;
+    avatar_hidden_from_others?: boolean;
     tenant_role?: string;
     is_platform_superadmin?: boolean;
     is_tenant_owner?: boolean;
