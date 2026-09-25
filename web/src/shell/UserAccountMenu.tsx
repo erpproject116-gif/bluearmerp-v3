@@ -1,15 +1,16 @@
-import { A, useNavigate } from "@solidjs/router";
-import { Show, createSignal, onCleanup, onMount } from "solid-js";
-import { useAuth, canManageBranding, canViewCrm } from "../shared/auth-context";
+import { A, useLocation, useNavigate } from "@solidjs/router";
+import { Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { useAuth, canManageBranding } from "../shared/auth-context";
 import { AvatarUploadButton } from "../shared/AvatarUploadButton";
 import { signOutWithPresenceClear } from "../shared/PresenceHeartbeat";
 import { UserAvatar } from "../shared/UserAvatar";
 import { brandingLabel } from "../shared/branding/brandingStore";
 import { useShell } from "./shell-context";
-import { useInlineGuides } from "../shared/inlineGuides";
+import { hasInlineGuidesStoredPref, useInlineGuides } from "../shared/inlineGuides";
 import { ThemeSwitcher } from "../shared/ThemeSwitcher";
 import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
-import { useCrmTaskModal } from "../shared/CrmTaskModal";
+import { useToast } from "../shared/toast";
+import { resolveWorkflowForPath } from "../shared/workflowGuides";
 
 function BookIcon() {
   return (
@@ -35,19 +36,36 @@ function SignOutIcon() {
   );
 }
 
-
 export function UserAccountMenu() {
   const auth = useAuth();
   const shell = useShell();
   const navigate = useNavigate();
+  const loc = useLocation();
   const guides = useInlineGuides();
-  const crmTask = useCrmTaskModal();
+  const toast = useToast();
   const [open, setOpen] = createSignal(false);
+
+  const hasWorkflowGuide = () => Boolean(resolveWorkflowForPath(loc.pathname, auth.me));
+
+  // Owners / superadmins: tips stay on until they hide them (no visit-count auto-off).
+  createEffect(() => {
+    const u = auth.me?.user;
+    if (!u) return;
+    const privileged = Boolean(u.is_tenant_owner || u.is_platform_superadmin);
+    if (!privileged || hasInlineGuidesStoredPref()) return;
+    if (!guides.enabled()) guides.setEnabled(true);
+  });
 
   const signOut = async () => {
     setOpen(false);
     await signOutWithPresenceClear();
     navigate("/signin", { replace: true });
+  };
+
+  const handleTipsToggle = () => {
+    const next = !guides.enabled();
+    guides.setEnabled(next);
+    toast.success(next ? "Tips shown" : "Tips hidden");
   };
 
   onMount(() => {
@@ -135,30 +153,18 @@ export function UserAccountMenu() {
                     "text-brand-700": guides.enabled(),
                     "text-text-secondary hover:text-text-primary": !guides.enabled(),
                   }}
-                  onClick={() => {
-                    guides.toggle();
-                  }}
+                  onClick={handleTipsToggle}
                 >
-                  Tips {guides.enabled() ? "on" : "off"}
+                  {guides.enabled() ? "Hide tips" : "Show tips"}
                 </button>
-                <div class="px-3 py-1">
-                  <ThemeSwitcher />
-                </div>
-                <div class="px-1">
-                  <WorkflowGuideHeaderControl class="w-full justify-center rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 transition hover:bg-brand-50" compact />
-                </div>
-                <Show when={canViewCrm(auth.me)}>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
-                    onClick={() => {
-                      setOpen(false);
-                      crmTask.open();
-                    }}
-                  >
-                    + CRM task
-                  </button>
+                <p class="px-3 pb-1 text-[11px] leading-snug text-text-secondary">
+                  Tips on forms and list pages. Does not turn off Help &amp; guides.
+                </p>
+                <ThemeSwitcher labeled />
+                <Show when={hasWorkflowGuide()}>
+                  <div class="px-1">
+                    <WorkflowGuideHeaderControl class="w-full justify-center rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 transition hover:bg-brand-50" compact />
+                  </div>
                 </Show>
                 <A
                   href="/app/documentation"

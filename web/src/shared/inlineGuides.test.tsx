@@ -7,7 +7,7 @@ function TipsToggle() {
   const guides = useInlineGuides();
   return (
     <button type="button" onClick={() => guides.toggle()}>
-      Tips {guides.enabled() ? "on" : "off"}
+      {guides.enabled() ? "Hide tips" : "Show tips"}
     </button>
   );
 }
@@ -31,8 +31,8 @@ describe("inlineGuides Tips toggle", () => {
     expect(screen.getByText("How Stocks fits together")).toBeInTheDocument();
     expect(screen.getByText("Creating a sale")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Tips on" }));
-    expect(screen.getByRole("button", { name: "Tips off" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hide tips" }));
+    expect(screen.getByRole("button", { name: "Show tips" })).toBeInTheDocument();
     expect(screen.queryByText("How Stocks fits together")).not.toBeInTheDocument();
     expect(screen.queryByText("Creating a sale")).not.toBeInTheDocument();
   });
@@ -47,7 +47,7 @@ describe("inlineGuides Tips toggle", () => {
       </>
     ));
     expect(screen.getByText("Ungated tip copy")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Tips on" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide tips" }));
     expect(screen.queryByText("Ungated tip copy")).not.toBeInTheDocument();
   });
 

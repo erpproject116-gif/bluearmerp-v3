@@ -34,6 +34,16 @@ export function incrementUiVisitCount(): number {
   }
 }
 
+/** True when the user has explicitly chosen Show tips / Hide tips. */
+export function hasInlineGuidesStoredPref(): boolean {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw === "0" || raw === "1";
+  } catch {
+    return false;
+  }
+}
+
 function readEnabled(): boolean {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
