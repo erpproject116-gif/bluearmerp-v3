@@ -207,6 +207,9 @@ export function LookupCombo(props: Props) {
           class={`${inputClass} pr-14`}
           value={displayValue()}
           placeholder={props.placeholder ?? "Search…"}
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck={false}
           disabled={props.disabled}
           role="combobox"
           aria-autocomplete="list"
