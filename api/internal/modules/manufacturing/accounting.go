@@ -18,6 +18,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inventorygl"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/invoicejournal"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -180,24 +181,63 @@ func normalizeManufacturingCosts(material, labor, overhead, other float64) (manu
 	}, nil
 }
 
+// Journal line labels shared by the preview and the posted entry.
+const (
+	costLineFinishedGoods = "Finished goods inventory"
+	costLineMaterials     = "Materials inventory"
+	costLineConversion    = "Production cost absorption"
+)
+
+// costPostingAccounts are the three chart-of-accounts legs of a completion entry:
+// Dr finished goods (total), Cr materials (material), Cr conversion (labor+overhead+other).
+type costPostingAccounts struct {
+	Debit            int64
+	CreditMaterial   int64
+	CreditConversion int64
+}
+
+// buildCostPostingLines maps the preview lines onto the chosen accounts. Zero
+// lines are already dropped by manufacturingJournalPreview, so the conversion
+// account is only consulted when there is a conversion amount.
+func buildCostPostingLines(costs manufacturingCosts, accts costPostingAccounts) []invoicejournal.Line {
+	preview := manufacturingJournalPreview(costs)
+	lines := make([]invoicejournal.Line, 0, len(preview))
+	for _, line := range preview {
+		accountID := accts.Debit
+		switch line.Label {
+		case costLineMaterials:
+			accountID = accts.CreditMaterial
+		case costLineConversion:
+			accountID = accts.CreditConversion
+		}
+		lines = append(lines, invoicejournal.Line{
+			AccountID: accountID,
+			Debit:     line.Debit,
+			Credit:    line.Credit,
+			Remark:    line.Label,
+		})
+	}
+	return lines
+}
+
 func manufacturingJournalPreview(costs manufacturingCosts) []manufacturingJournalLine {
 	if costs.Total <= 0.0001 {
 		return []manufacturingJournalLine{}
 	}
 	lines := []manufacturingJournalLine{{
-		Label: "Finished goods inventory",
+		Label: costLineFinishedGoods,
 		Debit: costs.Total,
 	}}
 	if costs.Material > 0.0001 {
 		lines = append(lines, manufacturingJournalLine{
-			Label:  "Materials inventory",
+			Label:  costLineMaterials,
 			Credit: costs.Material,
 		})
 	}
 	conversion := costs.Labor + costs.Overhead + costs.Other
 	if conversion > 0.0001 {
 		lines = append(lines, manufacturingJournalLine{
-			Label:  "Production cost absorption",
+			Label:  costLineConversion,
 			Credit: conversion,
 		})
 	}
@@ -286,17 +326,17 @@ func postManufacturingCompletionJournal(
 		"Manufacturing completion "+workOrderNo, postedAt, userID).Scan(&journalID); err != nil {
 		return 0, err
 	}
-	preview := manufacturingJournalPreview(costs)
-	for i, line := range preview {
-		accountID := inventoryAccountID
-		if line.Label == "Production cost absorption" {
-			accountID = cogsAccountID
-		}
+	lines := buildCostPostingLines(costs, costPostingAccounts{
+		Debit:            inventoryAccountID,
+		CreditMaterial:   inventoryAccountID,
+		CreditConversion: cogsAccountID,
+	})
+	for i, line := range lines {
 		if _, err := tx.Exec(ctx, `
 			insert into public.fin_journal_entry_lines
 			  (journal_entry_id, line_no, account_id, debit, credit, remarks)
 			values ($1,$2,$3,$4,$5,$6)`,
-			journalID, i+1, accountID, line.Debit, line.Credit, line.Label); err != nil {
+			journalID, i+1, line.AccountID, line.Debit, line.Credit, line.Remark); err != nil {
 			return 0, err
 		}
 	}
