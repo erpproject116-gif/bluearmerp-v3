@@ -40,6 +40,8 @@ export default function JournalEntriesPage() {
   const client = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
+  const [readOnly, setReadOnly] = createSignal(false);
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
     useTransactionListState("updated_at");
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -125,6 +127,7 @@ export default function JournalEntriesPage() {
   const isArchived = (row: JournalEntryRow) => Boolean(row.archived_at) || row.status === "cancelled";
 
   const openCreate = () => {
+    setReadOnly(false);
     setEditId(null);
     setRemarks("");
     setLines([
@@ -134,12 +137,9 @@ export default function JournalEntriesPage() {
     setModalOpen(true);
   };
 
-  const openEdit = async (row = selectedRow()) => {
-    if (!row) {
-      toast.warning("Select a draft journal entry to edit.");
-      return;
-    }
-    if (row.status !== "draft" || isArchived(row)) {
+  const loadEntry = async (row: JournalEntryRow, intent: "edit" | "view") => {
+    const locked = row.status !== "draft" || isArchived(row);
+    if (intent === "edit" && locked) {
       toast.warning("Only draft journal entries can be edited.");
       return;
     }
@@ -156,11 +156,22 @@ export default function JournalEntriesPage() {
       project_id: ln.project_id ? String(ln.project_id) : "",
     }));
     while (loaded.length < 2) loaded.push({ account_code: "", debit: "", credit: "", dept_id: "", project_id: "" });
+    setReadOnly(intent === "view" && locked);
     setEditId(row.id);
     setRemarks(res.data.remarks ?? "");
     setLines(loaded);
     setModalOpen(true);
   };
+
+  const openEdit = async (row = selectedRow()) => {
+    if (!row) {
+      toast.warning("Select a draft journal entry to edit.");
+      return;
+    }
+    await loadEntry(row, "edit");
+  };
+
+  const openFromList = (row: JournalEntryRow) => void loadEntry(row, "view");
 
   const draft = useDocumentDraft({
     entityType: DRAFT_ENTITY.finJournalEntry,
@@ -319,7 +330,10 @@ export default function JournalEntriesPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
-        onEdit={(row) => void openEdit(row)}
+        selectable
+        selectedIds={selectedIds()}
+        onSelectionChange={setSelectedIds}
+        onEdit={openFromList}
         onNew={openCreate}
         newLabel="New draft"
         codeKey="entry_no"
@@ -390,13 +404,21 @@ export default function JournalEntriesPage() {
 
       <EntityModal
         open={modalOpen()}
-        title={editId() ? "Edit journal entry (draft)" : "New journal entry (draft)"}
+        title={
+          readOnly()
+            ? "Journal entry"
+            : editId()
+              ? "Edit journal entry (draft)"
+              : "New journal entry (draft)"
+        }
         onClose={() => {
           setModalOpen(false);
           setEditId(null);
+          setReadOnly(false);
         }}
         onSave={() => void saveEntry()}
         saving={saving()}
+        hideSave={readOnly()}
         wide
         headerActions={
           <RecordHistoryButton
@@ -412,7 +434,7 @@ export default function JournalEntriesPage() {
         </Show>
         <ModalFormGuide guideId="journal_entry" spanFull />
         <Field label="Remarks">
-          <input class={inputClass} value={remarks()} onInput={(e) => setRemarks(e.currentTarget.value)} />
+          <input class={inputClass} value={remarks()} disabled={readOnly()} onInput={(e) => setRemarks(e.currentTarget.value)} />
         </Field>
         <div class="col-span-2 space-y-2">
           <p class="text-sm font-medium text-text-primary">Lines</p>
@@ -421,6 +443,7 @@ export default function JournalEntriesPage() {
               <div class="grid grid-cols-5 gap-2">
                 <select
                   class={inputClass}
+                  disabled={readOnly()}
                   value={ln.account_code}
                   onChange={(e) =>
                     setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, account_code: e.currentTarget.value } : r)))
@@ -437,6 +460,7 @@ export default function JournalEntriesPage() {
                 </select>
                 <select
                   class={inputClass}
+                  disabled={readOnly()}
                   value={ln.dept_id}
                   onChange={(e) =>
                     setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, dept_id: e.currentTarget.value } : r)))
@@ -451,6 +475,7 @@ export default function JournalEntriesPage() {
                 </select>
                 <select
                   class={inputClass}
+                  disabled={readOnly()}
                   value={ln.project_id}
                   onChange={(e) =>
                     setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, project_id: e.currentTarget.value } : r)))
@@ -467,6 +492,7 @@ export default function JournalEntriesPage() {
                   class={inputClass}
                   type="number"
                   placeholder="Debit"
+                  disabled={readOnly()}
                   value={ln.debit}
                   onInput={(e) =>
                     setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, debit: e.currentTarget.value } : r)))
@@ -476,6 +502,7 @@ export default function JournalEntriesPage() {
                   class={inputClass}
                   type="number"
                   placeholder="Credit"
+                  disabled={readOnly()}
                   value={ln.credit}
                   onInput={(e) =>
                     setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, credit: e.currentTarget.value } : r)))
@@ -484,13 +511,15 @@ export default function JournalEntriesPage() {
               </div>
             )}
           </For>
-          <button
-            type="button"
-            class="text-sm text-brand-600 hover:underline"
-            onClick={() => setLines((rows) => [...rows, { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }])}
-          >
-            + Add line
-          </button>
+          <Show when={!readOnly()}>
+            <button
+              type="button"
+              class="text-sm text-brand-600 hover:underline"
+              onClick={() => setLines((rows) => [...rows, { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }])}
+            >
+              + Add line
+            </button>
+          </Show>
         </div>
       </EntityModal>
     </div>

@@ -824,6 +824,8 @@ export function EntityModal(props: {
   onSecondarySave?: () => void;
   /** Optional controls at the right of the title (e.g. History). */
   headerActions?: JSX.Element;
+  /** Hide the primary save button (read-only view). */
+  hideSave?: boolean;
   children: JSX.Element;
 }) {
   return (
@@ -874,15 +876,17 @@ export function EntityModal(props: {
                   {props.secondarySaveLabel}
                 </button>
               </Show>
-              <button
-                type="button"
-                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-                disabled={props.saving}
-                aria-busy={props.saving ? "true" : "false"}
-                onClick={() => props.onSave()}
-              >
-                {props.saving ? "Saving…" : (props.saveLabel ?? "Save changes")}
-              </button>
+              <Show when={!props.hideSave}>
+                <button
+                  type="button"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                  disabled={props.saving}
+                  aria-busy={props.saving ? "true" : "false"}
+                  onClick={() => props.onSave()}
+                >
+                  {props.saving ? "Saving…" : (props.saveLabel ?? "Save changes")}
+                </button>
+              </Show>
             </div>
           </div>
         </div>
