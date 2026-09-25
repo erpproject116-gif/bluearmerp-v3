@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { For, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { useAuth } from "../../../shared/auth-context";
@@ -16,6 +17,7 @@ type Props = {
   totalRows: number;
   page: number;
   pageSize: number;
+  onPageSizeChange?: (pageSize: number) => void;
   loading: boolean;
   generatedAt: () => Date;
   onPageChange: (page: number) => void;
@@ -143,7 +145,10 @@ export function PurchaseRequestStatusReport(props: Props) {
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-xs text-text-secondary">
         <span>[P.{props.page}]</span>
         <span>{props.generatedAt().toLocaleString()}</span>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <Show when={props.onPageSizeChange}>
+            <PageSizeSelect value={props.pageSize} onChange={(n) => { props.onPageSizeChange!(n); props.onPageChange(1); }} />
+          </Show>
           <button type="button" class="rounded border border-stroke px-2 py-1 disabled:opacity-40" disabled={props.page <= 1} onClick={() => props.onPageChange(props.page - 1)}>
             Prev
           </button>

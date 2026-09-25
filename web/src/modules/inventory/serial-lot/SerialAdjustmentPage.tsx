@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { createEffect, createSignal, For, on, onMount, Show, untrack } from "solid-js";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -75,13 +76,13 @@ export default function SerialAdjustmentPage() {
   const [itemLabel, setItemLabel] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const list = useSerialAdjustmentCandidates(() => {
     const f = submitted();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       filters: {
@@ -354,7 +355,8 @@ export default function SerialAdjustmentPage() {
               Page {page()} · {list.data?.total ?? 0} total
             </p>
             <div class="flex gap-2">
-              <button
+              <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button
                 type="button"
                 class="rounded-lg border border-stroke px-3 py-1.5 text-sm disabled:opacity-50"
                 disabled={page() <= 1}
@@ -365,7 +367,7 @@ export default function SerialAdjustmentPage() {
               <button
                 type="button"
                 class="rounded-lg border border-stroke px-3 py-1.5 text-sm disabled:opacity-50"
-                disabled={page() * pageSize >= (list.data?.total ?? 0)}
+                disabled={page() * pageSize() >= (list.data?.total ?? 0)}
                 onClick={() => setPage((p) => p + 1)}
               >
                 Next

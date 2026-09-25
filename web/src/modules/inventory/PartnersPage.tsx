@@ -53,7 +53,7 @@ export type Partner = {
 };
 
 export default function PartnersPage() {
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("partner_code");
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState("partner_code");
   const [searchParams, setSearchParams] = useSearchParams();
   const kindFilter = () => {
     const k = String(searchParams.kind ?? "").toLowerCase();
@@ -118,7 +118,7 @@ export default function PartnersPage() {
 
   const list = useInventoryList<Partner>("partners", () => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -300,7 +300,7 @@ export default function PartnersPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

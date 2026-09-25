@@ -26,7 +26,7 @@ function paramStr(raw: string | string[] | undefined): string {
 
 export default function CustomerWarrantyPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useListState("warranty_end");
   const [selected, setSelected] = createSignal<WarrantyAsset | null>(null);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -61,7 +61,7 @@ export default function CustomerWarrantyPage() {
 
   const list = useWarrantyAssets(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     q: q() || undefined,
     status: statusFilter() || undefined,
     coverage: "sales",
@@ -248,7 +248,7 @@ export default function CustomerWarrantyPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

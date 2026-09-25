@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { A } from "@solidjs/router";
 import { createSignal, For, onMount, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
@@ -35,12 +36,12 @@ export default function CustomerVendorBookPage(props: Props) {
   const [draftFilters, setDraftFilters] = createSignal(defaultPartnerBookFilters(props.bookType));
   const [submittedFilters, setSubmittedFilters] = createSignal(defaultPartnerBookFilters(props.bookType));
   const [page, setPage] = createSignal(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = usePartnerBookReport(() => ({
     filters: submittedFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     enabled: true,
   }));
 
@@ -83,7 +84,7 @@ export default function CustomerVendorBookPage(props: Props) {
     URL.revokeObjectURL(url);
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   const rowsWithBalance = () => {
     let running = 0;
@@ -237,7 +238,8 @@ export default function CustomerVendorBookPage(props: Props) {
               Page {page()} of {totalPages()}
             </span>
             <div class="flex gap-2">
-              <button type="button" class="rounded border border-stroke px-3 py-1" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>
+              <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button type="button" class="rounded border border-stroke px-3 py-1" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>
                 Prev
               </button>
               <button type="button" class="rounded border border-stroke px-3 py-1" disabled={page() >= totalPages()} onClick={() => setPage((p) => p + 1)}>

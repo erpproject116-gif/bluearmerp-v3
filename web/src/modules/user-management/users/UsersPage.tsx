@@ -26,7 +26,7 @@ type RowMenuPos = { top: number; left: number };
 export default function UsersPage() {
   const auth = useAuth();
   const navigate = useNavigate();
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useListState("email", 25, { defaultStatus: "active_pending" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [menuOpenId, setMenuOpenId] = createSignal<number | null>(null);
@@ -100,7 +100,7 @@ export default function UsersPage() {
 
   const list = useTenantUserList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -541,7 +541,7 @@ export default function UsersPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

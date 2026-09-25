@@ -283,7 +283,7 @@ export default function PurchaseOrderListPage() {
   const auth = useAuth();
   const invalidate = useInvalidatePurchaseOrders();
 
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useTransactionListState(
     "updated_at",
     25,
   );
@@ -332,7 +332,7 @@ export default function PurchaseOrderListPage() {
 
   const list = usePurchaseOrderList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -579,7 +579,7 @@ export default function PurchaseOrderListPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

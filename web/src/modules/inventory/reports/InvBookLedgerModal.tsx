@@ -3,6 +3,7 @@ import { Portal } from "solid-js/web";
 import { useNavigate } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { PageJumpControl } from "../../../shared/PageJumpControl";
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { defaultReportDateRange } from "../../../shared/reports/ReportPageLayout";
 import { ReportLoadingOverlay } from "../../../shared/reports/ReportLoadingOverlay";
 import { GridExportButtons } from "../../../shared/gridExport";
@@ -80,7 +81,7 @@ export function InvBookLedgerModal(props: Props) {
   const [openingSource, setOpeningSource] = createSignal(false);
   const [salesDoc, setSalesDoc] = createSignal<SalesDetail | null>(null);
   const [purchaseDoc, setPurchaseDoc] = createSignal<SupplierInvoiceDetail | null>(null);
-  const pageSize = 100;
+  const [pageSize, setPageSize] = createSignal(100);
   let tableRoot: HTMLDivElement | undefined;
 
   createEffect(() => {
@@ -131,7 +132,7 @@ export function InvBookLedgerModal(props: Props) {
   const report = useInvBookSlips(() => ({
     filters: filters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "created_at",
     order: "asc",
     enabled: props.open && props.row != null,
@@ -155,7 +156,7 @@ export function InvBookLedgerModal(props: Props) {
     return { increase, release, ending };
   });
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
   const title = () => {
     const row = props.row;
     if (!row) return "Inv. Book";
@@ -368,6 +369,7 @@ export function InvBookLedgerModal(props: Props) {
                 >
                   Prev
                 </button>
+                <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
                 <PageJumpControl page={page()} totalPages={totalPages()} onPageChange={setPage} compact />
                 <button
                   type="button"

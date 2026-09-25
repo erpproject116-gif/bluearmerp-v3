@@ -112,7 +112,7 @@ export default function OperationsHubPage() {
   const { customValues, setCustom, loadCustom } = useCustomValues();
   const { activeCustomFields } = useFormFieldSettings(OPERATIONS_ENTITY.workItem);
 
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("title");
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("title");
   const debouncedQ = useDebouncedSignal(q);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
 
@@ -142,8 +142,8 @@ export default function OperationsHubPage() {
   const tableRows = createMemo(() => {
     const rows = [...(items.data?.rows ?? [])];
     rows.sort((a, b) => compareRows(a, b, sort(), order()));
-    const start = (page() - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
+    const start = (page() - 1) * pageSize();
+    return rows.slice(start, start + pageSize());
   });
 
   const tableTotal = createMemo(() => items.data?.rows.length ?? 0);
@@ -551,7 +551,7 @@ export default function OperationsHubPage() {
             sortOrder={order()}
             onSort={toggleSort}
             page={page()}
-            pageSize={pageSize}
+            pageSize={pageSize()} onPageSizeChange={setPageSize}
             total={tableTotal()}
             onPageChange={setPage}
             search={q()}

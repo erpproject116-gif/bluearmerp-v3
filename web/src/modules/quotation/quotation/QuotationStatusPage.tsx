@@ -20,7 +20,7 @@ export default function QuotationStatusPage() {
   const [submittedFilters, setSubmittedFilters] = createSignal<QuotationStatusFilters | null>(null);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<QuotationDetail | null>(null);
@@ -28,7 +28,7 @@ export default function QuotationStatusPage() {
   const report = useQuotationStatusReport(() => ({
     filters: submittedFilters() ?? defaultStatusFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "order_date",
     order: "desc",
     enabled: submittedFilters() !== null,
@@ -77,7 +77,7 @@ export default function QuotationStatusPage() {
           totalAmount={report.data?.summary.total_amount ?? 0}
           totalRows={report.data?.total ?? 0}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           loading={report.isFetching}
           generatedAt={generatedAt}
           onPageChange={setPage}

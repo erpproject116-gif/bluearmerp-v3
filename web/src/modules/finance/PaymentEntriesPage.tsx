@@ -8,10 +8,10 @@ import { FinanceLayout } from "./FinanceLayout";
 type PaymentEntryRow = PaymentEntry & { id: number };
 
 export default function PaymentEntriesPage() {
-  const { page, setPage, sort, order, toggleSort, pageSize } = useListState("entry_date");
+  const { page, setPage, sort, order, toggleSort, pageSize, setPageSize } = useListState("entry_date");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
 
-  const list = usePaymentEntries(() => ({ page: page(), pageSize }));
+  const list = usePaymentEntries(() => ({ page: page(), pageSize: pageSize() }));
 
   const rows = createMemo((): PaymentEntryRow[] =>
     (list.data?.rows ?? []).map((r) => ({
@@ -62,7 +62,7 @@ export default function PaymentEntriesPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
       />

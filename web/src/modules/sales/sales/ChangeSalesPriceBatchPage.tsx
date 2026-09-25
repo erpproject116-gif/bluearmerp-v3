@@ -19,12 +19,12 @@ export default function ChangeSalesPriceBatchPage() {
   const [page, setPage] = createSignal(1);
   const [editableRows, setEditableRows] = createSignal<EditablePriceBatchRow[]>([]);
   const [saving, setSaving] = createSignal(false);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const query = usePriceBatchLines(() => ({
     filters: submittedFilters() ?? defaultStatusFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "order_date",
     order: "desc",
     enabled: submittedFilters() !== null,
@@ -74,7 +74,7 @@ export default function ChangeSalesPriceBatchPage() {
           rows={query.data?.rows ?? []}
           loading={query.isFetching}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           totalRows={query.data?.total ?? 0}
           onPageChange={setPage}
           editableRows={editableRows}

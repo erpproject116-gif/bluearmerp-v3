@@ -69,13 +69,13 @@ export default function LotBatchesListPage() {
   const [order, setOrder] = createSignal<"asc" | "desc">("asc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [urlFilterActive, setUrlFilterActive] = createSignal(false);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const list = useLotBatchList(() => {
     const f = submittedFilters();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       q: f.q || undefined,
@@ -328,7 +328,7 @@ export default function LotBatchesListPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={list.data?.total ?? 0}
           onPageChange={setPage}
           onRefresh={invalidate}

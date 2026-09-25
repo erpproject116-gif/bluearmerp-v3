@@ -23,7 +23,7 @@ const STATUS_TABS = [
 ];
 
 export default function ScheduledReceiptsPage() {
-  const { page, setPage, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+  const { page, setPage, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState(
     "expected_date",
     25,
     { defaultOrder: "asc", defaultStatus: "" },
@@ -41,13 +41,13 @@ export default function ScheduledReceiptsPage() {
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: sort(),
       order: order(),
     });
     if (statusFilter()) qs.set("status", statusFilter());
     return {
-      queryKey: ["wms-scheduled-receipts", page(), pageSize, sort(), order(), statusFilter()],
+      queryKey: ["wms-scheduled-receipts", page(), pageSize(), sort(), order(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<ScheduledReceipt[]>(`/api/v1/wms/scheduled-receipts?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -149,7 +149,7 @@ export default function ScheduledReceiptsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         status={statusFilter()}

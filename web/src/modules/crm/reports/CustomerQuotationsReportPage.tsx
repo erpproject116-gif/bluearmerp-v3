@@ -10,12 +10,12 @@ export default function CustomerQuotationsReportPage() {
   const [submittedFilters, setSubmittedFilters] = createSignal<CustomerQuotationsFilters | null>(null);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useCustomerQuotationsReport(() => ({
     filters: submittedFilters() ?? defaultCustomerQuotationsFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "quotation_count",
     order: "desc",
     enabled: submittedFilters() !== null,
@@ -43,7 +43,7 @@ export default function CustomerQuotationsReportPage() {
           rows={report.data?.rows ?? []}
           totalRows={report.data?.total ?? 0}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           loading={report.isFetching}
           generatedAt={generatedAt}
           onPageChange={setPage}

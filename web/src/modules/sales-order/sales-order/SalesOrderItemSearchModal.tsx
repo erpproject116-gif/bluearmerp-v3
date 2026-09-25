@@ -59,7 +59,7 @@ export function SalesOrderItemSearchModal(props: Props) {
   const [page, setPage] = createSignal(1);
   const [searching, setSearching] = createSignal(false);
   const [showQuickItem, setShowQuickItem] = createSignal(false);
-  const pageSize = 50;
+  const [pageSize] = createSignal(50);
 
   const runSearch = async (p = 1) => {
     setSearching(true);
@@ -78,7 +78,7 @@ export function SalesOrderItemSearchModal(props: Props) {
         sort_by_modified: f.sort_by_modified,
         usage_status: f.usage_status,
         page: p,
-        page_size: pageSize,
+        page_size: pageSize(),
       };
       if (props.contextLocationId) body.context_location_id = props.contextLocationId;
       if (f.purchase_price_min !== "") body.purchase_price_min = Number(f.purchase_price_min);
@@ -215,15 +215,15 @@ export function SalesOrderItemSearchModal(props: Props) {
                   </For>
                 </tbody>
               </table>
-              <Show when={total() > pageSize}>
+              <Show when={total() > pageSize()}>
                 <div class="mt-3 flex items-center gap-2">
                   <button type="button" class="rounded border border-stroke px-2 py-1 text-sm disabled:opacity-40" disabled={page() <= 1} onClick={() => void runSearch(page() - 1)}>
                     Previous
                   </button>
                   <span class="text-sm text-text-secondary">
-                    Page {page()} of {Math.max(1, Math.ceil(total() / pageSize))}
+                    Page {page()} of {Math.max(1, Math.ceil(total() / pageSize()))}
                   </span>
-                  <button type="button" class="rounded border border-stroke px-2 py-1 text-sm disabled:opacity-40" disabled={page() >= Math.ceil(total() / pageSize)} onClick={() => void runSearch(page() + 1)}>
+                  <button type="button" class="rounded border border-stroke px-2 py-1 text-sm disabled:opacity-40" disabled={page() >= Math.ceil(total() / pageSize())} onClick={() => void runSearch(page() + 1)}>
                     Next
                   </button>
                 </div>

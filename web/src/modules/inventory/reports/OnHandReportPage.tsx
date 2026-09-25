@@ -15,12 +15,12 @@ export default function OnHandReportPage() {
   const [submitted, setSubmitted] = createSignal<OnHandFilters | null>(null);
   const [runId, setRunId] = createSignal(0);
   const [page, setPage] = createSignal(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useOnHandReport(() => ({
     filters: submitted() ?? defaultFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "item_code",
     order: "asc",
     enabled: submitted() !== null,
@@ -47,7 +47,7 @@ export default function OnHandReportPage() {
 
   const patch = (p: Partial<OnHandFilters>) => setDraft((prev) => ({ ...prev, ...p }));
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <>
@@ -95,6 +95,7 @@ export default function OnHandReportPage() {
         page={page()}
         totalPages={totalPages()}
         onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
         onSearch={search}
         onReset={() => setSubmitted(null)}
         onExportCsv={() => submitted() && void downloadReportCsv(onHandExportUrl(submitted()!), "inventory-on-hand.csv")}

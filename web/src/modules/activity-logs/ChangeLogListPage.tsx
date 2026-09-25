@@ -16,7 +16,7 @@ function formatTimestamp(iso: string): string {
 
 export default function ChangeLogListPage() {
   const [params] = useSearchParams();
-  const { page, setPage, sort, order, toggleSort, pageSize } = useListState("created_at", 25, {
+  const { page, setPage, sort, order, toggleSort, pageSize, setPageSize } = useListState("created_at", 25, {
     defaultOrder: "desc",
   });
 
@@ -61,7 +61,7 @@ export default function ChangeLogListPage() {
     const f = submittedFilters();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       dateFrom: f.dateFrom || undefined,
@@ -200,7 +200,7 @@ export default function ChangeLogListPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={list.data?.total ?? 0}
           onPageChange={setPage}
           onRefresh={() => void list.refetch()}

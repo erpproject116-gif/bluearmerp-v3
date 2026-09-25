@@ -39,13 +39,13 @@ export default function SerialRegistryListPage() {
   const [generateOpen, setGenerateOpen] = createSignal(false);
   const [editRow, setEditRow] = createSignal<SerialUnitRow | null>(null);
   const [urlFilterActive, setUrlFilterActive] = createSignal(false);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const list = useSerialUnitList(() => {
     const f = submittedFilters();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       q: f.q || undefined,
@@ -297,7 +297,7 @@ export default function SerialRegistryListPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={list.data?.total ?? 0}
           onPageChange={setPage}
           onRefresh={invalidate}

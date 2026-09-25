@@ -15,12 +15,12 @@ export default function ShippingOrderStatusPage() {
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<ShippingReportFilters>(defaults);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useShippingOrderStatusReport(() => ({
     filters: filters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "shipping_date",
     order: "desc",
     enabled: submitted(),
@@ -43,7 +43,7 @@ export default function ShippingOrderStatusPage() {
     setGeneratedAt(new Date());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <SalesOrderLayout>
@@ -60,6 +60,7 @@ export default function ShippingOrderStatusPage() {
         page={page()}
         totalPages={totalPages()}
         onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
         onSearch={search}
         onReset={() => {
           setFilters(defaults);

@@ -51,7 +51,7 @@ function taskCardDetails(task: FollowUpTask): KanbanDetailRow[] {
 export default function FollowUpTasksPage() {
   const [searchParams] = useSearchParams();
   const [viewMode, setViewMode] = createSignal<ViewMode>(loadViewMode(STORAGE_KEY));
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("due_date");
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("due_date");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const toast = useToast();
   const invalidate = useInvalidateFollowUpTasks();
@@ -82,7 +82,7 @@ export default function FollowUpTasksPage() {
 
   const list = useFollowUpTasks(() => ({
     page: viewMode() === "board" ? 1 : page(),
-    pageSize: viewMode() === "board" ? 500 : pageSize,
+    pageSize: viewMode() === "board" ? 500 : pageSize(),
     q: q() || undefined,
     board: viewMode() === "board",
   }));
@@ -156,7 +156,7 @@ export default function FollowUpTasksPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={list.data?.total ?? 0}
           onPageChange={setPage}
           search={q()}

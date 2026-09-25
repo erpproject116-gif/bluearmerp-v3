@@ -25,7 +25,7 @@ function isLeadStatus(v: string | undefined): v is LeadStatus {
 export default function LeadsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("updated_at");
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("updated_at");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [selected, setSelected] = createSignal<Lead | null>(null);
@@ -47,7 +47,7 @@ export default function LeadsPage() {
 
   const list = useLeads(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     q: q() || undefined,
     status: filterStatus(),
   }));
@@ -196,7 +196,7 @@ export default function LeadsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

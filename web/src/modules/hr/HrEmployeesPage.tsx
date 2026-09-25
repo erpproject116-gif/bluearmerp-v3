@@ -34,7 +34,7 @@ import { hasPermission, useAuth } from "../../shared/auth-context";
 const STATUS_OPTIONS = ["active", "inactive", "terminated"];
 
 export default function HrEmployeesPage() {
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("full_name");
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("full_name");
   const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -82,7 +82,7 @@ export default function HrEmployeesPage() {
 
   const list = useEmployees(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     q: q() || undefined,
     lifecycle: lifecycle.filter(),
   }));
@@ -375,7 +375,7 @@ export default function HrEmployeesPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

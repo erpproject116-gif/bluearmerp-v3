@@ -25,7 +25,7 @@ export default function SalesStatusPage() {
   const [submittedFilters, setSubmittedFilters] = createSignal<SalesStatusFilters>(defaultStatusFilters());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<SalesDetail | null>(null);
@@ -33,7 +33,7 @@ export default function SalesStatusPage() {
   const report = useSalesStatusReport(() => ({
     filters: submittedFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "order_date",
     order: "desc",
     enabled: true,
@@ -85,7 +85,7 @@ export default function SalesStatusPage() {
           totalAmount={report.data?.summary.total_amount ?? 0}
           totalRows={report.data?.total ?? 0}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           loading={report.isFetching}
           generatedAt={generatedAt}
           onPageChange={setPage}

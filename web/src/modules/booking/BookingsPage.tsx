@@ -68,7 +68,7 @@ export default function BookingsPage() {
   const qc = useQueryClient();
   const loc = useLocation();
   const navigate = useNavigate();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, statusFilter, setStatusFilter } = useListState(
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize, statusFilter, setStatusFilter } = useListState(
     "starts_at",
     25,
     { defaultOrder: "asc", defaultStatus: "" },
@@ -92,7 +92,7 @@ export default function BookingsPage() {
     queryFn: async () => {
       const qs = new URLSearchParams({
         page: String(page()),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
         sort: sort(),
         order: order(),
       });
@@ -215,7 +215,7 @@ export default function BookingsPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={list.data?.total ?? 0}
           onPageChange={setPage}
           search={q()}

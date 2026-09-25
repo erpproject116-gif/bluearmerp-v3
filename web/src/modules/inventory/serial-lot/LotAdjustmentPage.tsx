@@ -54,13 +54,13 @@ export default function LotAdjustmentPage() {
   const [itemLabel, setItemLabel] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
-  const pageSize = 25;
+  const [pageSize] = createSignal(20);
 
   const list = useLotAdjustmentCandidates(() => {
     const f = submitted();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: "lot_no",
       order: "asc" as const,
       filters: {

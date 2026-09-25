@@ -29,21 +29,21 @@ const STATUS_TABS = [
 export default function QcRequestsPage() {
   const toast = useToast();
   const client = useQueryClient();
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useListState("request_date", 25, { defaultOrder: "desc", defaultStatus: "" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
 
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: sort(),
       order: order(),
     });
     if (q()) qs.set("q", q());
     if (statusFilter()) qs.set("progress_status", statusFilter());
     return {
-      queryKey: ["qc-requests", page(), pageSize, sort(), order(), q(), statusFilter()],
+      queryKey: ["qc-requests", page(), pageSize(), sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<QcRequest[]>(`/api/v1/quality/qc-requests?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -119,7 +119,7 @@ export default function QcRequestsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

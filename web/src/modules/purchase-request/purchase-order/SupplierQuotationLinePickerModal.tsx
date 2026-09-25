@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
@@ -55,11 +56,11 @@ export function SupplierQuotationLinePickerModal(props: Props) {
   const [q, setQ] = createSignal("");
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
-  const pageSize = 500;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const [data] = createResource(
     () => (props.open ? { q: q(), page: page() } : null),
-    async (p) => fetchOpenLines(p!.q, p!.page, pageSize),
+    async (p) => fetchOpenLines(p!.q, p!.page, pageSize()),
   );
 
   const toggleRow = (lineId: number) => {
@@ -88,7 +89,7 @@ export function SupplierQuotationLinePickerModal(props: Props) {
     setSelected(new Set<number>());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((data()?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((data()?.total ?? 0) / pageSize()));
 
   return (
     <Show when={props.open}>
@@ -178,7 +179,8 @@ export function SupplierQuotationLinePickerModal(props: Props) {
                       Page {page()} of {totalPages()}
                     </span>
                     <div class="flex gap-2">
-                      <button
+                      <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button
                         type="button"
                         class="rounded border border-stroke px-3 py-1 disabled:opacity-40"
                         disabled={page() <= 1}

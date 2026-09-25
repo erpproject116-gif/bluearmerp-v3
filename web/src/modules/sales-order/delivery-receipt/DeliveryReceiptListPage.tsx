@@ -31,7 +31,7 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
   const toast = useToast();
   const invalidate = useInvalidateDeliveryReceipts();
   const listHref = () => props.listHref ?? "/app/sales-order/delivery-receipts";
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState(
     "delivery_date",
     25,
     { defaultOrder: "desc", defaultStatus: "" },
@@ -43,7 +43,7 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
 
   const list = useDeliveryReceiptList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -159,7 +159,7 @@ export function DeliveryReceiptListPageInner(props: PageOptions = {}) {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

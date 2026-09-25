@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { createSignal, For, onMount } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
@@ -21,12 +22,12 @@ export default function ArApStatusReportPage() {
   const [draft, setDraft] = createSignal<ArApStatusFilters>(defaultFilters());
   const [submitted, setSubmitted] = createSignal<ArApStatusFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useArApStatusReport(() => ({
     filters: submitted(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "partner_name",
     order: "asc",
     enabled: true,
@@ -55,7 +56,7 @@ export default function ArApStatusReportPage() {
     setPage(1);
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
   let reportBodyEl: HTMLDivElement | undefined;
 
   return (
@@ -133,7 +134,8 @@ export default function ArApStatusReportPage() {
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
           <span>Page {page()} / {totalPages()}</span>
           <div class="flex gap-2">
-            <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
+            <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
             <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() >= totalPages()} onClick={() => setPage((p) => p + 1)}>Next</button>
             <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => void downloadReportCsv(arApStatusExportUrl(submitted()), "ar-ap-status.csv")}>Export CSV</button>
           </div>

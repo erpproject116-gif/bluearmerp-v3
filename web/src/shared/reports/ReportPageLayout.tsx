@@ -6,6 +6,7 @@ import { uiLabel } from "../branding/uiLabel";
 import { CollapsibleFilterPanel } from "../CollapsibleFilterPanel";
 import { GridExportButtons } from "../gridExport";
 import { PageJumpControl } from "../PageJumpControl";
+import { PageSizeSelect } from "../pageSize";
 import {
   inferReportDatePreset,
   localISODate,
@@ -30,8 +31,10 @@ export type ReportPageLayoutProps = {
   loading?: boolean;
   generatedAt?: Date;
   page?: number;
+  pageSize?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   filterExtra?: JSX.Element;
   children: JSX.Element;
   /** Filename stem for client-side exports from the on-screen table. */
@@ -165,6 +168,16 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                   <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => props.onExportCsv!()}>
                     {uiLabel("reports.export_csv")} (API)
                   </button>
+                </Show>
+                <Show when={props.onPageSizeChange && props.pageSize}>
+                  <PageSizeSelect
+                    value={props.pageSize!}
+                    disabled={props.loading === true}
+                    onChange={(n) => {
+                      props.onPageSizeChange!(n);
+                      if ((props.page ?? 1) !== 1) props.onPageChange?.(1);
+                    }}
+                  />
                 </Show>
                 <Show when={props.onPageChange && props.page && props.totalPages}>
                   <button

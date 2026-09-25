@@ -13,6 +13,7 @@ import {
   type ReleaseQueueRow,
   type RecentReleaseRow,
 } from "../../../shared/useReleaseQueue";
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { useToast } from "../../../shared/toast";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { SalesOrderLayout } from "../SalesOrderLayout";
@@ -24,7 +25,7 @@ export default function ReleaseSalesOrderPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const invalidate = useInvalidateReleaseQueue();
-  const { page, setPage, q, setQ, sort, order, pageSize } = useListState("order_date", 25, { defaultOrder: "desc" });
+  const { page, setPage, q, setQ, sort, order, pageSize, setPageSize } = useListState("order_date", 25, { defaultOrder: "desc" });
   const [releaseQty, setReleaseQty] = createSignal<Record<number, string>>({});
   const [serialIds, setSerialIds] = createSignal<Record<number, number[]>>({});
   const [serialLabels, setSerialLabels] = createSignal<Record<number, string>>({});
@@ -35,7 +36,7 @@ export default function ReleaseSalesOrderPage() {
 
   const queue = useReleaseQueue(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -111,7 +112,7 @@ export default function ReleaseSalesOrderPage() {
     void recent.refetch();
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((queue.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((queue.data?.total ?? 0) / pageSize()));
 
   return (
     <SalesOrderLayout>
@@ -234,6 +235,7 @@ export default function ReleaseSalesOrderPage() {
 
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3">
           <div class="flex gap-2 text-xs text-text-secondary">
+            <PageSizeSelect value={pageSize()} onChange={setPageSize} />
             <button type="button" class="rounded border border-stroke px-2 py-1 disabled:opacity-40" disabled={page() <= 1} onClick={() => setPage(page() - 1)}>
               Prev
             </button>

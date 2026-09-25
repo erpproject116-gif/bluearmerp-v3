@@ -123,14 +123,14 @@ export function TaxTypeModal(props: {
 
 export default function TaxTypeListPage() {
   const invalidate = useInvalidateTaxTypes();
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("sort_order");
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState("sort_order");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<TaxTypeDetail | null>(null);
 
   const list = useTaxTypeList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -166,7 +166,7 @@ export default function TaxTypeListPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

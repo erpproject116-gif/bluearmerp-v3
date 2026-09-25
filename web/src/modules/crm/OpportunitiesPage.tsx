@@ -25,7 +25,7 @@ const STAGE_OPTIONS: OpportunityStage[] = [
 ];
 
 export default function OpportunitiesPage() {
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("expected_close_date");
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("expected_close_date");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [selected, setSelected] = createSignal<Opportunity | null>(null);
@@ -39,7 +39,7 @@ export default function OpportunitiesPage() {
   const toast = useToast();
   const invalidate = useInvalidateOpportunities();
 
-  const list = useOpportunities(() => ({ page: page(), pageSize, q: q() || undefined }));
+  const list = useOpportunities(() => ({ page: page(), pageSize: pageSize(), q: q() || undefined }));
 
   const openNew = () => {
     setSelected(null);
@@ -137,7 +137,7 @@ export default function OpportunitiesPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

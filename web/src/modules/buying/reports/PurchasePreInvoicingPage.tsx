@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { createSignal, For, onMount } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { DateInput } from "../../../shared/DateInput";
@@ -20,12 +21,12 @@ export default function PurchasePreInvoicingPage() {
   const [draftFilters, setDraftFilters] = createSignal(defaultFilters());
   const [submittedFilters, setSubmittedFilters] = createSignal(defaultFilters());
   const [page, setPage] = createSignal(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = usePurchasePreInvoicingReport(() => ({
     filters: submittedFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     enabled: true,
   }));
 
@@ -67,7 +68,7 @@ export default function PurchasePreInvoicingPage() {
     await downloadApiFile(exportUrl(), "purchase-pre-invoicing.csv");
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <div class="space-y-6 p-4">
@@ -147,7 +148,8 @@ export default function PurchasePreInvoicingPage() {
             Page {page()} of {totalPages()}
           </span>
           <div class="flex gap-2">
-            <button type="button" class="rounded border px-3 py-1" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>
+            <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button type="button" class="rounded border px-3 py-1" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>
               Prev
             </button>
             <button type="button" class="rounded border px-3 py-1" disabled={page() >= totalPages()} onClick={() => setPage((p) => p + 1)}>

@@ -57,7 +57,7 @@ export default function QuotationPipelinePage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<QuotationDetail | null>(null);
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("order_date");
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("order_date");
   const toast = useToast();
   const invalidate = useInvalidateQuotationPipeline();
   const pipeline = useQuotationPipeline();
@@ -95,8 +95,8 @@ export default function QuotationPipelinePage() {
   });
 
   const pagedRows = createMemo(() => {
-    const start = (page() - 1) * pageSize;
-    return filteredCards().slice(start, start + pageSize);
+    const start = (page() - 1) * pageSize();
+    return filteredCards().slice(start, start + pageSize());
   });
 
   const boardColumns = createMemo(() =>
@@ -168,7 +168,7 @@ export default function QuotationPipelinePage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={filteredCards().length}
           onPageChange={setPage}
         />

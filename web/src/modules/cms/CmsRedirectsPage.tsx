@@ -8,7 +8,7 @@ import { apiFetch } from "../../shared/api";
 import { useCmsRedirects, type CmsRedirect } from "../../shared/useCms";
 
 export default function CmsRedirectsPage() {
-  const { page, setPage, pageSize } = useListState("created_at", 25, { defaultOrder: "desc", defaultStatus: "" });
+  const { page, setPage, pageSize, setPageSize } = useListState("created_at", 25, { defaultOrder: "desc", defaultStatus: "" });
   const auth = useAuth();
   const toast = useToast();
   const canWrite = () => hasPermission(auth.me, "cms.pages_write", "write");
@@ -17,7 +17,7 @@ export default function CmsRedirectsPage() {
   const [fromSlug, setFromSlug] = createSignal("");
   const [toSlug, setToSlug] = createSignal("");
   const [saving, setSaving] = createSignal(false);
-  const list = useCmsRedirects(() => ({ page: page(), pageSize }));
+  const list = useCmsRedirects(() => ({ page: page(), pageSize: pageSize() }));
 
   return (
     <div>
@@ -63,7 +63,7 @@ export default function CmsRedirectsPage() {
         codeKey="from_slug"
         nameKey="to_slug"
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         onRefresh={() => void list.refetch()}

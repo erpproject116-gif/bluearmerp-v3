@@ -23,7 +23,7 @@ const STATUS_TABS = [
 ];
 
 export default function InboxPage() {
-  const { page, setPage, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+  const { page, setPage, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState(
     "created_at",
     25,
     { defaultOrder: "desc", defaultStatus: "" },
@@ -36,13 +36,13 @@ export default function InboxPage() {
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: sort(),
       order: order(),
     });
     if (statusFilter()) qs.set("status", statusFilter());
     return {
-      queryKey: ["data-center-inbox", page(), pageSize, sort(), order(), statusFilter()],
+      queryKey: ["data-center-inbox", page(), pageSize(), sort(), order(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<IngestedDocument[]>(`/api/v1/data-center/inbox?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load inbox");
@@ -112,7 +112,7 @@ export default function InboxPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         status={statusFilter()}

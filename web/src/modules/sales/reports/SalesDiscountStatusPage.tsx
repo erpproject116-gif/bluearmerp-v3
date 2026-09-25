@@ -19,10 +19,10 @@ export default function SalesDiscountStatusPage() {
   const [template, setTemplate] = createSignal<SalesDiscountStatusTemplate>(loadDiscountStatusTemplate());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const useSubtotalMode = () => template().subtotalBy !== "none";
-  const effectivePageSize = () => (useSubtotalMode() ? SUBTOTAL_PAGE_SIZE : pageSize);
+  const effectivePageSize = () => (useSubtotalMode() ? SUBTOTAL_PAGE_SIZE : pageSize());
   const effectivePage = () => (useSubtotalMode() ? 1 : page());
 
   const report = useSalesDiscountStatusReport(() => ({
@@ -67,6 +67,7 @@ export default function SalesDiscountStatusPage() {
           totalRows={report.data?.total ?? 0}
           page={effectivePage()}
           pageSize={effectivePageSize()}
+          onPageSizeChange={setPageSize}
           loading={report.isFetching}
           generatedAt={generatedAt}
           subtotalMode={useSubtotalMode()}

@@ -20,7 +20,7 @@ type Props = {
 
 type StatusChip = "all" | "in_progress" | "finished";
 
-const pageSize = 500;
+const [pageSize, setPageSize] = createSignal(20);
 
 function poChip(status: string, progress: string): StatusChip {
   const s = (status || "").toLowerCase();
@@ -67,7 +67,7 @@ export function OpenPOLinePickerModal(props: Props) {
   const [data] = createResource(
     () => (props.open ? { filters: filters(), page: page() } : null),
     async (p) => {
-      const qs = buildOpenLineQuery({ page: p!.page, pageSize, filters: p!.filters });
+      const qs = buildOpenLineQuery({ page: p!.page, pageSize: pageSize(), filters: p!.filters });
       const res = await apiFetch<OpenPOLine[]>(`/api/v1/finance/supplier-invoices/open-po-lines?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load purchase order lines");
       return { rows: res.data ?? [], total: res.meta?.total ?? (res.data?.length ?? 0) };
@@ -124,7 +124,7 @@ export function OpenPOLinePickerModal(props: Props) {
       error={data.error}
       total={filteredRows().length}
       page={page()}
-      pageSize={pageSize}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
       onPageChange={setPage}
       rows={rows()}
       rowKey={(row) => Number(row.purchase_order_line_id)}

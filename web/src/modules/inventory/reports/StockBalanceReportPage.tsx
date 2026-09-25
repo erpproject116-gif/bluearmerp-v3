@@ -8,12 +8,12 @@ export default function StockBalanceReportPage() {
   const [runId, setRunId] = createSignal(0);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useStockBalanceReport(() => ({
     filters: {},
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "item_code",
     order: "asc",
     enabled: submitted(),
@@ -40,7 +40,7 @@ export default function StockBalanceReportPage() {
     setGeneratedAt(new Date());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <ReportPageLayout
@@ -53,6 +53,7 @@ export default function StockBalanceReportPage() {
       page={page()}
       totalPages={totalPages()}
       onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
       onSearch={search}
       onReset={() => {
         setSubmitted(true);

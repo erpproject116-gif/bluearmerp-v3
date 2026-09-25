@@ -36,7 +36,7 @@ function docLabel(row: InboxMessageRow): string {
 }
 
 export default function CommsInboxPage() {
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("internal_date", 25, {
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("internal_date", 25, {
     defaultOrder: "desc",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -46,7 +46,7 @@ export default function CommsInboxPage() {
     async ({ page: p, q: query }) => {
       const qs = new URLSearchParams({
         page: String(p),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
       });
       if (query) qs.set("q", query);
       const res = await apiFetch<InboxMessageRow[]>(`/api/v1/comms/inbox?${qs}`);
@@ -86,7 +86,7 @@ export default function CommsInboxPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list()?.total ?? 0}
         onPageChange={setPage}
         search={q()}

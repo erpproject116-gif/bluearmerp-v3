@@ -25,14 +25,14 @@ export default function SalesHistoryPage() {
   const auth = useAuth();
   const navigate = useNavigate();
   const canLogs = () => canViewActivityLogs(auth.me);
-  const { page, setPage, sort, order, toggleSort, pageSize, q, setQ } = useListState("created_at", 25, {
+  const { page, setPage, sort, order, toggleSort, pageSize, setPageSize, q, setQ } = useListState("created_at", 25, {
     defaultOrder: "desc",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
 
   const logs = useActivityLogList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort() === "order_date" ? "created_at" : sort(),
     order: order(),
     targetType: "sa_sales",
@@ -42,7 +42,7 @@ export default function SalesHistoryPage() {
 
   const invoices = useSalesList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort() === "created_at" ? "order_date" : sort(),
     order: order(),
     q: q() || undefined,
@@ -122,7 +122,7 @@ export default function SalesHistoryPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={logs.data?.total ?? 0}
           onPageChange={setPage}
           search={q()}
@@ -159,7 +159,7 @@ export default function SalesHistoryPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={invoices.data?.total ?? 0}
           onPageChange={setPage}
           search={q()}

@@ -42,7 +42,7 @@ export default function SerialStatusReportPage() {
   const [sort, setSort] = createSignal("serial_no");
   const [order, setOrder] = createSignal<"asc" | "desc">("asc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const goTrace = (row: { serial_no: string }) => openSerialTrace(navigate, row.serial_no);
 
@@ -50,7 +50,7 @@ export default function SerialStatusReportPage() {
     const f = submitted();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       filters: f,
@@ -214,7 +214,7 @@ export default function SerialStatusReportPage() {
               sortOrder={order()}
               onSort={toggleSort}
               page={page()}
-              pageSize={pageSize}
+              pageSize={pageSize()} onPageSizeChange={setPageSize}
               total={report.data?.total ?? 0}
               onPageChange={setPage}
               onRefresh={search}
@@ -237,7 +237,7 @@ export default function SerialStatusReportPage() {
               },
               { key: "unit_count", header: "Units", clickable: false },
             ]}
-            rows={withRowIds((report.data?.rows ?? []) as SerialStatusSummaryRow[], page(), pageSize)}
+            rows={withRowIds((report.data?.rows ?? []) as SerialStatusSummaryRow[], page(), pageSize())}
             loading={report.isFetching}
             selectedId={selectedId()}
             onSelect={setSelectedId}
@@ -247,7 +247,7 @@ export default function SerialStatusReportPage() {
             sortOrder={order()}
             onSort={toggleSort}
             page={page()}
-            pageSize={pageSize}
+            pageSize={pageSize()} onPageSizeChange={setPageSize}
             total={report.data?.total ?? 0}
             onPageChange={setPage}
             onRefresh={search}

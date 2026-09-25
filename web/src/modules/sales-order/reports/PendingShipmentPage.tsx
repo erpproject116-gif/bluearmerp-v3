@@ -14,12 +14,12 @@ export default function PendingShipmentPage() {
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<ShippingReportFilters>(defaults);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = usePendingShipmentReport(() => ({
     filters: filters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "order_date",
     order: "desc",
     enabled: submitted(),
@@ -42,7 +42,7 @@ export default function PendingShipmentPage() {
     setGeneratedAt(new Date());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <SalesOrderLayout>
@@ -59,6 +59,7 @@ export default function PendingShipmentPage() {
         page={page()}
         totalPages={totalPages()}
         onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
         onSearch={search}
         onReset={() => {
           setFilters(defaults);

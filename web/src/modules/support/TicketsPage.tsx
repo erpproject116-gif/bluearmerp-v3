@@ -34,7 +34,7 @@ export default function TicketsPage() {
   const canCreate = () => hasPermission(auth.me, "support.tickets_new", "write");
   const canBulkStatus = () => canManageAllSupportTickets(auth.me);
   const scopedToMine = () => !canManageAllSupportTickets(auth.me);
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useListState("ticket_date", 25, { defaultStatus: "", defaultOrder: "desc" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
@@ -44,7 +44,7 @@ export default function TicketsPage() {
 
   const list = useSupportTickets(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     q: q() || undefined,
     status: statusFilter() || undefined,
     sort: sort(),
@@ -164,7 +164,7 @@ export default function TicketsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

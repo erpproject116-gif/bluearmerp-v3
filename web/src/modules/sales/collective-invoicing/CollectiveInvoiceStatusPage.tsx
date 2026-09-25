@@ -19,10 +19,10 @@ export default function CollectiveInvoiceStatusPage() {
   const [template, setTemplate] = createSignal<CollectiveInvoiceStatusTemplate>(loadCollectiveInvoiceStatusTemplate());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const useSubtotalMode = () => (submittedFilters() ? template().subtotalBy !== "none" : false);
-  const effectivePageSize = () => (useSubtotalMode() ? SUBTOTAL_PAGE_SIZE : pageSize);
+  const effectivePageSize = () => (useSubtotalMode() ? SUBTOTAL_PAGE_SIZE : pageSize());
   const effectivePage = () => (useSubtotalMode() ? 1 : page());
 
   const report = useCollectiveInvoiceStatusReport(() => ({
@@ -68,6 +68,7 @@ export default function CollectiveInvoiceStatusPage() {
           totalRows={report.data?.total ?? 0}
           page={effectivePage()}
           pageSize={effectivePageSize()}
+          onPageSizeChange={setPageSize}
           loading={report.isFetching}
           generatedAt={generatedAt}
           subtotalMode={useSubtotalMode()}

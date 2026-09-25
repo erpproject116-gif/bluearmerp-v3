@@ -131,7 +131,7 @@ export default function ChartOfAccountsPage() {
   const toast = useToast();
   const client = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, statusFilter, setStatusFilter } = useListState(
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize, statusFilter, setStatusFilter } = useListState(
     "account_code",
     200,
     { defaultStatus: "active" },
@@ -177,7 +177,7 @@ export default function ChartOfAccountsPage() {
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(viewMode() === "simple" ? 2000 : pageSize),
+      pageSize: String(viewMode() === "simple" ? 2000 : pageSize()),
       sort: sort(),
       order: order(),
       q: q(),
@@ -255,7 +255,7 @@ export default function ChartOfAccountsPage() {
   const parentOptions = createQuery(() => ({
     queryKey: ["finance-accounts-parent-options"],
     queryFn: async () => {
-      // Fetch per account_type so expense (5xxx) is never truncated by a global pageSize
+      // Fetch per account_type so expense (5xxx) is never truncated by a global pageSize()
       // cap when the chart has many asset/liability rows ahead of it.
       const types: AccountRow["account_type"][] = ["asset", "liability", "equity", "income", "expense"];
       const chunks = await Promise.all(
@@ -1416,7 +1416,7 @@ export default function ChartOfAccountsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

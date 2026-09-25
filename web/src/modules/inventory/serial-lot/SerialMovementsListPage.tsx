@@ -54,13 +54,13 @@ export default function SerialMovementsListPage() {
   const [sort, setSort] = createSignal("created_at");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const list = useSerialEventList(() => {
     const f = submittedFilters();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       q: f.q || undefined,
@@ -182,7 +182,7 @@ export default function SerialMovementsListPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={list.data?.total ?? 0}
           onPageChange={setPage}
           onRefresh={invalidate}

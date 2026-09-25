@@ -61,20 +61,20 @@ export default function ProductionCostsPage() {
   const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = createQuery(() => {
     const f = filters();
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       date_from: f.date_from,
       date_to: f.date_to,
     });
     if (f.bom_type) qs.set("bom_type", f.bom_type);
     if (f.books_status) qs.set("books_status", f.books_status);
     return {
-      queryKey: ["mfg-production-costs", page(), pageSize, f],
+      queryKey: ["mfg-production-costs", page(), pageSize(), f],
       queryFn: async () => {
         const res = await apiFetch<CostRow[]>(`/api/v1/manufacturing/reports/production-costs?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load production costs");
@@ -104,7 +104,7 @@ export default function ProductionCostsPage() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
   const rows = () => report.data?.rows ?? [];
 
   return (
@@ -121,6 +121,7 @@ export default function ProductionCostsPage() {
       page={page()}
       totalPages={totalPages()}
       onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
       onSearch={search}
       onReset={() => {
         setDraftFilters(defaults);

@@ -23,7 +23,7 @@ export default function FixedAssetsPage() {
   const auth = useAuth();
   const canCreate = () => hasPermission(auth.me, "fixed_assets.assets_new", "write");
   const canRunDep = () => hasPermission(auth.me, "fixed_assets.depreciation_runs", "write");
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useListState("acquisition_date", 25, { defaultStatus: "", defaultOrder: "desc" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -44,7 +44,7 @@ export default function FixedAssetsPage() {
 
   const list = useFixedAssets(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     q: q() || undefined,
     status: statusFilter() || undefined,
     sort: sort(),
@@ -188,7 +188,7 @@ export default function FixedAssetsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

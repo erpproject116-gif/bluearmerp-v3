@@ -25,7 +25,7 @@ export default function JobCostingPage() {
   const canCreateProject = () => hasPermission(auth.me, "job_costing.projects_new", "write");
   const canBudget = () => hasPermission(auth.me, "job_costing.budget", "write");
   const canTimesheet = () => hasPermission(auth.me, "job_costing.timesheets", "write");
-  const { page, setPage, q, setQ, pageSize } = useListState("project_name");
+  const { page, setPage, q, setQ, pageSize, setPageSize } = useListState("project_name");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [activeProjectId, setActiveProjectId] = createSignal<number | null>(null);
   const [projectModalOpen, setProjectModalOpen] = createSignal(false);
@@ -44,7 +44,7 @@ export default function JobCostingPage() {
   const toast = useToast();
   const invalidate = useInvalidateJobCosting();
 
-  const list = useJobCostProjects(() => ({ page: page(), pageSize, q: q() || undefined }));
+  const list = useJobCostProjects(() => ({ page: page(), pageSize: pageSize(), q: q() || undefined }));
   const budget = useBudgetLines(activeProjectId);
   const bva = useBudgetVsActual(activeProjectId);
   const timesheets = useJobCostTimesheets(() => ({
@@ -166,7 +166,7 @@ export default function JobCostingPage() {
         codeKey="project_code"
         nameKey="project_name"
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

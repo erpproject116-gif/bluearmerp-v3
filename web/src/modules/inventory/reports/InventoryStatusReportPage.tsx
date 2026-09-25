@@ -180,7 +180,7 @@ export default function InventoryStatusReportPage() {
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [unitsTargetRow, setUnitsTargetRow] = createSignal<FindStockUnitsTarget | null>(null);
   const [ledgerRow, setLedgerRow] = createSignal<InvBookLedgerTarget | null>(null);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
   let qDebounce: ReturnType<typeof setTimeout> | undefined;
 
   const [categories] = createResource(async () => {
@@ -210,7 +210,7 @@ export default function InventoryStatusReportPage() {
   const report = useInventoryStatusReport(() => ({
     filters: submitted(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "item_code",
     order: "asc",
     enabled: true,
@@ -284,7 +284,7 @@ export default function InventoryStatusReportPage() {
   });
   const { widthFor, onResizeStart, tableWidth } = useResizableColumns(colDefs);
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
   const filters = () => submitted();
 
   const openSerials = (item: MatrixItem, locId: number, locName: string) => {
@@ -317,6 +317,7 @@ export default function InventoryStatusReportPage() {
       page={page()}
       totalPages={totalPages()}
       onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
       onSearch={search}
       exportFilename="inv-balance-by-location"
       onReset={() => {

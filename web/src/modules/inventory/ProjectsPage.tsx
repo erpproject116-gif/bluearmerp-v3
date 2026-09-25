@@ -16,7 +16,7 @@ import { useListState } from "../../shared/useListState";
 type Project = { id: number; project_code: string; project_name: string; status: string; custom_values?: Record<string, unknown> };
 
 export default function ProjectsPage() {
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("project_code");
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState("project_code");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Project | null>(null);
@@ -30,7 +30,7 @@ export default function ProjectsPage() {
 
   const list = useInventoryList<Project>("projects", () => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -108,7 +108,7 @@ export default function ProjectsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

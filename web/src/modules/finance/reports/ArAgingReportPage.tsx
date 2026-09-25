@@ -15,12 +15,12 @@ export default function ArAgingReportPage() {
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<AgingFilters>({ as_of: todayIso() });
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useArAgingReport(() => ({
     filters: filters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "age_days",
     order: "desc",
     enabled: submitted(),
@@ -48,7 +48,7 @@ export default function ArAgingReportPage() {
     setGeneratedAt(new Date());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
   const sum = () => report.data?.summary;
 
   return (
@@ -66,6 +66,7 @@ export default function ArAgingReportPage() {
         page={page()}
         totalPages={totalPages()}
         onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
         onSearch={search}
         onReset={() => {
           setFilters({ as_of: todayIso() });

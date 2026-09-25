@@ -16,7 +16,7 @@ type Props = {
   mapOnly?: boolean;
 };
 
-const pageSize = 500;
+const [pageSize, setPageSize] = createSignal(20);
 
 export function OpenGRLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -55,7 +55,7 @@ export function OpenGRLinePickerModal(props: Props) {
   const [data] = createResource(
     () => (props.open ? { filters: filters(), page: page() } : null),
     async (p) => {
-      const qs = buildOpenLineQuery({ page: p!.page, pageSize, filters: p!.filters });
+      const qs = buildOpenLineQuery({ page: p!.page, pageSize: pageSize(), filters: p!.filters });
       const res = await apiFetch<OpenGRLine[]>(`/api/v1/finance/supplier-invoices/open-gr-lines?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load goods receipt lines");
       return { rows: res.data ?? [], total: res.meta?.total ?? (res.data?.length ?? 0) };
@@ -99,7 +99,7 @@ export function OpenGRLinePickerModal(props: Props) {
       error={data.error}
       total={data()?.total ?? 0}
       page={page()}
-      pageSize={pageSize}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
       onPageChange={setPage}
       rows={rows()}
       rowKey={(row) => Number(row.goods_receipt_line_id)}

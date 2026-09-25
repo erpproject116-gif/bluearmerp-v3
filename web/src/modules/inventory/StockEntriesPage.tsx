@@ -80,7 +80,7 @@ function statusClass(status: string) {
 export default function StockEntriesPage() {
   const toast = useToast();
   const client = useQueryClient();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useTransactionListState("datetime", 25);
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useTransactionListState("datetime", 25);
   const [createOpen, setCreateOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<LocationTransferDetail | null>(null);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -101,11 +101,11 @@ export default function StockEntriesPage() {
   });
 
   const list = createQuery(() => ({
-    queryKey: ["stock-transfer-lines", page(), pageSize, q(), sort(), order(), status()],
+    queryKey: ["stock-transfer-lines", page(), pageSize(), q(), sort(), order(), status()],
     queryFn: async () => {
       const qs = new URLSearchParams({
         page: String(page()),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
         sort: sort(),
         order: order(),
       });
@@ -332,7 +332,7 @@ export default function StockEntriesPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

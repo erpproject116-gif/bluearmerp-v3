@@ -8,13 +8,13 @@ import { downloadCmsBlob, fetchCmsMediaBlob, uploadCmsMedia } from "../../shared
 import { formatFileSize } from "../../shared/attachments";
 
 export default function CmsMediaPage() {
-  const { page, setPage, q, setQ, pageSize } = useListState("created_at", 25, { defaultOrder: "desc", defaultStatus: "" });
+  const { page, setPage, q, setQ, pageSize, setPageSize } = useListState("created_at", 25, { defaultOrder: "desc", defaultStatus: "" });
   const auth = useAuth();
   const toast = useToast();
   const canWrite = () => hasPermission(auth.me, "cms.media_write", "write");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [uploading, setUploading] = createSignal(false);
-  const list = useCmsMedia(() => ({ page: page(), pageSize, q: q() || undefined }));
+  const list = useCmsMedia(() => ({ page: page(), pageSize: pageSize(), q: q() || undefined }));
   const mutations = useCmsMutations();
 
   const onUpload = async (file: File) => {
@@ -124,7 +124,7 @@ export default function CmsMediaPage() {
         codeKey="file_name"
         nameKey="file_name"
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

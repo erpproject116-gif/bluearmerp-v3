@@ -33,7 +33,7 @@ export function OfficialReceiptListPageInner(props: PageOptions = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const invalidate = useInvalidateOfficialReceipts();
 
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState(
     "receipt_date",
     25,
     { defaultOrder: "desc" },
@@ -44,7 +44,7 @@ export function OfficialReceiptListPageInner(props: PageOptions = {}) {
 
   const list = useOfficialReceiptList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -131,7 +131,7 @@ export function OfficialReceiptListPageInner(props: PageOptions = {}) {
         onSort={toggleSort}
         total={list.data?.total ?? 0}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         onPageChange={setPage}
         search={q()}
         onSearchChange={setQ}

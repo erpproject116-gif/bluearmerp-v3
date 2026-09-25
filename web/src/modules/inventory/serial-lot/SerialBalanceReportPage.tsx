@@ -50,13 +50,13 @@ export default function SerialBalanceReportPage() {
   const [sort, setSort] = createSignal("serial_no");
   const [order, setOrder] = createSignal<"asc" | "desc">("asc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const report = useSerialBalanceReport(() => {
     const f = submitted();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       filters: f,
@@ -86,7 +86,7 @@ export default function SerialBalanceReportPage() {
     }
   };
 
-  const withIds = (rows: SerialBalanceRow[]) => withRowIds(rows, page(), pageSize);
+  const withIds = (rows: SerialBalanceRow[]) => withRowIds(rows, page(), pageSize());
 
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -191,7 +191,7 @@ export default function SerialBalanceReportPage() {
           sortOrder={order()}
           onSort={toggleSort}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={report.data?.total ?? 0}
           onPageChange={setPage}
           onRefresh={search}

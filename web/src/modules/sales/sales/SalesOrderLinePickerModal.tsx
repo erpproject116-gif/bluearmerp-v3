@@ -57,7 +57,7 @@ type Props = {
   partnerLabel?: string;
 };
 
-const pageSize = 500;
+const [pageSize, setPageSize] = createSignal(20);
 
 export function SalesOrderLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -97,7 +97,7 @@ export function SalesOrderLinePickerModal(props: Props) {
   const [data] = createResource(
     () => (props.open ? { filters: filters(), page: page() } : null),
     async (p) => {
-      const qs = buildOpenLineQuery({ page: p!.page, pageSize, filters: p!.filters });
+      const qs = buildOpenLineQuery({ page: p!.page, pageSize: pageSize(), filters: p!.filters });
       const res = await apiFetch<OpenSalesOrderLineRow[]>(`/api/v1/sales/sales-order-lines/open?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load sales order lines");
       return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
@@ -143,7 +143,7 @@ export function SalesOrderLinePickerModal(props: Props) {
       error={data.error}
       total={data()?.total ?? 0}
       page={page()}
-      pageSize={pageSize}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
       onPageChange={setPage}
       rows={rows()}
       rowKey={(row) => Number(row.sales_order_line_id)}

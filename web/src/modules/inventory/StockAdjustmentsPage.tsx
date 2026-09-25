@@ -95,7 +95,7 @@ export default function StockAdjustmentsPage() {
   const auth = useAuth();
   const toast = useToast();
   const qc = useQueryClient();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("created_at", 25, {
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("created_at", 25, {
     defaultOrder: "desc",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -127,7 +127,7 @@ export default function StockAdjustmentsPage() {
     queryFn: async () => {
       const qs = new URLSearchParams({
         page: String(page()),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
         sort: sort(),
         order: order(),
       });
@@ -372,7 +372,7 @@ export default function StockAdjustmentsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

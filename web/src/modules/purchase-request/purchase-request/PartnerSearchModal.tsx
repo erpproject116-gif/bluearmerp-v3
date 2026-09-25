@@ -46,14 +46,14 @@ export function PartnerSearchModal(props: Props) {
   const [results, setResults] = createSignal<PartnerSearchRow[]>([]);
   const [total, setTotal] = createSignal(0);
   const [searching, setSearching] = createSignal(false);
-  const pageSize = 50;
+  const [pageSize] = createSignal(50);
 
   const runSearch = async (p = 1) => {
     setSearching(true);
     const f = filters();
     const qs = new URLSearchParams({
       page: String(p),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: "partner_code",
       order: "asc",
     });

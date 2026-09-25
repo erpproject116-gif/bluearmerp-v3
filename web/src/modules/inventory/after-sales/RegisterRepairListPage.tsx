@@ -41,7 +41,7 @@ export default function RegisterRepairListPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState(
     "registration_date",
     25,
     { defaultOrder: "desc" },
@@ -51,7 +51,7 @@ export default function RegisterRepairListPage() {
 
   const list = useRepairRegistrationList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -130,7 +130,7 @@ export default function RegisterRepairListPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

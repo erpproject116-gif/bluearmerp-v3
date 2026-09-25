@@ -45,7 +45,7 @@ export default function SerialBookReportPage() {
   const [sort, setSort] = createSignal("created_at");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const goTrace = (row: { serial_no: string }) => openSerialTrace(navigate, row.serial_no);
 
@@ -53,7 +53,7 @@ export default function SerialBookReportPage() {
     const f = submitted();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       filters: f,
@@ -262,7 +262,7 @@ export default function SerialBookReportPage() {
               sortOrder={order()}
               onSort={toggleSort}
               page={page()}
-              pageSize={pageSize}
+              pageSize={pageSize()} onPageSizeChange={setPageSize}
               total={report.data?.total ?? 0}
               onPageChange={setPage}
               onRefresh={search}
@@ -283,7 +283,7 @@ export default function SerialBookReportPage() {
               { key: "issued_qty", header: "Issued", render: (r) => String(r.issued_qty) },
               { key: "closing_qty", header: "Closing", render: (r) => String(r.closing_qty) },
             ]}
-            rows={withRowIds((report.data?.rows ?? []) as SerialBookSummaryRow[], page(), pageSize)}
+            rows={withRowIds((report.data?.rows ?? []) as SerialBookSummaryRow[], page(), pageSize())}
             loading={report.isFetching}
             selectedId={selectedId()}
             onSelect={setSelectedId}
@@ -293,7 +293,7 @@ export default function SerialBookReportPage() {
             sortOrder={order()}
             onSort={toggleSort}
             page={page()}
-            pageSize={pageSize}
+            pageSize={pageSize()} onPageSizeChange={setPageSize}
             total={report.data?.total ?? 0}
             onPageChange={setPage}
             onRefresh={search}

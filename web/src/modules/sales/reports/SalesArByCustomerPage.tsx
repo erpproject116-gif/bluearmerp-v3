@@ -10,12 +10,12 @@ export default function SalesArByCustomerPage() {
   const [submittedFilters, setSubmittedFilters] = createSignal<ArByCustomerFilters>(defaultArFilters());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useArByCustomerReport(() => ({
     filters: submittedFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "last_txn_date",
     order: "desc",
     enabled: true,
@@ -44,7 +44,7 @@ export default function SalesArByCustomerPage() {
         rows={report.data?.rows ?? []}
         totalRows={report.data?.total ?? 0}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         loading={report.isFetching && !report.data}
         generatedAt={generatedAt}
         onPageChange={setPage}

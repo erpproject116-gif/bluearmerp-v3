@@ -50,7 +50,7 @@ type Props = {
   partnerLabel?: string;
 };
 
-const pageSize = 500;
+const [pageSize, setPageSize] = createSignal(20);
 
 export function QuotationLinePickerModal(props: Props) {
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
@@ -90,7 +90,7 @@ export function QuotationLinePickerModal(props: Props) {
   const [data] = createResource(
     () => (props.open ? { filters: filters(), page: page() } : null),
     async (p) => {
-      const qs = buildOpenLineQuery({ page: p!.page, pageSize, filters: p!.filters });
+      const qs = buildOpenLineQuery({ page: p!.page, pageSize: pageSize(), filters: p!.filters });
       const res = await apiFetch<OpenQuotationLineRow[]>(
         `/api/v1/sales-order/sales-orders/quotation-lines/open?${qs}`,
       );
@@ -146,7 +146,7 @@ export function QuotationLinePickerModal(props: Props) {
       error={data.error}
       total={data()?.total ?? 0}
       page={page()}
-      pageSize={pageSize}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
       onPageChange={setPage}
       rows={rows()}
       rowKey={(row) => Number(row.quotation_line_id)}

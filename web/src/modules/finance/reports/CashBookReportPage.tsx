@@ -28,13 +28,13 @@ export default function CashBookReportPage(props: Props) {
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = createQuery(() => ({
     queryKey: ["cash-book", apiPath(), filters(), page(), submitted()],
     enabled: submitted(),
     queryFn: async () => {
-      const qs = new URLSearchParams({ page: String(page()), pageSize: String(pageSize), sort: "entry_date", order: "asc" });
+      const qs = new URLSearchParams({ page: String(page()), pageSize: String(pageSize()), sort: "entry_date", order: "asc" });
       if (filters().date_from) qs.set("date_from", filters().date_from!);
       if (filters().date_to) qs.set("date_to", filters().date_to!);
       const res = await apiFetch<CashBookRow[]>(`${apiPath()}?${qs}`);
@@ -60,7 +60,7 @@ export default function CashBookReportPage(props: Props) {
     setGeneratedAt(new Date());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   const exportUrl = () => {
     const qs = new URLSearchParams();
@@ -84,6 +84,7 @@ export default function CashBookReportPage(props: Props) {
         page={page()}
         totalPages={totalPages()}
         onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
         onSearch={search}
         onReset={() => {
           setFilters(defaults);

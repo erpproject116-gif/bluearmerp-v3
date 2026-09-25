@@ -139,7 +139,7 @@ export default function ProductionReportsPage() {
   const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const selectTab = (t: ReportTab) => {
     setSearchParams({ tab: t }, { replace: true });
@@ -153,7 +153,7 @@ export default function ProductionReportsPage() {
     const activeTab = tab();
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       date_from: f.date_from,
       date_to: f.date_to,
     });
@@ -161,7 +161,7 @@ export default function ProductionReportsPage() {
     if (f.bom_type) qs.set("bom_type", f.bom_type);
     if (f.work_order_id) qs.set("work_order_id", String(f.work_order_id));
     return {
-      queryKey: ["mfg-report", activeTab, page(), pageSize, f],
+      queryKey: ["mfg-report", activeTab, page(), pageSize(), f],
       queryFn: async () => {
         const res = await apiFetch<unknown[]>(`${reportPath(activeTab)}?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load report");
@@ -197,7 +197,7 @@ export default function ProductionReportsPage() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <>
@@ -230,6 +230,7 @@ export default function ProductionReportsPage() {
         page={page()}
         totalPages={totalPages()}
         onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
         onSearch={search}
         onReset={() => {
           setDraftFilters(defaults);

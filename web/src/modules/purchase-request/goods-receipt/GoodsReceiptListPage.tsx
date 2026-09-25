@@ -38,7 +38,7 @@ export default function GoodsReceiptListPage() {
   const canReverse = () => hasPermission(auth.me, "purchase_order.goods_receipts_reverse", "write");
   const toast = useToast();
   const invalidate = useInvalidateGoodsReceipts();
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useTransactionListState(
     "updated_at",
     25,
   );
@@ -102,7 +102,7 @@ export default function GoodsReceiptListPage() {
 
   const list = useGoodsReceiptList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -261,7 +261,7 @@ export default function GoodsReceiptListPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

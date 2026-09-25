@@ -22,7 +22,7 @@ function statusLabel(status: string) {
 export default function UserPermissionsPage() {
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, pageSize } = useListState("email", 25, {
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, pageSize, setPageSize } = useListState("email", 25, {
     defaultStatus: "active",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -37,7 +37,7 @@ export default function UserPermissionsPage() {
 
   const list = useTenantUserList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -198,7 +198,7 @@ export default function UserPermissionsPage() {
         codeKey="email"
         nameKey="full_name"
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

@@ -7,12 +7,12 @@ export default function StockAgeingReportPage() {
   const [submitted, setSubmitted] = createSignal(true);
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useStockAgeingReport(() => ({
     filters: {},
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "age_days",
     order: "desc",
     enabled: submitted(),
@@ -35,7 +35,7 @@ export default function StockAgeingReportPage() {
     setGeneratedAt(new Date());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <ReportPageLayout
@@ -48,6 +48,7 @@ export default function StockAgeingReportPage() {
       page={page()}
       totalPages={totalPages()}
       onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
       onSearch={search}
       onReset={() => {
         setSubmitted(true);

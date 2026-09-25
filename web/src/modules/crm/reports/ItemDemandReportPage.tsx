@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { createSignal, For, onMount } from "solid-js";
 import { DateInput } from "../../../shared/DateInput";
 import { Field } from "../../../shared/SpreadsheetGrid";
@@ -19,13 +20,13 @@ export default function ItemDemandReportPage() {
   const [submitted, setSubmitted] = createSignal<ItemDemandFilters>(defaultFilters());
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
   const auth = useAuth();
 
   const report = useItemDemandReport(() => ({
     filters: submitted(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "quoted_qty",
     order: "desc",
     enabled: true,
@@ -72,7 +73,7 @@ export default function ItemDemandReportPage() {
     URL.revokeObjectURL(url);
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <CrmLayout>
@@ -145,7 +146,8 @@ export default function ItemDemandReportPage() {
             <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => void downloadCsv()}>
               Export CSV
             </button>
-            <button
+            <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button
               type="button"
               class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
               disabled={page() <= 1}

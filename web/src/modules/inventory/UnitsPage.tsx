@@ -25,7 +25,7 @@ type Conversion = {
 export default function UnitsPage() {
   const auth = useAuth();
   const canWrite = () => hasPermission(auth.me, "inventory.units", "write");
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useListState("code");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -42,14 +42,14 @@ export default function UnitsPage() {
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: sort(),
       order: order(),
     });
     if (q()) qs.set("q", q());
     if (statusFilter()) qs.set("status", statusFilter());
     return {
-      queryKey: ["inv-units", page(), pageSize, sort(), order(), q(), statusFilter()],
+      queryKey: ["inv-units", page(), pageSize(), sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<Unit[]>(`/api/v1/inventory/units?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -178,7 +178,7 @@ export default function UnitsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

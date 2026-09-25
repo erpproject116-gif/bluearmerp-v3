@@ -25,7 +25,7 @@ export default function InvBookReportPage() {
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [ledgerRow, setLedgerRow] = createSignal<InvBookLedgerTarget | null>(null);
   const [filterError, setFilterError] = createSignal("");
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const [locations] = createResource(async () => {
     const res = await apiFetch<LocationOpt[]>(
@@ -37,7 +37,7 @@ export default function InvBookReportPage() {
   const report = useInvBookReport(() => ({
     filters: applied(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "item_code",
     order: "asc",
     enabled: submitted() && Boolean(applied().date_from && applied().date_to),
@@ -89,7 +89,7 @@ export default function InvBookReportPage() {
 
   const openLedger = (row: InvBookLedgerTarget) => setLedgerRow(row);
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   const branchOptions = () =>
     (locations() ?? []).filter((l) => !l.is_rma && (l.status == null || l.status === "active"));
@@ -110,6 +110,7 @@ export default function InvBookReportPage() {
         page={page()}
         totalPages={totalPages()}
         onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
         onSearch={search}
         onReset={() => {
           const next = defaultFilters();

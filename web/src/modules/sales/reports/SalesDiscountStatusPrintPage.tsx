@@ -32,11 +32,11 @@ async function fetchAllRows(filters: SalesDiscountStatusFilters, template: Retur
   const rows: SalesDiscountStatusRow[] = [];
   let summary = { total_sales_amount: 0, total_invoicing_amount: 0, total_difference_amount: 0 };
   let page = 1;
-  const pageSize = 100;
+  const [pageSize] = createSignal(100);
   while (page <= 100) {
     const qs = filtersToSearchParams(filters, {
       page,
-      pageSize,
+      pageSize: pageSize(),
       sort: template.sortField,
       order: template.sortOrder,
       sort2: template.sortField2 || undefined,

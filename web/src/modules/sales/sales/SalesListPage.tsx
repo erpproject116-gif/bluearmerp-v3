@@ -39,7 +39,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
   const auth = useAuth();
   const invalidate = useInvalidateSales();
 
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useTransactionListState(
     "updated_at",
     25,
   );
@@ -60,7 +60,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
 
   const list = useSalesList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -313,7 +313,7 @@ export function SalesListPageInner(props: PageOptions = {}) {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

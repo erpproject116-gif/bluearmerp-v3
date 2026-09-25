@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "./pageSize";
 import { For, Show, createSignal, onCleanup, type JSX } from "solid-js";
 import { inputClass } from "./SpreadsheetGrid";
 import { modalDismissClass } from "./Modal";
@@ -25,6 +26,7 @@ export function defaultMonitorDates(days = 30): { dateFrom: string; dateTo: stri
 export function buildOpenLineQuery(opts: {
   page: number;
   pageSize: number;
+  onPageSizeChange?: (pageSize: number) => void;
   sort?: string;
   filters: OpenMonitorFilters;
 }): string {
@@ -61,6 +63,7 @@ type Props = {
   page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   rows: Record<string, unknown>[];
   rowKey: (row: Record<string, unknown>) => number;
   selected: Set<number>;
@@ -282,7 +285,10 @@ export function OpenTransactionMonitor(props: Props) {
           </div>
 
           <div class="flex flex-wrap items-center justify-between gap-2 border-t border-stroke px-5 py-3">
-            <div class="flex items-center gap-2 text-xs text-text-secondary">
+            <div class="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+              <Show when={props.onPageSizeChange}>
+                <PageSizeSelect value={props.pageSize} onChange={(n) => { props.onPageSizeChange!(n); props.onPageChange(1); }} />
+              </Show>
               <button
                 type="button"
                 class="rounded border border-stroke px-2 py-1 disabled:opacity-40"

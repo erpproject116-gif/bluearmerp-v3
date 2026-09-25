@@ -13,6 +13,7 @@ import { uiLabel } from "./branding/uiLabel";
 import { GridExportButtons, type GridExportColumn } from "./gridExport";
 import { useGridColumnPrefs } from "./useGridColumnPrefs";
 import { PageJumpControl } from "./PageJumpControl";
+import { PageSizeSelect, snapPageSize } from "./pageSize";
 
 const NON_HIDEABLE_KEYS = new Set(["actions", "print", "history", "lifecycle", "date_no_display"]);
 
@@ -62,6 +63,7 @@ type Props<T extends { id: number }> = {
   pageSize?: number;
   total?: number;
   onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   search?: string;
   onSearchChange?: (q: string) => void;
   searchPlaceholder?: string;
@@ -172,6 +174,41 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
     return total;
   });
 
+  const serverPaged = () => props.page !== undefined && props.onPageSizeChange !== undefined;
+  const [localPage, setLocalPage] = createSignal(1);
+  const [localPageSize, setLocalPageSize] = createSignal(20);
+  const activePage = () => (serverPaged() ? (props.page ?? 1) : localPage());
+  const activePageSize = () => (serverPaged() ? snapPageSize(props.pageSize ?? 20) : localPageSize());
+  const visibleRows = createMemo(() => {
+    const rows = displayRows();
+    if (serverPaged()) return rows;
+    const size = localPageSize();
+    const start = (localPage() - 1) * size;
+    return rows.slice(start, start + size);
+  });
+  const visibleTotal = () => (serverPaged() ? (displayTotal() ?? displayRows().length) : displayRows().length);
+
+  createEffect(() => {
+    if (serverPaged()) return;
+    const pages = Math.max(1, Math.ceil(displayRows().length / localPageSize()));
+    if (localPage() > pages) setLocalPage(pages);
+  });
+
+  const changePageSize = (n: number) => {
+    const size = snapPageSize(n);
+    if (serverPaged()) {
+      props.onPageSizeChange?.(size);
+      return;
+    }
+    setLocalPageSize(size);
+    setLocalPage(1);
+  };
+
+  const changePage = (n: number) => {
+    if (serverPaged()) props.onPageChange?.(n);
+    else setLocalPage(n);
+  };
+
   createEffect(() => {
     const external = props.search ?? "";
     if (external !== lastEmittedSearch) {
@@ -215,7 +252,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
 
   const selectedIdSet = createMemo(() => selectionSet(props.selectedIds));
 
-  const pageRowIds = createMemo(() => displayRows().map((r) => r.id));
+  const pageRowIds = createMemo(() => visibleRows().map((r) => r.id));
 
   const pageAllSelected = createMemo(() => {
     const ids = pageRowIds();
@@ -287,27 +324,27 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
   };
 
   createEffect(() => {
-    const rows = displayRows();
+    const rows = visibleRows();
     if (rows.length === 0) setFocusIdx(0);
     else if (focusIdx() >= rows.length) setFocusIdx(rows.length - 1);
   });
 
   const totalPages = () => {
-    const total = displayTotal() ?? 0;
-    const size = props.pageSize ?? 1;
+    const total = visibleTotal() ?? 0;
+    const size = activePageSize() || 1;
     return Math.max(1, Math.ceil(total / size));
   };
 
   const rangeStart = () => {
-    const total = displayTotal();
+    const total = visibleTotal();
     if (!total || total === 0) return 0;
-    return ((props.page ?? 1) - 1) * (props.pageSize ?? displayRows().length) + 1;
+    return (activePage() - 1) * activePageSize() + 1;
   };
 
   const rangeEnd = () => {
-    const total = displayTotal();
+    const total = visibleTotal();
     if (!total || total === 0) return 0;
-    return Math.min((props.page ?? 1) * (props.pageSize ?? displayRows().length), total);
+    return Math.min(activePage() * activePageSize(), total);
   };
 
   onMount(() => {
@@ -326,18 +363,18 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setFocusIdx((i) => Math.min(i + 1, Math.max(0, displayRows().length - 1)));
-        const row = displayRows()[focusIdx()];
+        setFocusIdx((i) => Math.min(i + 1, Math.max(0, visibleRows().length - 1)));
+        const row = visibleRows()[focusIdx()];
         if (row) props.onSelect(row.id);
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
         setFocusIdx((i) => Math.max(i - 1, 0));
-        const row = displayRows()[focusIdx()];
+        const row = visibleRows()[focusIdx()];
         if (row) props.onSelect(row.id);
       }
       if (e.key === "Enter") {
-        const row = displayRows()[focusIdx()];
+        const row = visibleRows()[focusIdx()];
         if (row) {
           e.preventDefault();
           props.onEdit(row);
@@ -701,7 +738,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               </tr>
             </thead>
             <tbody>
-              {displayRows().map((row, idx) => (
+              {visibleRows().map((row, idx) => (
                 <tr
                   data-row-id={row.id}
                   class="cursor-pointer transition hover:erp-panel"
@@ -754,53 +791,45 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
               ))}
             </tbody>
           </table>
-          <Show when={displayRows().length === 0 && !props.loading}>
+          <Show when={visibleRows().length === 0 && !props.loading}>
             <p class="p-8 text-center text-sm text-text-secondary">{uiLabel("common.no_rows")}</p>
           </Show>
         </DataTableScroll>
         </div>
-        <Show when={displayTotal() !== undefined && props.page !== undefined && props.pageSize !== undefined}>
-          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3">
             <span class="text-sm text-text-secondary">
-              {displayTotal() === 0
+              {visibleTotal() === 0
                 ? uiLabel("common.no_results")
-                : `Showing ${rangeStart()}–${rangeEnd()} of ${displayTotal()}`}
+                : `Showing ${rangeStart()}–${rangeEnd()} of ${visibleTotal()}`}
               <Show when={isRefreshing()}>
                 <span class="ml-2 text-brand-600">{uiLabel("common.updating")}</span>
               </Show>
             </span>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <PageSizeSelect value={activePageSize()} onChange={changePageSize} disabled={props.loading} />
               <button
                 type="button"
                 class="rounded-lg border border-stroke px-3 py-1.5 text-sm disabled:opacity-40"
-                disabled={(props.page ?? 1) <= 1}
-                onClick={() => props.onPageChange?.((props.page ?? 1) - 1)}
+                disabled={activePage() <= 1}
+                onClick={() => changePage(activePage() - 1)}
               >
                 {uiLabel("common.previous")}
               </button>
-              <Show when={props.onPageChange}>
-                <PageJumpControl
-                  page={props.page ?? 1}
-                  totalPages={totalPages()}
-                  onPageChange={(p) => props.onPageChange?.(p)}
-                />
-              </Show>
-              <Show when={!props.onPageChange}>
-                <span class="text-sm text-text-secondary">
-                  Page {props.page} of {totalPages()}
-                </span>
-              </Show>
+              <PageJumpControl
+                page={activePage()}
+                totalPages={totalPages()}
+                onPageChange={changePage}
+              />
               <button
                 type="button"
                 class="rounded-lg border border-stroke px-3 py-1.5 text-sm disabled:opacity-40"
-                disabled={(props.page ?? 1) >= totalPages()}
-                onClick={() => props.onPageChange?.((props.page ?? 1) + 1)}
+                disabled={activePage() >= totalPages()}
+                onClick={() => changePage(activePage() + 1)}
               >
                 {uiLabel("common.next")}
               </button>
             </div>
           </div>
-        </Show>
       </Show>
       </div>
     </div>

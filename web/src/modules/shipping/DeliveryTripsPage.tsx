@@ -16,7 +16,7 @@ type DeliveryTrip = {
 };
 
 export default function DeliveryTripsPage() {
-  const { page, setPage, sort, order, toggleSort, pageSize } = useListState("trip_date", 25, {
+  const { page, setPage, sort, order, toggleSort, pageSize, setPageSize } = useListState("trip_date", 25, {
     defaultOrder: "desc",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -32,12 +32,12 @@ export default function DeliveryTripsPage() {
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: sort(),
       order: order(),
     });
     return {
-      queryKey: ["delivery-trips", page(), pageSize, sort(), order()],
+      queryKey: ["delivery-trips", page(), pageSize(), sort(), order()],
       queryFn: async () => {
         const res = await apiFetch<DeliveryTrip[]>(`/api/v1/shipping/trips?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -100,7 +100,7 @@ export default function DeliveryTripsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search=""

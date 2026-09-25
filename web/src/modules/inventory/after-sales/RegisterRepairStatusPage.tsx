@@ -47,7 +47,7 @@ export default function RegisterRepairStatusPage() {
   const [partnerLabel, setPartnerLabel] = createSignal("");
   const [submitted, setSubmitted] = createSignal<{ date_from: string; date_to: string; status: string; partner_id?: number } | null>(null);
   const [page, setPage] = createSignal(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = createQuery(() => ({
     queryKey: ["repair-registration-status", submitted(), page()],
@@ -58,7 +58,7 @@ export default function RegisterRepairStatusPage() {
         date_from: f.date_from,
         date_to: f.date_to,
         page: String(page()),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
         sort: "registration_date",
         order: "desc",
       });
@@ -170,7 +170,7 @@ export default function RegisterRepairStatusPage() {
           codeKey="registration_no"
           nameKey="date_no_display"
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           total={report.data?.total ?? 0}
           onPageChange={setPage}
         />

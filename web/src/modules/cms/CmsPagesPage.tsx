@@ -15,7 +15,7 @@ import { useCmsPages, type CmsPage } from "../../shared/useCms";
 import { DEFAULT_CMS_TOPIC } from "./cmsPermalink";
 
 export default function CmsPagesPage() {
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState(
     "updated_at",
     25,
     { defaultOrder: "desc", defaultStatus: "" },
@@ -34,7 +34,7 @@ export default function CmsPagesPage() {
   const { byKey, fields, activeCustomFields } = useFormFieldSettings(CMS_ENTITY.page);
   const list = useCmsPages(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     status: statusFilter() || undefined,
     q: q() || undefined,
     sort: sort(),
@@ -113,7 +113,7 @@ export default function CmsPagesPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

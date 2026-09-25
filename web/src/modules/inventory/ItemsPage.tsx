@@ -119,7 +119,7 @@ function rowToForm(row: Item): ItemFormState {
 }
 
 export default function ItemsPage() {
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("item_code");
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState("item_code");
   const [draftQ, setDraftQ] = createSignal("");
   const auth = useAuth();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -239,7 +239,7 @@ export default function ItemsPage() {
     const adv = advancedFilters();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       q: q() || undefined,
@@ -552,7 +552,7 @@ export default function ItemsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         itemsCsvImport

@@ -169,7 +169,7 @@ export default function WorkOrdersPage() {
   const processPolicy = useProcessPolicy(() => mode() === "assembly" || mode() === "recipe");
   const requireFgQc = () => Boolean(processPolicy.data?.manufacturing_require_fg_qc);
 
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useListState(isAssembly() ? "transacted_at" : "order_date", 25, {
       defaultOrder: "desc",
       defaultStatus: isAssembly() ? "open" : "",
@@ -228,7 +228,7 @@ export default function WorkOrdersPage() {
     const apiStatus = statusFilter() === "open" ? "" : statusFilter();
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: sort(),
       order: order(),
     });
@@ -237,7 +237,7 @@ export default function WorkOrdersPage() {
     const bomType = bomTypeForMode(mode());
     if (bomType) qs.set("bom_type", bomType);
     return {
-      queryKey: ["mfg-work-orders", mode(), page(), pageSize, sort(), order(), q(), statusFilter()],
+      queryKey: ["mfg-work-orders", mode(), page(), pageSize(), sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<WorkOrder[]>(`/api/v1/manufacturing/work-orders?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -1004,7 +1004,7 @@ export default function WorkOrdersPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

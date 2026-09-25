@@ -15,12 +15,12 @@ export default function OfficialReceiptStatusPage() {
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [journalReceiptId, setJournalReceiptId] = createSignal<number | null>(null);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = useOfficialReceiptStatusReport(() => ({
     filters: submittedFilters() ?? defaultOfficialReceiptStatusFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: "receipt_date",
     order: "desc",
     enabled: submittedFilters() !== null,
@@ -47,7 +47,7 @@ export default function OfficialReceiptStatusPage() {
           rows={report.data?.rows ?? []}
           totalRows={report.data?.total ?? 0}
           page={page()}
-          pageSize={pageSize}
+          pageSize={pageSize()} onPageSizeChange={setPageSize}
           loading={report.isFetching}
           generatedAt={generatedAt}
           onPageChange={setPage}

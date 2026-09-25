@@ -28,7 +28,7 @@ export function PaymentVoucherListPageInner(props: PageOptions = {}) {
   const loc = useLocation();
   const navigate = useNavigate();
   const invalidate = useInvalidatePaymentVouchers();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("payment_date", 25, {
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("payment_date", 25, {
     defaultOrder: "desc",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -36,7 +36,7 @@ export function PaymentVoucherListPageInner(props: PageOptions = {}) {
 
   const list = usePaymentVoucherList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -103,7 +103,7 @@ export function PaymentVoucherListPageInner(props: PageOptions = {}) {
         onSort={toggleSort}
         total={list.data?.total ?? 0}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         onPageChange={setPage}
         search={q()}
         onSearchChange={setQ}

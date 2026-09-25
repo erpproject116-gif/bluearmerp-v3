@@ -17,17 +17,17 @@ export default function PlatformTicketsPage() {
   const [q, setQ] = createSignal("");
   const [status, setStatus] = createSignal("");
   const [page, setPage] = createSignal(1);
-  const pageSize = 50;
+  const [pageSize] = createSignal(50);
   const tickets = usePlatformTickets({
     q: () => q(),
     status: () => status(),
     page: () => page(),
-    pageSize: () => pageSize,
+    pageSize: () => pageSize(),
   });
 
   const totalPages = () => {
     const total = tickets.data?.total ?? 0;
-    return Math.max(1, Math.ceil(total / pageSize));
+    return Math.max(1, Math.ceil(total / pageSize()));
   };
 
   const exportUrl = (format: "csv" | "md") => {

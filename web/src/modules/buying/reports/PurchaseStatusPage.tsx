@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { createSignal, For, onMount, Show } from "solid-js";
 import { formatPeso } from "../../../shared/money";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
@@ -14,12 +15,12 @@ export default function PurchaseStatusPage() {
   const [draftFilters, setDraftFilters] = createSignal<PurchaseStatusFilters>(defaultPurchaseStatusFilters());
   const [submittedFilters, setSubmittedFilters] = createSignal<PurchaseStatusFilters>(defaultPurchaseStatusFilters());
   const [page, setPage] = createSignal(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   const report = usePurchaseStatusReport(() => ({
     filters: submittedFilters(),
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     enabled: true,
   }));
 
@@ -48,7 +49,7 @@ export default function PurchaseStatusPage() {
 
   const patch = (p: Partial<PurchaseStatusFilters>) => setDraftFilters((prev) => ({ ...prev, ...p }));
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <div class="space-y-6">
@@ -112,7 +113,8 @@ export default function PurchaseStatusPage() {
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
             <span>Page {page()} / {totalPages()}</span>
             <div class="flex gap-2">
-              <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
+              <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
               <button type="button" class="rounded border border-stroke px-3 py-1 disabled:opacity-50" disabled={page() >= totalPages()} onClick={() => setPage((p) => p + 1)}>Next</button>
               <button type="button" class="rounded border border-stroke px-3 py-1" onClick={() => void downloadReportCsv(purchaseStatusExportUrl(submittedFilters()), "purchase-status.csv")}>Export CSV</button>
             </div>

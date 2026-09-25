@@ -51,7 +51,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
   const [page, setPage] = createSignal(1);
   const [sort, setSort] = createSignal("request_date");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -77,7 +77,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
     const f = activeFilters();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: f?.sort_by_modified ? "updated_at" : sort(),
       order: f?.sort_by_modified ? "desc" : order(),
       q: f?.q,
@@ -290,7 +290,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
             sortOrder={order()}
             onSort={toggleSort}
             page={page()}
-            pageSize={pageSize}
+            pageSize={pageSize()} onPageSizeChange={setPageSize}
             total={list.data?.total ?? 0}
             onPageChange={setPage}
             status={progressTab()}

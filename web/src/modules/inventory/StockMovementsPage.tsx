@@ -64,7 +64,7 @@ function defaultDateRange(): { from: string; to: string } {
 export default function StockMovementsPage() {
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("created_at", 25, { defaultOrder: "desc" });
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("created_at", 25, { defaultOrder: "desc" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
   const [movementType, setMovementType] = createSignal("");
@@ -96,7 +96,7 @@ export default function StockMovementsPage() {
     queryFn: async () => {
       const qs = new URLSearchParams({
         page: String(page()),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
         sort: sort(),
         order: order(),
       });
@@ -198,7 +198,7 @@ export default function StockMovementsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

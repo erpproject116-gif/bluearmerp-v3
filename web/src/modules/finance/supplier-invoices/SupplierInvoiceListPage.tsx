@@ -52,7 +52,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const invalidate = useInvalidateSupplierInvoices();
   const basePath = () => listBasePath(loc.pathname);
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useTransactionListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useTransactionListState(
     "updated_at",
     25,
   );
@@ -74,7 +74,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
 
   const list = useSupplierInvoiceList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -326,7 +326,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
         onSort={toggleSort}
         total={list.data?.total ?? 0}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         onPageChange={setPage}
         search={q()}
         onSearchChange={setQ}

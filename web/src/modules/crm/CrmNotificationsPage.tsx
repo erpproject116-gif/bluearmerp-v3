@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../shared/pageSize";
 import { createSignal, For, Show, onMount } from "solid-js";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import {
@@ -41,7 +42,7 @@ export default function CrmNotificationsPage() {
   const [page, setPage] = createSignal(1);
   const [unreadOnly, setUnreadOnly] = createSignal(false);
   const [source, setSource] = createSignal<SourceFilter>("");
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
   const toast = useToast();
   const invalidate = useInvalidateCrmNotifications();
 
@@ -55,13 +56,13 @@ export default function CrmNotificationsPage() {
 
   const list = useCrmNotifications(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     unreadOnly: unreadOnly(),
     source: source(),
     excludeActivityInfo: source() !== "activity",
   }));
 
-  const totalPages = () => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize()));
 
   const markRead = async (n: CrmNotification) => {
     if (n.read_at) return true;
@@ -191,7 +192,8 @@ export default function CrmNotificationsPage() {
       </div>
 
       <div class="mt-4 flex items-center justify-end gap-2 text-sm">
-        <button
+        <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button
           type="button"
           class="rounded border border-stroke px-3 py-1 hover:bg-slate-50 disabled:opacity-50"
           disabled={page() <= 1}

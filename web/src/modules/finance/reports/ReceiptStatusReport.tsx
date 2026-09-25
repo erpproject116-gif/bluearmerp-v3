@@ -15,6 +15,7 @@ type Props = {
   totalRows: number;
   page: number;
   pageSize: number;
+  onPageSizeChange?: (pageSize: number) => void;
   loading: boolean;
   generatedAt: () => Date;
   onPageChange: (page: number) => void;

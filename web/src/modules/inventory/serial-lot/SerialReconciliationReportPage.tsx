@@ -31,13 +31,13 @@ export default function SerialReconciliationReportPage() {
   const [sort, setSort] = createSignal("variance");
   const [order, setOrder] = createSignal<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
 
   const report = useSerialReconciliationReport(() => {
     const f = submitted();
     return {
       page: page(),
-      pageSize,
+      pageSize: pageSize(),
       sort: sort(),
       order: order(),
       filters: f,
@@ -146,7 +146,7 @@ export default function SerialReconciliationReportPage() {
                 { key: "serial_unit_count", header: "Serial count", render: (r) => String(r.serial_unit_count) },
                 { key: "variance", header: "Variance", render: (r) => String(r.variance) },
               ]}
-              rows={withRowIds(report.data?.rows ?? [], page(), pageSize)}
+              rows={withRowIds(report.data?.rows ?? [], page(), pageSize())}
               loading={report.isFetching}
               selectedId={selectedId()}
               onSelect={setSelectedId}
@@ -156,7 +156,7 @@ export default function SerialReconciliationReportPage() {
               sortOrder={order()}
               onSort={toggleSort}
               page={page()}
-              pageSize={pageSize}
+              pageSize={pageSize()} onPageSizeChange={setPageSize}
               total={report.data?.total ?? 0}
               onPageChange={setPage}
               onRefresh={search}
@@ -190,7 +190,7 @@ export default function SerialReconciliationReportPage() {
               },
               { key: "variance", header: "Variance", clickable: false, render: (r) => String(r.variance) },
             ]}
-            rows={withRowIds(report.data?.rows ?? [], page(), pageSize)}
+            rows={withRowIds(report.data?.rows ?? [], page(), pageSize())}
             loading={report.isFetching}
             selectedId={selectedId()}
             onSelect={setSelectedId}
@@ -200,7 +200,7 @@ export default function SerialReconciliationReportPage() {
             sortOrder={order()}
             onSort={toggleSort}
             page={page()}
-            pageSize={pageSize}
+            pageSize={pageSize()} onPageSizeChange={setPageSize}
             total={report.data?.total ?? 0}
             onPageChange={setPage}
             onRefresh={search}

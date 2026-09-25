@@ -1,3 +1,4 @@
+import { PageSizeSelect } from "../../../shared/pageSize";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { useSearchParams } from "@solidjs/router";
@@ -75,7 +76,7 @@ export function OpenBalancePaymentPage(props: Props) {
   const [journalOpen, setJournalOpen] = createSignal(false);
   const [allowMulti, setAllowMulti] = createSignal(false);
   const [txnTarget, setTxnTarget] = createSignal<OpenBalanceRow | null>(null);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
 
   createEffect(() => {
     const next = initialQ();
@@ -99,7 +100,7 @@ export function OpenBalancePaymentPage(props: Props) {
     queryFn: async () => {
       const qs = new URLSearchParams({
         page: String(page()),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
         sort: "occurrence_date",
         order: "desc",
       });
@@ -124,7 +125,7 @@ export function OpenBalancePaymentPage(props: Props) {
     setDueTo("");
     setPage(1);
   };
-  const totalPages = createMemo(() => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize)));
+  const totalPages = createMemo(() => Math.max(1, Math.ceil((list.data?.total ?? 0) / pageSize())));
   const pageBalanceTotal = createMemo(() =>
     rows().reduce((sum, r) => sum + (Number(r.balance) || 0), 0),
   );
@@ -373,7 +374,8 @@ export function OpenBalancePaymentPage(props: Props) {
           {props.side === "ar" ? "Receipts Journal" : "Payments Journal"}
         </button>
         <div class="flex items-center gap-2 text-sm">
-          <button
+          <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+<button
             type="button"
             class="rounded border border-stroke px-2 py-1 disabled:opacity-40"
             disabled={page() <= 1}

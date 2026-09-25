@@ -42,7 +42,7 @@ export default function JournalEntriesPage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
   const [readOnly, setReadOnly] = createSignal(false);
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useTransactionListState("updated_at");
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editId, setEditId] = createSignal<number | null>(null);
@@ -56,11 +56,11 @@ export default function JournalEntriesPage() {
   const [acting, setActing] = createSignal(false);
 
   const list = createQuery(() => ({
-    queryKey: ["journal-entries", page(), pageSize, sort(), order(), q(), statusFilter()],
+    queryKey: ["journal-entries", page(), pageSize(), sort(), order(), q(), statusFilter()],
     queryFn: async () => {
       const qs = new URLSearchParams({
         page: String(page()),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
         sort: sort(),
         order: order(),
       });
@@ -343,7 +343,7 @@ export default function JournalEntriesPage() {
         onSort={toggleSort}
         total={list.data?.total ?? 0}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         onPageChange={setPage}
         search={q()}
         onSearchChange={setQ}

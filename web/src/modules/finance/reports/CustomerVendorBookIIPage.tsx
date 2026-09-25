@@ -24,7 +24,7 @@ export default function CustomerVendorBookIIPage(props: Props) {
   const [page, setPage] = createSignal(1);
   const [generatedAt, setGeneratedAt] = createSignal(new Date());
   const [filters, setFilters] = createSignal<DateRangeFilters>(defaults);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = createSignal(50);
   const title = () =>
     props.bookType === "ar" ? "Customer/Vendor Book II (AR)" : "Customer/Vendor Book II (AP)";
 
@@ -35,7 +35,7 @@ export default function CustomerVendorBookIIPage(props: Props) {
       const qs = new URLSearchParams({
         book_type: props.bookType,
         page: String(page()),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
         sort: "partner_name",
         order: "asc",
       });
@@ -64,7 +64,7 @@ export default function CustomerVendorBookIIPage(props: Props) {
     setGeneratedAt(new Date());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((report.data?.total ?? 0) / pageSize()));
 
   return (
     <FinanceLayout>
@@ -81,6 +81,7 @@ export default function CustomerVendorBookIIPage(props: Props) {
         page={page()}
         totalPages={totalPages()}
         onPageChange={setPage}
+      pageSize={pageSize()} onPageSizeChange={setPageSize}
         onSearch={search}
         onReset={() => {
           setFilters(defaults);

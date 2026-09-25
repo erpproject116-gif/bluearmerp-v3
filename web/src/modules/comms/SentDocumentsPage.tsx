@@ -43,7 +43,7 @@ function statusLabel(status: string): string {
 }
 
 export default function SentDocumentsPage() {
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("created_at", 25, {
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("created_at", 25, {
     defaultOrder: "desc",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -53,7 +53,7 @@ export default function SentDocumentsPage() {
     async ({ page: p, q: query }) => {
       const qs = new URLSearchParams({
         page: String(p),
-        pageSize: String(pageSize),
+        pageSize: String(pageSize()),
       });
       if (query) qs.set("q", query);
       const res = await apiFetch<SentMessageRow[]>(`/api/v1/comms/sent-messages?${qs}`);
@@ -93,7 +93,7 @@ export default function SentDocumentsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list()?.total ?? 0}
         onPageChange={setPage}
         search={q()}

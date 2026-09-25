@@ -25,11 +25,11 @@ async function fetchAllRows(filters: CollectiveInvoiceStatusFilters, template: R
   const rows: CollectiveInvoiceStatusRow[] = [];
   let summary = { total_pretax: 0, total_tax: 0, total_sales: 0 };
   let page = 1;
-  const pageSize = 100;
+  const [pageSize] = createSignal(100);
   while (page <= 100) {
     const qs = filtersToSearchParams(filters, {
       page,
-      pageSize,
+      pageSize: pageSize(),
       sort: template.sortField,
       order: template.sortOrder,
       sort2: template.sortField2 || undefined,

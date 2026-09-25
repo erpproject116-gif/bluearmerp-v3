@@ -16,7 +16,7 @@ import { useListState } from "../../shared/useListState";
 type Department = { id: number; department_code: string; department_name: string; status: string; custom_values?: Record<string, unknown> };
 
 export default function DepartmentsPage() {
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState("department_code");
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState("department_code");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editing, setEditing] = createSignal<Department | null>(null);
@@ -30,7 +30,7 @@ export default function DepartmentsPage() {
 
   const list = useInventoryList<Department>("departments", () => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -108,7 +108,7 @@ export default function DepartmentsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

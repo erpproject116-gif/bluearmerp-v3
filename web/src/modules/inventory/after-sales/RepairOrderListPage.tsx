@@ -20,7 +20,7 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
   const navigate = useNavigate();
   const invalidate = useInvalidateRepairOrders();
 
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState(
     "order_date",
     25,
     { defaultOrder: "desc", defaultStatus: props.defaultProgressFilter ?? "" },
@@ -31,7 +31,7 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
 
   const list = useRepairOrderList(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -144,7 +144,7 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

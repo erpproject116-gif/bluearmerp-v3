@@ -29,11 +29,11 @@ export default function OperationsAutomationPage() {
   const [setPriority, setSetPriority] = createSignal("high");
   const [saving, setSaving] = createSignal(false);
 
-  const { page, setPage, pageSize } = useListState("rule_name", 25);
+  const { page, setPage, pageSize, setPageSize } = useListState("rule_name", 25);
   const rules = useOperationsAutomationRules(() => ({
     workspace_id: workspaceId() ?? undefined,
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
   }));
 
   const openNew = () => {
@@ -163,7 +163,7 @@ export default function OperationsAutomationPage() {
         codeKey="rule_name"
         nameKey="rule_name"
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={rules.data?.total ?? 0}
         onPageChange={setPage}
       />

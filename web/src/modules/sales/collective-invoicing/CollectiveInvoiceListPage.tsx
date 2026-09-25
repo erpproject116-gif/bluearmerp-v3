@@ -33,7 +33,7 @@ export default function CollectiveInvoiceListPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const invalidate = useInvalidateCollectiveInvoices();
-  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize } = useListState("invoice_date", 25, {
+  const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("invoice_date", 25, {
     defaultOrder: "desc",
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
@@ -42,7 +42,7 @@ export default function CollectiveInvoiceListPage() {
 
   const list = useCollectiveInvoices(() => ({
     page: page(),
-    pageSize,
+    pageSize: pageSize(),
     sort: sort(),
     order: order(),
     q: q() || undefined,
@@ -184,7 +184,7 @@ export default function CollectiveInvoiceListPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

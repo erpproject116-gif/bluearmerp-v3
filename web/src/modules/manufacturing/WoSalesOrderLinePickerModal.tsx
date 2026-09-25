@@ -49,11 +49,11 @@ export function WoSalesOrderLinePickerModal(props: Props) {
   const [q, setQ] = createSignal("");
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
-  const pageSize = 500;
+  const [pageSize] = createSignal(20);
 
   const [data] = createResource(
     () => (props.open ? { q: q(), page: page() } : null),
-    async (p) => fetchOpenLines(p!.q, p!.page, pageSize),
+    async (p) => fetchOpenLines(p!.q, p!.page, pageSize()),
   );
 
   const toggleRow = (lineId: number) => {
@@ -80,7 +80,7 @@ export function WoSalesOrderLinePickerModal(props: Props) {
     setSelected(new Set<number>());
   };
 
-  const totalPages = () => Math.max(1, Math.ceil((data()?.total ?? 0) / pageSize));
+  const totalPages = () => Math.max(1, Math.ceil((data()?.total ?? 0) / pageSize()));
 
   return (
     <Show when={props.open}>
@@ -162,7 +162,7 @@ export function WoSalesOrderLinePickerModal(props: Props) {
                       </For>
                     </tbody>
                   </table>
-                  <Show when={payload().total > pageSize}>
+                  <Show when={payload().total > pageSize()}>
                     <div class="mt-3 flex items-center gap-2">
                       <button
                         type="button"

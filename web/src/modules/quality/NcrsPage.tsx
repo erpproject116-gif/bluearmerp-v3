@@ -28,7 +28,7 @@ const STATUS_TABS = [
 const SEVERITY_OPTIONS = ["minor", "major", "critical"];
 
 export default function NcrsPage() {
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
     useListState("ncr_date", 25, { defaultOrder: "desc", defaultStatus: "" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [modalOpen, setModalOpen] = createSignal(false);
@@ -42,14 +42,14 @@ export default function NcrsPage() {
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: sort(),
       order: order(),
     });
     if (q()) qs.set("q", q());
     if (statusFilter()) qs.set("status", statusFilter());
     return {
-      queryKey: ["qms-ncrs", page(), pageSize, sort(), order(), q(), statusFilter()],
+      queryKey: ["qms-ncrs", page(), pageSize(), sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<Ncr[]>(`/api/v1/quality/ncrs?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -129,7 +129,7 @@ export default function NcrsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

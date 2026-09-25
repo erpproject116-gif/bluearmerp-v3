@@ -262,7 +262,7 @@ export default function BomsPage() {
   const navigate = useNavigate();
   const auth = useAuth();
   const canBulkDeactivate = () => hasPermission(auth.me, "manufacturing.boms_bulk", "write");
-  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } = useListState(
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } = useListState(
     "transaction_date",
     25,
     { defaultOrder: "desc" },
@@ -325,7 +325,7 @@ export default function BomsPage() {
   const list = createQuery(() => {
     const qs = new URLSearchParams({
       page: String(page()),
-      pageSize: String(pageSize),
+      pageSize: String(pageSize()),
       sort: sort(),
       order: order(),
     });
@@ -333,7 +333,7 @@ export default function BomsPage() {
     if (statusFilter()) qs.set("status", statusFilter());
     qs.set("bom_type", mode() === "all" ? "assembly" : mode());
     return {
-      queryKey: ["mfg-boms", mode(), page(), pageSize, sort(), order(), q(), statusFilter()],
+      queryKey: ["mfg-boms", mode(), page(), pageSize(), sort(), order(), q(), statusFilter()],
       queryFn: async () => {
         const res = await apiFetch<Bom[]>(`/api/v1/manufacturing/boms?${qs}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load");
@@ -819,7 +819,7 @@ export default function BomsPage() {
         sortOrder={order()}
         onSort={toggleSort}
         page={page()}
-        pageSize={pageSize}
+        pageSize={pageSize()} onPageSizeChange={setPageSize}
         total={list.data?.total ?? 0}
         onPageChange={setPage}
         search={q()}

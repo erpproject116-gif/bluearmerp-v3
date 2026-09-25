@@ -52,7 +52,7 @@ export default function StockReconciliationPage() {
   const navigate = useNavigate();
   const [expanded, setExpanded] = createSignal<string | null>(null);
   const [page, setPage] = createSignal(1);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = createSignal(20);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
   const [adjustItemId, setAdjustItemId] = createSignal<number | null>(null);
@@ -80,7 +80,7 @@ export default function StockReconciliationPage() {
       enabled: Boolean(cat),
       queryFn: async () => {
         if (!cat) return { rows: [] as Record<string, unknown>[], total: 0 };
-        const qs = new URLSearchParams({ page: String(page()), pageSize: String(pageSize) });
+        const qs = new URLSearchParams({ page: String(page()), pageSize: String(pageSize()) });
         const res = await apiFetch<Record<string, unknown>[]>(
           `/api/v1/inventory/reconciliation/${cat.api}?${qs}`,
         );
@@ -272,7 +272,7 @@ export default function StockReconciliationPage() {
     }
   };
 
-  const gridRows = () => withRowIds(detail.data?.rows ?? [], page(), pageSize);
+  const gridRows = () => withRowIds(detail.data?.rows ?? [], page(), pageSize());
 
   return (
     <div class="space-y-4">
@@ -361,7 +361,7 @@ export default function StockReconciliationPage() {
                           codeKey="item_code"
                           nameKey="item_name"
                           page={page()}
-                          pageSize={pageSize}
+                          pageSize={pageSize()} onPageSizeChange={setPageSize}
                           total={detail.data?.total ?? 0}
                           onPageChange={setPage}
                           onRefresh={() => void detail.refetch()}
