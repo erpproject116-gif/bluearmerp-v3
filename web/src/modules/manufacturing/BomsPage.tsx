@@ -517,6 +517,25 @@ export default function BomsPage() {
 
   const addLine = () => setLines((prev) => [...prev, { ...emptyLine(), line_no: prev.length + 1 }]);
 
+  const shiftLabelIndex = (prev: Record<number, string>, index: number) => {
+    const next: Record<number, string> = {};
+    for (const [key, value] of Object.entries(prev)) {
+      const i = Number(key);
+      if (!Number.isFinite(i) || i === index) continue;
+      next[i > index ? i - 1 : i] = value;
+    }
+    return next;
+  };
+
+  const removeLine = (index: number) => {
+    setLines((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== index).map((row, i) => ({ ...row, line_no: i + 1 }));
+    });
+    setLineLabels((prev) => shiftLabelIndex(prev, index));
+    setLineUnitLabels((prev) => shiftLabelIndex(prev, index));
+  };
+
   const collectSaveErrors = (): FormErrors => {
     const requiredValues: Record<string, unknown> = {
       bom_name: bomName(),
@@ -1298,6 +1317,15 @@ export default function BomsPage() {
                       Set price on the item
                     </A>
                   </p>
+                </Show>
+                <Show when={lines().length > 1}>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-red-700 hover:underline"
+                    onClick={() => removeLine(lineNo)}
+                  >
+                    Remove
+                  </button>
                 </Show>
                 </div>
               );

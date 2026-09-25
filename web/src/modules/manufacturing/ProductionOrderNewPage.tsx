@@ -19,7 +19,7 @@ import { cuttingStepGuidance } from "../production/mfgWizardStepGuidance";
 import { mfgStationHandoff, mfgSuccess, mfgWarn } from "../production/mfgToast";
 import { jobsHref } from "../production/mfgProductionMode";
 import { submitBusyLabel } from "../../shared/submitCopy";
-import { formatMoney } from "../../shared/money";
+import { formatMoney, sanitizeQtyInput } from "../../shared/money";
 import NewAssemblyOrderWizard from "./NewAssemblyOrderWizard";
 import NewRecipeOrderWizard from "./NewRecipeOrderWizard";
 import { searchBomsForOrderType } from "./mfgBomLookup";
@@ -614,12 +614,14 @@ function NewCuttingOrderWizard() {
                       <td class="px-3 py-2">
                         <input
                           class={`${inputClass} w-28`}
-                          type="number"
-                          min="0"
-                          step="any"
+                          type="text"
+                          inputMode="decimal"
                           value={actualByItem()[ln.component_item_id] ?? ""}
                           onInput={(e) =>
-                            setActualByItem({ ...actualByItem(), [ln.component_item_id]: e.currentTarget.value })
+                            setActualByItem({
+                              ...actualByItem(),
+                              [ln.component_item_id]: sanitizeQtyInput(e.currentTarget.value),
+                            })
                           }
                           aria-label={`Actual qty for ${ln.component_name}`}
                         />
@@ -635,11 +637,10 @@ function NewCuttingOrderWizard() {
             <Field label="Extra waste qty">
               <input
                 class={inputClass}
-                type="number"
-                min="0"
-                step="any"
+                type="text"
+                inputMode="decimal"
                 value={wasteQtyDisplay()}
-                onInput={(e) => setWasteQtyOverride(e.currentTarget.value)}
+                onInput={(e) => setWasteQtyOverride(sanitizeQtyInput(e.currentTarget.value))}
                 aria-label="Extra waste quantity"
               />
               <p class="mt-1 text-[11px] text-text-secondary">
