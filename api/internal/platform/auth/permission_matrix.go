@@ -100,30 +100,8 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 		return err
 	}
 
-	groupRows, err := pool.Query(ctx, `
-		select gp.permission_code, gp.access_level
-		from public.tenant_user_group_members gm
-		join public.tenant_user_group_permissions gp
-		  on gp.group_id = gm.group_id and gp.tenant_id = gm.tenant_id
-		join public.tenant_user_groups g on g.id = gm.group_id and g.is_active = true
-		where gm.tenant_id = $1 and gm.user_id = $2`,
-		tu.TenantID, tu.AppUserID)
-	if err != nil {
-		return err
-	}
-	for groupRows.Next() {
-		var code, lvl string
-		if err := groupRows.Scan(&code, &lvl); err != nil {
-			groupRows.Close()
-			return err
-		}
-		perms[code] = mergeAccess(perms[code], lvl)
-	}
-	groupRows.Close()
-	if err := groupRows.Err(); err != nil {
-		return err
-	}
-
+	// Effective access is Role, then per-user Overrides replace. Groups were retired
+	// in migration 308 (their grants were folded into overrides).
 	ovRows, err := pool.Query(ctx, `
 		select permission_code, access_level
 		from public.user_permission_overrides
@@ -151,24 +129,6 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 		tu.submitPerms = submit
 	}
 	return nil
-}
-
-func accessRank(level string) int {
-	switch level {
-	case AccessWrite:
-		return 2
-	case AccessRead:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func mergeAccess(current, next string) string {
-	if accessRank(next) > accessRank(current) {
-		return next
-	}
-	return current
 }
 
 func (tu TenantUser) legacyPermissionLevel(code string) string {

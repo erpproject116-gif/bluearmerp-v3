@@ -20,12 +20,3 @@ func bumpTenantRoleRevisionTx(ctx context.Context, tx pgx.Tx, tenantID int64, ro
 		tenantID, roleCode)
 	return err
 }
-
-func bumpGroupMembersRevisionTx(ctx context.Context, tx pgx.Tx, tenantID, groupID int64) error {
-	_, err := tx.Exec(ctx, `
-		update public.users u set auth_revision = auth_revision + 1, updated_at = now()
-		from public.tenant_user_group_members m
-		where m.user_id = u.id and m.tenant_id = $1 and m.group_id = $2 and u.status = 'active'`,
-		tenantID, groupID)
-	return err
-}

@@ -26,15 +26,6 @@ func bumpTenantRoleRevisionTx(ctx context.Context, tx pgx.Tx, tenantID int64, ro
 	return err
 }
 
-func bumpGroupMembersRevisionTx(ctx context.Context, tx pgx.Tx, tenantID, groupID int64) error {
-	_, err := tx.Exec(ctx, `
-		update public.users u set auth_revision = auth_revision + 1, updated_at = now()
-		from public.tenant_user_group_members m
-		where m.user_id = u.id and m.tenant_id = $1 and m.group_id = $2 and u.status = 'active'`,
-		tenantID, groupID)
-	return err
-}
-
 // BumpUserRevision increments revision and invalidates cache for one app user.
 func BumpUserRevision(ctx context.Context, pool *pgxpool.Pool, userID int64) error {
 	var authID *string
@@ -71,28 +62,6 @@ func InvalidateUsersByTenantRole(ctx context.Context, pool *pgxpool.Pool, tenant
 		select auth_user_id::text from public.users
 		where tenant_id = $1 and tenant_role = $2 and auth_user_id is not null`,
 		tenantID, roleCode)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var authID string
-		if err := rows.Scan(&authID); err != nil {
-			return err
-		}
-		InvalidateUser(authID)
-	}
-	return rows.Err()
-}
-
-// InvalidateGroupMembers clears cache for all members of a group.
-func InvalidateGroupMembers(ctx context.Context, pool *pgxpool.Pool, tenantID, groupID int64) error {
-	rows, err := pool.Query(ctx, `
-		select u.auth_user_id::text
-		from public.tenant_user_group_members m
-		join public.users u on u.id = m.user_id
-		where m.tenant_id = $1 and m.group_id = $2 and u.auth_user_id is not null`,
-		tenantID, groupID)
 	if err != nil {
 		return err
 	}

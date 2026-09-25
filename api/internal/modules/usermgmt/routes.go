@@ -13,7 +13,6 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerUserRoutes(ur, pool)
 		registerRoleRoutes(ur, pool)
 		registerPermissionRoutes(ur, pool)
-		registerGroupRoutes(ur, pool)
 		registerTenantModuleRoutes(ur, pool)
 		registerUserDataScopeRoutes(ur, pool)
 	})

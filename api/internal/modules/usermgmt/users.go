@@ -30,7 +30,6 @@ type UserRow struct {
 	Status       string     `json:"status"`
 	AuthLinked   bool       `json:"auth_linked"`
 	IsOwner      bool       `json:"is_owner"`
-	GroupNames   string     `json:"group_names,omitempty"`
 	InviteID     *int64     `json:"invite_id,omitempty"`
 	InvitedAt    *time.Time `json:"invited_at,omitempty"`
 	InvitedBy    *int64     `json:"invited_by_user_id,omitempty"`
@@ -55,8 +54,6 @@ func registerUserRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/users/{id}/reset-for-reinvite", resetUserForReinvite(pool))
 	r.Post("/users/{id}/reinvite", reinviteExistingUser(pool))
 	r.Post("/users/{id}/transfer-ownership", transferOwnership(pool))
-	r.Get("/users/{id}/groups", getUserGroups(pool))
-	r.Put("/users/{id}/groups", putUserGroups(pool))
 	r.Post("/invites/{id}/revoke", revokeInvite(pool))
 	r.Post("/invites/{id}/resend", resendInvite(pool))
 }
@@ -121,12 +118,6 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 			  u.status,
 			  u.auth_user_id is not null,
 			  t.owner_user_id = u.id,
-			  coalesce((
-			    select string_agg(g.group_name, ', ' order by g.group_name)
-			    from public.tenant_user_group_members gm
-			    join public.tenant_user_groups g on g.id = gm.group_id and g.is_active = true
-			    where gm.tenant_id = u.tenant_id and gm.user_id = u.id
-			  ), ''),
 			  ui.id,
 			  ui.invited_at,
 			  ui.invited_by_user_id,
@@ -158,7 +149,7 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 			var row UserRow
 			if err := rows.Scan(
 				&row.ID, &row.Email, &row.FullName, &row.TenantRole, &row.Status,
-				&row.AuthLinked, &row.IsOwner, &row.GroupNames, &row.InviteID, &row.InvitedAt, &row.InvitedBy, &total,
+				&row.AuthLinked, &row.IsOwner, &row.InviteID, &row.InvitedAt, &row.InvitedBy, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to list users.", "ERR_INTERNAL")
 				return
@@ -511,51 +502,6 @@ func patchUser(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func getUserGroups(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tu, _ := auth.FromContext(r.Context())
-		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-		if err != nil {
-			response.Validation(w, map[string]string{"id": "Invalid id."})
-			return
-		}
-		ids, err := loadUserGroupIDs(r.Context(), pool, tu.TenantID, id)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to load groups.", "ERR_INTERNAL")
-			return
-		}
-		if ids == nil {
-			ids = []int64{}
-		}
-		response.OK(w, map[string]any{"group_ids": ids}, "OK")
-	}
-}
-
-func putUserGroups(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tu, _ := auth.FromContext(r.Context())
-		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-		if err != nil {
-			response.Validation(w, map[string]string{"id": "Invalid id."})
-			return
-		}
-		var body struct {
-			GroupIDs []int64 `json:"group_ids"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			response.Err(w, http.StatusBadRequest, "Invalid JSON body.", "ERR_BAD_REQUEST")
-			return
-		}
-		if err := saveUserGroups(r.Context(), pool, tu.TenantID, id, body.GroupIDs); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to update groups.", "ERR_INTERNAL")
-			return
-		}
-		_ = auth.InvalidateUserByAppUserID(r.Context(), pool, id)
-		ids, _ := loadUserGroupIDs(r.Context(), pool, tu.TenantID, id)
-		response.OK(w, map[string]any{"group_ids": ids}, "Groups updated.")
-	}
-}
-
 func revokeInvite(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -612,7 +558,7 @@ func revokeInvite(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// reinviteExistingUser emails access again without clearing roles, groups, scopes, or auth link.
+// reinviteExistingUser emails access again without clearing role, overrides, scopes, or auth link.
 // Includes a set-password link (Supabase Admin recovery/invite) when possible.
 func reinviteExistingUser(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -822,11 +768,6 @@ func resetUserForReinvite(pool *pgxpool.Pool) http.HandlerFunc {
 		if _, err := tx.Exec(r.Context(), `
 			delete from public.user_permission_overrides where tenant_id = $1 and user_id = $2`, tu.TenantID, id); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to clear overrides.", "ERR_INTERNAL")
-			return
-		}
-		if _, err := tx.Exec(r.Context(), `
-			delete from public.tenant_user_group_members where tenant_id = $1 and user_id = $2`, tu.TenantID, id); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to clear groups.", "ERR_INTERNAL")
 			return
 		}
 
