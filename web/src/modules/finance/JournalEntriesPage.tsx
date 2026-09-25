@@ -10,6 +10,8 @@ import { GridExportButtons } from "../../shared/gridExport";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 
 type JournalEntryRow = {
   id: number;
@@ -361,6 +363,7 @@ export default function JournalEntriesPage() {
               <th class="px-3 py-2 text-left">Entry No</th>
               <th class="px-3 py-2 text-left">Status</th>
               <th class="px-3 py-2 text-left">Remarks</th>
+              <th class="px-3 py-2 text-left">History</th>
             </tr>
           </thead>
           <tbody>
@@ -390,6 +393,14 @@ export default function JournalEntriesPage() {
                     </Show>
                   </td>
                   <td class="px-3 py-2">{row.remarks ?? "—"}</td>
+                  <td class="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <ActivityHistoryLink
+                      module="finance"
+                      targetType="fin_journal_entry"
+                      targetId={row.id}
+                      title={`History — ${row.entry_no}`}
+                    />
+                  </td>
                 </tr>
               )}
             </For>
@@ -407,6 +418,14 @@ export default function JournalEntriesPage() {
         onSave={() => void saveEntry()}
         saving={saving()}
         wide
+        headerActions={
+          <RecordHistoryButton
+            variant="button"
+            targetType="fin_journal_entry"
+            targetId={editId()}
+            title={editId() ? `History — journal #${editId()}` : "History"}
+          />
+        }
       >
         <Show when={editId() === null}>
           <draft.DraftBanner />

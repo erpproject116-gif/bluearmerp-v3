@@ -10,6 +10,7 @@ import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid
 import { useToast } from "../../shared/toast";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 
 export type StockAdjustmentRequestRow = {
   id: number;
@@ -341,6 +342,12 @@ export default function StockAdjustmentsPage() {
                 >
                   {r.status === "draft" ? "Edit draft" : "View"}
                 </button>
+                <ActivityHistoryLink
+                  module="inventory"
+                  targetType="inv_stock_adjustment_request"
+                  targetId={r.id}
+                  title={`History — adjustment #${r.id}`}
+                />
               </div>
             ),
           },

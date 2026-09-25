@@ -11,6 +11,7 @@ import type { LotBatchRow } from "../../shared/useSerialLotList";
 import { ProductionLayout } from "./ProductionLayout";
 import { jobsHref, parseMfgMode } from "./mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "./mfgToast";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 
 type WorkOrderOption = {
   id: number;
@@ -347,9 +348,17 @@ export default function ProductionIssueStationPage() {
           {(ctx) => (
             <>
               <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-                <p class="text-sm font-medium text-text-primary">
-                  {ctx().work_order_no} · {ctx().location_name}
-                </p>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-sm font-medium text-text-primary">
+                    {ctx().work_order_no} · {ctx().location_name}
+                  </p>
+                  <RecordHistoryButton
+                    variant="button"
+                    targetType="mfg_work_order"
+                    targetId={ctx().work_order_id}
+                    title={`History — ${ctx().work_order_no}`}
+                  />
+                </div>
                 <Show when={needs()}>
                   {(m) => (
                     <div class="mt-3 space-y-2">

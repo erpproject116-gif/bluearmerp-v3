@@ -22,6 +22,7 @@ import {
   WoSalesOrderLinePickerModal,
   type PickedWoSalesOrderLine,
 } from "./WoSalesOrderLinePickerModal";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 
 type WorkOrder = {
   id: number;
@@ -733,6 +734,12 @@ export default function WorkOrdersPage() {
                 <span class="text-[11px] font-medium text-text-secondary">Reversed</span>
               </Show>
             </Show>
+            <ActivityHistoryLink
+              module="manufacturing"
+              targetType="mfg_work_order"
+              targetId={r.id}
+              title={`History — ${r.work_order_no}`}
+            />
           </div>
         ),
       });
@@ -884,6 +891,12 @@ export default function WorkOrdersPage() {
                 <span class="text-[11px] font-medium text-text-secondary">Reversed</span>
               </Show>
             </Show>
+            <ActivityHistoryLink
+              module="manufacturing"
+              targetType="mfg_work_order"
+              targetId={r.id}
+              title={`History — ${r.work_order_no}`}
+            />
           </div>
         ),
       },

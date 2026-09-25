@@ -9,6 +9,7 @@ import { ProductionLayout } from "./ProductionLayout";
 import { jobsHref, parseMfgMode } from "./mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "./mfgToast";
 import { DEFAULT_SERIAL_PREFIX } from "../../shared/printCode128Labels";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 
 type WorkOrderOption = {
   id: number;
@@ -329,14 +330,22 @@ export default function ProductionReceiveStationPage() {
         <Show when={context()}>
           {(ctx) => (
             <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
-              <p class="text-sm font-medium text-text-primary">
-                Job {ctx().work_order_no}
-                <Show when={ctx().bom_code}>
-                  {" "}
-                  · Recipe {ctx().bom_code}
-                  <Show when={ctx().bom_name}> — {ctx().bom_name}</Show>
-                </Show>
-              </p>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-sm font-medium text-text-primary">
+                  Job {ctx().work_order_no}
+                  <Show when={ctx().bom_code}>
+                    {" "}
+                    · Recipe {ctx().bom_code}
+                    <Show when={ctx().bom_name}> — {ctx().bom_name}</Show>
+                  </Show>
+                </p>
+                <RecordHistoryButton
+                  variant="button"
+                  targetType="mfg_work_order"
+                  targetId={ctx().work_order_id}
+                  title={`History — ${ctx().work_order_no}`}
+                />
+              </div>
               <p class="mt-1 text-xs text-text-secondary">
                 {ctx().finished_item_code} — {ctx().finished_item_name}
               </p>

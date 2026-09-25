@@ -13,6 +13,7 @@ import {
   emptyStockAdjustmentLine,
   type StockAdjustmentLineRow,
 } from "./StockAdjustmentLineGrid";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 
 export type StockAdjustmentInitialItem = { id: number; label: string };
 
@@ -295,6 +296,14 @@ export function StockAdjustmentModal(props: Props) {
       secondarySaveLabel="Save draft"
       saveLabel={readOnly() ? "Close" : "Submit for approval"}
       saving={saving()}
+      headerActions={
+        <RecordHistoryButton
+          variant="button"
+          targetType="inv_stock_adjustment_request"
+          targetId={props.requestId}
+          title={props.requestId ? `History — adjustment #${props.requestId}` : "History"}
+        />
+      }
     >
       <draft.DraftBanner />
       <ModalFormGuide guideId="stock_adjustment" spanFull />

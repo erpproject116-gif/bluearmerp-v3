@@ -12,6 +12,7 @@ import {
   PartnerSearchModal,
   type PartnerSearchRow,
 } from "../../purchase-request/purchase-request/PartnerSearchModal";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 
 type Expense = {
   id: number;
@@ -318,6 +319,11 @@ export default function ExpensesPage() {
                       <Show when={row.payment_voucher_id}>
                         <span class="text-xs text-text-secondary">PV #{row.payment_voucher_id}</span>
                       </Show>
+                      <RecordHistoryButton
+                        targetType="fin_expense"
+                        targetId={row.id}
+                        title={`History — ${row.expense_no}`}
+                      />
                     </div>
                   </td>
                 </tr>
