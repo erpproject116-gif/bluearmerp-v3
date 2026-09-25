@@ -1,7 +1,7 @@
-import { createEffect, createSignal, Show } from "solid-js";
-import { apiFetch } from "../../../shared/api";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { apiFetch, type ApiResult } from "../../../shared/api";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
-import { submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult, submitEntity } from "../../../shared/handleSaveResult";
 import { useToast } from "../../../shared/toast";
 import { useAuth } from "../../../shared/auth-context";
 import { PermissionMatrix, type MatrixValue } from "../../../shared/PermissionMatrix";
@@ -32,6 +32,7 @@ export default function RolesPage() {
   const [description, setDescription] = createSignal("");
   const [isActive, setIsActive] = createSignal(true);
   const [applyUserScopes, setApplyUserScopes] = createSignal(false);
+  const [copyFromRoleCode, setCopyFromRoleCode] = createSignal("");
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateUserManagement();
@@ -47,6 +48,7 @@ export default function RolesPage() {
     setDescription("");
     setIsActive(true);
     setApplyUserScopes(false);
+    setCopyFromRoleCode("");
     setModalOpen(true);
   };
 
@@ -85,34 +87,56 @@ export default function RolesPage() {
     }
     setSaving(true);
     const ed = editing();
-    const ok = await submitEntity(
-      () =>
-        ed
-          ? apiFetch(`/api/v1/user-management/roles/${ed.id}`, {
-              method: "PATCH",
-              body: JSON.stringify({
-                role_name: name,
-                description: description(),
-                is_active: isActive(),
-                apply_user_scopes: applyUserScopes(),
-              }),
-            }, { silent: true })
-          : apiFetch("/api/v1/user-management/roles", {
-              method: "POST",
-              body: JSON.stringify({
-                role_code: roleCode().trim() || undefined,
-                role_name: name,
-                description: description(),
-                apply_user_scopes: applyUserScopes(),
-              }),
-            }, { silent: true }),
-      toast,
-      ed ? "Role updated." : "Role created.",
-    );
+    if (ed) {
+      const ok = await submitEntity(
+        () =>
+          apiFetch(`/api/v1/user-management/roles/${ed.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              role_name: name,
+              description: description(),
+              is_active: isActive(),
+              apply_user_scopes: applyUserScopes(),
+            }),
+          }, { silent: true }),
+        toast,
+        "Role updated.",
+      );
+      setSaving(false);
+      if (!ok) return;
+      setModalOpen(false);
+      invalidate.all();
+      return;
+    }
+
+    // New role: create (optionally copying another role), then open its Permissions right away.
+    const copyFrom = copyFromRoleCode().trim();
+    let res: ApiResult<TenantRoleRow>;
+    try {
+      res = await apiFetch<TenantRoleRow>("/api/v1/user-management/roles", {
+        method: "POST",
+        body: JSON.stringify({
+          role_code: roleCode().trim() || undefined,
+          role_name: name,
+          description: description(),
+          apply_user_scopes: applyUserScopes(),
+          copy_from_role_code: copyFrom || undefined,
+        }),
+      }, { silent: true });
+    } catch {
+      setSaving(false);
+      toast.error("Could not reach the server. Check your connection and try again.");
+      return;
+    }
     setSaving(false);
+    const ok = handleSaveResult(res, toast, copyFrom ? "Role created from the selected role. Adjust its permissions." : "Role created. Set its permissions.");
     if (!ok) return;
     setModalOpen(false);
     invalidate.all();
+    const created = res.data;
+    if (created?.id) {
+      openPermissions(created);
+    }
   };
 
   const savePermissions = async () => {
@@ -139,7 +163,7 @@ export default function RolesPage() {
   return (
     <>
       <p class="mb-3 text-sm text-text-secondary">
-        Job templates. Edit the permission matrix for everyone with this role. Prefer roles first; use Groups only for shared team add-ons.
+        Job templates. Edit the permission matrix for everyone with this role. Start from a role that is close, then adjust.
       </p>
       <SpreadsheetGrid
         columns={[
@@ -213,6 +237,26 @@ export default function RolesPage() {
         saving={saving()}
       >
         <Show when={!editing()}>
+          <Field label="Start from">
+            <select
+              class={inputClass}
+              value={copyFromRoleCode()}
+              onChange={(e) => setCopyFromRoleCode(e.currentTarget.value)}
+              aria-label="Start from an existing role"
+            >
+              <option value="">Blank (everything D/A)</option>
+              <For each={rows().filter((r) => r.is_active)}>
+                {(r) => (
+                  <option value={r.role_code}>
+                    {r.role_name}
+                  </option>
+                )}
+              </For>
+            </select>
+            <p class="mt-1 text-xs text-text-secondary">
+              Copies that role’s Read/Write/D/A, Submit, and Cancel. You can change any of it next.
+            </p>
+          </Field>
           <Field label="Role code">
             <input
               class={inputClass}
@@ -263,7 +307,9 @@ export default function RolesPage() {
           </Field>
         </Show>
         <p class="text-xs text-text-secondary">
-          Use <strong>Permissions</strong> on the role row to set Read, Write, or D/A for each module and feature.
+          <Show when={!editing()} fallback={<>Use <strong>Permissions</strong> on the role row to set Read, Write, or D/A for each module and feature.</>}>
+            After you save, the <strong>Permissions</strong> matrix opens so you can set Read, Write, or D/A for each module and feature.
+          </Show>
         </p>
       </EntityModal>
 

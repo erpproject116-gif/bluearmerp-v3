@@ -38,6 +38,8 @@ type roleBody struct {
 	CanManageFormSettings bool   `json:"can_manage_form_settings"`
 	ApplyUserScopes       bool   `json:"apply_user_scopes"`
 	SortOrder             *int   `json:"sort_order"`
+	// CopyFromRoleCode copies the source role's permission matrix (levels, submit, cancel) onto the new role.
+	CopyFromRoleCode string `json:"copy_from_role_code"`
 }
 
 type rolePatchBody struct {
@@ -116,9 +118,31 @@ func createRole(pool *pgxpool.Pool) http.HandlerFunc {
 		if body.SortOrder != nil {
 			sortOrder = *body.SortOrder
 		}
+		copyFrom := stringsTrim(body.CopyFromRoleCode)
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create role.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		if copyFrom != "" {
+			var exists bool
+			if err := tx.QueryRow(r.Context(), `
+				select exists(select 1 from public.tenant_roles where tenant_id = $1 and role_code = $2)`,
+				tu.TenantID, copyFrom).Scan(&exists); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to create role.", "ERR_INTERNAL")
+				return
+			}
+			if !exists {
+				response.Validation(w, map[string]string{"copy_from_role_code": "Source role not found."})
+				return
+			}
+		}
 
 		var row RoleRow
-		err := pool.QueryRow(r.Context(), `
+		err = tx.QueryRow(r.Context(), `
 			insert into public.tenant_roles (
 			  tenant_id, role_code, role_name, description, is_system,
 			  can_manage_users, can_manage_form_settings, apply_user_scopes, sort_order
@@ -140,10 +164,31 @@ func createRole(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "role.create", "tenant_role", &row.ID, nil, map[string]any{
-			"role_code": row.RoleCode,
-		})
-		_ = saveRolePermissions(r.Context(), pool, tu.TenantID, row.RoleCode, map[string]string{}, nil, nil)
+		if copyFrom != "" {
+			// Start from an existing role: copy its levels, submit, and cancel flags.
+			if _, err := tx.Exec(r.Context(), `
+				insert into public.tenant_role_permissions (tenant_id, role_code, permission_code, access_level, can_submit, can_cancel)
+				select tenant_id, $3, permission_code, access_level, coalesce(can_submit, false), coalesce(can_cancel, false)
+				from public.tenant_role_permissions
+				where tenant_id = $1 and role_code = $2`,
+				tu.TenantID, copyFrom, row.RoleCode); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to copy permissions.", "ERR_INTERNAL")
+				return
+			}
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create role.", "ERR_INTERNAL")
+			return
+		}
+
+		auditPayload := map[string]any{"role_code": row.RoleCode}
+		if copyFrom != "" {
+			auditPayload["copy_from"] = copyFrom
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "role.create", "tenant_role", &row.ID, nil, auditPayload)
+		if copyFrom == "" {
+			_ = saveRolePermissions(r.Context(), pool, tu.TenantID, row.RoleCode, map[string]string{}, nil, nil)
+		}
 		response.OK(w, row, "Role created.")
 	}
 }
