@@ -861,33 +861,38 @@ export function EntityModal(props: {
     <Show when={props.open}>
       <Portal>
         <div
-          class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-6 sm:items-center ${props.stacked ? "z-[70]" : "z-50"}`}
+          class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-3 sm:p-6 ${props.stacked ? "z-[70]" : "z-50"}`}
+          style={{ "padding-bottom": "max(1rem, env(safe-area-inset-bottom))" }}
           role="presentation"
         >
           <div
-            class="erp-surface w-full rounded-2xl border border-stroke p-6 shadow-xl"
+            class="erp-surface my-2 flex max-h-[min(100dvh,100svh)] w-full flex-col overflow-hidden rounded-2xl border border-stroke shadow-xl sm:my-4"
             classList={{ "max-w-6xl": props.wide, "max-w-4xl": !props.wide }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="entity-modal-title"
           >
-            <div class="flex items-center justify-between gap-3">
-              <h2 id="entity-modal-title" class="text-lg font-semibold text-text-primary">
+            <div class="flex shrink-0 items-center justify-between gap-3 border-b border-stroke px-4 py-4 sm:px-6">
+              <h2 id="entity-modal-title" class="min-w-0 truncate text-lg font-semibold text-text-primary">
                 {props.title}
               </h2>
               <Show when={props.headerActions}>
-                <div class="flex items-center gap-2">{props.headerActions}</div>
+                <div class="flex shrink-0 items-center gap-2">{props.headerActions}</div>
               </Show>
             </div>
-            <div
-              class="mt-5"
-              classList={{
-                "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3": !props.singleColumn,
-              }}
-            >
-              {props.children}
+            <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+              <div
+                classList={{
+                  "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3": !props.singleColumn,
+                }}
+              >
+                {props.children}
+              </div>
             </div>
-            <div class="mt-6 flex justify-end gap-3 border-t border-stroke pt-4">
+            <div
+              class="flex shrink-0 justify-end gap-3 border-t border-stroke px-4 py-4 sm:px-6"
+              style={{ "padding-bottom": "max(1rem, env(safe-area-inset-bottom))" }}
+            >
               <button
                 type="button"
                 class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:erp-panel"
