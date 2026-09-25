@@ -568,6 +568,14 @@ export default function WorkOrdersPage() {
     invalidate();
   };
 
+  const packStationHref = (r: WorkOrder) => {
+    const qs = new URLSearchParams();
+    if (r.location_id) qs.set("location_id", String(r.location_id));
+    if (r.location_name) qs.set("location_name", r.location_name);
+    const q = qs.toString();
+    return q ? `/app/inventory/serial-lot/pack-station?${q}` : "/app/inventory/serial-lot/pack-station";
+  };
+
   const stationQuery = (woId: number, r?: WorkOrder) => {
     const m = r ? woType(r) : mode() === "all" ? "assembly" : mode();
     return `?woId=${woId}&mode=${m}`;
@@ -788,7 +796,7 @@ export default function WorkOrdersPage() {
             <Show when={r.status === "completed"}>
               <Show when={!r.reversed_at}>
                 <A
-                  href="/app/inventory/serial-lot/pack-station"
+                  href={packStationHref(r)}
                   class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -970,7 +978,7 @@ export default function WorkOrdersPage() {
             <Show when={r.status === "completed"}>
               <Show when={!r.reversed_at}>
                 <A
-                  href="/app/inventory/serial-lot/pack-station"
+                  href={packStationHref(r)}
                   class="rounded border border-brand-300 bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
                   onClick={(e) => e.stopPropagation()}
                 >
