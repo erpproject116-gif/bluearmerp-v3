@@ -97,6 +97,10 @@ func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
 				where += " and status <> 'cancelled'"
 			}
 		}
+		if p.Q != "" {
+			args = append(args, "%"+p.Q+"%")
+			where += fmt.Sprintf(" and (entry_no ilike $%d or coalesce(remarks, '') ilike $%d)", len(args), len(args))
+		}
 		args = append(args, p.PageSize, offset)
 		limIdx, offIdx := len(args)-1, len(args)
 		q := fmt.Sprintf(`

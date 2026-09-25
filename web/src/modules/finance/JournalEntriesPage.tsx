@@ -1,15 +1,14 @@
-import { uiLabel } from "../../shared/branding/uiLabel";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { handleSaveResult } from "../../shared/handleSaveResult";
-import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
-import { GridExportButtons } from "../../shared/gridExport";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { useTransactionListState } from "../../shared/useListState";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 
@@ -29,18 +28,20 @@ type JournalEntryDetail = JournalEntryRow & {
   lines?: { account_code: string; debit: number; credit: number; dept_id?: number | null; project_id?: number | null }[];
 };
 
-type StatusFilter = "all" | "draft" | "posted" | "archived";
-
 type JournalLine = { account_code: string; debit: string; credit: string; dept_id: string; project_id: string };
 type AccountOption = { id: number; account_code: string; account_name: string; is_active: boolean };
 type DimOption = { id: number; name?: string; department_name?: string; project_name?: string };
+
+const toolbarBtn =
+  "rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary disabled:opacity-50";
 
 export default function JournalEntriesPage() {
   const toast = useToast();
   const client = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const [statusFilter, setStatusFilter] = createSignal<StatusFilter>("all");
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize } =
+    useTransactionListState("updated_at");
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editId, setEditId] = createSignal<number | null>(null);
   const [remarks, setRemarks] = createSignal("");
@@ -53,33 +54,41 @@ export default function JournalEntriesPage() {
   const [acting, setActing] = createSignal(false);
 
   const list = createQuery(() => ({
-    queryKey: ["journal-entries", statusFilter()],
+    queryKey: ["journal-entries", page(), pageSize, sort(), order(), q(), statusFilter()],
     queryFn: async () => {
-      const qs = new URLSearchParams({ pageSize: "50" });
-      if (statusFilter() === "archived") {
+      const qs = new URLSearchParams({
+        page: String(page()),
+        pageSize: String(pageSize),
+        sort: sort(),
+        order: order(),
+      });
+      const status = statusFilter();
+      if (status === "archived") {
         qs.set("status", "archived");
         qs.set("include_archived", "1");
-      } else if (statusFilter() !== "all") {
-        qs.set("status", statusFilter());
+      } else if (status) {
+        qs.set("status", status);
       }
+      if (q()) qs.set("q", q());
       const res = await apiFetch<JournalEntryRow[]>(`/api/v1/finance/journal-entries?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load");
-      return res.data ?? [];
+      return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
     },
+    placeholderData: (prev: { rows: JournalEntryRow[]; total: number } | undefined) => prev,
   }));
 
   createEffect(() => {
     const raw = searchParams.highlight ?? searchParams.openId;
     const id = Number(Array.isArray(raw) ? raw[0] : raw);
     if (!Number.isFinite(id) || id <= 0) return;
-    if (!list.data?.some((r) => r.id === id)) return;
+    if (!list.data?.rows.some((r) => r.id === id)) return;
     setSelectedId(id);
     const next = { ...searchParams } as Record<string, string | undefined>;
     delete next.highlight;
     delete next.openId;
     setSearchParams(next, { replace: true });
     requestAnimationFrame(() => {
-      document.getElementById(`je-row-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      document.querySelector(`[data-row-id="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
   });
 
@@ -112,7 +121,7 @@ export default function JournalEntriesPage() {
 
   const invalidate = () => void client.invalidateQueries({ queryKey: ["journal-entries"] });
 
-  const selectedRow = () => (list.data ?? []).find((r) => r.id === selectedId()) ?? null;
+  const selectedRow = () => (list.data?.rows ?? []).find((r) => r.id === selectedId()) ?? null;
   const isArchived = (row: JournalEntryRow) => Boolean(row.archived_at) || row.status === "cancelled";
 
   const openCreate = () => {
@@ -125,8 +134,7 @@ export default function JournalEntriesPage() {
     setModalOpen(true);
   };
 
-  const openEdit = async () => {
-    const row = selectedRow();
+  const openEdit = async (row = selectedRow()) => {
     if (!row) {
       toast.warning("Select a draft journal entry to edit.");
       return;
@@ -266,147 +274,119 @@ export default function JournalEntriesPage() {
 
   return (
     <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <h1 class="text-xl font-semibold text-slate-900">Journal Entry</h1>
-        <div class="flex flex-wrap items-center gap-2">
-          <label class="flex items-center gap-2 text-sm text-text-secondary">
-            Status
-            <select
-              class="rounded-lg border border-stroke px-2 py-1.5 text-sm text-text-primary"
-              value={statusFilter()}
-              onChange={(e) => setStatusFilter(e.currentTarget.value as StatusFilter)}
-            >
-              <option value="all">All (active)</option>
-              <option value="draft">Drafts only</option>
-              <option value="posted">Posted only</option>
-              <option value="archived">Archived</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
-            onClick={() => invalidate()}
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
-            disabled={selectedRow()?.status !== "draft" || isArchived(selectedRow()!)}
-            onClick={() => void openEdit()}
-          >
-            Edit selected
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
-            disabled={posting()}
-            onClick={() => void postSelected()}
-          >
-            {posting() ? "Posting…" : "Post selected"}
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
-            disabled={acting() || selectedRow()?.status !== "posted" || Boolean(selectedRow()?.reversed_by_entry_id)}
-            onClick={() => void reverseSelected()}
-          >
-            Reverse selected
-          </button>
-          <Show
-            when={selectedRow()?.archived_at}
-            fallback={
-              <button
-                type="button"
-                class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
-                disabled={acting() || !selectedRow() || isArchived(selectedRow()!)}
-                onClick={() => void archiveSelected()}
-              >
-                Archive selected
-              </button>
-            }
-          >
+      <SpreadsheetGrid<JournalEntryRow>
+        columns={[
+          { key: "entry_no", header: "Entry No", clickable: true },
+          {
+            key: "status",
+            header: "Status",
+            sortable: false,
+            render: (row) => (
+              <span classList={{ "text-slate-400": isArchived(row) }}>
+                <span class="capitalize">{row.status}</span>
+                <Show when={row.reversed_by_entry_id}>
+                  <span class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">Reversed</span>
+                </Show>
+                <Show when={isArchived(row)}>
+                  <span class="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">Archived</span>
+                </Show>
+              </span>
+            ),
+            exportValue: (row) => row.status,
+          },
+          {
+            key: "remarks",
+            header: "Remarks",
+            sortable: false,
+            render: (row) => row.remarks || "—",
+            exportValue: (row) => row.remarks ?? "",
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (row) => (
+              <ActivityHistoryLink
+                module="finance"
+                targetType="fin_journal_entry"
+                targetId={row.id}
+                title={`History — ${row.entry_no}`}
+              />
+            ),
+          },
+        ]}
+        rows={list.data?.rows ?? []}
+        loading={list.isFetching}
+        selectedId={selectedId()}
+        onSelect={setSelectedId}
+        onEdit={(row) => void openEdit(row)}
+        onNew={openCreate}
+        newLabel="New draft"
+        codeKey="entry_no"
+        nameKey="remarks"
+        sortKey={sort()}
+        sortOrder={order()}
+        onSort={toggleSort}
+        total={list.data?.total ?? 0}
+        page={page()}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        search={q()}
+        onSearchChange={setQ}
+        searchPlaceholder="Search entry no or remarks…"
+        status={statusFilter()}
+        onStatusChange={setStatusFilter}
+        statusLabel="Status"
+        statusOptions={[
+          { value: "", label: "All (active)" },
+          { value: "draft", label: "Drafts only" },
+          { value: "posted", label: "Posted only" },
+          { value: "archived", label: "Archived" },
+        ]}
+        toolbarExtra={
+          <>
             <button
               type="button"
-              class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
-              disabled={acting()}
-              onClick={() => void unarchiveSelected()}
+              class={toolbarBtn}
+              disabled={selectedRow()?.status !== "draft" || Boolean(selectedRow() && isArchived(selectedRow()!))}
+              onClick={() => void openEdit()}
             >
-              Restore selected
+              Edit
             </button>
-          </Show>
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={openCreate}
-          >
-            New draft
-          </button>
-          <GridExportButtons
-            title="Journal Entries"
-            filename="journal-entries"
-            columns={[
-              { key: "entry_no", header: "Entry No", value: (r) => String(r.entry_no ?? "") },
-              { key: "status", header: "Status", value: (r) => String(r.status ?? "") },
-              { key: "remarks", header: "Remarks", value: (r) => String(r.remarks ?? "") },
-            ]}
-            rows={() => (list.data ?? []) as unknown as Record<string, unknown>[]}
-          />
-        </div>
-      </div>
-
-      <Show when={!list.isLoading} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
-        <table class="min-w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-3 py-2 text-left w-10" />
-              <th class="px-3 py-2 text-left">Entry No</th>
-              <th class="px-3 py-2 text-left">Status</th>
-              <th class="px-3 py-2 text-left">Remarks</th>
-              <th class="px-3 py-2 text-left">History</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={list.data ?? []}>
-              {(row) => (
-                <tr
-                  id={`je-row-${row.id}`}
-                  classList={{
-                    "border-t border-slate-100": true,
-                    "bg-brand-50": selectedId() === row.id,
-                    "ring-2 ring-brand-400 ring-inset": selectedId() === row.id,
-                    "text-slate-400": isArchived(row),
-                  }}
-                  onClick={() => setSelectedId(row.id)}
+            <button type="button" class={toolbarBtn} disabled={posting() || !selectedRow()} onClick={() => void postSelected()}>
+              {posting() ? "Posting…" : "Post"}
+            </button>
+            <button
+              type="button"
+              class={toolbarBtn}
+              disabled={acting() || selectedRow()?.status !== "posted" || Boolean(selectedRow()?.reversed_by_entry_id)}
+              onClick={() => void reverseSelected()}
+            >
+              Reverse
+            </button>
+            <Show
+              when={selectedRow()?.archived_at}
+              fallback={
+                <button
+                  type="button"
+                  class={toolbarBtn}
+                  disabled={acting() || !selectedRow() || isArchived(selectedRow()!)}
+                  onClick={() => void archiveSelected()}
                 >
-                  <td class="px-3 py-2">
-                    <input type="radio" checked={selectedId() === row.id} readOnly />
-                  </td>
-                  <td class="px-3 py-2">{row.entry_no}</td>
-                  <td class="px-3 py-2 capitalize">
-                    {row.status}
-                    <Show when={row.reversed_by_entry_id}>
-                      <span class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">Reversed</span>
-                    </Show>
-                    <Show when={isArchived(row)}>
-                      <span class="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">Archived</span>
-                    </Show>
-                  </td>
-                  <td class="px-3 py-2">{row.remarks ?? "—"}</td>
-                  <td class="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                    <ActivityHistoryLink
-                      module="finance"
-                      targetType="fin_journal_entry"
-                      targetId={row.id}
-                      title={`History — ${row.entry_no}`}
-                    />
-                  </td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-      </Show>
+                  Archive
+                </button>
+              }
+            >
+              <button type="button" class={toolbarBtn} disabled={acting()} onClick={() => void unarchiveSelected()}>
+                Restore
+              </button>
+            </Show>
+          </>
+        }
+        onRefresh={invalidate}
+        exportFilename="journal-entries"
+        exportTitle="Journal Entries"
+      />
 
       <EntityModal
         open={modalOpen()}

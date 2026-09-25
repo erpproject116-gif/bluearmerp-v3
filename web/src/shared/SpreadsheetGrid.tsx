@@ -703,6 +703,7 @@ export function SpreadsheetGrid<T extends { id: number }>(props: Props<T>) {
             <tbody>
               {displayRows().map((row, idx) => (
                 <tr
+                  data-row-id={row.id}
                   class="cursor-pointer transition hover:erp-panel"
                   classList={{ "bg-brand-50": idx === focusIdx() || props.selectedId === row.id }}
                   onClick={() => {
