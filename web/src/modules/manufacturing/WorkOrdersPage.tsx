@@ -23,6 +23,7 @@ import {
   type PickedWoSalesOrderLine,
 } from "./WoSalesOrderLinePickerModal";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { InvBookLedgerModal, type InvBookLedgerTarget } from "../inventory/reports/InvBookLedgerModal";
 
 type WorkOrder = {
@@ -1195,6 +1196,18 @@ export default function WorkOrdersPage() {
         saving={saving()}
         singleColumn
         saveLabel={editing() ? (editing()!.status === "draft" ? "Save" : "Close") : "Create"}
+        headerActions={
+          <Show when={editing()}>
+            {(wo) => (
+              <RecordHistoryButton
+                variant="button"
+                targetType="mfg_work_order"
+                targetId={wo().id}
+                title={`History — ${wo().work_order_no}`}
+              />
+            )}
+          </Show>
+        }
       >
         <Show when={editing() && editing()!.status !== "draft"}>
           <p class="col-span-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

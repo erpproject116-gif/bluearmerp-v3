@@ -9,6 +9,7 @@ import {
   showClientValidationBlocker,
 } from "../../shared/handleSaveResult";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { WideEntityModal } from "../../shared/WideEntityModal";
@@ -289,16 +290,26 @@ export function LocationTransferModal(props: Props) {
       saving={saving()}
       readOnly={readOnly()}
       headerActions={
-        <Show when={!readOnly()}>
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-            disabled={saving()}
-            onClick={() => void save(true)}
-          >
-            {saving() ? "Saving…" : "Save & post"}
-          </button>
-        </Show>
+        <>
+          <Show when={entryId()}>
+            <RecordHistoryButton
+              variant="button"
+              targetType="inv_stock_entry"
+              targetId={entryId()}
+              title={entryNo() ? `History — ${entryNo()}` : "History"}
+            />
+          </Show>
+          <Show when={!readOnly()}>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              disabled={saving()}
+              onClick={() => void save(true)}
+            >
+              {saving() ? "Saving…" : "Save & post"}
+            </button>
+          </Show>
+        </>
       }
     >
       <FormErrorSummary errors={fieldErrors} />

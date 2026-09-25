@@ -144,9 +144,9 @@ func replaceStockAdjustmentLines(ctx context.Context, tx pgx.Tx, requestID, tena
 	return insertStockAdjustmentLines(ctx, tx, requestID, tenantID, lines)
 }
 
-func postStockAdjustmentLines(ctx context.Context, tx pgx.Tx, tenantID, userID int64, reason string, lines []stockAdjustmentLineRow) (map[string]string, error) {
+func postStockAdjustmentLines(ctx context.Context, tx pgx.Tx, tenantID, userID, requestID int64, reason string, lines []stockAdjustmentLineRow) (map[string]string, error) {
 	for _, ln := range lines {
-		_, _, _, validation, err := postStockAdjustment(ctx, tx, tenantID, userID, ln.ItemID, ln.LocationID, ln.QtyDelta, reason)
+		_, _, _, validation, err := postStockAdjustment(ctx, tx, tenantID, userID, requestID, ln.ItemID, ln.LocationID, ln.QtyDelta, reason)
 		if validation != nil {
 			return validation, nil
 		}

@@ -29,6 +29,7 @@ export type StockMovementRow = {
 function auditTargetForMovement(
   refType: string,
   refId: number,
+  movementId: number,
 ): { targetType: string; targetId: number } | null {
   if (!Number.isFinite(refId) || refId <= 0) return null;
   switch (refType) {
@@ -41,6 +42,10 @@ function auditTargetForMovement(
       return { targetType: "inv_stock_entry", targetId: refId };
     case "mfg_work_order":
       return { targetType: "mfg_work_order", targetId: refId };
+    case "stock_adjustment":
+      // Older rows stored the movement id in ref_id. Those have no request to open.
+      if (refId === movementId) return null;
+      return { targetType: "inv_stock_adjustment_request", targetId: refId };
     default:
       return null;
   }
@@ -192,7 +197,7 @@ export default function StockMovementsPage() {
             header: "History",
             sortable: false,
             render: (r) => {
-              const target = auditTargetForMovement(r.ref_type, r.ref_id);
+              const target = auditTargetForMovement(r.ref_type, r.ref_id, r.id);
               if (!target) return null;
               return (
                 <ActivityHistoryLink

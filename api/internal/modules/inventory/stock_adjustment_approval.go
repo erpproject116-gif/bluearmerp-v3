@@ -112,7 +112,7 @@ func ensureItemLocation(ctx context.Context, pool *pgxpool.Pool, tenantID, itemI
 
 // postStockAdjustment applies balance + movement inside an open transaction.
 // Returns movement id and the on-hand qty before/after the change.
-func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID int64, itemID, locationID int64, qtyDelta float64, reason string) (movementID int64, qtyBefore, qtyAfter float64, validation map[string]string, err error) {
+func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID, requestID int64, itemID, locationID int64, qtyDelta float64, reason string) (movementID int64, qtyBefore, qtyAfter float64, validation map[string]string, err error) {
 	err = tx.QueryRow(ctx, `
 		select qty_on_hand::float8
 		from public.inv_item_location_balances
@@ -148,16 +148,15 @@ func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID int64,
 	}
 
 	reason = strings.TrimSpace(reason)
+	if requestID <= 0 {
+		return 0, qtyBefore, qtyAfter, map[string]string{"request_id": "Adjustment request is required."}, nil
+	}
 	err = tx.QueryRow(ctx, `
 		insert into public.inv_stock_movements
 		  (tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id, reason, created_by_user_id)
-		values ($1, $2, $3, $4, 'adjustment', 'stock_adjustment', 0, $5, $6)
+		values ($1, $2, $3, $4, 'adjustment', 'stock_adjustment', $5, $6, $7)
 		returning id`,
-		tenantID, itemID, locationID, qtyDelta, reason, userID).Scan(&movementID)
-	if err != nil {
-		return 0, qtyBefore, qtyAfter, nil, err
-	}
-	_, err = tx.Exec(ctx, `update public.inv_stock_movements set ref_id = $1 where id = $1`, movementID)
+		tenantID, itemID, locationID, qtyDelta, requestID, reason, userID).Scan(&movementID)
 	if err != nil {
 		return 0, qtyBefore, qtyAfter, nil, err
 	}
@@ -800,7 +799,7 @@ func approveStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"lines": "No adjustment lines found."})
 			return
 		}
-		validation, err := postStockAdjustmentLines(r.Context(), tx, tu.TenantID, tu.AppUserID, reason, lines)
+		validation, err := postStockAdjustmentLines(r.Context(), tx, tu.TenantID, tu.AppUserID, id, reason, lines)
 		if validation != nil {
 			response.Validation(w, validation)
 			return
