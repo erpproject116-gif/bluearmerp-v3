@@ -17,6 +17,7 @@ import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useProductionMode } from "../production/ProductionModeLayout";
 import { recipesHref } from "../production/mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "../production/mfgToast";
+import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 
 type BomLine = {
   id?: number;
@@ -837,6 +838,15 @@ export default function BomsPage() {
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
         saving={saving()}
+        wide
+        headerActions={
+          <RecordHistoryButton
+            variant="button"
+            targetType="mfg_bom"
+            targetId={editing()?.id}
+            title={editing() ? `History — ${editing()!.bom_code}` : "History"}
+          />
+        }
       >
         <div class="col-span-full">
           <draft.DraftBanner />
