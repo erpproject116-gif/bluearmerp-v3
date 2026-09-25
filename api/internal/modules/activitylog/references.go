@@ -38,6 +38,14 @@ left join lateral (
     when 'inv_lot_batch' then (select lb.lot_no from public.inv_lot_batches lb where lb.id = al.target_id and lb.tenant_id = al.tenant_id limit 1)
     when 'inv_product_bundle' then (select pb.bundle_code from public.inv_product_bundles pb where pb.id = al.target_id and pb.tenant_id = al.tenant_id limit 1)
     when 'inv_price_list' then (select pl.name from public.inv_price_lists pl where pl.id = al.target_id and pl.tenant_id = al.tenant_id limit 1)
+    when 'mfg_work_order' then (select wo.work_order_no from public.mfg_work_orders wo where wo.id = al.target_id and wo.tenant_id = al.tenant_id limit 1)
+    when 'mfg_bom' then (select coalesce(nullif(b.bom_name, ''), b.bom_code) from public.mfg_boms b where b.id = al.target_id and b.tenant_id = al.tenant_id limit 1)
+    when 'fin_journal_entry' then (select je.entry_no from public.fin_journal_entries je where je.id = al.target_id and je.tenant_id = al.tenant_id limit 1)
+    when 'fin_expense' then (select e.expense_no from public.fin_expenses e where e.id = al.target_id and e.tenant_id = al.tenant_id limit 1)
+    when 'inv_stock_adjustment_request' then (select sar.request_no from public.inv_stock_adjustment_requests sar where sar.id = al.target_id and sar.tenant_id = al.tenant_id limit 1)
+    when 'credit_note' then (select cn.credit_no from public.fin_credit_notes cn where cn.id = al.target_id and cn.tenant_id = al.tenant_id limit 1)
+    when 'retainer_invoice' then (select ri.retainer_no from public.fin_retainer_invoices ri where ri.id = al.target_id and ri.tenant_id = al.tenant_id limit 1)
+    when 'vendor_credit' then (select vc.credit_no from public.fin_vendor_credits vc where vc.id = al.target_id and vc.tenant_id = al.tenant_id limit 1)
     else null
   end as reference_no
 ) ref on true`

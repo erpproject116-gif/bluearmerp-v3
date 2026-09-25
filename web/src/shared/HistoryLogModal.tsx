@@ -26,7 +26,7 @@ function formatWhen(iso: string): string {
 /**
  * Full activity + change history for a single transaction, shown in its own modal.
  * Lists every recorded action (create, edits, conversions, attachment uploads,
- * invoice posting, ...) with timestamp and the PIC (actor) who made it.
+ * invoice posting, ...) with timestamp and who made it.
  *
  * Always stacked (z-[70] + portal) so it appears above WideEntityModal / nested
  * transaction windows that also use fixed overlays.
@@ -45,10 +45,16 @@ export function HistoryLogModal(props: Props) {
     enabled: isOpen() && Boolean(targetId()),
   }));
 
+  const activityText = (row: { summary?: string | null; action_code?: string }) => {
+    const s = (row.summary ?? "").trim();
+    if (s) return s;
+    return "Something changed on this record.";
+  };
+
   return (
     <Modal
       open={isOpen()}
-      title={props.title ?? "History log"}
+      title={props.title ?? "History"}
       onClose={props.onClose}
       wide
       stacked
@@ -74,8 +80,8 @@ export function HistoryLogModal(props: Props) {
               <thead class="sticky top-0 bg-white text-left text-xs uppercase text-text-secondary">
                 <tr class="border-b border-stroke">
                   <th class="py-2 pr-3">When</th>
-                  <th class="py-2 pr-3">PIC</th>
-                  <th class="py-2">Activity</th>
+                  <th class="py-2 pr-3">Who</th>
+                  <th class="py-2">What happened</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,7 +91,7 @@ export function HistoryLogModal(props: Props) {
                       <td class="whitespace-nowrap py-2 pr-3 text-text-secondary">{formatWhen(row.created_at)}</td>
                       <td class="whitespace-nowrap py-2 pr-3 font-medium text-text-primary">{row.actor_name || "System"}</td>
                       <td class="py-2">
-                        <div class="font-medium text-text-primary">{row.summary || row.action_code}</div>
+                        <div class="font-medium text-text-primary">{activityText(row)}</div>
                         <Show when={(row.details?.length ?? 0) > 0}>
                           <ul class="mt-1 list-disc space-y-0.5 pl-5 text-xs text-text-secondary">
                             <For each={row.details ?? []}>{(d) => <li>{d}</li>}</For>

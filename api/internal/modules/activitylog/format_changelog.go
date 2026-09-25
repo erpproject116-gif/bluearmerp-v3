@@ -115,6 +115,18 @@ var entityLabels = map[string]string{
 	"form_field_settings":       "Form settings",
 	"document_draft":            "Document draft",
 	"api":                       "API request",
+	"mfg_work_order":            "Production job",
+	"mfg_bom":                   "Recipe / BOM",
+	"fin_journal_entry":         "Journal entry",
+	"fin_expense":               "Expense",
+	"fin_recurring_expense":     "Recurring expense",
+	"inv_stock_adjustment_request": "Stock adjustment",
+	"credit_note":               "Credit note",
+	"retainer_invoice":          "Retainer invoice",
+	"vendor_credit":             "Vendor credit",
+	"fin_landed_cost_header":    "Landed cost",
+	"pos_session":               "POS session",
+	"recurring_invoice":         "Recurring invoice",
 }
 
 var referenceLabels = map[string]string{
@@ -145,7 +157,16 @@ var referenceLabels = map[string]string{
 	"inv_serial_unit":         "Serial No.",
 	"inv_lot_batch":           "Lot No.",
 	"inv_product_bundle":      "Bundle",
-	"inv_price_list":          "Price List",
+	"inv_price_list":               "Price List",
+	"mfg_work_order":               "Job No.",
+	"mfg_bom":                      "BOM",
+	"fin_journal_entry":            "JE No.",
+	"fin_expense":                  "Expense No.",
+	"inv_stock_adjustment_request": "Adjustment No.",
+	"credit_note":                  "Credit No.",
+	"retainer_invoice":             "Retainer No.",
+	"vendor_credit":                "Vendor Credit No.",
+	"fin_landed_cost_header":       "Landed Cost No.",
 }
 
 func entityLabel(targetType string) string {
@@ -164,10 +185,40 @@ func referenceLabel(targetType string) string {
 
 func actionVerb(actionCode string) string {
 	switch {
+	case strings.HasSuffix(actionCode, ".cancel"):
+		return "cancelled"
+	case strings.Contains(actionCode, "convert_to_cash"):
+		return "converted to cash for"
+	case strings.Contains(actionCode, "create_from_return"):
+		return "created from return for"
+	case strings.Contains(actionCode, "record_payment"):
+		return "recorded payment on"
+	case strings.HasSuffix(actionCode, ".archive"):
+		return "archived"
+	case strings.HasSuffix(actionCode, ".unarchive"):
+		return "restored"
+	case strings.HasSuffix(actionCode, ".create"):
+		return "created"
 	case strings.HasSuffix(actionCode, ".update"):
 		return "updated"
 	case strings.HasSuffix(actionCode, ".delete"):
 		return "deleted"
+	case strings.Contains(actionCode, "work_order_complete"), strings.HasSuffix(actionCode, ".complete"):
+		return "completed"
+	case strings.Contains(actionCode, "work_order_cost_post"):
+		return "recorded costs for"
+	case strings.Contains(actionCode, "wo_issue"), strings.HasSuffix(actionCode, ".issue_serials"), strings.HasSuffix(actionCode, ".issue_lots"):
+		return "issued materials for"
+	case strings.HasSuffix(actionCode, ".reverse"), strings.Contains(actionCode, "work_order_reverse"):
+		return "reversed"
+	case strings.HasSuffix(actionCode, ".void"):
+		return "voided"
+	case strings.HasSuffix(actionCode, ".approve"):
+		return "approved"
+	case strings.HasSuffix(actionCode, ".reject"):
+		return "rejected"
+	case strings.HasSuffix(actionCode, ".mark_paid"), strings.Contains(actionCode, "expense_mark_paid"):
+		return "marked paid on"
 	case strings.HasSuffix(actionCode, ".progress_status"):
 		return "changed progress on"
 	case strings.HasSuffix(actionCode, ".invoicing_status"):
@@ -209,7 +260,7 @@ func actionVerb(actionCode string) string {
 	case strings.HasSuffix(actionCode, ".invite_revoke"):
 		return "revoked invite for"
 	default:
-		return "modified"
+		return "updated"
 	}
 }
 
