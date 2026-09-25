@@ -24,39 +24,59 @@ import (
 )
 
 type WorkOrder struct {
-	ID                     int64    `json:"id"`
-	WorkOrderNo            string   `json:"work_order_no"`
-	BomID                  int64    `json:"bom_id"`
-	BomCode                string   `json:"bom_code,omitempty"`
-	BomName                string   `json:"bom_name,omitempty"`
-	FinishedItemID         int64    `json:"finished_item_id"`
-	FinishedItemCode       string   `json:"finished_item_code,omitempty"`
-	FinishedItemName       string   `json:"finished_item_name,omitempty"`
-	FinishedBaseUnit       string   `json:"finished_base_unit_code,omitempty"`
-	LocationID             int64    `json:"location_id"`
-	LocationName           string   `json:"location_name,omitempty"`
-	QtyToProduce           float64  `json:"qty_to_produce"`
-	QtyProduced            float64  `json:"qty_produced"`
-	Status                 string   `json:"status"`
-	OrderDate              string   `json:"order_date"`
-	Notes                  *string  `json:"notes,omitempty"`
-	CreatedAt              *string  `json:"created_at,omitempty"`
-	ReleasedAt             *string  `json:"released_at,omitempty"`
-	CompletedAt            *string  `json:"completed_at,omitempty"`
-	ReversedAt             *string  `json:"reversed_at,omitempty"`
-	TransactedAt           *string  `json:"transacted_at,omitempty"`
-	ActualInputQty         *float64 `json:"actual_input_qty,omitempty"`
-	InputLotBatchID        *int64   `json:"input_lot_batch_id,omitempty"`
-	InspectionStatus       string   `json:"inspection_status"`
-	InspectionNotes        *string  `json:"inspection_notes,omitempty"`
-	InspectedAt            *string  `json:"inspected_at,omitempty"`
-	SourceSalesOrderID     *int64   `json:"source_sales_order_id,omitempty"`
-	SourceSalesOrderLineID *int64   `json:"source_sales_order_line_id,omitempty"`
-	SourceSalesOrderNo     *string  `json:"source_sales_order_no,omitempty"`
-	BomType                string   `json:"bom_type,omitempty"`
-	FinishedTrackSerial    bool     `json:"finished_track_serial,omitempty"`
-	FinishedTrackLot       bool     `json:"finished_track_lot,omitempty"`
-	ComponentsTracked      bool     `json:"components_tracked,omitempty"`
+	ID                     int64                   `json:"id"`
+	WorkOrderNo            string                  `json:"work_order_no"`
+	BomID                  int64                   `json:"bom_id"`
+	BomCode                string                  `json:"bom_code,omitempty"`
+	BomName                string                  `json:"bom_name,omitempty"`
+	FinishedItemID         int64                   `json:"finished_item_id"`
+	FinishedItemCode       string                  `json:"finished_item_code,omitempty"`
+	FinishedItemName       string                  `json:"finished_item_name,omitempty"`
+	FinishedBaseUnit       string                  `json:"finished_base_unit_code,omitempty"`
+	LocationID             int64                   `json:"location_id"`
+	LocationName           string                  `json:"location_name,omitempty"`
+	QtyToProduce           float64                 `json:"qty_to_produce"`
+	QtyProduced            float64                 `json:"qty_produced"`
+	Status                 string                  `json:"status"`
+	OrderDate              string                  `json:"order_date"`
+	Notes                  *string                 `json:"notes,omitempty"`
+	CreatedAt              *string                 `json:"created_at,omitempty"`
+	ReleasedAt             *string                 `json:"released_at,omitempty"`
+	CompletedAt            *string                 `json:"completed_at,omitempty"`
+	ReversedAt             *string                 `json:"reversed_at,omitempty"`
+	TransactedAt           *string                 `json:"transacted_at,omitempty"`
+	ActualInputQty         *float64                `json:"actual_input_qty,omitempty"`
+	InputLotBatchID        *int64                  `json:"input_lot_batch_id,omitempty"`
+	InspectionStatus       string                  `json:"inspection_status"`
+	InspectionNotes        *string                 `json:"inspection_notes,omitempty"`
+	InspectedAt            *string                 `json:"inspected_at,omitempty"`
+	SourceSalesOrderID     *int64                  `json:"source_sales_order_id,omitempty"`
+	SourceSalesOrderLineID *int64                  `json:"source_sales_order_line_id,omitempty"`
+	SourceSalesOrderNo     *string                 `json:"source_sales_order_no,omitempty"`
+	BomType                string                  `json:"bom_type,omitempty"`
+	FinishedTrackSerial    bool                    `json:"finished_track_serial,omitempty"`
+	FinishedTrackLot       bool                    `json:"finished_track_lot,omitempty"`
+	ComponentsTracked      bool                    `json:"components_tracked,omitempty"`
+	WasteLines             []WorkOrderWasteView    `json:"waste_lines,omitempty"`
+	OutputActuals          []WorkOrderOutputActual `json:"output_actuals,omitempty"`
+}
+
+type WorkOrderWasteView struct {
+	ComponentItemID *int64  `json:"component_item_id,omitempty"`
+	ComponentCode   string  `json:"component_code,omitempty"`
+	ComponentName   string  `json:"component_name,omitempty"`
+	Classification  string  `json:"classification"`
+	Qty             float64 `json:"qty"`
+	ExpectedQty     float64 `json:"expected_qty"`
+	Difference      float64 `json:"difference"`
+	WasteReasonCode string  `json:"waste_reason_code,omitempty"`
+	WasteReasonName string  `json:"waste_reason_name,omitempty"`
+	Notes           *string `json:"notes,omitempty"`
+}
+
+type WorkOrderOutputActual struct {
+	ComponentItemID int64   `json:"component_item_id"`
+	Qty             float64 `json:"qty"`
 }
 
 type MaterialNeedLine struct {
@@ -1133,7 +1153,62 @@ func loadWorkOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) 
 	row.InspectionNotes = inspectionNotes
 	row.InspectedAt = inspectedAt
 	row.SourceSalesOrderNo = soNo
+	row.WasteLines = loadWorkOrderWasteLines(ctx, pool, tenantID, id)
+	row.OutputActuals = loadWorkOrderOutputActuals(ctx, pool, tenantID, id)
 	return row, nil
+}
+
+func loadWorkOrderWasteLines(ctx context.Context, pool *pgxpool.Pool, tenantID, woID int64) []WorkOrderWasteView {
+	rows, err := pool.Query(ctx, `
+		select wl.component_item_id, coalesce(i.item_code, ''), coalesce(i.item_name, ''),
+		  wl.classification, wl.qty::float8, wl.expected_qty::float8,
+		  coalesce(wr.code, ''), coalesce(wr.name, ''), wl.notes
+		from public.mfg_wo_waste_lines wl
+		left join public.inv_items i on i.id = wl.component_item_id
+		left join public.mfg_waste_reasons wr on wr.id = wl.waste_reason_id
+		where wl.tenant_id = $1 and wl.work_order_id = $2
+		order by wl.id`, tenantID, woID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []WorkOrderWasteView
+	for rows.Next() {
+		var line WorkOrderWasteView
+		if err := rows.Scan(
+			&line.ComponentItemID, &line.ComponentCode, &line.ComponentName,
+			&line.Classification, &line.Qty, &line.ExpectedQty,
+			&line.WasteReasonCode, &line.WasteReasonName, &line.Notes,
+		); err != nil {
+			return out
+		}
+		line.Difference = line.Qty - line.ExpectedQty
+		out = append(out, line)
+	}
+	return out
+}
+
+func loadWorkOrderOutputActuals(ctx context.Context, pool *pgxpool.Pool, tenantID, woID int64) []WorkOrderOutputActual {
+	rows, err := pool.Query(ctx, `
+		select component_item_id, coalesce(sum(qty), 0)::float8
+		from public.mfg_wo_output_lots
+		where tenant_id = $1 and work_order_id = $2 and component_item_id is not null
+		  and status in ('staged', 'posted')
+		group by component_item_id
+		order by component_item_id`, tenantID, woID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []WorkOrderOutputActual
+	for rows.Next() {
+		var line WorkOrderOutputActual
+		if err := rows.Scan(&line.ComponentItemID, &line.Qty); err != nil {
+			return out
+		}
+		out = append(out, line)
+	}
+	return out
 }
 
 func validateWorkOrderBody(b workOrderBody) map[string]string {

@@ -51,6 +51,26 @@ type WorkOrder = {
   completed_at?: string | null;
   reversed_at?: string | null;
   transacted_at?: string | null;
+  actual_input_qty?: number | null;
+  waste_lines?: WorkOrderWasteView[];
+  output_actuals?: WorkOrderOutputActual[];
+};
+
+type WorkOrderWasteView = {
+  component_item_id?: number | null;
+  component_code?: string;
+  component_name?: string;
+  classification: string;
+  qty: number;
+  expected_qty: number;
+  difference: number;
+  waste_reason_code?: string;
+  waste_reason_name?: string;
+};
+
+type WorkOrderOutputActual = {
+  component_item_id: number;
+  qty: number;
 };
 
 function needsTakeFromStock(r: WorkOrder): boolean {
@@ -231,6 +251,29 @@ export default function WorkOrdersPage() {
   });
 
   const invalidate = () => void client.invalidateQueries({ queryKey: ["mfg-work-orders"] });
+
+  createEffect(() => {
+    const rawQ = String(searchParams.q ?? "").trim();
+    const rows = list.data?.rows ?? [];
+    if (!rawQ || rows.length !== 1) return;
+    if (selectedId() !== rows[0].id) setSelectedId(rows[0].id);
+  });
+
+  const jobTrace = createQuery(() => {
+    const id = selectedId();
+    return {
+      queryKey: ["wo-job-trace", id],
+      enabled: id != null,
+      queryFn: async () => {
+        const [woRes, needsRes] = await Promise.all([
+          apiFetch<WorkOrder>(`/api/v1/manufacturing/work-orders/${id}`),
+          apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${id}/material-needs`),
+        ]);
+        if (!woRes.success || !woRes.data) throw new Error(woRes.message ?? "Failed to load job");
+        return { wo: woRes.data, needs: needsRes.success ? needsRes.data ?? null : null };
+      },
+    };
+  });
 
   const loadMaterials = async (woId: number) => {
     const res = await apiFetch<MaterialNeeds>(`/api/v1/manufacturing/work-orders/${woId}/material-needs`);
@@ -973,6 +1016,87 @@ export default function WorkOrdersPage() {
         statusOptions={isAssembly() ? ASSEMBLY_STATUS_TABS : DISASSEMBLY_STATUS_TABS}
         onRefresh={invalidate}
       />
+
+      <Show when={selectedId() != null ? jobTrace.data : undefined}>
+        {(trace) => {
+          const wo = () => trace().wo;
+          const needs = () => trace().needs;
+          const actualFor = (itemId: number) =>
+            wo().output_actuals?.find((a) => a.component_item_id === itemId)?.qty;
+          const reasonLabel = (line: WorkOrderWasteView) =>
+            line.waste_reason_code ? `${line.waste_reason_code} — ${line.waste_reason_name ?? ""}` : "—";
+          return (
+            <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+              <h2 class="text-sm font-semibold text-text-primary">
+                {wo().work_order_no} — input, output, and difference
+              </h2>
+              <p class="mt-1 text-xs text-text-secondary">
+                Raw material, each output, waste, and extra waste for this job.
+              </p>
+              <Show when={needs()?.input_line}>
+                {(input) => (
+                  <p class="mt-3 text-sm text-text-primary">
+                    Raw material: <span class="font-medium">{input().component_name}</span>
+                    {" · expected "}
+                    {input().stock_to_issue} {input().stock_unit_code}
+                    <Show when={wo().actual_input_qty != null}>
+                      {" · actual "}
+                      {wo().actual_input_qty}
+                    </Show>
+                  </p>
+                )}
+              </Show>
+              <table class="mt-3 min-w-full text-left text-sm">
+                <thead class="text-xs uppercase text-text-secondary">
+                  <tr>
+                    <th class="py-1 pr-3">Output</th>
+                    <th class="py-1 pr-3 text-right">Expected</th>
+                    <th class="py-1 pr-3 text-right">Actual</th>
+                    <th class="py-1 text-right">Difference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={needs()?.lines ?? []}>
+                    {(ln) => {
+                      const actual = actualFor(ln.component_item_id);
+                      const difference = actual == null ? null : actual - ln.stock_to_issue;
+                      return (
+                        <tr class="border-t border-stroke/70">
+                          <td class="py-1.5 pr-3">
+                            {ln.component_code} — {ln.component_name}
+                          </td>
+                          <td class="py-1.5 pr-3 text-right tabular-nums">{ln.stock_to_issue}</td>
+                          <td class="py-1.5 pr-3 text-right tabular-nums">{actual ?? "—"}</td>
+                          <td class="py-1.5 text-right tabular-nums">{difference ?? "—"}</td>
+                        </tr>
+                      );
+                    }}
+                  </For>
+                </tbody>
+              </table>
+              <Show when={(wo().waste_lines?.length ?? 0) > 0}>
+                <h3 class="mt-4 text-xs font-semibold uppercase text-text-secondary">Waste and extra waste</h3>
+                <ul class="mt-1 space-y-1 text-sm">
+                  <For each={wo().waste_lines ?? []}>
+                    {(line) => (
+                      <li class="flex flex-wrap justify-between gap-2">
+                        <span>
+                          {line.component_name || "Extra waste"}
+                          {" · "}
+                          {reasonLabel(line)}
+                        </span>
+                        <span class="tabular-nums">
+                          actual {line.qty} · expected {line.expected_qty} · difference {line.difference}
+                        </span>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
+            </section>
+          );
+        }}
+      </Show>
 
       <EntityModal
         open={modalOpen()}

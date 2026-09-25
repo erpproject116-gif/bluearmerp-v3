@@ -21,6 +21,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessRead)).Get("/waste-reasons", listWasteReasons(pool))
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Post("/waste-reasons", createWasteReason(pool))
 		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Patch("/waste-reasons/{id}", updateWasteReason(pool))
+		mr.With(auth.RequirePermission("manufacturing.boms", auth.AccessWrite)).Delete("/waste-reasons/{id}", deleteWasteReason(pool))
 
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/sales-order-lines/open", listOpenSalesOrderSlipLinesForWO(pool))
 		mr.With(auth.RequirePermission("manufacturing.work_orders", auth.AccessRead)).Get("/work-orders/open-sales-order-lines", listOpenSalesOrderLinesForWO(pool))

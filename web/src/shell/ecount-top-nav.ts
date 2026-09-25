@@ -292,7 +292,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       },
       {
         id: "production_waste",
-        label: "Waste & variance",
+        label: "Waste & difference",
         href: "/app/production/reports?tab=waste-variance",
         iconId: "reports",
         topId: "inv1",

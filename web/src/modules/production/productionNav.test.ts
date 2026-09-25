@@ -40,7 +40,7 @@ describe("production nav", () => {
     expect(production!.children?.find((c) => c.id === "production_waste")?.href).toBe(
       "/app/production/reports?tab=waste-variance",
     );
-    expect(production!.children?.find((c) => c.id === "production_waste")?.label).toBe("Waste & variance");
+    expect(production!.children?.find((c) => c.id === "production_waste")?.label).toBe("Waste & difference");
   });
 
   it("does not render duplicate header feature tabs for empty features", () => {

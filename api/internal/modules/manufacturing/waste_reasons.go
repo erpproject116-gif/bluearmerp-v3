@@ -141,3 +141,33 @@ func updateWasteReason(pool *pgxpool.Pool) http.HandlerFunc {
 		response.OK(w, row, "Waste reason updated.")
 	}
 }
+
+func deleteWasteReason(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var used int64
+		if err := pool.QueryRow(r.Context(), `
+			select count(*) from public.mfg_wo_waste_lines
+			where tenant_id = $1 and waste_reason_id = $2`, tu.TenantID, id).Scan(&used); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to check waste reason usage.", "ERR_INTERNAL")
+			return
+		}
+		if used > 0 {
+			response.Err(w, http.StatusConflict, "This reason is used on a job. Deactivate it instead.", "ERR_IN_USE")
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			delete from public.mfg_waste_reasons
+			where id = $1 and tenant_id = $2`, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Waste reason not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.OK(w, map[string]any{"id": id}, "Waste reason deleted.")
+	}
+}

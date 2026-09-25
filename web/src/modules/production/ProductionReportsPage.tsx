@@ -94,7 +94,7 @@ const TAB_LABELS: Record<ReportTab, string> = {
   progress: "Progress",
   "stock-movements": "Stock movements",
   "disassembly-yield": "Cutting yield",
-  "waste-variance": "Waste & variance",
+  "waste-variance": "Waste & difference",
 };
 
 const VALID_TABS = Object.keys(TAB_LABELS) as ReportTab[];
@@ -439,7 +439,7 @@ export default function ProductionReportsPage() {
                 <th class="px-3 py-2">Class</th>
                 <th class="px-3 py-2 text-right">Planned</th>
                 <th class="px-3 py-2 text-right">Actual</th>
-                <th class="px-3 py-2 text-right">Variance</th>
+                <th class="px-3 py-2 text-right">Difference</th>
                 <th class="px-3 py-2">Yield band</th>
                 <th class="px-3 py-2 text-right">Actual input</th>
               </tr>

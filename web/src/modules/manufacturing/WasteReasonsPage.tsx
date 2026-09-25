@@ -18,6 +18,10 @@ export default function WasteReasonsPage() {
   const [name, setName] = createSignal("");
   const [abnormal, setAbnormal] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
+  const [editingId, setEditingId] = createSignal<number | null>(null);
+  const [editCode, setEditCode] = createSignal("");
+  const [editName, setEditName] = createSignal("");
+  const [editAbnormal, setEditAbnormal] = createSignal(false);
 
   const load = async () => {
     const res = await apiFetch<WasteReason[]>("/api/v1/manufacturing/waste-reasons", undefined, { silent: true });
@@ -75,6 +79,52 @@ export default function WasteReasonsPage() {
       mfgWarn(res.message, "Could not update.");
       return;
     }
+    await load();
+  };
+
+  const startEdit = (row: WasteReason) => {
+    setEditingId(row.id);
+    setEditCode(row.code);
+    setEditName(row.name);
+    setEditAbnormal(row.is_abnormal);
+  };
+
+  const saveEdit = async (row: WasteReason) => {
+    if (!editCode().trim() || !editName().trim()) {
+      mfgWarn(null, "Code and name are required.");
+      return;
+    }
+    const res = await apiFetch(
+      `/api/v1/manufacturing/waste-reasons/${row.id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          code: editCode().trim(),
+          name: editName().trim(),
+          is_abnormal: editAbnormal(),
+          is_active: row.is_active,
+        }),
+      },
+      { silent: true },
+    );
+    if (!res.success) {
+      mfgWarn(res.message, "Could not update waste reason.");
+      return;
+    }
+    mfgSuccess("Waste reason updated.");
+    setEditingId(null);
+    await load();
+  };
+
+  const removeReason = async (row: WasteReason) => {
+    if (!window.confirm(`Delete ${row.code}? This cannot be undone.`)) return;
+    const res = await apiFetch(`/api/v1/manufacturing/waste-reasons/${row.id}`, { method: "DELETE" }, { silent: true });
+    if (!res.success) {
+      mfgWarn(res.message, "Could not delete waste reason.");
+      return;
+    }
+    mfgSuccess("Waste reason deleted.");
+    if (editingId() === row.id) setEditingId(null);
     await load();
   };
 
@@ -137,14 +187,49 @@ export default function WasteReasonsPage() {
             <For each={rows()}>
               {(r) => (
                 <tr class="border-t border-stroke/80">
-                  <td class="px-3 py-2 font-medium">{r.code}</td>
-                  <td class="px-3 py-2">{r.name}</td>
-                  <td class="px-3 py-2">{r.is_abnormal ? "Yes" : "No"}</td>
+                  <td class="px-3 py-2 font-medium">
+                    <Show when={editingId() === r.id} fallback={r.code}>
+                      <input class={inputClass} value={editCode()} onInput={(e) => setEditCode(e.currentTarget.value)} />
+                    </Show>
+                  </td>
+                  <td class="px-3 py-2">
+                    <Show when={editingId() === r.id} fallback={r.name}>
+                      <input class={inputClass} value={editName()} onInput={(e) => setEditName(e.currentTarget.value)} />
+                    </Show>
+                  </td>
+                  <td class="px-3 py-2">
+                    <Show when={editingId() === r.id} fallback={r.is_abnormal ? "Yes" : "No"}>
+                      <label class="flex items-center gap-2 text-xs">
+                        <input type="checkbox" checked={editAbnormal()} onChange={(e) => setEditAbnormal(e.currentTarget.checked)} />
+                        Abnormal
+                      </label>
+                    </Show>
+                  </td>
                   <td class="px-3 py-2">{r.is_active ? "Yes" : "No"}</td>
                   <td class="px-3 py-2 text-right">
-                    <button type="button" class="text-xs font-medium text-brand-700 hover:underline" onClick={() => void toggleActive(r)}>
-                      {r.is_active ? "Deactivate" : "Activate"}
-                    </button>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <Show
+                        when={editingId() === r.id}
+                        fallback={
+                          <button type="button" class="text-xs font-medium text-brand-700 hover:underline" onClick={() => startEdit(r)}>
+                            Edit
+                          </button>
+                        }
+                      >
+                        <button type="button" class="text-xs font-medium text-brand-700 hover:underline" onClick={() => void saveEdit(r)}>
+                          Save
+                        </button>
+                        <button type="button" class="text-xs font-medium text-text-secondary hover:underline" onClick={() => setEditingId(null)}>
+                          Cancel
+                        </button>
+                      </Show>
+                      <button type="button" class="text-xs font-medium text-brand-700 hover:underline" onClick={() => void toggleActive(r)}>
+                        {r.is_active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button type="button" class="text-xs font-medium text-red-700 hover:underline" onClick={() => void removeReason(r)}>
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
