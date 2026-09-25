@@ -52,37 +52,6 @@ export function CommercialPaywallHost() {
     return forceOpen() || status() === "awaiting_payment";
   };
 
-  // #region agent log
-  createEffect(() => {
-    const s = status();
-    const trade = onTradeScreen();
-    const show = showPaywall();
-    const writeBlocked = Boolean(auth.me?.commercial?.write_blocked);
-    const entBlocked = Boolean(auth.me?.entitlement?.write_blocked);
-    fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "09cb83" },
-      body: JSON.stringify({
-        sessionId: "09cb83",
-        hypothesisId: "A",
-        location: "CommercialPaywall.tsx:showPaywall",
-        message: "trade gate evaluation",
-        data: {
-          path: loc.pathname,
-          commercialStatus: s ?? null,
-          onTradeScreen: trade,
-          forceOpen: forceOpen(),
-          showPaywall: show,
-          commercialWriteBlocked: writeBlocked,
-          entitlementWriteBlocked: entBlocked,
-          company: auth.me?.tenant?.company_code ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  });
-  // #endregion
-
   createEffect(() => {
     const s = status();
     const prev = prevStatus();
@@ -125,24 +94,6 @@ export function CommercialPaywallHost() {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ code?: string }>).detail;
       if (detail?.code === "ERR_COMMERCIAL_LOCKED") {
-        // #region agent log
-        fetch("http://127.0.0.1:7860/ingest/4e7a973e-c880-478e-9306-d7b0547d6f55", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "09cb83" },
-          body: JSON.stringify({
-            sessionId: "09cb83",
-            hypothesisId: "B",
-            location: "CommercialPaywall.tsx:commercial-locked-event",
-            message: "ERR_COMMERCIAL_LOCKED forced paywall open",
-            data: {
-              path: loc.pathname,
-              commercialStatus: status() ?? null,
-              priorForceOpen: forceOpen(),
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         setForceOpen(true);
         void auth.refresh({ background: true });
       }
