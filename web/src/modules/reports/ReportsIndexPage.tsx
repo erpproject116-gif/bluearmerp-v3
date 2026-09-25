@@ -336,7 +336,7 @@ export default function ReportsIndexPage() {
   const searching = () => q().trim().length > 0;
 
   return (
-    <div class="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+    <div class="w-full space-y-5">
       {/* BI dashboard — period summary + ops intelligence charts (formerly ?tab=intel / period-summary) */}
       <section id="reports-bi" class="scroll-mt-4 rounded-xl border border-brand-200 bg-surface p-5 shadow-sm">
         <ReportsBiDashboard opsVariant="full" />

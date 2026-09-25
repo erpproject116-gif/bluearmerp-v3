@@ -235,7 +235,7 @@ export default function FinancialInsightsPage() {
 
   return (
     <FinanceLayout>
-      <div class="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
+      <div class="w-full space-y-6">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">General ledger</p>
