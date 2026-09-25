@@ -163,7 +163,7 @@ export default function RolesPage() {
   return (
     <>
       <p class="mb-3 text-sm text-text-secondary">
-        Job templates. Edit the permission matrix for everyone with this role. Start from a role that is close, then adjust.
+        Job templates. Edit the permission matrix for everyone with this role. Start from a role that is close, then adjust. Use Overrides on Users for one-off exceptions.
       </p>
       <SpreadsheetGrid
         columns={[
@@ -326,7 +326,7 @@ export default function RolesPage() {
           groups={registry.data ?? []}
           values={permValues()}
           loading={registry.isLoading || rolePerms.isLoading}
-          title="Defaults for this role (modules turned on under Module & Features). Users also inherit from groups."
+          title="Defaults for this role (modules turned on under Module & Features). Per-user Overrides on Users can change them."
           enabledModuleCodes={auth.me?.enabled_module_codes ?? null}
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
           submitFlags={submitFlags()}

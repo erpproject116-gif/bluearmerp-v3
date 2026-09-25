@@ -110,7 +110,6 @@ import {
   CollectiveInvoicePrintPage,
   CollectiveInvoiceStatusPrintPage,
   UsersPage,
-  UserGroupsPage,
   RolesPage,
   UserPermissionsPage,
   ProcessPoliciesPage,

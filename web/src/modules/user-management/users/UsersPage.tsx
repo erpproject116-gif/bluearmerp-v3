@@ -15,12 +15,9 @@ import {
   type TenantUserRow,
 } from "../../../shared/useUserManagement";
 import {
-  fetchUserGroups,
-  saveUserGroups,
   saveUserPermissionOverrides,
   useInvalidatePermissions,
   usePermissionRegistry,
-  useUserGroupList,
   useUserPermissions,
 } from "../../../shared/usePermissions";
 
@@ -68,13 +65,11 @@ export default function UsersPage() {
   const [editRole, setEditRole] = createSignal("member");
   const [editStatus, setEditStatus] = createSignal("active");
   const [editName, setEditName] = createSignal("");
-  const [editGroupIds, setEditGroupIds] = createSignal<number[]>([]);
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateUserManagement();
   const permInvalidate = useInvalidatePermissions();
   const roles = useTenantRoleList();
-  const groups = useUserGroupList();
   const registry = usePermissionRegistry();
   const userPerms = useUserPermissions(permUserId);
   const previewPerms = useUserPermissions(previewUserId);
@@ -119,17 +114,12 @@ export default function UsersPage() {
     setInviteOpen(true);
   };
 
-  const openEdit = async (row: TenantUserRow) => {
+  const openEdit = (row: TenantUserRow) => {
     setEditing(row);
     setEditName(row.full_name ?? "");
     setEditRole(row.tenant_role);
     setEditStatus(row.status);
-    setEditGroupIds([]);
     setEditOpen(true);
-    const res = await fetchUserGroups(row.id);
-    if (res.success && res.data?.group_ids) {
-      setEditGroupIds(res.data.group_ids);
-    }
   };
 
   const openOverrides = (row: TenantUserRow) => {
@@ -243,19 +233,8 @@ export default function UsersPage() {
       toast,
       "User updated.",
     );
-    if (!ok) {
-      setSaving(false);
-      return;
-    }
-    if (!row.is_owner) {
-      const groupRes = await saveUserGroups(row.id, editGroupIds());
-      if (!groupRes.success) {
-        toast.warning(groupRes.message ?? "User saved but groups could not be updated.");
-        setSaving(false);
-        return;
-      }
-    }
     setSaving(false);
+    if (!ok) return;
     setEditOpen(false);
     invalidate.all();
   };
@@ -273,7 +252,7 @@ export default function UsersPage() {
     }
     if (
       !confirm(
-        `Soft-delete ${row.full_name || row.email}? They lose access immediately. Role, groups, overrides, and data scopes are kept for restore.`,
+        `Soft-delete ${row.full_name || row.email}? They lose access immediately. Role, overrides, and data scopes are kept for restore.`,
       )
     ) {
       return;
@@ -301,7 +280,7 @@ export default function UsersPage() {
       toast.warning(res.message ?? "Could not restore user.");
       return;
     }
-    toast.success("User restored with prior role, groups, and scopes.");
+    toast.success("User restored with prior role, overrides, and scopes.");
     invalidate.all();
   };
 
@@ -332,11 +311,11 @@ export default function UsersPage() {
     toast.success(res.message ?? "Invite email re-queued.");
   };
 
-  /** Safe re-invite: keeps roles/groups/scopes/auth; emails sign-in + set-password. */
+  /** Safe re-invite: keeps role/overrides/scopes/auth; emails sign-in + set-password. */
   const reinviteKeepData = async (row: TenantUserRow) => {
     if (
       !confirm(
-        `Re-invite ${row.full_name || row.email} and send a set-password link?\n\nKeeps their roles, groups, and permissions. They get an email to sign in and set a new password.`,
+        `Re-invite ${row.full_name || row.email} and send a set-password link?\n\nKeeps their role, overrides, and data scopes. They get an email to sign in and set a new password.`,
       )
     ) {
       return;
@@ -362,7 +341,7 @@ export default function UsersPage() {
     }
     if (
       !confirm(
-        `Remove access and reset ${row.full_name || row.email} for re-invite?\n\nClears data scopes, overrides, and groups; unlinks Google; status becomes Pending invite.\n\nPrefer “Re-invite + set password” if you only need to resend access or let them set a password.`,
+        `Remove access and reset ${row.full_name || row.email} for re-invite?\n\nClears data scopes and overrides; unlinks Google; status becomes Pending invite.\n\nPrefer “Re-invite + set password” if you only need to resend access or let them set a password.`,
       )
     ) {
       return;
@@ -445,7 +424,7 @@ export default function UsersPage() {
   return (
     <div class="space-y-3">
       <p class="text-sm text-text-secondary">
-        Invite people, assign a role (and optional groups), soft-delete/restore. The company owner cannot be deleted
+        Invite people, assign a role, soft-delete/restore. The company owner cannot be deleted
         until a platform superadmin or the current owner uses <strong>Make company owner</strong> on another active
         user. The list defaults to{" "}
         <strong>Active + pending</strong> so outstanding invites stay visible until the person signs in with Google
@@ -478,11 +457,6 @@ export default function UsersPage() {
                 {row.is_owner ? " (Owner)" : ""}
               </span>
             ),
-          },
-          {
-            key: "group_names",
-            header: "Groups",
-            render: (row) => <span class="text-xs text-text-secondary">{row.group_names || "—"}</span>,
           },
           {
             key: "status",
@@ -852,32 +826,6 @@ export default function UsersPage() {
                   </Show>
                 </select>
               </Field>
-              <Show when={!row().is_owner}>
-                <Field label="Groups">
-                  <p class="mb-2 text-xs text-text-secondary">
-                    Optional team packs that add permissions on top of the user’s role (highest level wins).
-                  </p>
-                  <div class="max-h-40 overflow-y-auto rounded-lg border border-stroke p-2">
-                    <For each={groups.data ?? []}>
-                      {(g) => (
-                        <label class="flex cursor-pointer items-center gap-2 py-1 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editGroupIds().includes(g.id)}
-                            disabled={!g.is_active}
-                            onChange={() =>
-                              setEditGroupIds((ids) =>
-                                ids.includes(g.id) ? ids.filter((x) => x !== g.id) : [...ids, g.id],
-                              )
-                            }
-                          />
-                          <span>{g.group_name}</span>
-                        </label>
-                      )}
-                    </For>
-                  </div>
-                </Field>
-              </Show>
             </>
           )}
         </Show>
@@ -893,12 +841,9 @@ export default function UsersPage() {
         singleColumn
       >
         <p class="mb-3 text-sm text-text-secondary">
-          Rare exceptions on top of role <span class="font-medium">{userPerms.data?.tenant_role}</span>
-          <Show when={(userPerms.data?.group_names?.length ?? 0) > 0}>
-            {" "}and groups {(userPerms.data?.group_names ?? []).join(", ")}
-          </Show>
-          . Choose <strong>Role</strong> to inherit the effective default (role + groups). Prefer changing the role
-          matrix when many people need the same access.
+          Rare exceptions on top of role <span class="font-medium">{userPerms.data?.tenant_role}</span>. Choose{" "}
+          <strong>Role</strong> to inherit the role default. Prefer changing the role matrix when many people need the
+          same access.
         </p>
         <PermissionMatrix
           groups={registry.data ?? []}
@@ -906,7 +851,7 @@ export default function UsersPage() {
           allowInherit
           roleDefaults={userPerms.data?.effective as Record<string, AccessLevel> | undefined}
           loading={registry.isLoading || userPerms.isLoading}
-          title="Per-user overrides. Effective access is the highest from role, all groups, then these overrides."
+          title="Per-user overrides. Effective access is the role level unless one of these overrides changes it."
           enabledModuleCodes={auth.me?.enabled_module_codes ?? null}
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
         />
@@ -922,11 +867,8 @@ export default function UsersPage() {
         singleColumn
       >
         <p class="mb-3 text-sm text-text-secondary">
-          Runtime matrix for role <strong>{previewPerms.data?.tenant_role}</strong>
-          <Show when={(previewPerms.data?.group_names?.length ?? 0) > 0}>
-            {" "}+ groups {(previewPerms.data?.group_names ?? []).join(", ")}
-          </Show>
-          , then overrides. Matches what the app enforces after sign-in.
+          Runtime matrix for role <strong>{previewPerms.data?.tenant_role}</strong>, then overrides. Matches what the
+          app enforces after sign-in.
         </p>
         <Show when={previewPerms.isLoading}>
           <p class="text-sm text-text-secondary">Loading…</p>

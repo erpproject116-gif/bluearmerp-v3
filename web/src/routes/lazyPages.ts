@@ -149,7 +149,6 @@ export const CollectiveInvoiceSlipPrintPage = lazy(() => import("../modules/sale
 export const CollectiveInvoicePrintPage = lazy(() => import("../modules/sales/collective-invoicing/CollectiveInvoicePrintPage"));
 export const CollectiveInvoiceStatusPrintPage = lazy(() => import("../modules/sales/collective-invoicing/CollectiveInvoiceStatusPrintPage"));
 export const UsersPage = lazy(() => import("../modules/user-management/users/UsersPage"));
-export const UserGroupsPage = lazy(() => import("../modules/user-management/groups/UserGroupsPage"));
 export const RolesPage = lazy(() => import("../modules/user-management/roles/RolesPage"));
 export const UserPermissionsPage = lazy(() => import("../modules/user-management/user-permissions/UserPermissionsPage"));
 export const ProcessPoliciesPage = lazy(() => import("../modules/user-management/process-policies/ProcessPoliciesPage"));

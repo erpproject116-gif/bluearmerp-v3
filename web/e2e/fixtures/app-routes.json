@@ -280,7 +280,6 @@
     "/app/support/tickets",
     "/app/thank-you-activated",
     "/app/user-management/demo-data",
-    "/app/user-management/groups",
     "/app/user-management/help-feedback",
     "/app/user-management/mapping-center",
     "/app/user-management/migration-center",
@@ -1777,10 +1776,6 @@
     },
     {
       "path": "/app/user-management/demo-data",
-      "kind": "app_static"
-    },
-    {
-      "path": "/app/user-management/groups",
       "kind": "app_static"
     },
     {

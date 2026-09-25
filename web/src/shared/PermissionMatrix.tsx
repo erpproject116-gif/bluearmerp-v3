@@ -56,7 +56,7 @@ export function PermissionMatrix(props: Props) {
     <Show when={!props.loading} fallback={<p class="text-sm text-text-secondary">Loading permissions…</p>}>
       <p class="mb-3 text-sm text-text-secondary">
         {props.title ??
-          "App-wide access for every module and feature. Effective access is the highest level from role, groups, and per-user overrides."}
+          "App-wide access for every module and feature. Effective access is the role level unless a per-user override changes it."}
       </p>
       <div class="max-h-[min(70vh,560px)] overflow-y-auto rounded-lg border border-stroke">
         <table class="w-full text-left text-sm">
@@ -173,7 +173,7 @@ export function PermissionMatrix(props: Props) {
         <strong>Read-only</strong> — view lists and details. <strong>Read & Write</strong> — create and edit.{" "}
         <strong>D/A</strong> — do not allow.
         {showActions() ? " **Submit** — post/confirm/submit actions. **Cancel** — cancel or undo actions." : null}
-        {props.allowInherit ? " **Role** — inherit from the user’s assigned role (groups and overrides can raise access)." : null}
+        {props.allowInherit ? " **Role** — inherit from the user’s assigned role (overrides can raise or lower it)." : null}
       </p>
     </Show>
   );

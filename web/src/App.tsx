@@ -140,7 +140,6 @@ import {
   CollectiveInvoicePrintPage,
   CollectiveInvoiceStatusPrintPage,
   UsersPage,
-  UserGroupsPage,
   RolesPage,
   UserPermissionsPage,
   ProcessPoliciesPage,
@@ -1056,11 +1055,6 @@ export default function App() {
           <Route path="/user-management/roles" component={() => (
             <AdminModuleRoute>
               <RolesPage />
-            </AdminModuleRoute>
-          )} />
-          <Route path="/user-management/groups" component={() => (
-            <AdminModuleRoute>
-              <UserGroupsPage />
             </AdminModuleRoute>
           )} />
           <Route path="/user-management/user-permissions" component={() => (

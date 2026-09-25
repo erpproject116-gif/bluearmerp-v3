@@ -15,12 +15,6 @@ export type PermissionModuleGroup = {
   permissions: PermissionRegistryRow[];
 };
 
-export type GroupPermissionsPayload = {
-  group_code: string;
-  group_name: string;
-  permissions: Record<string, string>;
-};
-
 export type RolePermissionsPayload = {
   role_code: string;
   role_name: string;
@@ -35,10 +29,8 @@ export type UserPermissionsPayload = {
   full_name: string;
   tenant_role: string;
   role_permissions: Record<string, string>;
-  group_permissions?: Record<string, string>;
   overrides: Record<string, string>;
   effective: Record<string, string>;
-  group_names?: string[];
 };
 
 export function usePermissionRegistry() {
@@ -108,71 +100,7 @@ export function useInvalidatePermissions() {
     registry: () => void client.invalidateQueries({ queryKey: ["permission-registry"] }),
     role: (id: number) => void client.invalidateQueries({ queryKey: ["role-permissions", id] }),
     user: (id: number) => void client.invalidateQueries({ queryKey: ["user-permissions", id] }),
-    groups: () => void client.invalidateQueries({ queryKey: ["user-groups"] }),
-    group: (id: number) => void client.invalidateQueries({ queryKey: ["group-permissions", id] }),
   };
-}
-
-export type UserGroupRow = {
-  id: number;
-  group_code: string;
-  group_name: string;
-  description?: string;
-  is_active: boolean;
-  sort_order: number;
-  member_count?: number;
-};
-
-export function useUserGroupList() {
-  return createQuery(() => ({
-    queryKey: ["user-groups"],
-    queryFn: async () => {
-      const res = await apiFetch<UserGroupRow[]>("/api/v1/user-management/groups");
-      if (!res.success) throw new Error(res.message ?? "Failed to load groups");
-      return res.data ?? [];
-    },
-    staleTime: 60_000,
-  }));
-}
-
-export function useGroupPermissions(groupId: () => number | null) {
-  return createQuery(() => {
-    const id = groupId();
-    return {
-      queryKey: ["group-permissions", id],
-      enabled: id != null,
-      queryFn: async () => {
-        const res = await apiFetch<GroupPermissionsPayload>(`/api/v1/user-management/groups/${id}/permissions`);
-        if (!res.success) throw new Error(res.message ?? "Failed to load group permissions");
-        return res.data!;
-      },
-    };
-  });
-}
-
-export async function saveGroupPermissions(groupId: number, permissions: Record<string, string>) {
-  return apiFetch<GroupPermissionsPayload>(`/api/v1/user-management/groups/${groupId}/permissions`, {
-    method: "PUT",
-    body: JSON.stringify({ permissions }),
-  });
-}
-
-export async function saveGroupMembers(groupId: number, userIds: number[]) {
-  return apiFetch(`/api/v1/user-management/groups/${groupId}/members`, {
-    method: "PUT",
-    body: JSON.stringify({ user_ids: userIds }),
-  });
-}
-
-export async function saveUserGroups(userId: number, groupIds: number[]) {
-  return apiFetch(`/api/v1/user-management/users/${userId}/groups`, {
-    method: "PUT",
-    body: JSON.stringify({ group_ids: groupIds }),
-  });
-}
-
-export async function fetchUserGroups(userId: number) {
-  return apiFetch<{ group_ids: number[] }>(`/api/v1/user-management/users/${userId}/groups`);
 }
 
 export type UserDataScope = { scope_type: string; record_id: number };
