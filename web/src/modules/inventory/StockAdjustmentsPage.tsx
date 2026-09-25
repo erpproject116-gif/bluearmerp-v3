@@ -10,6 +10,7 @@ import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid
 import { useToast } from "../../shared/toast";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
+import { InvBookLedgerModal, type InvBookLedgerTarget } from "./reports/InvBookLedgerModal";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 
 export type StockAdjustmentRequestRow = {
@@ -100,6 +101,7 @@ export default function StockAdjustmentsPage() {
   });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
+  const [ledgerRow, setLedgerRow] = createSignal<InvBookLedgerTarget | null>(null);
   const [editRequestId, setEditRequestId] = createSignal<number | null>(null);
   const [status, setStatus] = createSignal("");
   const [draftQ, setDraftQ] = createSignal("");
@@ -246,7 +248,23 @@ export default function StockAdjustmentsPage() {
       <SpreadsheetGrid<StockAdjustmentRequestRow>
         columns={[
           { key: "created_at", header: "When", render: (r) => formatWhen(r.created_at) },
-          { key: "item_code", header: "Item", render: (r) => (r.line_count && r.line_count > 1 ? `${r.item_code} (+${r.line_count - 1})` : r.item_code) },
+          {
+            key: "item_code",
+            header: "Item",
+            clickable: false,
+            render: (r) => (
+              <button
+                type="button"
+                class="text-left font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLedgerRow({ item_id: r.item_id, item_code: r.item_code, item_name: r.item_name });
+                }}
+              >
+                {r.line_count && r.line_count > 1 ? `${r.item_code} (+${r.line_count - 1})` : r.item_code}
+              </button>
+            ),
+          },
           { key: "item_name", header: "Item name" },
           { key: "location_name", header: "Location / branch" },
           {
@@ -418,6 +436,12 @@ export default function StockAdjustmentsPage() {
         </div>
       </Show>
 
+      <InvBookLedgerModal
+        open={ledgerRow() != null}
+        row={ledgerRow()}
+        period={{ date_from: dateFrom(), date_to: dateTo() }}
+        onClose={() => setLedgerRow(null)}
+      />
       <StockAdjustmentModal
         open={adjustOpen()}
         requestId={editRequestId()}

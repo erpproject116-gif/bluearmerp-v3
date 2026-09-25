@@ -23,6 +23,7 @@ import {
   type PickedWoSalesOrderLine,
 } from "./WoSalesOrderLinePickerModal";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { InvBookLedgerModal, type InvBookLedgerTarget } from "../inventory/reports/InvBookLedgerModal";
 
 type WorkOrder = {
   id: number;
@@ -30,6 +31,8 @@ type WorkOrder = {
   bom_id?: number;
   bom_code?: string;
   bom_name?: string;
+  finished_item_id?: number;
+  finished_item_code?: string;
   finished_item_name?: string;
   finished_base_unit_code?: string;
   location_id?: number;
@@ -216,6 +219,8 @@ export default function WorkOrdersPage() {
   const [saving, setSaving] = createSignal(false);
   const [actionId, setActionId] = createSignal<number | null>(null);
   const [materials, setMaterials] = createSignal<MaterialNeeds | null>(null);
+  const [ledgerRow, setLedgerRow] = createSignal<InvBookLedgerTarget | null>(null);
+  const openItemBook = (item: InvBookLedgerTarget) => setLedgerRow(item);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [loadSlipBusy, setLoadSlipBusy] = createSignal(false);
   const [inspectingId, setInspectingId] = createSignal<number | null>(null);
@@ -589,6 +594,31 @@ export default function WorkOrdersPage() {
       const cols: Column<WorkOrder>[] = [
         { key: "work_order_no", header: "Job no.", clickable: true },
         { key: "bom_code", header: "Recipe" },
+        {
+          key: "finished_item_code",
+          header: "Item code",
+          clickable: false,
+          sortable: false,
+          render: (r) =>
+            r.finished_item_id && r.finished_item_code ? (
+              <button
+                type="button"
+                class="text-left font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openItemBook({
+                    item_id: r.finished_item_id!,
+                    item_code: r.finished_item_code!,
+                    item_name: r.finished_item_name ?? "",
+                  });
+                }}
+              >
+                {r.finished_item_code}
+              </button>
+            ) : (
+              "—"
+            ),
+        },
         { key: "finished_item_name", header: copy().headerItemLabel },
         { key: "location_name", header: "Location" },
         {
@@ -797,6 +827,31 @@ export default function WorkOrdersPage() {
       { key: "work_order_no", header: "Job no.", clickable: true },
       { key: "order_date", header: "Date" },
       { key: "bom_code", header: "Recipe" },
+      {
+        key: "finished_item_code",
+        header: "Item code",
+        clickable: false,
+        sortable: false,
+        render: (r) =>
+          r.finished_item_id && r.finished_item_code ? (
+            <button
+              type="button"
+              class="text-left font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                openItemBook({
+                  item_id: r.finished_item_id!,
+                  item_code: r.finished_item_code!,
+                  item_name: r.finished_item_name ?? "",
+                });
+              }}
+            >
+              {r.finished_item_code}
+            </button>
+          ) : (
+            "—"
+          ),
+      },
       { key: "finished_item_name", header: copy().headerItemLabel },
       { key: "location_name", header: "Location" },
       {
@@ -1036,7 +1091,21 @@ export default function WorkOrdersPage() {
               <Show when={needs()?.input_line}>
                 {(input) => (
                   <p class="mt-3 text-sm text-text-primary">
-                    Raw material: <span class="font-medium">{input().component_name}</span>
+                    Raw material:{" "}
+                    <button
+                      type="button"
+                      class="font-medium text-brand-600 hover:underline"
+                      onClick={() =>
+                        openItemBook({
+                          item_id: input().component_item_id,
+                          item_code: input().component_code,
+                          item_name: input().component_name,
+                        })
+                      }
+                    >
+                      {input().component_code}
+                    </button>{" "}
+                    <span class="font-medium">{input().component_name}</span>
                     {" · expected "}
                     {input().stock_to_issue} {input().stock_unit_code}
                     <Show when={wo().actual_input_qty != null}>
@@ -1063,7 +1132,21 @@ export default function WorkOrdersPage() {
                       return (
                         <tr class="border-t border-stroke/70">
                           <td class="py-1.5 pr-3">
-                            {ln.component_code} — {ln.component_name}
+                            <button
+                              type="button"
+                              class="font-medium text-brand-600 hover:underline"
+                              onClick={() =>
+                                openItemBook({
+                                  item_id: ln.component_item_id,
+                                  item_code: ln.component_code,
+                                  item_name: ln.component_name,
+                                })
+                              }
+                            >
+                              {ln.component_code}
+                            </button>
+                            {" — "}
+                            {ln.component_name}
                           </td>
                           <td class="py-1.5 pr-3 text-right tabular-nums">{ln.stock_to_issue}</td>
                           <td class="py-1.5 pr-3 text-right tabular-nums">{actual ?? "—"}</td>
@@ -1166,7 +1249,21 @@ export default function WorkOrdersPage() {
                   <div class="rounded border border-stroke p-2 text-xs">
                     <p class="font-medium text-text-primary">{copy().materialsInputLabel}</p>
                     <p>
-                      {input().component_code}: {input().stock_to_issue.toFixed(4)} {input().stock_unit_code}
+                      <button
+                        type="button"
+                        class="font-medium text-brand-600 hover:underline"
+                        onClick={() =>
+                          openItemBook({
+                            item_id: input().component_item_id,
+                            item_code: input().component_code,
+                            item_name: input().component_name,
+                          })
+                        }
+                      >
+                        {input().component_code}
+                      </button>
+                      {": "}
+                      {input().stock_to_issue.toFixed(4)} {input().stock_unit_code}
                     </p>
                   </div>
                 )}
@@ -1196,7 +1293,23 @@ export default function WorkOrdersPage() {
                     <For each={m().lines}>
                       {(ln) => (
                         <tr class={ln.shortage > 0 ? "bg-red-50 text-red-800" : ""}>
-                          <td class="px-2 py-1.5">{ln.component_code} — {ln.component_name}</td>
+                          <td class="px-2 py-1.5">
+                            <button
+                              type="button"
+                              class="font-medium text-brand-600 hover:underline"
+                              onClick={() =>
+                                openItemBook({
+                                  item_id: ln.component_item_id,
+                                  item_code: ln.component_code,
+                                  item_name: ln.component_name,
+                                })
+                              }
+                            >
+                              {ln.component_code}
+                            </button>
+                            {" — "}
+                            {ln.component_name}
+                          </td>
                           <td class="px-2 py-1.5">{ln.bom_qty} {ln.bom_unit_code}</td>
                           <Show when={mode() === "assembly"}>
                             <td class="px-2 py-1.5">{ln.scrap_qty} {ln.bom_unit_code}</td>
@@ -1235,6 +1348,7 @@ export default function WorkOrdersPage() {
         onClose={() => setSoPickerOpen(false)}
         onConfirm={(picked) => void applySalesOrderLines(picked)}
       />
+      <InvBookLedgerModal open={ledgerRow() != null} row={ledgerRow()} onClose={() => setLedgerRow(null)} />
     </>
   );
 }

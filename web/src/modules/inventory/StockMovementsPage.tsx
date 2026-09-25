@@ -8,6 +8,7 @@ import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
+import { InvBookLedgerModal, type InvBookLedgerTarget } from "./reports/InvBookLedgerModal";
 
 export type StockMovementRow = {
   id: number;
@@ -66,6 +67,7 @@ export default function StockMovementsPage() {
   const [searchParams] = useSearchParams();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("created_at", 25, { defaultOrder: "desc" });
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [ledgerRow, setLedgerRow] = createSignal<InvBookLedgerTarget | null>(null);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
   const [movementType, setMovementType] = createSignal("");
   const [draftQ, setDraftQ] = createSignal("");
@@ -163,9 +165,25 @@ export default function StockMovementsPage() {
       <SpreadsheetGrid
         columns={[
           { key: "created_at", header: "When", render: (r) => formatWhen(r.created_at) },
-          { key: "item_code", header: "Item Code" },
+          {
+            key: "item_code",
+            header: "Item Code",
+            clickable: false,
+            render: (r) => (
+              <button
+                type="button"
+                class="text-left font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLedgerRow({ item_id: r.item_id, item_code: r.item_code, item_name: r.item_name });
+                }}
+              >
+                {r.item_code}
+              </button>
+            ),
+          },
           { key: "item_name", header: "Item Name" },
-          { key: "location_name", header: "Location" },
+          { key: "location_name", header: "Location", clickable: false },
           { key: "qty_delta", header: "Qty Δ", render: (r) => r.qty_delta.toFixed(4) },
           { key: "movement_type", header: "Type" },
           { key: "reason", header: "Reason", render: (r) => r.reason ?? "" },
@@ -217,6 +235,12 @@ export default function StockMovementsPage() {
       </Show>
 
       <StockAdjustmentModal open={adjustOpen()} onClose={() => setAdjustOpen(false)} onSaved={invalidate} />
+      <InvBookLedgerModal
+        open={ledgerRow() != null}
+        row={ledgerRow()}
+        period={{ date_from: dateFrom(), date_to: dateTo() }}
+        onClose={() => setLedgerRow(null)}
+      />
     </div>
   );
 }
