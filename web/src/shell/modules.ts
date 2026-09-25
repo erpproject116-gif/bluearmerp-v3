@@ -67,6 +67,11 @@ export const appModules: AppModule[] = [
       { label: "Dashboard & charts", href: "/app/reports#reports-bi", settingsHref: "/app/reports" },
       { label: "Catalog", href: "/app/reports#report-catalog", settingsHref: "/app/reports" },
       { label: "Saved Views", href: "/app/reports/saved-views", settingsHref: "/app/reports" },
+      {
+        label: "Financial Insights",
+        href: "/app/finance/acct-i/financial-insights",
+        settingsHref: "/app/finance/acct-i/financial-insights",
+      },
     ],
   },
   {
