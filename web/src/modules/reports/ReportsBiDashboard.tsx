@@ -89,14 +89,23 @@ function int(n: number | undefined) {
 const REPORTS_ACTION_PREFIX = "baiko-reports-action:";
 
 function plainActionSentences(msg: string) {
-  return msg
+  const clean = msg
     .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\s+/g, " ")
     .trim();
+  const sentences = clean.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const blocks: string[] = [];
+  for (let i = 0; i < sentences.length; i += 2) {
+    blocks.push(sentences.slice(i, i + 2).join(" "));
+  }
+  return blocks.join("\n\n");
 }
 
+const REPORTS_STORY_QUERY =
+  "Explain this in plain sentences an owner can read aloud. Use only these figures and these words: sales, cost of the goods, profit after the goods, shop costs, profit after everything, cash, cash in, cash out, money customers owe, money you owe. Do not say accounts receivable, accounts payable, revenue, gross profit, net profit, operating expenses, journal, AR, or AP. Do not add a heading. After every two sentences, leave a blank line. Give an opinion of what this means for the shop, say what to correct when a data warning is included, give one labeled estimate of what may happen next only when sales are not New, and end with a short action plan. Do not invent a peso, customer, or date. Do not say the books were audited.";
+
 function reportsActionStorageKey(from: string, to: string, sentence: string) {
-  return ["reports", from, to, sentence].join("|");
+  return ["reports", "story2", from, to, sentence].join("|");
 }
 
 function readReportsAction(key: string) {
@@ -203,7 +212,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
           {
             method: "POST",
             body: JSON.stringify({
-              query: "Say what to do next in plain sentences. Use only these figures. Do not add a heading.",
+              query: REPORTS_STORY_QUERY,
               pathname: "/app/reports",
               page_facts: facts,
             }),
@@ -299,7 +308,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                 What should I do?
               </button>
               <Show when={!!actionParagraph()}>
-                <p class="mt-2 text-sm text-text-secondary">{actionParagraph()}</p>
+                <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-text-secondary">{actionParagraph()}</p>
               </Show>
             </section>
 

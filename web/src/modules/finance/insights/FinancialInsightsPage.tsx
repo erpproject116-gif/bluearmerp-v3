@@ -190,6 +190,7 @@ function metricSlice(metrics: MetricRow[] | undefined, key: string) {
 function whyLineFingerprint(ov: Overview, metric: string, overdue: OverdueInvoice[] | undefined) {
   const row = metricSlice(ov.metrics, metric);
   const parts = [
+    "story2",
     ov.current_from,
     ov.current_to,
     ov.compare_from,
@@ -259,15 +260,24 @@ function writeActionCache(key: string, text: string) {
 }
 
 function insightsActionKey(ov: Overview) {
-  return ["insights", ov.current_from, ov.current_to, ov.compare_from, ov.compare_to, ov.reading ?? ""].join("|");
+  return ["insights", "story2", ov.current_from, ov.current_to, ov.compare_from, ov.compare_to, ov.reading ?? ""].join("|");
 }
 
 function plainBaikoSentences(msg: string) {
-  return msg
+  const clean = msg
     .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\s+/g, " ")
     .trim();
+  const sentences = clean.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const blocks: string[] = [];
+  for (let i = 0; i < sentences.length; i += 2) {
+    blocks.push(sentences.slice(i, i + 2).join(" "));
+  }
+  return blocks.join("\n\n");
 }
+
+const BAIKO_STORY_QUERY =
+  "Explain this in plain sentences an owner can read aloud. Use only these figures and these words: sales, cost of the goods, profit after the goods, shop costs, profit after everything, cash, cash in, cash out, money customers owe, money you owe. Do not say accounts receivable, accounts payable, revenue, gross profit, net profit, operating expenses, journal, AR, or AP. Do not add a heading. After every two sentences, leave a blank line. Give an opinion of what this means for the shop, say what to correct when a data warning is included, give one labeled estimate of what may happen next only when sales are not New, and end with a short action plan. Do not invent a peso, customer, or date. Do not say the books were audited.";
 
 export default function FinancialInsightsPage() {
   const [params, setParams] = useSearchParams();
@@ -282,7 +292,9 @@ export default function FinancialInsightsPage() {
   });
   const comparison = createMemo(() => queryParamFirst(params.comparison) || "previous_month");
   const interval = createMemo(() => queryParamFirst(params.interval) || "month");
-  const whyMetric = createMemo(() => queryParamFirst(params.why_metric) || "revenue");
+  const whyFromUrl = queryParamFirst(params.why_metric) || "revenue";
+  const [whyChoice, setWhyChoice] = createSignal(whyFromUrl);
+  const whyMetric = whyChoice;
   const [askedMetric, setAskedMetric] = createSignal<string | null>(null);
   const [actionAsked, setActionAsked] = createSignal(false);
   const [compareFrom, setCompareFrom] = createSignal(queryParamFirst(params.compare_from) || "");
@@ -411,7 +423,7 @@ export default function FinancialInsightsPage() {
           {
             method: "POST",
             body: JSON.stringify({
-              query: "Explain this one line in plain sentences. Use only these figures. Do not add a heading.",
+              query: BAIKO_STORY_QUERY,
               pathname: "/app/finance/acct-i/financial-insights",
               page_facts: facts,
             }),
@@ -471,7 +483,7 @@ export default function FinancialInsightsPage() {
           {
             method: "POST",
             body: JSON.stringify({
-              query: "Say what to do next in plain sentences. Use only these figures. Do not add a heading.",
+              query: BAIKO_STORY_QUERY,
               pathname: "/app/finance/acct-i/financial-insights",
               page_facts: facts,
             }),
@@ -489,10 +501,22 @@ export default function FinancialInsightsPage() {
 
   const actionParagraph = createMemo(() => cachedAction() || (actionAsked() ? baikoAction.data ?? "" : ""));
 
+  const whyBusy = createMemo(
+    () =>
+      contributors.isFetching ||
+      (whyMetric() === "accounts_receivable" && overdueCustomers.isFetching) ||
+      (askedMetric() === whyMetric() && baikoWhy.isFetching),
+  );
+
+  let whySection: HTMLElement | undefined;
   const openWhy = (key: string) => {
     const metric = key === "gross_profit" ? "cogs" : key;
     setAskedMetric(metric);
-    setParams({ ...params, why_metric: metric }, { replace: true });
+    setWhyChoice(metric);
+    const url = new URL(window.location.href);
+    url.searchParams.set("why_metric", metric);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    queueMicrotask(() => whySection?.scrollIntoView({ block: "nearest" }));
   };
 
   const applyRange = (preset: ReportDatePresetId, next: { date_from: string; date_to: string }) => {
@@ -640,7 +664,7 @@ export default function FinancialInsightsPage() {
                     What should I do?
                   </button>
                   <Show when={!!actionParagraph()}>
-                    <p class="mt-2 text-sm text-text-secondary">{actionParagraph()}</p>
+                    <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-text-secondary">{actionParagraph()}</p>
                   </Show>
                 </div>
               </Show>
@@ -714,7 +738,7 @@ export default function FinancialInsightsPage() {
                 </Show>
               </section>
 
-              <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+              <section ref={whySection} class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
                 <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
                   <h2 class="text-sm font-semibold text-text-primary">Why did this change?</h2>
                   <select
@@ -725,61 +749,69 @@ export default function FinancialInsightsPage() {
                     <For each={WHY_METRICS}>{(m) => <option value={m.value}>{m.label}</option>}</For>
                   </select>
                 </div>
-                <Show when={contributors.isLoading}>
-                  <p class="text-sm text-text-secondary">Loading…</p>
-                </Show>
-                <Show when={!contributors.isLoading && (contributors.data?.rows?.length ?? 0) > 0}>
-                  <ul class="divide-y divide-stroke/70">
-                    <For each={contributors.data?.rows ?? []}>
-                      {(row) => (
-                        <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                          <div>
-                            <A href={row.href} class="font-medium text-brand-700 hover:underline">
-                              {row.account_code} · {row.account_name}
-                            </A>
-                            <p class="text-xs text-text-secondary">
-                              {formatPeso(row.previous)} → {formatPeso(row.current)}
-                            </p>
-                          </div>
-                          <span class={`tabular-nums font-semibold ${row.change >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                            {row.change >= 0 ? "+" : ""}
-                            {formatPeso(row.change)}
-                          </span>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </Show>
-                <Show when={!contributors.isLoading && (contributors.data?.rows?.length ?? 0) === 0}>
-                  <p class="text-sm text-text-secondary">
-                    {contributors.data?.explanation || "No single account explains this change. The movement is in the total."}
-                  </p>
-                  <Show when={!!contributors.data?.href}>
-                    <A href={contributors.data?.href || "#"} class="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline">
-                      {contributors.data?.href_label || "Open the report"}
-                    </A>
+                <Show
+                  when={!whyBusy()}
+                  fallback={
+                    <div class="space-y-2" role="status" aria-live="polite">
+                      <p class="text-sm text-text-secondary">Loading this line…</p>
+                      <div class="h-3 w-3/4 animate-pulse rounded bg-slate-100" />
+                      <div class="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+                    </div>
+                  }
+                >
+                  <Show when={(contributors.data?.rows?.length ?? 0) > 0}>
+                    <ul class="divide-y divide-stroke/70">
+                      <For each={contributors.data?.rows ?? []}>
+                        {(row) => (
+                          <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                            <div>
+                              <A href={row.href} class="font-medium text-brand-700 hover:underline">
+                                {row.account_code} · {row.account_name}
+                              </A>
+                              <p class="text-xs text-text-secondary">
+                                {formatPeso(row.previous)} → {formatPeso(row.current)}
+                              </p>
+                            </div>
+                            <span class={`tabular-nums font-semibold ${row.change >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                              {row.change >= 0 ? "+" : ""}
+                              {formatPeso(row.change)}
+                            </span>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
                   </Show>
-                </Show>
-                <Show when={!!baikoParagraph()}>
-                  <p class="mt-3 text-sm text-text-secondary">{baikoParagraph()}</p>
-                </Show>
-                <Show when={whyMetric() === "accounts_receivable" && (overdueCustomers.data?.overdue_alerts?.length ?? 0) > 0}>
-                  <p class="mb-2 mt-4 text-sm font-medium text-text-primary">Who still owes you</p>
-                  <ul class="space-y-1 text-sm">
-                    <For each={overdueCustomers.data?.overdue_alerts ?? []}>
-                      {(row) => (
-                        <li class="flex flex-wrap justify-between gap-2">
-                          <span>
-                            {row.customer_name || "Customer"} · {row.sales_no}
-                            <Show when={!!row.due_date}>
-                              <span class="text-text-secondary"> · due {row.due_date}</span>
-                            </Show>
-                          </span>
-                          <span class="tabular-nums">{formatPeso(row.balance)}</span>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
+                  <Show when={(contributors.data?.rows?.length ?? 0) === 0}>
+                    <p class="text-sm text-text-secondary">
+                      {contributors.data?.explanation || "No single account explains this change. The movement is in the total."}
+                    </p>
+                    <Show when={!!contributors.data?.href}>
+                      <A href={contributors.data?.href || "#"} class="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline">
+                        {contributors.data?.href_label || "Open the report"}
+                      </A>
+                    </Show>
+                  </Show>
+                  <Show when={!!baikoParagraph()}>
+                    <p class="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-secondary">{baikoParagraph()}</p>
+                  </Show>
+                  <Show when={whyMetric() === "accounts_receivable" && (overdueCustomers.data?.overdue_alerts?.length ?? 0) > 0}>
+                    <p class="mb-2 mt-4 text-sm font-medium text-text-primary">Who still owes you</p>
+                    <ul class="space-y-1 text-sm">
+                      <For each={overdueCustomers.data?.overdue_alerts ?? []}>
+                        {(row) => (
+                          <li class="flex flex-wrap justify-between gap-2">
+                            <span>
+                              {row.customer_name || "Customer"} · {row.sales_no}
+                              <Show when={!!row.due_date}>
+                                <span class="text-text-secondary"> · due {row.due_date}</span>
+                              </Show>
+                            </span>
+                            <span class="tabular-nums">{formatPeso(row.balance)}</span>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
                 </Show>
               </section>
 
