@@ -143,7 +143,10 @@ func LoadAccountContributors(
 	if limit <= 0 {
 		limit = 8
 	}
-	accountTypes, cogsOnly, invert := contributorFilter(metricKey)
+	accountTypes, cogsOnly, invert, supported := contributorFilter(metricKey)
+	if !supported {
+		return []AccountContribution{}, nil
+	}
 	curMap, err := loadAccountAmounts(ctx, pool, tenantID, curFrom, curTo, accountTypes, cogsOnly, invert)
 	if err != nil {
 		return nil, err
@@ -207,20 +210,37 @@ func coalesceName(a, b string) string {
 	return b
 }
 
-func contributorFilter(key MetricKey) (types []string, cogsOnly *bool, invert bool) {
+func contributorFilter(key MetricKey) (types []string, cogsOnly *bool, invert bool, supported bool) {
 	switch key {
 	case MetricRevenue:
-		return []string{"income"}, nil, true
+		return []string{"income"}, nil, true, true
 	case MetricCOGS:
 		t := true
-		return []string{"expense"}, &t, false
+		return []string{"expense"}, &t, false, true
 	case MetricOperatingExpenses:
 		t := false
-		return []string{"expense"}, &t, false
+		return []string{"expense"}, &t, false, true
 	case MetricGrossProfit, MetricNetProfit:
-		return []string{"income", "expense"}, nil, true
+		return []string{"income", "expense"}, nil, true, true
 	default:
-		return []string{"expense"}, nil, false
+		// Cash, money customers owe, and money you owe are ending balances.
+		// They must not fall through to expense accounts.
+		return nil, nil, false, false
+	}
+}
+
+// balanceChangeNote is the plain sentence stem for an ending balance.
+// The handler fills the pesos. Account queries are not used.
+func balanceChangeNote(key MetricKey) (stem string, hrefLabel string, ok bool) {
+	switch key {
+	case MetricCash:
+		return "Cash", "Open cash on the balance sheet", true
+	case MetricAccountsReceivable:
+		return "Money customers owe", "Open who owes you", true
+	case MetricAccountsPayable:
+		return "Money you owe", "Open who you owe", true
+	default:
+		return "", "", false
 	}
 }
 

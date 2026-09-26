@@ -118,7 +118,24 @@ type Contributor = {
   href: string;
 };
 
-type Contributors = { metric_key: string; rows: Contributor[] };
+type Contributors = {
+  metric_key: string;
+  rows: Contributor[];
+  explanation?: string;
+  href?: string;
+  href_label?: string;
+};
+
+type OverdueInvoice = {
+  sales_no: string;
+  customer_name: string;
+  balance: number;
+  due_date: string;
+};
+
+type FinancialHealthSnap = {
+  overdue_alerts?: OverdueInvoice[];
+};
 
 const COMPARISON_OPTIONS: { value: string; label: string }[] = [
   { value: "previous_month", label: "Previous month" },
@@ -131,10 +148,13 @@ const COMPARISON_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const WHY_METRICS: { value: string; label: string }[] = [
-  { value: "operating_expenses", label: "Operating Expenses" },
-  { value: "revenue", label: "Revenue" },
-  { value: "cogs", label: "COGS" },
-  { value: "net_profit", label: "Net Profit accounts" },
+  { value: "revenue", label: "Sales" },
+  { value: "cogs", label: "Cost of the goods" },
+  { value: "operating_expenses", label: "Shop costs" },
+  { value: "net_profit", label: "Profit after everything" },
+  { value: "accounts_receivable", label: "Money customers owe" },
+  { value: "accounts_payable", label: "Money you owe" },
+  { value: "cash", label: "Cash" },
 ];
 
 function fmtMetric(row: { format: string }, value: number) {
@@ -171,7 +191,7 @@ export default function FinancialInsightsPage() {
   });
   const comparison = createMemo(() => queryParamFirst(params.comparison) || "previous_month");
   const interval = createMemo(() => queryParamFirst(params.interval) || "month");
-  const whyMetric = createMemo(() => queryParamFirst(params.why_metric) || "operating_expenses");
+  const whyMetric = createMemo(() => queryParamFirst(params.why_metric) || "revenue");
   const [compareFrom, setCompareFrom] = createSignal(queryParamFirst(params.compare_from) || "");
   const [compareTo, setCompareTo] = createSignal(queryParamFirst(params.compare_to) || "");
 
@@ -222,6 +242,18 @@ export default function FinancialInsightsPage() {
       if (!res.success) throw new Error(res.message ?? "Failed to load contributors");
       return res.data!;
     },
+    staleTime: 60_000,
+  }));
+
+  const overdueCustomers = createQuery(() => ({
+    queryKey: ["finance-insights-overdue-customers"],
+    enabled: whyMetric() === "accounts_receivable",
+    queryFn: async () => {
+      const res = await apiFetch<FinancialHealthSnap>("/api/v1/dashboard/financial-health", {}, { silent: true });
+      if (!res.success || !res.data) return { overdue_alerts: [] as OverdueInvoice[] };
+      return res.data;
+    },
+    retry: false,
     staleTime: 60_000,
   }));
 
@@ -441,9 +473,9 @@ export default function FinancialInsightsPage() {
                   </select>
                 </div>
                 <Show when={contributors.isLoading}>
-                  <p class="text-sm text-text-secondary">Loading account contributors…</p>
+                  <p class="text-sm text-text-secondary">Loading…</p>
                 </Show>
-                <Show when={(contributors.data?.rows?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No account-level movers for this metric.</p>}>
+                <Show when={!contributors.isLoading && (contributors.data?.rows?.length ?? 0) > 0}>
                   <ul class="divide-y divide-stroke/70">
                     <For each={contributors.data?.rows ?? []}>
                       {(row) => (
@@ -460,6 +492,34 @@ export default function FinancialInsightsPage() {
                             {row.change >= 0 ? "+" : ""}
                             {formatPeso(row.change)}
                           </span>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
+                <Show when={!contributors.isLoading && (contributors.data?.rows?.length ?? 0) === 0}>
+                  <p class="text-sm text-text-secondary">
+                    {contributors.data?.explanation || "No single account explains this change. The movement is in the total."}
+                  </p>
+                  <Show when={!!contributors.data?.href}>
+                    <A href={contributors.data?.href || "#"} class="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline">
+                      {contributors.data?.href_label || "Open the report"}
+                    </A>
+                  </Show>
+                </Show>
+                <Show when={whyMetric() === "accounts_receivable" && (overdueCustomers.data?.overdue_alerts?.length ?? 0) > 0}>
+                  <p class="mb-2 mt-4 text-sm font-medium text-text-primary">Who still owes you</p>
+                  <ul class="space-y-1 text-sm">
+                    <For each={overdueCustomers.data?.overdue_alerts ?? []}>
+                      {(row) => (
+                        <li class="flex flex-wrap justify-between gap-2">
+                          <span>
+                            {row.customer_name || "Customer"} · {row.sales_no}
+                            <Show when={!!row.due_date}>
+                              <span class="text-text-secondary"> · due {row.due_date}</span>
+                            </Show>
+                          </span>
+                          <span class="tabular-nums">{formatPeso(row.balance)}</span>
                         </li>
                       )}
                     </For>

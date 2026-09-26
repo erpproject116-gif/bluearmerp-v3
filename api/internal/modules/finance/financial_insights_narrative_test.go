@@ -44,6 +44,23 @@ func TestInsightsReadingUncollectedAndPayable(t *testing.T) {
 	}
 }
 
+func TestContributorFilterDoesNotQueryBalancesAsExpenses(t *testing.T) {
+	for _, key := range []MetricKey{MetricCash, MetricAccountsReceivable, MetricAccountsPayable} {
+		types, _, _, ok := contributorFilter(key)
+		if ok || len(types) > 0 {
+			t.Fatalf("%s must not query accounts, got %v ok=%v", key, types, ok)
+		}
+		stem, label, balance := balanceChangeNote(key)
+		if !balance || stem == "" || label == "" {
+			t.Fatalf("%s missing balance note", key)
+		}
+	}
+	types, _, _, ok := contributorFilter(MetricRevenue)
+	if !ok || len(types) != 1 || types[0] != "income" {
+		t.Fatalf("sales filter = %v ok=%v", types, ok)
+	}
+}
+
 func TestInsightsReadingDataQualityFirst(t *testing.T) {
 	dq := insightsDataQuality{Incomplete: true, Message: "Financial data may be incomplete: 2 draft journal(s)."}
 	metrics := []insightsMetricRow{

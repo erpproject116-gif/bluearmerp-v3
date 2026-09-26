@@ -2,6 +2,7 @@ package finance
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/money"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -66,6 +68,9 @@ type insightsContributorsResponse struct {
 	CompareFrom string                `json:"compare_from"`
 	CompareTo   string                `json:"compare_to"`
 	Rows        []AccountContribution `json:"rows"`
+	Explanation string                `json:"explanation,omitempty"`
+	Href        string                `json:"href,omitempty"`
+	HrefLabel   string                `json:"href_label,omitempty"`
 }
 
 func registerFinancialInsightsRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -250,6 +255,36 @@ func financialInsightsContributors(pool *pgxpool.Pool) http.HandlerFunc {
 				limit = n
 			}
 		}
+		resp := insightsContributorsResponse{
+			MetricKey:   string(metricKey),
+			CurrentFrom: periods.CurrentFrom.Format("2006-01-02"),
+			CurrentTo:   periods.CurrentTo.Format("2006-01-02"),
+			CompareFrom: periods.CompareFrom.Format("2006-01-02"),
+			CompareTo:   periods.CompareTo.Format("2006-01-02"),
+			Rows:        []AccountContribution{},
+		}
+		if note, hrefLabel, balance := balanceChangeNote(metricKey); balance {
+			cur, err := LoadWindowTotals(r.Context(), pool, tu.TenantID, periods.CurrentFrom, periods.CurrentTo)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load contributors.", "ERR_INTERNAL")
+				return
+			}
+			prev, err := LoadWindowTotals(r.Context(), pool, tu.TenantID, periods.CompareFrom, periods.CompareTo)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load contributors.", "ERR_INTERNAL")
+				return
+			}
+			resp.Explanation = fmt.Sprintf("%s went from %s to %s, a change of %s.",
+				note,
+				money.Format(prev.ValueFor(metricKey), "PHP"),
+				money.Format(cur.ValueFor(metricKey), "PHP"),
+				money.Format(cur.ValueFor(metricKey)-prev.ValueFor(metricKey), "PHP"),
+			)
+			resp.Href = insightsMetricHref(metricKey, periods.CurrentFrom, periods.CurrentTo)
+			resp.HrefLabel = hrefLabel
+			response.OK(w, resp, "OK")
+			return
+		}
 		rows, err := LoadAccountContributors(
 			r.Context(), pool, tu.TenantID,
 			periods.CurrentFrom, periods.CurrentTo,
@@ -260,14 +295,14 @@ func financialInsightsContributors(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load contributors.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, insightsContributorsResponse{
-			MetricKey:   string(metricKey),
-			CurrentFrom: periods.CurrentFrom.Format("2006-01-02"),
-			CurrentTo:   periods.CurrentTo.Format("2006-01-02"),
-			CompareFrom: periods.CompareFrom.Format("2006-01-02"),
-			CompareTo:   periods.CompareTo.Format("2006-01-02"),
-			Rows:        rows,
-		}, "OK")
+		if rows == nil {
+			rows = []AccountContribution{}
+		}
+		resp.Rows = rows
+		if len(rows) == 0 {
+			resp.Explanation = "No single account explains this change. The movement is in the total."
+		}
+		response.OK(w, resp, "OK")
 	}
 }
 
