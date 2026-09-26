@@ -1,6 +1,22 @@
 package copilot
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestInsightsPageToolOnlyAcceptsJSON(t *testing.T) {
+	if _, ok := insightsPageTool(nil); ok {
+		t.Fatal("empty facts should not become a tool")
+	}
+	if _, ok := insightsPageTool(json.RawMessage("not-json")); ok {
+		t.Fatal("invalid facts should not become a tool")
+	}
+	got, ok := insightsPageTool(json.RawMessage(`{"reading":"Sales started at ₱1.00"}`))
+	if !ok || got.Name != "financial_insights_page" || !got.OK {
+		t.Fatalf("got %+v ok=%v", got, ok)
+	}
+}
 
 func TestClassifyIntent(t *testing.T) {
 	cases := []struct {

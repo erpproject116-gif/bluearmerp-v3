@@ -103,6 +103,8 @@ type TrendBucket = {
   accounts_payable: number;
   gross_margin_pct: number;
   net_margin_pct: number;
+  cogs?: number;
+  has_journal_data?: boolean;
 };
 
 type Trends = { interval: string; from: string; to: string; buckets: TrendBucket[] };
@@ -255,6 +257,71 @@ export default function FinancialInsightsPage() {
     },
     retry: false,
     staleTime: 60_000,
+  }));
+
+  const baikoRetell = createQuery(() => ({
+    queryKey: [
+      "finance-insights-baiko",
+      overview.data?.reading ?? "",
+      trends.data?.buckets?.length ?? 0,
+      overdueCustomers.data?.overdue_alerts?.length ?? 0,
+    ],
+    enabled: Boolean(overview.data?.reading),
+    retry: false,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const ov = overview.data;
+      if (!ov?.reading) return null;
+      const sales = (ov.metrics ?? []).find((m) => m.key === "revenue");
+      const facts = {
+        reading: ov.reading,
+        current_from: ov.current_from,
+        current_to: ov.current_to,
+        compare_from: ov.compare_from,
+        compare_to: ov.compare_to,
+        sales_change_label: sales?.change_pct_label ?? "",
+        metrics: (ov.metrics ?? []).map((m) => ({
+          key: m.key,
+          current: m.current,
+          previous: m.previous,
+          change: m.change,
+          change_pct_label: m.change_pct_label ?? "",
+        })),
+        trend_buckets: (trends.data?.buckets ?? []).map((b) => ({
+          label: b.label,
+          has_journal_data: b.has_journal_data,
+          revenue: b.revenue,
+          cogs: b.cogs ?? 0,
+          gross_profit: b.gross_profit,
+          operating_expenses: b.operating_expenses,
+          net_profit: b.net_profit,
+          cash: b.cash,
+          accounts_receivable: b.accounts_receivable,
+          accounts_payable: b.accounts_payable,
+        })),
+        overdue_names: (overdueCustomers.data?.overdue_alerts ?? []).map((a) => ({
+          customer_name: a.customer_name,
+          sales_no: a.sales_no,
+          balance: a.balance,
+          due_date: a.due_date,
+        })),
+      };
+      const res = await apiFetch<{ message?: string; used_ai?: boolean }>(
+        "/api/v1/copilot/ask",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            query: "Retell the financial insights reading in plain words. Use only the page figures.",
+            pathname: "/app/finance/acct-i/financial-insights",
+            page_facts: facts,
+          }),
+        },
+        { silent: true },
+      );
+      const msg = res.data?.message?.trim() ?? "";
+      if (!res.success || !res.data?.used_ai || !msg || /audited/i.test(msg)) return null;
+      return msg;
+    },
   }));
 
   const applyRange = (preset: ReportDatePresetId, next: { date_from: string; date_to: string }) => {
@@ -422,8 +489,8 @@ export default function FinancialInsightsPage() {
 
               <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
                 <h2 class="mb-3 text-sm font-semibold text-text-primary">Key changes</h2>
-                <Show when={!!d().reading}>
-                  <p class="mb-3 text-sm text-text-secondary">{d().reading}</p>
+                <Show when={!!(baikoRetell.data || d().reading)}>
+                  <p class="mb-3 text-sm text-text-secondary">{baikoRetell.data || d().reading}</p>
                 </Show>
                 <Show when={(d().key_changes?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No material movements in this comparison.</p>}>
                   <ul class="space-y-2">

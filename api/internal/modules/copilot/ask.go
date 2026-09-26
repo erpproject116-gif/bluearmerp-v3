@@ -1,6 +1,7 @@
 package copilot
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -23,6 +24,9 @@ type askBody struct {
 	Locale      string                            `json:"locale"`
 	Attachments []helpassistant.ComposeAttachment `json:"attachments"`
 	Entities    []EntityRef                       `json:"entities"`
+	// PageFacts is the Financial Insights payload already shown on screen.
+	// Baiko may rephrase it. It is not a license to add numbers.
+	PageFacts json.RawMessage `json:"page_facts,omitempty"`
 }
 
 type askResult struct {
@@ -270,6 +274,9 @@ func postAsk(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		mode := classifyIntent(query)
+		if _, ok := insightsPageTool(body.PageFacts); ok {
+			mode = "ops"
+		}
 		pathname := strings.TrimSpace(body.Pathname)
 		entities := mergeEntities(body.Entities, parseMentionTokens(query))
 
@@ -419,16 +426,20 @@ func askDocs(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg he
 }
 
 func askOps(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, cfg helpassistant.Config, query, pathname string, body askBody, entities []EntityRef) askResult {
-	specs := toolsForQuery(query, entities)
 	var tools []toolResult
 	var links []deepLink
 	var draft *actionDraft
-	for _, s := range specs {
-		tr := runTool(ctx, pool, tu, s.Name, s.Args)
-		tools = append(tools, tr)
-		links = append(links, tr.DeepLinks...)
-		if tr.ActionDraft != nil {
-			draft = tr.ActionDraft
+	if page, ok := insightsPageTool(body.PageFacts); ok {
+		tools = []toolResult{page}
+	} else {
+		specs := toolsForQuery(query, entities)
+		for _, s := range specs {
+			tr := runTool(ctx, pool, tu, s.Name, s.Args)
+			tools = append(tools, tr)
+			links = append(links, tr.DeepLinks...)
+			if tr.ActionDraft != nil {
+				draft = tr.ActionDraft
+			}
 		}
 	}
 	msg, usage, model, used := summarizeTools(ctx, cfg, query, tools, body.Attachments)
@@ -530,7 +541,24 @@ Rules:
 - Never write or debug source code; never propose shell, SQL, or infrastructure commands.
 - For expenses: prefer recurring.monthly_burn / yearly_burn and cash.outflow_mtd / outflow_ytd (and as_of).
 - For revenue / year-end projections: you do NOT have a crystal ball. Give a transparent estimate from live figures only — e.g. YTD inflow/revenue run-rate × remaining months, plus open pipeline / open quotations if present. Label it clearly as an estimate, list assumptions, and never present it as a booked forecast.
+- When a tool named financial_insights_page is present, retell only that JSON, including its reading. Do not invent pesos, customers, or dates. Do not say the books were audited. If sales are marked New, or the earlier sales amount is about zero, do not forecast the rest of the year.
 - Always format money with the Philippine peso sign ₱ and thousands separators (example ₱1,234.50). Never use $ or the letters PHP as a currency prefix.`
+
+// insightsPageTool turns on-screen Financial Insights figures into the only tool
+// Baiko may retell. Other live tools stay out so a different snapshot cannot be mixed in.
+func insightsPageTool(raw json.RawMessage) (toolResult, bool) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || !json.Valid(raw) {
+		return toolResult{}, false
+	}
+	if len(raw) > 16000 {
+		raw = raw[:16000]
+		if !json.Valid(raw) {
+			return toolResult{}, false
+		}
+	}
+	return toolResult{Name: "financial_insights_page", OK: true, Data: append(json.RawMessage(nil), raw...)}, true
+}
 
 func summarizeTools(ctx context.Context, cfg helpassistant.Config, query string, tools []toolResult, atts []helpassistant.ComposeAttachment) (string, llm.Usage, string, bool) {
 	packed, unpackedN, packedN := PackTools(tools, defaultPackToolsMaxBytes)
