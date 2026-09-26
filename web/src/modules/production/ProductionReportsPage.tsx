@@ -255,7 +255,7 @@ export default function ProductionReportsPage() {
               </Field>
             </Show>
             <Show when={tab() !== "stock-movements"}>
-              <Field label="WO status">
+              <Field label="Job status">
                 <select
                   class={inputClass}
                   value={draftFilters().status ?? ""}
@@ -296,7 +296,7 @@ export default function ProductionReportsPage() {
           <table class="erp-grid min-w-full text-left text-sm">
             <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
               <tr>
-                <th class="px-3 py-2">WO no.</th>
+                <th class="px-3 py-2">Job number</th>
                 <th class="px-3 py-2">Date</th>
                 <th class="px-3 py-2">Status</th>
                 <th class="px-3 py-2">Inspection</th>
@@ -306,7 +306,7 @@ export default function ProductionReportsPage() {
                 <th class="px-3 py-2">Location</th>
                 <th class="px-3 py-2 text-right">Qty</th>
                 <th class="px-3 py-2 text-right">Produced</th>
-                <th class="px-3 py-2">Source SO</th>
+                <th class="px-3 py-2">Source sales order</th>
               </tr>
             </thead>
             <tbody>
@@ -362,9 +362,9 @@ export default function ProductionReportsPage() {
           <table class="erp-grid min-w-full text-left text-sm">
             <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
               <tr>
-                <th class="px-3 py-2">WO no.</th>
+                <th class="px-3 py-2">Job number</th>
                 <th class="px-3 py-2">Recipe</th>
-                <th class="px-3 py-2">Source SO</th>
+                <th class="px-3 py-2">Source sales order</th>
                 <th class="px-3 py-2">Status</th>
                 <th class="px-3 py-2 text-right">To produce</th>
                 <th class="px-3 py-2 text-right">Produced</th>
@@ -404,8 +404,8 @@ export default function ProductionReportsPage() {
             <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
               <tr>
                 <th class="px-3 py-2">Date</th>
-                <th class="px-3 py-2">WO no.</th>
-                <th class="px-3 py-2">Source SO</th>
+                <th class="px-3 py-2">Job number</th>
+                <th class="px-3 py-2">Source sales order</th>
                 <th class="px-3 py-2">Item</th>
                 <th class="px-3 py-2">Location</th>
                 <th class="px-3 py-2 text-right">Qty delta</th>

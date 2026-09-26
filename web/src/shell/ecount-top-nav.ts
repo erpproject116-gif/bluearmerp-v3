@@ -49,7 +49,7 @@ export const ECOUNT_TOP_MODULES: EcountTopModule[] = [
   },
   {
     id: "acct2",
-    label: "Cash & AR/AP",
+    label: "Cash, accounts receivable, and accounts payable",
     hint: "Collections, disbursements, bookkeeping",
     href: "/app/finance/bookkeeping",
     navGroupIds: ["accounting_dept"],

@@ -66,10 +66,10 @@ const REPORT_GROUPS: ReportGroup[] = [
 const GLOBAL_QUICK: { key: string; fallbackLabel: string }[] = [
   { key: "profit_and_loss", fallbackLabel: "Profit & Loss" },
   { key: "balance_sheet", fallbackLabel: "Balance Sheet" },
-  { key: "ar_aging", fallbackLabel: "A/R Aging" },
-  { key: "ap_aging", fallbackLabel: "A/P Aging" },
+  { key: "ar_aging", fallbackLabel: "Accounts receivable aging" },
+  { key: "ap_aging", fallbackLabel: "Accounts payable aging" },
   { key: "stock_balance", fallbackLabel: "Stock Balance" },
-  { key: "so_analysis", fallbackLabel: "SO Analysis" },
+  { key: "so_analysis", fallbackLabel: "Sales order analysis" },
 ];
 
 const moduleLabels: Record<string, string> = {

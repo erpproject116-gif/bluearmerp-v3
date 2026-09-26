@@ -97,7 +97,7 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       id: "qc",
       label: "Quality check",
       short: "If required",
-      description: "Only when your company turns on FG QC in Process policies.",
+      description: "Only when your company turns on finished-goods quality check in Process policies.",
       detail: "When QC is off (default), Jobs never show Pass/Hold. When on, Pass before Finish build if blocked.",
       href: "/app/production/assembly/jobs",
       routePrefixes: ["/app/production/assembly/jobs"],
@@ -111,7 +111,7 @@ const ASSEMBLY_FLOW: ProductionFlow = {
       short: "Update stock",
       description: "Posts stock: parts out, finished product in. Writes actual produced.",
       detail:
-        "Click Finish build on the job row (draft or released). Does not create a new item and does not post FG cost — stock qty only.",
+        "Click Finish build on the job row (draft or released). Does not create a new item and does not post finished-goods cost — stock quantity only.",
       href: "/app/production/assembly/jobs",
       routePrefixes: ["/app/production/assembly/jobs"],
       onJobsRow: true,

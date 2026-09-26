@@ -155,7 +155,7 @@ export default function StockMovementsPage() {
             <select class={inputClass} value={movementType()} onChange={(e) => setMovementType(e.currentTarget.value)}>
               <option value="">All</option>
               <option value="adjustment">Adjustment</option>
-              <option value="so_release">SO Release</option>
+              <option value="so_release">Sales order release</option>
               <option value="sales">Sales</option>
               <option value="goods_receipt">Purchase Receive</option>
               <option value="transfer_in">Transfer in</option>

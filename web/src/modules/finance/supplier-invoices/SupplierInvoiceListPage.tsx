@@ -106,7 +106,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
       },
       {
         key: "po_numbers",
-        header: "PO Number",
+        header: "Purchase order number",
         sortable: false,
         render: (r) => r.po_numbers ?? "",
       },
@@ -192,7 +192,7 @@ export function SupplierInvoiceListPageInner(props: PageOptions = {}) {
       },
       {
         key: "pic_name",
-        header: "PIC Name",
+        header: "Person in charge",
         sortable: false,
         render: (r) => r.pic_name ?? "",
       },

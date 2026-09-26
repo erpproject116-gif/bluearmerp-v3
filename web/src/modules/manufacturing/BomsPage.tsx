@@ -623,7 +623,7 @@ export default function BomsPage() {
       );
       if (missingUomIdx >= 0 && !errs.lines) {
         errs.lines = `Line ${missingUomIdx + 1}: this item has no base unit. Set it on the item, then pick the line again.`;
-        errs[`lines[${missingUomIdx}].unit_id`] = "UoM is required.";
+        errs[`lines[${missingUomIdx}].unit_id`] = "Unit is required.";
       }
       const missingBase = bodyLines.some((ln) => {
         const full = lines().find((r) => r.component_item_id === ln.component_item_id);
@@ -733,7 +733,7 @@ export default function BomsPage() {
   const bulkDeactivate = async () => {
     const ids = [...selectedIds()];
     if (ids.length === 0 || !canBulkDeactivate()) return;
-    if (!window.confirm(`Deactivate ${ids.length} selected BOM(s)? Active recipes will be marked inactive.`)) return;
+    if (!window.confirm(`Deactivate ${ids.length} selected recipe(s)? Active recipes will be marked inactive.`)) return;
     setBulkBusy(true);
     const res = await apiFetch<{ updated: number; skipped: number }>(
       "/api/v1/manufacturing/boms/actions/bulk-deactivate",
@@ -824,7 +824,7 @@ export default function BomsPage() {
         onPageChange={setPage}
         search={q()}
         onSearchChange={setQ}
-        searchPlaceholder="Search BOM code, name, item…"
+        searchPlaceholder="Search recipe code, name, item…"
         status={statusFilter()}
         onStatusChange={setStatusFilter}
         statusLabel="Status"
@@ -848,7 +848,7 @@ export default function BomsPage() {
         }
       />
       <Show when={list.isError}>
-        <p class="mt-2 text-sm text-red-600">{list.error instanceof Error ? list.error.message : "Failed to load BOMs."}</p>
+        <p class="mt-2 text-sm text-red-600">{list.error instanceof Error ? list.error.message : "Failed to load recipes."}</p>
       </Show>
 
       <EntityModal
@@ -927,7 +927,7 @@ export default function BomsPage() {
           />
           <Show when={headerMissingBaseUnit() && (finishedItemId() ?? 0) > 0}>
             <p class="mt-1 text-xs text-amber-800">
-              This item has no base unit, so Batch UoM was left empty.{" "}
+              This item has no base unit, so Batch unit was left empty.{" "}
               <A class="font-medium text-brand-700 hover:underline" href={`/app/inventory/items?open=${finishedItemId()}`}>
                 Set the base unit on the item
               </A>
@@ -954,7 +954,7 @@ export default function BomsPage() {
             />
           </Field>
           <label class="block">
-            <span class="mb-1 block text-sm font-medium text-text-primary">Batch UoM</span>
+            <span class="mb-1 block text-sm font-medium text-text-primary">Batch unit</span>
             <input
               class={`${inputClass} bg-slate-50 text-text-secondary`}
               readOnly
@@ -962,7 +962,7 @@ export default function BomsPage() {
               tabindex={-1}
               placeholder="From the whole item's base unit"
               value={outputUnitLabel()}
-              aria-label="Batch UoM"
+              aria-label="Batch unit"
             />
           </label>
         </Show>
@@ -1000,7 +1000,7 @@ export default function BomsPage() {
                 />
               </Field>
               <label class="block">
-                <span class="mb-1 block text-sm font-medium text-text-primary">Batch UoM</span>
+                <span class="mb-1 block text-sm font-medium text-text-primary">Batch unit</span>
                 <input
                   class={`${inputClass} bg-slate-50 text-text-secondary`}
                   readOnly
@@ -1008,7 +1008,7 @@ export default function BomsPage() {
                   tabindex={-1}
                   placeholder="From the finished item's base unit"
                   value={outputUnitLabel()}
-                  aria-label="Batch UoM"
+                  aria-label="Batch unit"
                 />
               </label>
             </Show>
@@ -1024,7 +1024,7 @@ export default function BomsPage() {
                   aria-label="Additional cost type"
                 >
                   <option value="">None</option>
-                  <option value="bom_purchase_cost">BOM purchase cost</option>
+                  <option value="bom_purchase_cost">Recipe purchase cost</option>
                 </select>
               </Field>
             </Show>
@@ -1067,7 +1067,7 @@ export default function BomsPage() {
                   <LookupCombo
                     label={isAssembly() ? "Item" : `Line ${lineNo + 1}`}
                     required
-                    description={isAssembly() ? `Line ${lineNo + 1} — pick from search so UoM and cost fill in.` : undefined}
+                    description={isAssembly() ? `Line ${lineNo + 1} — pick from search so the unit and cost fill in.` : undefined}
                     unlinkedHint="Not linked — pick it from the list or press Enter."
                     value={() => lineLabels()[lineNo] ?? ""}
                     selectedId={() => lines()[lineNo]?.component_item_id || null}
@@ -1236,14 +1236,14 @@ export default function BomsPage() {
                     </label>
                   </Show>
                   <label class="text-sm">
-                    <span class="text-text-secondary">UoM</span>
+                    <span class="text-text-secondary">Unit</span>
                     <input
                       class={`${inputClass} mt-1`}
                       readOnly
                       aria-readonly="true"
                       tabindex={0}
                       value={(lines()[lineNo]?.base_unit_code || lines()[lineNo]?.unit_code || "").trim()}
-                      aria-label={`UoM line ${lineNo + 1}`}
+                      aria-label={`Unit line ${lineNo + 1}`}
                     />
                   </label>
                   <Show when={isAssembly()}>
@@ -1336,7 +1336,7 @@ export default function BomsPage() {
           </button>
           <p class="text-xs text-text-secondary">
             {isAssembly()
-              ? "Pick each item from the list (don’t only type the name). UoM is the item’s base unit, and cost fills in automatically. Costs are estimates from purchase price, or standard cost when purchase price is blank; open Advanced for spare qty and batch settings. Quantities are decimals (half a unit is 0.5)."
+              ? "Pick each item from the list (don’t only type the name). Unit is the item’s base unit, and cost fills in automatically. Costs are estimates from purchase price, or standard cost when purchase price is blank; open Advanced for spare quantity and batch settings. Quantities are decimals (half a unit is 0.5)."
               : copy().stockHint}
           </p>
         </div>

@@ -908,7 +908,7 @@ export function SupplierInvoiceModal(props: Props) {
             fallback={
               <p class="mt-1">
                 Stock posts on <span class="font-medium">Save</span> when qty-tracked lines have serials/lots complete.
-                Set Progress to <span class="font-medium">Completed</span> for AP / vendor bill. Next:{" "}
+                Set Progress to <span class="font-medium">Completed</span> for accounts payable / vendor bill. Next:{" "}
                 <A href="/app/finance/payment-vouchers" class="font-medium text-brand-700 hover:underline">
                   Payment Made
                 </A>
@@ -1034,7 +1034,7 @@ export function SupplierInvoiceModal(props: Props) {
             <ModalLookupField
               settings={byKey}
               fieldKey="pic_name"
-              fallbackLabel="PIC"
+              fallbackLabel="Person in charge"
               value={picName}
               selectedId={picUserId}
               onInput={setPicName}
@@ -1081,7 +1081,7 @@ export function SupplierInvoiceModal(props: Props) {
                   when={Boolean(effectiveEditing())}
                   fallback={
                     <p class="rounded-lg border border-dashed border-stroke bg-slate-50 px-3 py-2 text-xs text-text-secondary">
-                      Starts as Unconfirmed. Stock posts on save (scan serials if required). Set Progress to Completed on the list for AP.
+                      Starts as Unconfirmed. Stock posts on save (scan serials if required). Set Progress to Completed on the list for accounts payable.
                     </p>
                   }
                 >
@@ -1122,7 +1122,7 @@ export function SupplierInvoiceModal(props: Props) {
                 />
               )}
             </ModalField>
-            <ModalField settings={byKey} fieldKey="reference" fallbackLabel="PO Number">
+            <ModalField settings={byKey} fieldKey="reference" fallbackLabel="Purchase order number">
               {(m) => (
                 <input
                   class={inputClass}
@@ -1181,7 +1181,7 @@ export function SupplierInvoiceModal(props: Props) {
                 scope="finance/supplier-invoices"
                 formOpen={props.open}
                 docId={effectiveEditing()?.id}
-                label={`${uiLabel("purchasing.attachments_invoice")} (DR / vendor SI)`}
+                label={`${uiLabel("purchasing.attachments_invoice")} (delivery receipt / vendor sales invoice)`}
                 emptyUnsavedHint="Upload extra files for this purchase (max 25 MB each). Uploads when you Save."
                 required={
                   policyRequiresAttachment(processPolicy.data, "supplier_invoice") &&
@@ -1273,7 +1273,7 @@ export function SupplierInvoiceModal(props: Props) {
             <p class="text-xs text-text-secondary">
               <Show
                 when={processPolicy.data?.purchase_require_gr_before_supplier_invoice}
-                fallback="Load Slip → Purchase Order (or blank Bill) posts stock on save when serials/lots are complete. Attach DR / vendor SI before Completed (AP)."
+                fallback="Load Slip → Purchase Order (or blank Bill) posts stock on save when serials/lots are complete. Attach the delivery receipt or vendor sales invoice before Completed (accounts payable)."
               >
                 Process policy requires Purchase Receive before Bill — use Load Slip → Purchase Receive, or turn the gate off under Process policies (Bill-first is the default).
               </Show>
@@ -1370,7 +1370,7 @@ export function SupplierInvoiceModal(props: Props) {
               </For>
               <Show when={withholdingLines().length > 0}>
                 <p class="text-sm text-text-secondary">
-                  Total withheld: {formatMoney(totalWithheld())} — posted to EWT payable when purchase is posted to GL.
+                  Total withheld: {formatMoney(totalWithheld())} — posted to EWT payable when the purchase is posted to the general ledger.
                 </p>
               </Show>
             </div>

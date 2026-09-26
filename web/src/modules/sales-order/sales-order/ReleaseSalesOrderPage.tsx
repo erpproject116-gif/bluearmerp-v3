@@ -124,7 +124,7 @@ export default function ReleaseSalesOrderPage() {
           <div class="flex flex-wrap items-center gap-2">
             <input
               class={`${inputClass} w-56`}
-              placeholder="Search SO, customer, item…"
+              placeholder="Search sales order, customer, item…"
               value={q()}
               onInput={(e) => {
                 setQ(e.currentTarget.value);

@@ -145,7 +145,7 @@ export function OpenTransactionMonitor(props: Props) {
               Search
               <input
                 class={`${inputClass} mt-0.5 min-w-[12rem]`}
-                placeholder="Customer, partner code, SO no, item…"
+                placeholder="Customer, partner code, sales order number, item…"
                 value={draftQ()}
                 onInput={(e) => commitQ(e.currentTarget.value)}
               />
@@ -154,7 +154,7 @@ export function OpenTransactionMonitor(props: Props) {
               Doc No.
               <input
                 class={`${inputClass} mt-0.5 w-36`}
-                placeholder="Slip / SO / PO…"
+                placeholder="Slip, sales order, or purchase order…"
                 value={draftDocNo()}
                 onInput={(e) => commitDocNo(e.currentTarget.value)}
               />
