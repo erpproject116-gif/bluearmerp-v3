@@ -3,18 +3,22 @@
 # Invoked by GitHub Actions via Alibaba ECS RunCommand, or manually on the VM.
 #
 # Usage:
-#   deploy-api-on-ecs.sh [COMMIT_SHA] [GITHUB_TOKEN]
+#   deploy-api-on-ecs.sh [COMMIT_SHA] [GITHUB_TOKEN] [CONTAINER_NAME]
 #
-# COMMIT_SHA  — optional; defaults to origin/main after fetch
-# GITHUB_TOKEN — optional PAT for private repo fetch (x-access-token)
+# COMMIT_SHA     — optional; when set, fetch that commit (it need not be on main).
+#                  When omitted, reset to origin/main.
+# GITHUB_TOKEN   — optional PAT for private repo fetch (x-access-token)
+# CONTAINER_NAME — optional; defaults to bluearm-api. Production omits this argument.
 
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-/root/bluearmerp-v3}"
 DEPLOY_SHA="${1:-}"
 GIT_TOKEN="${2:-}"
-CONTAINER_NAME="${CONTAINER_NAME:-bluearm-api}"
-ENV_FILE="/tmp/bluearm-api.env"
+CONTAINER_NAME="${3:-${CONTAINER_NAME:-bluearm-api}}"
+ENV_FILE="/tmp/${CONTAINER_NAME}.env"
+ENV_BAK="/tmp/${CONTAINER_NAME}.env.bak"
+IMAGE_NAME="${CONTAINER_NAME}:latest"
 HEALTH_URL="http://127.0.0.1:8080/health"
 SCHEMA_URL="http://127.0.0.1:8080/health/schema"
 
@@ -24,10 +28,11 @@ if [ -n "$GIT_TOKEN" ]; then
   git remote set-url origin "https://x-access-token:${GIT_TOKEN}@github.com/erpproject116-gif/bluearmerp-v3.git"
 fi
 
-git fetch origin main
 if [ -n "$DEPLOY_SHA" ]; then
+  git fetch origin "$DEPLOY_SHA"
   git reset --hard "$DEPLOY_SHA"
 else
+  git fetch origin main
   git reset --hard origin/main
 fi
 git log -1 --oneline
@@ -35,13 +40,13 @@ git log -1 --oneline
 docker inspect "$CONTAINER_NAME" --format '{{range .Config.Env}}{{println .}}{{end}}' > "$ENV_FILE"
 # Keep a durable copy so a failed stop/rm/run cycle cannot wipe secrets.
 if [ -s "$ENV_FILE" ] && grep -q '^DATABASE_URL=' "$ENV_FILE" && grep -q '^SUPABASE_URL=' "$ENV_FILE"; then
-  cp -f "$ENV_FILE" /tmp/bluearm-api.env.bak
-elif [ -f /tmp/bluearm-api.env.bak ] && grep -q '^DATABASE_URL=' /tmp/bluearm-api.env.bak; then
-  cp -f /tmp/bluearm-api.env.bak "$ENV_FILE"
+  cp -f "$ENV_FILE" "$ENV_BAK"
+elif [ -f "$ENV_BAK" ] && grep -q '^DATABASE_URL=' "$ENV_BAK"; then
+  cp -f "$ENV_BAK" "$ENV_FILE"
 fi
 
 cd api
-docker build -t bluearm-api:latest .
+docker build -t "$IMAGE_NAME" .
 docker stop "$CONTAINER_NAME" 2>/dev/null || true
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 docker run -d \
@@ -49,7 +54,7 @@ docker run -d \
   --restart unless-stopped \
   --env-file "$ENV_FILE" \
   -p 8080:8080 \
-  bluearm-api:latest
+  "$IMAGE_NAME"
 
 health_code="000"
 for _ in $(seq 1 30); do
