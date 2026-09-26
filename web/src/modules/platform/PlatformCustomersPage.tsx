@@ -429,6 +429,7 @@ export default function PlatformCustomersPage() {
 
       <Show when={q.isPending} fallback={
         <Show when={q.isError} fallback={
+          <>
           <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
             <table class="w-full min-w-[40rem] text-left text-sm">
               <thead class="border-b border-stroke bg-slate-50 text-xs uppercase text-text-secondary">
@@ -539,6 +540,7 @@ export default function PlatformCustomersPage() {
               </div>
             </section>
           </Show>
+          </>
         }>
           <p class="text-sm text-red-600">Failed to load customers.</p>
         </Show>

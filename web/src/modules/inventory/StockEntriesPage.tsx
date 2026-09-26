@@ -4,7 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
 import { showBlockerResult } from "../../shared/handleSaveResult";
-import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { Field, SpreadsheetGrid, inputClass, type Column } from "../../shared/SpreadsheetGrid";
 import { useTransactionListState } from "../../shared/useListState";
 import { applyColumnLabels, listViewKey, useColumnLabelSettings } from "../../shared/useColumnLabelSettings";
 import { useToast } from "../../shared/toast";
@@ -202,7 +202,7 @@ export default function StockEntriesPage() {
       </CollapsibleFilterPanel>
 
       <SpreadsheetGrid<TransferLineRow>
-        columns={applyColumnLabels([
+        columns={applyColumnLabels<Column<TransferLineRow>>([
           {
             key: "datetime",
             header: "Datetime",

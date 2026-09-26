@@ -4,7 +4,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { DateInput } from "../../shared/DateInput";
 import { apiFetch } from "../../shared/api";
 import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
-import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { Field, SpreadsheetGrid, inputClass, type Column } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useListState } from "../../shared/useListState";
 import { applyColumnLabels, listViewKey, useColumnLabelSettings } from "../../shared/useColumnLabelSettings";
@@ -170,7 +170,7 @@ export default function StockMovementsPage() {
       </CollapsibleFilterPanel>
 
       <SpreadsheetGrid
-        columns={applyColumnLabels([
+        columns={applyColumnLabels<Column<StockMovementRow>>([
           { key: "created_at", header: "When", render: (r) => formatWhen(r.created_at) },
           {
             key: "item_code",

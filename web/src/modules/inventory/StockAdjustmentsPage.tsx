@@ -6,7 +6,7 @@ import { apiFetch } from "../../shared/api";
 import { hasPermission, useAuth, type MeData } from "../../shared/auth-context";
 import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
 import { showBlockerResult } from "../../shared/handleSaveResult";
-import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { Field, SpreadsheetGrid, inputClass, type Column } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
@@ -248,7 +248,7 @@ export default function StockAdjustmentsPage() {
       </CollapsibleFilterPanel>
 
       <SpreadsheetGrid<StockAdjustmentRequestRow>
-        columns={applyColumnLabels([
+        columns={applyColumnLabels<Column<StockAdjustmentRequestRow>>([
           { key: "created_at", header: "When", render: (r) => formatWhen(r.created_at) },
           {
             key: "item_code",
