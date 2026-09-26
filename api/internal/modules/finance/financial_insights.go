@@ -48,6 +48,7 @@ type insightsOverview struct {
 	HasJournalData bool                `json:"has_journal_data"`
 	Metrics        []insightsMetricRow `json:"metrics"`
 	KeyChanges     []KeyChange         `json:"key_changes"`
+	Reading        string              `json:"reading"`
 	DataQuality    insightsDataQuality `json:"data_quality"`
 }
 
@@ -161,6 +162,7 @@ func financialInsightsOverview(pool *pgxpool.Pool) http.HandlerFunc {
 			HasJournalData: cur.HasJournalData || prev.HasJournalData || ytd.HasJournalData,
 			Metrics:        metrics,
 			KeyChanges:     BuildKeyChanges(metrics, 6),
+			Reading:        BuildInsightsReading(metrics, dq),
 			DataQuality:    dq,
 		}, "OK")
 	}

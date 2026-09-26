@@ -71,8 +71,24 @@ type Overview = {
   has_journal_data: boolean;
   metrics: MetricRow[];
   key_changes: KeyChange[];
+  reading?: string;
   data_quality: DataQuality;
 };
+
+const PLAIN_METRIC_LABEL: Record<string, string> = {
+  revenue: "Sales",
+  cogs: "Cost of the goods",
+  gross_profit: "Profit after the goods",
+  operating_expenses: "Shop costs",
+  net_profit: "Profit after everything",
+  cash: "Cash",
+  accounts_receivable: "Money customers owe",
+  accounts_payable: "Money you owe",
+};
+
+function plainMetricLabel(key: string, fallback: string) {
+  return PLAIN_METRIC_LABEL[key] || fallback;
+}
 
 type TrendBucket = {
   label: string;
@@ -374,17 +390,26 @@ export default function FinancialInsightsPage() {
 
               <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
                 <h2 class="mb-3 text-sm font-semibold text-text-primary">Key changes</h2>
+                <Show when={!!d().reading}>
+                  <p class="mb-3 text-sm text-text-secondary">{d().reading}</p>
+                </Show>
                 <Show when={(d().key_changes?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No material movements in this comparison.</p>}>
                   <ul class="space-y-2">
                     <For each={d().key_changes ?? []}>
                       {(kc) => (
                         <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
                           <span class="font-medium text-text-primary">
-                            {kc.label}{" "}
+                            {plainMetricLabel(kc.key, kc.label)}{" "}
                             <span class={tone(kc.favorable)}>
-                              {kc.direction === "up" ? "↑" : kc.direction === "down" ? "↓" : "→"} {kc.change_label || formatPeso(kc.change)}
+                              {kc.direction === "up" ? "↑" : kc.direction === "down" ? "↓" : "→"} {formatPeso(kc.change)}
+                              <Show when={kc.change_label === "New"}>
+                                <span class="ml-1 font-normal text-text-secondary">(started from about zero)</span>
+                              </Show>
+                              <Show when={!!kc.change_label && kc.change_label !== "New" && kc.change_label !== "N/A"}>
+                                <span class="ml-1 font-normal">({kc.change_label})</span>
+                              </Show>
                             </span>
-                            <Show when={kc.material}>
+                            <Show when={kc.material && !(d().key_changes ?? []).every((row) => row.material)}>
                               <span class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900">
                                 Material
                               </span>
