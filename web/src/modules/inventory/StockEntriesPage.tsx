@@ -6,6 +6,7 @@ import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
 import { showBlockerResult } from "../../shared/handleSaveResult";
 import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { useTransactionListState } from "../../shared/useListState";
+import { applyColumnLabels, listViewKey, useColumnLabelSettings } from "../../shared/useColumnLabelSettings";
 import { useToast } from "../../shared/toast";
 import {
   LocationTransferModal,
@@ -78,6 +79,7 @@ function statusClass(status: string) {
 }
 
 export default function StockEntriesPage() {
+  const listCols = useColumnLabelSettings(listViewKey("inv_stock_entry"));
   const toast = useToast();
   const client = useQueryClient();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useTransactionListState("datetime", 25);
@@ -169,7 +171,7 @@ export default function StockEntriesPage() {
   return (
     <div class="space-y-4">
       <CollapsibleFilterPanel
-        title="Location Transfer"
+        title="Stocks Transfer"
         description="Move stock between locations. Qty out and Qty in are the same item quantity; Serial/Lot is a tracking count. Press F8 to search."
       >
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -200,7 +202,7 @@ export default function StockEntriesPage() {
       </CollapsibleFilterPanel>
 
       <SpreadsheetGrid<TransferLineRow>
-        columns={[
+        columns={applyColumnLabels([
           {
             key: "datetime",
             header: "Datetime",
@@ -311,7 +313,7 @@ export default function StockEntriesPage() {
               </div>
             ),
           },
-        ]}
+        ], listCols.columnLabel).filter((c) => listCols.isColumnVisible(c.key))}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
         selectedId={selectedId()}

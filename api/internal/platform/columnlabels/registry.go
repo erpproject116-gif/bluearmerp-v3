@@ -151,6 +151,29 @@ var standardRegistry = map[string][]StandardColumn{
 		{ColumnKey: "reason", Label: "Reason", SortOrder: 70},
 		{ColumnKey: "history", Label: "History", SortOrder: 80},
 	},
+	"inv_stock_entry.lines": {
+		{ColumnKey: "line_no", Label: "#", SortOrder: 10},
+		{ColumnKey: "item", Label: "Item", SortOrder: 20},
+		{ColumnKey: "qty_out", Label: "Quantity out", SortOrder: 30},
+		{ColumnKey: "qty_in", Label: "Quantity in", SortOrder: 40},
+		{ColumnKey: "serial_lot", Label: "Serial / lot", SortOrder: 50},
+		{ColumnKey: "count", Label: "Count", SortOrder: 60},
+		{ColumnKey: "remark", Label: "Remark", SortOrder: 70},
+	},
+	"inv_stock_entry.list": {
+		{ColumnKey: "datetime", Label: "Datetime", SortOrder: 10},
+		{ColumnKey: "entry_no", Label: "TR No", SortOrder: 20},
+		{ColumnKey: "item_code", Label: "Item", SortOrder: 30},
+		{ColumnKey: "from_location_name", Label: "Location out", SortOrder: 40},
+		{ColumnKey: "qty_out", Label: "Qty out", SortOrder: 50},
+		{ColumnKey: "to_location_name", Label: "Location in", SortOrder: 60},
+		{ColumnKey: "qty_in", Label: "Qty in", SortOrder: 70},
+		{ColumnKey: "serial_lot_count", Label: "Serial/Lot", SortOrder: 80},
+		{ColumnKey: "transferred_by_name", Label: "Transferred by", SortOrder: 90},
+		{ColumnKey: "reason", Label: "Reason", SortOrder: 100},
+		{ColumnKey: "status", Label: "Status", SortOrder: 110},
+		{ColumnKey: "actions", Label: "Actions", SortOrder: 120},
+	},
 }
 
 func StandardColumns(viewKey string) []StandardColumn {

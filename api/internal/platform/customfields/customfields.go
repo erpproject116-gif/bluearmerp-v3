@@ -59,6 +59,7 @@ var formEntityTypes = map[string]bool{
 	"ops_work_item":        true,
 	"cms_page":             true,
 	"inv_stock_adjustment": true,
+	"inv_stock_entry":      true,
 }
 
 type querier interface {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
@@ -45,7 +46,10 @@ type StockEntry struct {
 	PostedAt          *string          `json:"posted_at,omitempty"`
 	UpdatedAt         string           `json:"updated_at,omitempty"`
 	Lines             []StockEntryLine `json:"lines,omitempty"`
+	CustomValues      map[string]any   `json:"custom_values,omitempty"`
 }
+
+const stockEntryFormEntity = "inv_stock_entry"
 
 type StockEntryLine struct {
 	ID             int64             `json:"id,omitempty"`
@@ -108,6 +112,7 @@ type stockEntryBody struct {
 	ProjectID      *int64             `json:"project_id"`
 	ProjectName    *string            `json:"project_name"`
 	Lines          []stockEntryLineIn `json:"lines"`
+	CustomValues   map[string]any     `json:"custom_values"`
 }
 
 type stockEntryLineIn struct {
@@ -421,6 +426,9 @@ func loadStockEntry(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 	if e.Lines == nil {
 		e.Lines = []StockEntryLine{}
 	}
+	if vals, err := customfields.LoadValues(ctx, pool, tenantID, stockEntryFormEntity, id); err == nil && len(vals) > 0 {
+		e.CustomValues = vals
+	}
 	return e, nil
 }
 
@@ -445,7 +453,7 @@ func validateStockEntryBody(body stockEntryBody) map[string]string {
 			notes = strings.TrimSpace(*body.Notes)
 		}
 		if notes == "" {
-			errs["notes"] = "Reason is required for a location transfer."
+			errs["notes"] = "Reason is required."
 		}
 	case "issue":
 		if body.FromLocationID == nil || *body.FromLocationID <= 0 {
@@ -539,6 +547,10 @@ func createStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if err := replaceStockEntryLines(r.Context(), tx, tu.TenantID, entryID, body.FromLocationID, body.Lines); err != nil {
 			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
+			return
+		}
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, stockEntryFormEntity, entryID, body.CustomValues); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
 			return
 		}
 
@@ -637,6 +649,10 @@ func updateStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmart(w, map[string]string{"lines": err.Error()})
 			return
 		}
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, stockEntryFormEntity, id, body.CustomValues); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
+			return
+		}
 
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save entry.", "ERR_INTERNAL")
@@ -689,7 +705,7 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 				notes = strings.TrimSpace(*entry.Notes)
 			}
 			if notes == "" {
-				response.Validation(w, map[string]string{"notes": "Reason is required for a location transfer."})
+				response.Validation(w, map[string]string{"notes": "Reason is required."})
 				return
 			}
 			if entry.FromLocationID == nil || entry.ToLocationID == nil ||

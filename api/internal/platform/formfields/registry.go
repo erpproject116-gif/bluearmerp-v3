@@ -216,6 +216,15 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "qty_delta", Label: "Quantity change", FieldType: "number", DefaultRequired: true, SortOrder: 40},
 	},
 	"inv_stock_movement": {},
+	"inv_stock_entry": {
+		{FieldKey: "entry_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "entry_no", Label: "Transfer number", FieldType: "text", SortOrder: 20},
+		{FieldKey: "from_location_id", Label: "Location out", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "to_location_id", Label: "Location in", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+		{FieldKey: "pic_name", Label: "Person in charge", FieldType: "text", SortOrder: 50},
+		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 60},
+		{FieldKey: "notes", Label: "Reason", FieldType: "textarea", DefaultRequired: true, SortOrder: 70},
+	},
 }
 
 func StandardFields(entityType string) []StandardField {

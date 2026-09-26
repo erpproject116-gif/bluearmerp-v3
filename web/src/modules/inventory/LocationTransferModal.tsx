@@ -10,7 +10,10 @@ import {
 } from "../../shared/handleSaveResult";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
-import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalField } from "../../shared/ModalField";
+import { inputClass } from "../../shared/SpreadsheetGrid";
+import { CustomFieldsSection, collectCustomFieldErrors } from "../../shared/CustomFieldsSection";
+import { useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useToast } from "../../shared/toast";
 import { WideEntityModal } from "../../shared/WideEntityModal";
 import { ModuleIcon } from "../../shell/ModuleIcon";
@@ -39,6 +42,7 @@ export type LocationTransferDetail = {
   requested_at?: string | null;
   approved_by_name?: string;
   approved_at?: string | null;
+  custom_values?: Record<string, unknown>;
   lines?: Array<{
     id?: number;
     line_no: number;
@@ -91,8 +95,12 @@ type Props = {
   onSaved: () => void;
 };
 
+const STOCK_ENTRY_ENTITY = "inv_stock_entry";
+
 export function LocationTransferModal(props: Props) {
   const toast = useToast();
+  const { byKey, fields } = useFormFieldSettings(STOCK_ENTRY_ENTITY);
+  const [customValues, setCustomValues] = createSignal<Record<string, unknown>>({});
   const [entryDate, setEntryDate] = createSignal(todayISO());
   const [entryNo, setEntryNo] = createSignal("");
   const [entryId, setEntryId] = createSignal<number | null>(null);
@@ -130,6 +138,7 @@ export function LocationTransferModal(props: Props) {
     setProjectId(ed.project_id ?? null);
     setProjectLabel(ed.project_name ?? "");
     setReason(ed.notes?.trim() ?? "");
+    setCustomValues(ed.custom_values ?? {});
     setRequestedBy(ed.requested_by_name ?? "");
     setRequestedAt(ed.requested_at ?? null);
     setApprovedBy(ed.approved_by_name ?? "");
@@ -176,6 +185,7 @@ export function LocationTransferModal(props: Props) {
     setProjectId(null);
     setProjectLabel("");
     setReason("");
+    setCustomValues({});
     setLines([emptyTransferLine(1)]);
     setRequestedBy("");
     setRequestedAt(null);
@@ -193,6 +203,7 @@ export function LocationTransferModal(props: Props) {
     pic_name: picName().trim() || null,
     project_id: projectId(),
     project_name: projectLabel().trim() || null,
+    custom_values: customValues(),
     lines: lines()
       .filter((ln) => ln.item_id && Number(ln.qty) > 0)
       .map((ln) => ({
@@ -226,6 +237,10 @@ export function LocationTransferModal(props: Props) {
     if (fromLocId() && toLocId() && fromLocId() === toLocId()) {
       validationErrors.to_location_id = "Destination must be different from the source location.";
     }
+    const customDefs = fields()
+      .filter((f) => f.kind === "custom" && f.is_active && f.is_visible)
+      .map((f) => ({ field_key: f.field_key, label: f.label, is_required: f.is_required }));
+    Object.assign(validationErrors, collectCustomFieldErrors(customValues(), customDefs));
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
       showClientValidationBlocker(validationErrors, toast);
@@ -283,7 +298,7 @@ export function LocationTransferModal(props: Props) {
   return (
     <WideEntityModal
       open={props.open}
-      title={entryId() ? (readOnly() ? `Transfer ${entryNo()}` : `Edit transfer ${entryNo()}`) : "New Location Transfer"}
+      title={entryId() ? (readOnly() ? `Transfer ${entryNo()}` : `Edit transfer ${entryNo()}`) : "New Stocks Transfer"}
       icon={<ModuleIcon id="inventory" class="h-5 w-5" />}
       onClose={() => props.onClose()}
       onSave={readOnly() ? undefined : () => void save(false)}
@@ -314,95 +329,125 @@ export function LocationTransferModal(props: Props) {
     >
       <FormErrorSummary errors={fieldErrors} />
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Date" required error={fieldErrors().entry_date}>
-          <DateInput
-            class={inputClass}
-            value={entryDate()}
-            disabled={readOnly()}
-            onInput={(e) => setEntryDate(e.currentTarget.value)}
+        <ModalField settings={byKey} fieldKey="entry_date" fallbackLabel="Date" fallbackRequired errors={fieldErrors}>
+          {(m) => (
+            <DateInput
+              class={inputClass}
+              value={entryDate()}
+              disabled={readOnly() || m.disabled}
+              onInput={(e) => setEntryDate(e.currentTarget.value)}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="entry_no" fallbackLabel="Transfer number">
+          {(m) => (
+            <input class={inputClass} value={entryNo() || "Assigned on save"} readOnly disabled={m.disabled} />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="from_location_id" fallbackLabel="Location out" fallbackRequired bare errors={fieldErrors}>
+          {(m) => (
+            <LookupCombo
+              label={m.label}
+              required={m.required}
+              value={fromLocLabel}
+              selectedId={fromLocId}
+              error={fieldErrors().from_location_id}
+              disabled={readOnly() || m.disabled}
+              onInput={setFromLocLabel}
+              onSelect={(o) => {
+                setFromLocId(o.id);
+                setFromLocLabel(o.label);
+              }}
+              onClear={() => {
+                setFromLocId(null);
+                setFromLocLabel("");
+              }}
+              fetchOptions={fetchLocations}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="to_location_id" fallbackLabel="Location in" fallbackRequired bare errors={fieldErrors}>
+          {(m) => (
+            <LookupCombo
+              label={m.label}
+              required={m.required}
+              value={toLocLabel}
+              selectedId={toLocId}
+              error={fieldErrors().to_location_id}
+              disabled={readOnly() || m.disabled}
+              onInput={setToLocLabel}
+              onSelect={(o) => {
+                setToLocId(o.id);
+                setToLocLabel(o.label);
+              }}
+              onClear={() => {
+                setToLocId(null);
+                setToLocLabel("");
+              }}
+              fetchOptions={fetchLocations}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="pic_name" fallbackLabel="Person in charge" bare>
+          {(m) => (
+            <LookupCombo
+              label={m.label}
+              value={picName}
+              selectedId={picUserId}
+              disabled={readOnly() || m.disabled}
+              onInput={setPicName}
+              onSelect={(o) => {
+                setPicUserId(o.id);
+                setPicName(o.label);
+              }}
+              onClear={() => {
+                setPicUserId(null);
+                setPicName("");
+              }}
+              fetchOptions={fetchUsers}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="project_id" fallbackLabel="Project" bare>
+          {(m) => (
+            <LookupCombo
+              label={m.label}
+              value={projectLabel}
+              selectedId={projectId}
+              disabled={readOnly() || m.disabled}
+              onInput={setProjectLabel}
+              onSelect={(o) => {
+                setProjectId(o.id);
+                setProjectLabel(o.label);
+              }}
+              onClear={() => {
+                setProjectId(null);
+                setProjectLabel("");
+              }}
+              fetchOptions={fetchProjects}
+            />
+          )}
+        </ModalField>
+        <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Reason" fallbackRequired span="full" errors={fieldErrors}>
+          {(m) => (
+            <textarea
+              rows={2}
+              class={inputClass}
+              value={reason()}
+              disabled={readOnly() || m.disabled}
+              placeholder={m.placeholder || "Why is this stock moving?"}
+              onInput={(e) => setReason(e.currentTarget.value)}
+              {...m.inputProps}
+            />
+          )}
+        </ModalField>
+        <div class="col-span-full">
+          <CustomFieldsSection
+            entityType={STOCK_ENTRY_ENTITY}
+            values={customValues}
+            onChange={(key, value) => setCustomValues((prev) => ({ ...prev, [key]: value }))}
           />
-        </Field>
-        <Field label="TR Number">
-          <input class={inputClass} value={entryNo() || "Assigned on save"} readOnly />
-        </Field>
-        <LookupCombo
-          label="Location out"
-          required
-          value={fromLocLabel}
-          selectedId={fromLocId}
-          error={fieldErrors().from_location_id}
-          disabled={readOnly()}
-          onInput={setFromLocLabel}
-          onSelect={(o) => {
-            setFromLocId(o.id);
-            setFromLocLabel(o.label);
-          }}
-          onClear={() => {
-            setFromLocId(null);
-            setFromLocLabel("");
-          }}
-          fetchOptions={fetchLocations}
-        />
-        <LookupCombo
-          label="Location in"
-          required
-          value={toLocLabel}
-          selectedId={toLocId}
-          error={fieldErrors().to_location_id}
-          disabled={readOnly()}
-          onInput={setToLocLabel}
-          onSelect={(o) => {
-            setToLocId(o.id);
-            setToLocLabel(o.label);
-          }}
-          onClear={() => {
-            setToLocId(null);
-            setToLocLabel("");
-          }}
-          fetchOptions={fetchLocations}
-        />
-        <LookupCombo
-          label="PIC"
-          value={picName}
-          selectedId={picUserId}
-          disabled={readOnly()}
-          onInput={setPicName}
-          onSelect={(o) => {
-            setPicUserId(o.id);
-            setPicName(o.label);
-          }}
-          onClear={() => {
-            setPicUserId(null);
-            setPicName("");
-          }}
-          fetchOptions={fetchUsers}
-        />
-        <LookupCombo
-          label="Project"
-          value={projectLabel}
-          selectedId={projectId}
-          disabled={readOnly()}
-          onInput={setProjectLabel}
-          onSelect={(o) => {
-            setProjectId(o.id);
-            setProjectLabel(o.label);
-          }}
-          onClear={() => {
-            setProjectId(null);
-            setProjectLabel("");
-          }}
-          fetchOptions={fetchProjects}
-        />
-        <Field label="Reason" required error={fieldErrors().notes} span="full">
-          <textarea
-            rows={2}
-            class={inputClass}
-            value={reason()}
-            disabled={readOnly()}
-            placeholder="Why is this stock moving?"
-            onInput={(e) => setReason(e.currentTarget.value)}
-          />
-        </Field>
+        </div>
         <Show when={requestedBy() || approvedBy()}>
           <div class="col-span-full grid gap-2 rounded-lg border border-stroke bg-slate-50/80 px-3 py-2 text-xs text-text-secondary sm:grid-cols-2">
             <p>

@@ -47,6 +47,7 @@ import {
   StockAdjustmentsPage,
   StockAdjustmentSettingsPage,
   StockEntriesPage,
+  StockEntrySettingsPage,
   StockReconciliationPage,
   PriceListsPage,
   StockWorkspacePage,
@@ -546,6 +547,7 @@ export default function App() {
           <Route path="/inventory/stock-adjustments" component={StockAdjustmentsPage} />
           <Route path="/inventory/stock-adjustments/settings" component={StockAdjustmentSettingsPage} />
           <Route path="/inventory/stock-entries" component={StockEntriesPage} />
+          <Route path="/inventory/stock-entries/settings" component={StockEntrySettingsPage} />
           <Route path="/inventory/stock-reconciliation" component={StockReconciliationPage} />
           <Route path="/inventory/price-lists" component={PriceListsPage} />
           <Route path="/inventory/product-bundles" component={ProductBundlesPage} />

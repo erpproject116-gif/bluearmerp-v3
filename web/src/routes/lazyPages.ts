@@ -42,6 +42,7 @@ export const StockMovementSettingsPage = lazy(() => import("../modules/inventory
 export const StockAdjustmentsPage = lazy(() => import("../modules/inventory/StockAdjustmentsPage"));
 export const StockAdjustmentSettingsPage = lazy(() => import("../modules/inventory/StockAdjustmentSettingsPage"));
 export const StockEntriesPage = lazy(() => import("../modules/inventory/StockEntriesPage"));
+export const StockEntrySettingsPage = lazy(() => import("../modules/inventory/StockEntrySettingsPage"));
 export const StockReconciliationPage = lazy(() => import("../modules/inventory/StockReconciliationPage"));
 export const PriceListsPage = lazy(() => import("../modules/inventory/PriceListsPage"));
 export const StockWorkspacePage = lazy(() => import("../modules/inventory/StockWorkspacePage"));

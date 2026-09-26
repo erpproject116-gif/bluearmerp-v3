@@ -33,6 +33,7 @@ export const LINE_LABEL_ENTITY_TYPES = new Set([
   "pr_purchase_request",
   "po_purchase_order",
   "fin_supplier_invoice",
+  "inv_stock_entry",
 ]);
 
 /** Entity types with a registered `*.list` view for data-table column settings. */
@@ -40,6 +41,7 @@ export const LIST_COLUMN_ENTITY_TYPES = new Set([
   "fin_supplier_invoice",
   "inv_stock_adjustment",
   "inv_stock_movement",
+  "inv_stock_entry",
 ]);
 
 export function hasLineColumnLabels(entityType: string) {

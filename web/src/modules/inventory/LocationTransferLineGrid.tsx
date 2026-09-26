@@ -1,4 +1,5 @@
 import { Index, Show } from "solid-js";
+import { lineViewKey, useColumnLabelSettings } from "../../shared/useColumnLabelSettings";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
@@ -81,6 +82,9 @@ type Props = {
 };
 
 export function LocationTransferLineGrid(props: Props) {
+  const lineLabels = useColumnLabelSettings(lineViewKey("inv_stock_entry"));
+  const col = (key: string, fallback: string) => lineLabels.columnLabel(key, fallback);
+  const show = (key: string) => lineLabels.isColumnVisible(key, true);
   const updateLine = (index: number, patch: Partial<LocationTransferLineRow>) => {
     props.onChange((prev) => prev.map((ln, i) => (i === index ? { ...ln, ...patch } : ln)));
   };
@@ -101,7 +105,7 @@ export function LocationTransferLineGrid(props: Props) {
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Line items</h3>
           <p class="text-xs text-text-secondary">
-            Qty out and Qty in are the same item quantity. Serial/Lot is a tracking count only.
+            Quantity out and quantity in are the same item quantity. Serial / lot is a tracking count only.
           </p>
         </div>
         <Show when={!props.disabled}>
@@ -114,13 +118,13 @@ export function LocationTransferLineGrid(props: Props) {
         <table class="min-w-full text-left text-sm">
           <thead class="bg-slate-50 text-text-secondary">
             <tr>
-              <th class="px-2 py-2">#</th>
-              <th class="px-2 py-2">Item</th>
-              <th class="px-2 py-2 text-right">Qty out</th>
-              <th class="px-2 py-2 text-right">Qty in</th>
-              <th class="px-2 py-2">Serial / Lot</th>
-              <th class="px-2 py-2 text-right">Count</th>
-              <th class="px-2 py-2">Remark</th>
+              <th class="px-2 py-2">{col("line_no", "#")}</th>
+              <th class="px-2 py-2" classList={{ hidden: !show("item") }}>{col("item", "Item")}</th>
+              <th class="px-2 py-2 text-right" classList={{ hidden: !show("qty_out") }}>{col("qty_out", "Quantity out")}</th>
+              <th class="px-2 py-2 text-right" classList={{ hidden: !show("qty_in") }}>{col("qty_in", "Quantity in")}</th>
+              <th class="px-2 py-2" classList={{ hidden: !show("serial_lot") }}>{col("serial_lot", "Serial / lot")}</th>
+              <th class="px-2 py-2 text-right" classList={{ hidden: !show("count") }}>{col("count", "Count")}</th>
+              <th class="px-2 py-2" classList={{ hidden: !show("remark") }}>{col("remark", "Remark")}</th>
               <th class="px-2 py-2" />
             </tr>
           </thead>
@@ -129,7 +133,7 @@ export function LocationTransferLineGrid(props: Props) {
               {(line, index) => (
                 <tr class="border-t border-stroke/60">
                   <td class="px-2 py-1.5 tabular-nums text-text-secondary">{line().line_no}</td>
-                  <td class="min-w-[14rem] px-2 py-1.5">
+                  <td class="min-w-[14rem] px-2 py-1.5" classList={{ hidden: !show("item") }}>
                     <LookupCombo
                       label=""
                       value={() => line().item_label}
@@ -169,7 +173,7 @@ export function LocationTransferLineGrid(props: Props) {
                       fetchOptions={fetchItems}
                     />
                   </td>
-                  <td class="px-2 py-1.5">
+                  <td class="px-2 py-1.5" classList={{ hidden: !show("qty_out") }}>
                     <input
                       type="number"
                       min="0"
@@ -180,10 +184,10 @@ export function LocationTransferLineGrid(props: Props) {
                       onInput={(e) => updateLine(index, { qty: e.currentTarget.value })}
                     />
                   </td>
-                  <td class="px-2 py-1.5 text-right tabular-nums text-text-secondary">
+                  <td class="px-2 py-1.5 text-right tabular-nums text-text-secondary" classList={{ hidden: !show("qty_in") }}>
                     {line().qty || "—"}
                   </td>
-                  <td class="min-w-[10rem] px-2 py-1.5">
+                  <td class="min-w-[10rem] px-2 py-1.5" classList={{ hidden: !show("serial_lot") }}>
                     <Show when={line().item_id && line().track_serial}>
                       <SerialLineCell
                         mode="units"
@@ -230,10 +234,10 @@ export function LocationTransferLineGrid(props: Props) {
                       <span class="text-xs text-text-secondary">—</span>
                     </Show>
                   </td>
-                  <td class="px-2 py-1.5 text-right tabular-nums text-text-secondary">
+                  <td class="px-2 py-1.5 text-right tabular-nums text-text-secondary" classList={{ hidden: !show("count") }}>
                     {trackingCount(line()) > 0 ? trackingCount(line()) : "—"}
                   </td>
-                  <td class="min-w-[10rem] px-2 py-1.5">
+                  <td class="min-w-[10rem] px-2 py-1.5" classList={{ hidden: !show("remark") }}>
                     <input
                       class={inputClass}
                       value={line().remark}
