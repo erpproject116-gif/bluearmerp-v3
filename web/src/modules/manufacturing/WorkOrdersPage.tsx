@@ -25,6 +25,7 @@ import {
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
 import { InvBookLedgerModal, type InvBookLedgerTarget } from "../inventory/reports/InvBookLedgerModal";
+import { formatMoney } from "../../shared/money";
 
 type WorkOrder = {
   id: number;
@@ -210,7 +211,24 @@ export default function WorkOrdersPage() {
   const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = createSignal(false);
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [savedCosts, setSavedCosts] = createSignal<{ labor_cost: number; overhead_cost: number; other_cost: number } | null>(null);
   const [editing, setEditing] = createSignal<WorkOrder | null>(null);
+  createEffect(() => {
+    const ed = editing();
+    if (!modalOpen() || !ed || ed.status !== "completed") {
+      setSavedCosts(null);
+      return;
+    }
+    const id = ed.id;
+    void apiFetch<{ costs: { labor_cost: number; overhead_cost: number; other_cost: number } }>(
+      `/api/v1/manufacturing/work-orders/${id}/cost-posting`,
+      undefined,
+      { silent: true },
+    ).then((res) => {
+      if (editing()?.id !== id) return;
+      setSavedCosts(res.success && res.data ? res.data.costs : null);
+    });
+  });
   const [bomId, setBomId] = createSignal<number | null>(null);
   const [bomLabel, setBomLabel] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
@@ -1286,6 +1304,15 @@ export default function WorkOrdersPage() {
                       {": "}
                       {input().stock_to_issue.toFixed(4)} {input().stock_unit_code}
                     </p>
+                  </div>
+                )}
+              </Show>
+              <Show when={editing()?.status === "completed" && savedCosts()}>
+                {(costs) => (
+                  <div class="mb-3 grid gap-2 rounded-lg border border-stroke bg-slate-50 p-3 text-sm sm:grid-cols-3">
+                    <span class="text-text-secondary">Labor <span class="font-medium text-text-primary">{formatMoney(costs().labor_cost)}</span></span>
+                    <span class="text-text-secondary">Overhead <span class="font-medium text-text-primary">{formatMoney(costs().overhead_cost)}</span></span>
+                    <span class="text-text-secondary">Other <span class="font-medium text-text-primary">{formatMoney(costs().other_cost)}</span></span>
                   </div>
                 )}
               </Show>

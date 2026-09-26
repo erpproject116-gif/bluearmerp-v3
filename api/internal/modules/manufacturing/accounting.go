@@ -182,32 +182,27 @@ func normalizeManufacturingCosts(material, labor, overhead, other float64) (manu
 }
 
 // Journal line labels shared by the preview and the posted entry.
+// Material cost stays on the job and is not a journal line.
 const (
-	costLineFinishedGoods = "Finished goods inventory"
-	costLineMaterials     = "Materials inventory"
-	costLineConversion    = "Production cost absorption"
+	costLineProductionExpense = "Production expense"
+	costLineProductionCredit  = "Production cost absorption"
 )
 
-// costPostingAccounts are the three chart-of-accounts legs of a completion entry:
-// Dr finished goods (total), Cr materials (material), Cr conversion (labor+overhead+other).
+// costPostingAccounts are the expense legs of a completion entry:
+// Dr production expense, Cr production cost absorption, both for labor+overhead+other.
 type costPostingAccounts struct {
 	Debit            int64
 	CreditMaterial   int64
 	CreditConversion int64
 }
 
-// buildCostPostingLines maps the preview lines onto the chosen accounts. Zero
-// lines are already dropped by manufacturingJournalPreview, so the conversion
-// account is only consulted when there is a conversion amount.
+// buildCostPostingLines maps the preview lines onto the chosen expense accounts.
 func buildCostPostingLines(costs manufacturingCosts, accts costPostingAccounts) []invoicejournal.Line {
 	preview := manufacturingJournalPreview(costs)
 	lines := make([]invoicejournal.Line, 0, len(preview))
 	for _, line := range preview {
 		accountID := accts.Debit
-		switch line.Label {
-		case costLineMaterials:
-			accountID = accts.CreditMaterial
-		case costLineConversion:
+		if line.Label == costLineProductionCredit {
 			accountID = accts.CreditConversion
 		}
 		lines = append(lines, invoicejournal.Line{
@@ -221,27 +216,14 @@ func buildCostPostingLines(costs manufacturingCosts, accts costPostingAccounts) 
 }
 
 func manufacturingJournalPreview(costs manufacturingCosts) []manufacturingJournalLine {
-	if costs.Total <= 0.0001 {
+	conversion := costs.Labor + costs.Overhead + costs.Other
+	if conversion <= 0.0001 {
 		return []manufacturingJournalLine{}
 	}
-	lines := []manufacturingJournalLine{{
-		Label: costLineFinishedGoods,
-		Debit: costs.Total,
-	}}
-	if costs.Material > 0.0001 {
-		lines = append(lines, manufacturingJournalLine{
-			Label:  costLineMaterials,
-			Credit: costs.Material,
-		})
+	return []manufacturingJournalLine{
+		{Label: costLineProductionExpense, Debit: conversion},
+		{Label: costLineProductionCredit, Credit: conversion},
 	}
-	conversion := costs.Labor + costs.Overhead + costs.Other
-	if conversion > 0.0001 {
-		lines = append(lines, manufacturingJournalLine{
-			Label:  costLineConversion,
-			Credit: conversion,
-		})
-	}
-	return lines
 }
 
 func estimateManufacturingMaterialCost(
@@ -283,14 +265,11 @@ func postManufacturingCompletionJournal(
 	costs manufacturingCosts,
 ) (int64, error) {
 	enabled, err := inventorygl.Enabled(ctx, tx, tenantID)
-	if err != nil || !enabled || costs.Total <= 0.0001 {
+	conversion := costs.Labor + costs.Overhead + costs.Other
+	if err != nil || !enabled || conversion <= 0.0001 {
 		return 0, err
 	}
-	inventoryAccountID, err := financedefaults.ResolveByRole(ctx, tx, tenantID, financedefaults.RoleInventory)
-	if err != nil {
-		return 0, err
-	}
-	cogsAccountID, err := financedefaults.ResolveByRole(ctx, tx, tenantID, financedefaults.RoleCOGS)
+	expenseAccountID, err := financedefaults.ResolveByRole(ctx, tx, tenantID, financedefaults.RoleCOGS)
 	if err != nil {
 		return 0, err
 	}
@@ -327,9 +306,8 @@ func postManufacturingCompletionJournal(
 		return 0, err
 	}
 	lines := buildCostPostingLines(costs, costPostingAccounts{
-		Debit:            inventoryAccountID,
-		CreditMaterial:   inventoryAccountID,
-		CreditConversion: cogsAccountID,
+		Debit:            expenseAccountID,
+		CreditConversion: expenseAccountID,
 	})
 	for i, line := range lines {
 		if _, err := tx.Exec(ctx, `

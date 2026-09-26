@@ -203,14 +203,13 @@ func loadCostPosting(ctx context.Context, q rowQuerier, tenantID, workOrderID in
 	}
 	p.Lines = manufacturingJournalPreview(p.Costs)
 
-	if p.DebitAccountID == nil {
-		p.DebitAccountID = defaultAccountID(ctx, q, tenantID, financedefaults.RoleInventory)
-	}
-	if p.CreditMaterialAccountID == nil {
-		p.CreditMaterialAccountID = defaultAccountID(ctx, q, tenantID, financedefaults.RoleInventory)
-	}
-	if p.CreditConversionAccountID == nil && p.conversionAmount() > 0.0001 {
-		p.CreditConversionAccountID = defaultAccountID(ctx, q, tenantID, financedefaults.RoleCOGS)
+	if p.conversionAmount() > 0.0001 {
+		if p.DebitAccountID == nil {
+			p.DebitAccountID = defaultAccountID(ctx, q, tenantID, financedefaults.RoleCOGS)
+		}
+		if p.CreditConversionAccountID == nil {
+			p.CreditConversionAccountID = defaultAccountID(ctx, q, tenantID, financedefaults.RoleCOGS)
+		}
 	}
 	p.DebitAccountLabel = accountLabel(ctx, q, tenantID, p.DebitAccountID)
 	p.CreditMaterialAccountLabel = accountLabel(ctx, q, tenantID, p.CreditMaterialAccountID)
@@ -325,8 +324,8 @@ func putCostPosting(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load production costs.", "ERR_INTERNAL")
 			return
 		}
-		if current.Costs.Total <= 0.0001 {
-			response.Validation(w, map[string]string{"cost": "This job has no cost to record."})
+		if current.conversionAmount() <= 0.0001 {
+			response.Validation(w, map[string]string{"cost": "This job has no production cost to record. Material cost stays on the job and is not booked again."})
 			return
 		}
 		if current.reversed {
@@ -339,23 +338,17 @@ func putCostPosting(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		errs := map[string]string{}
-		if err := validateCostAccount(r.Context(), tx, tu.TenantID, body.DebitAccountID, "asset"); err != nil {
+		if err := validateCostAccount(r.Context(), tx, tu.TenantID, body.DebitAccountID, "expense"); err != nil {
 			errs["debit_account_id"] = err.Error()
 		}
-		if err := validateCostAccount(r.Context(), tx, tu.TenantID, body.CreditMaterialAccountID, "asset"); err != nil {
-			errs["credit_material_account_id"] = err.Error()
+		conversionID := int64(0)
+		if body.CreditConversionAccountID != nil {
+			conversionID = *body.CreditConversionAccountID
 		}
-		accts := costPostingAccounts{Debit: body.DebitAccountID, CreditMaterial: body.CreditMaterialAccountID}
-		if current.conversionAmount() > 0.0001 {
-			conversionID := int64(0)
-			if body.CreditConversionAccountID != nil {
-				conversionID = *body.CreditConversionAccountID
-			}
-			if err := validateCostAccount(r.Context(), tx, tu.TenantID, conversionID, "expense"); err != nil {
-				errs["credit_conversion_account_id"] = err.Error()
-			}
-			accts.CreditConversion = conversionID
+		if err := validateCostAccount(r.Context(), tx, tu.TenantID, conversionID, "expense"); err != nil {
+			errs["credit_conversion_account_id"] = err.Error()
 		}
+		accts := costPostingAccounts{Debit: body.DebitAccountID, CreditConversion: conversionID}
 		if len(errs) > 0 {
 			response.Validation(w, errs)
 			return
@@ -399,13 +392,13 @@ func putCostPosting(pool *pgxpool.Pool) http.HandlerFunc {
 			update public.mfg_work_order_cost_postings
 			set journal_entry_id = $3,
 			  debit_account_id = $4,
-			  credit_material_account_id = $5,
-			  credit_conversion_account_id = $6,
-			  remark = nullif($7, ''),
-			  accounts_set_by_user_id = $8,
+			  credit_material_account_id = null,
+			  credit_conversion_account_id = $5,
+			  remark = nullif($6, ''),
+			  accounts_set_by_user_id = $7,
 			  accounts_set_at = now()
 			where tenant_id = $1 and work_order_id = $2`,
-			tu.TenantID, workOrderID, journalID, accts.Debit, accts.CreditMaterial, conversionArg,
+			tu.TenantID, workOrderID, journalID, accts.Debit, conversionArg,
 			body.Remark, tu.AppUserID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to record in the books.", "ERR_INTERNAL")
 			return

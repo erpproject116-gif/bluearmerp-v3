@@ -53,6 +53,13 @@ type MaterialNeeds = {
 type JournalPreview = {
   accounting_enabled: boolean;
   costs: { material_cost: number };
+  lines?: { label: string; debit: number; credit: number }[];
+};
+
+type BomCostDetail = {
+  output_qty?: number;
+  direct_labor_cost?: number;
+  inbound_freight_cost?: number;
 };
 
 const searchBoms = (q: string) => lookupBomsForOrderType("assembly", q);
@@ -89,6 +96,9 @@ export default function NewAssemblyOrderWizard() {
   const [labor, setLabor] = createSignal("");
   const [overhead, setOverhead] = createSignal("");
   const [otherCost, setOtherCost] = createSignal("");
+  const [recipeLabor, setRecipeLabor] = createSignal(0);
+  const [recipeFreight, setRecipeFreight] = createSignal(0);
+  const [recipeOutputQty, setRecipeOutputQty] = createSignal(1);
   const [needs, setNeeds] = createSignal<MaterialNeeds | null>(null);
   const [needsError, setNeedsError] = createSignal("");
   const [journalPreview, setJournalPreview] = createSignal<JournalPreview | null>(null);
@@ -104,10 +114,28 @@ export default function NewAssemblyOrderWizard() {
     finished: false,
   });
 
+  const applyRecipeCosts = (qtyRaw: string, laborPerBatch = recipeLabor(), freightPerBatch = recipeFreight(), batchQty = recipeOutputQty()) => {
+    const batch = batchQty > 0 ? batchQty : 1;
+    const scale = (Number(qtyRaw) || 0) / batch;
+    const laborAmt = laborPerBatch * scale;
+    const freightAmt = freightPerBatch * scale;
+    setLabor(laborAmt ? String(Math.round(laborAmt * 10000) / 10000) : "");
+    setOverhead(freightAmt ? String(Math.round(freightAmt * 10000) / 10000) : "");
+  };
+
+  const loadRecipeCosts = async (id: number, qtyRaw: string) => {
+    const res = await apiFetch<BomCostDetail>(`/api/v1/manufacturing/boms/${id}`, undefined, { silent: true });
+    const laborPerBatch = Number(res.data?.direct_labor_cost) || 0;
+    const freightPerBatch = Number(res.data?.inbound_freight_cost) || 0;
+    const batchQty = Number(res.data?.output_qty) || 1;
+    setRecipeLabor(laborPerBatch);
+    setRecipeFreight(freightPerBatch);
+    setRecipeOutputQty(batchQty);
+    applyRecipeCosts(qtyRaw, laborPerBatch, freightPerBatch, batchQty);
+  };
+
   const additionalCost = () =>
     (Number(labor()) || 0) + (Number(overhead()) || 0) + (Number(otherCost()) || 0);
-  const estimatedTotalCost = () => (journalPreview()?.costs.material_cost ?? 0) + additionalCost();
-
   const hasShortage = () => materialNeedsHasShortage(needs()?.lines ?? []);
   const canDraftShortagePo = () =>
     hasPermission(auth.me, "purchase_order.purchase_orders", "write") &&
@@ -158,8 +186,13 @@ export default function NewAssemblyOrderWizard() {
   };
 
   const loadJournalPreview = async (id: number) => {
+    const qs = new URLSearchParams({
+      labor_cost: String(Number(labor()) || 0),
+      overhead_cost: String(Number(overhead()) || 0),
+      other_cost: String(Number(otherCost()) || 0),
+    });
     const res = await apiFetch<JournalPreview>(
-      `/api/v1/manufacturing/work-orders/${id}/journal-preview`,
+      `/api/v1/manufacturing/work-orders/${id}/journal-preview?${qs}`,
       undefined,
       { silent: true },
     );
@@ -406,10 +439,16 @@ export default function NewAssemblyOrderWizard() {
                   setBomSearchEmpty(false);
                   setBomMismatch(null);
                   setBomRateLimited(false);
+                  void loadRecipeCosts(o.id, qty());
                 }}
                 onClear={() => {
                   setBomId(null);
                   setBomLabel("");
+                  setRecipeLabor(0);
+                  setRecipeFreight(0);
+                  setRecipeOutputQty(1);
+                  setLabor("");
+                  setOverhead("");
                 }}
                 fetchOptions={async (q) => {
                   const result = await searchBoms(q);
@@ -457,7 +496,11 @@ export default function NewAssemblyOrderWizard() {
                 min="0.0001"
                 step="any"
                 value={qty()}
-                onInput={(e) => setQty(e.currentTarget.value)}
+                onInput={(e) => {
+                  const next = e.currentTarget.value;
+                  setQty(next);
+                  if (bomId()) applyRecipeCosts(next);
+                }}
                 aria-label="Quantity to produce"
               />
             </Field>
@@ -613,7 +656,7 @@ export default function NewAssemblyOrderWizard() {
             </Field>
             <p class="text-sm font-medium">Total additional: {formatPeso(additionalCost())}</p>
             <p class="text-[11px] text-text-secondary">
-              These costs are capitalized into the finished-goods estimate when you post.
+              Labor and overhead come from the recipe and scale with quantity. They post as an expense. Material cost stays on the job and is not booked again.
             </p>
           </div>
           <div class="rounded-xl border border-stroke bg-white p-4">
@@ -634,10 +677,18 @@ export default function NewAssemblyOrderWizard() {
                 }
               >
                 <div class="mt-2 space-y-1 text-xs">
-                  <div class="flex justify-between gap-3"><span>Dr Finished goods inventory</span><span>{formatPeso(estimatedTotalCost())}</span></div>
-                  <div class="flex justify-between gap-3"><span>Cr Materials inventory</span><span>{formatPeso(journalPreview()?.costs.material_cost ?? 0)}</span></div>
-                  <Show when={additionalCost() > 0}>
-                    <div class="flex justify-between gap-3"><span>Cr Production cost absorption</span><span>{formatPeso(additionalCost())}</span></div>
+                  <Show
+                    when={(journalPreview()?.lines?.length ?? 0) > 0}
+                    fallback={<p class="text-text-secondary">No production cost to post.</p>}
+                  >
+                    <For each={journalPreview()?.lines ?? []}>
+                      {(line) => (
+                        <div class="flex justify-between gap-3">
+                          <span>{line.debit > 0 ? "Dr" : "Cr"} {line.label}</span>
+                          <span>{formatPeso(line.debit > 0 ? line.debit : line.credit)}</span>
+                        </div>
+                      )}
+                    </For>
                   </Show>
                 </div>
                 <Show when={!journalPreview()?.accounting_enabled}>

@@ -42,13 +42,12 @@ type Props = {
   onSaved: () => void;
 };
 
-const LINE_FINISHED_GOODS = "Finished goods inventory";
-const LINE_MATERIALS = "Materials inventory";
+const LINE_PRODUCTION_EXPENSE = "Production expense";
 
 /**
- * Record a completed job's production cost in the books with chosen accounts:
- * Dr finished goods (total) / Cr materials (material) / Cr absorption (labor,
- * overhead, other). Mirrors the Acct I / Acct II pickers on the invoice tab.
+ * Record a completed job's production cost in the books:
+ * Dr production expense / Cr production cost absorption, both expense accounts,
+ * for labor + overhead + other. Material cost stays on the job.
  */
 export function RecordCostsModal(props: Props) {
   const toast = useToast();
@@ -60,8 +59,6 @@ export function RecordCostsModal(props: Props) {
 
   const [debitLabel, setDebitLabel] = createSignal("");
   const [debitId, setDebitId] = createSignal<number | null>(null);
-  const [materialLabel, setMaterialLabel] = createSignal("");
-  const [materialId, setMaterialId] = createSignal<number | null>(null);
   const [conversionLabel, setConversionLabel] = createSignal("");
   const [conversionId, setConversionId] = createSignal<number | null>(null);
   const [remark, setRemark] = createSignal("");
@@ -75,8 +72,7 @@ export function RecordCostsModal(props: Props) {
   const isDraft = () => payload()?.journal_status === "draft";
 
   const accountLabelFor = (line: PreviewLine): string => {
-    if (line.label === LINE_FINISHED_GOODS) return debitLabel();
-    if (line.label === LINE_MATERIALS) return materialLabel();
+    if (line.label === LINE_PRODUCTION_EXPENSE) return debitLabel();
     return conversionLabel();
   };
 
@@ -95,8 +91,6 @@ export function RecordCostsModal(props: Props) {
     setPayload(p);
     setDebitId(p.debit_account_id);
     setDebitLabel(p.debit_account_label);
-    setMaterialId(p.credit_material_account_id);
-    setMaterialLabel(p.credit_material_account_label);
     setConversionId(p.credit_conversion_account_id);
     setConversionLabel(p.credit_conversion_account_label);
     setRemark(p.remark ?? "");
@@ -108,7 +102,7 @@ export function RecordCostsModal(props: Props) {
   });
 
   const canSave = () =>
-    Boolean(payload()) && !saving() && Boolean(debitId()) && Boolean(materialId()) && (!needsConversion() || Boolean(conversionId()));
+    Boolean(payload()) && !saving() && needsConversion() && Boolean(debitId()) && Boolean(conversionId());
 
   const handleSave = async () => {
     const id = props.workOrderId;
@@ -123,8 +117,7 @@ export function RecordCostsModal(props: Props) {
           method: "PUT",
           body: JSON.stringify({
             debit_account_id: debitId(),
-            credit_material_account_id: materialId(),
-            credit_conversion_account_id: needsConversion() ? conversionId() : null,
+            credit_conversion_account_id: conversionId(),
             remark: remark().trim(),
           }),
         },
@@ -159,55 +152,41 @@ export function RecordCostsModal(props: Props) {
                 <span class="ml-2 text-text-secondary">{p().order_date.slice(0, 10)}</span>
               </div>
               <div class="text-text-secondary">
-                Total <span class="font-semibold text-text-primary">{formatMoney(p().costs.total_cost)}</span>
+                Production cost <span class="font-semibold text-text-primary">{formatMoney(conversionAmount())}</span>
               </div>
             </div>
 
             <p class="text-sm text-text-secondary">
-              Choose where this job's cost goes. The finished goods account is debited for the total; materials and
-              labor / overhead are credited. Only the accounts change — stock and the job stay as they are.
+              Record labor, overhead, and other cost as an expense. Material cost stays on the job and is not booked
+              again. Stock and the job stay as they are.
             </p>
 
+            <Show when={!needsConversion()}>
+              <p class="text-sm text-text-secondary">This job has no production cost to record.</p>
+            </Show>
+
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <LookupCombo
-                label="Finished goods inventory (debit)"
-                value={debitLabel}
-                selectedId={debitId}
-                onInput={setDebitLabel}
-                onSelect={(o) => {
-                  setDebitId(o.id);
-                  setDebitLabel(o.label);
-                }}
-                onClear={() => {
-                  setDebitId(null);
-                  setDebitLabel("");
-                }}
-                fetchOptions={(q) => fetchAccountOptions(q, "asset")}
-                placeholder="Search asset account…"
-                error={fieldErrors().debit_account_id}
-                required
-              />
-              <LookupCombo
-                label="Materials inventory (credit)"
-                value={materialLabel}
-                selectedId={materialId}
-                onInput={setMaterialLabel}
-                onSelect={(o) => {
-                  setMaterialId(o.id);
-                  setMaterialLabel(o.label);
-                }}
-                onClear={() => {
-                  setMaterialId(null);
-                  setMaterialLabel("");
-                }}
-                fetchOptions={(q) => fetchAccountOptions(q, "asset")}
-                placeholder="Search asset account…"
-                error={fieldErrors().credit_material_account_id}
-                required
-              />
               <Show when={needsConversion()}>
                 <LookupCombo
-                  label="Labor / overhead absorption (credit)"
+                  label="Production expense (debit)"
+                  value={debitLabel}
+                  selectedId={debitId}
+                  onInput={setDebitLabel}
+                  onSelect={(o) => {
+                    setDebitId(o.id);
+                    setDebitLabel(o.label);
+                  }}
+                  onClear={() => {
+                    setDebitId(null);
+                    setDebitLabel("");
+                  }}
+                  fetchOptions={(q) => fetchAccountOptions(q, "expense")}
+                  placeholder="Search expense account…"
+                  error={fieldErrors().debit_account_id}
+                  required
+                />
+                <LookupCombo
+                  label="Production cost absorption (credit)"
                   value={conversionLabel}
                   selectedId={conversionId}
                   onInput={setConversionLabel}

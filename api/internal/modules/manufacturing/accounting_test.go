@@ -14,8 +14,8 @@ func TestManufacturingCompleteCostAndJournalPreview(t *testing.T) {
 		t.Fatalf("total=%v want 175", costs.Total)
 	}
 	lines := manufacturingJournalPreview(costs)
-	if len(lines) != 3 {
-		t.Fatalf("lines=%d want 3", len(lines))
+	if len(lines) != 2 {
+		t.Fatalf("lines=%d want 2", len(lines))
 	}
 	var debit, credit float64
 	for _, line := range lines {
@@ -25,8 +25,18 @@ func TestManufacturingCompleteCostAndJournalPreview(t *testing.T) {
 	if math.Abs(debit-credit) > 0.0001 {
 		t.Fatalf("journal is not balanced: debit=%v credit=%v", debit, credit)
 	}
-	if lines[0].Label != "Finished goods inventory" || lines[0].Debit != 175 {
-		t.Fatalf("unexpected finished-goods line: %+v", lines[0])
+	if lines[0].Label != "Production expense" || lines[0].Debit != 55 {
+		t.Fatalf("unexpected production expense line: %+v", lines[0])
+	}
+	if lines[1].Label != "Production cost absorption" || lines[1].Credit != 55 {
+		t.Fatalf("unexpected absorption line: %+v", lines[1])
+	}
+	materialOnly, err := normalizeManufacturingCosts(50, 0, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := manufacturingJournalPreview(materialOnly); len(got) != 0 {
+		t.Fatalf("material-only job should not book inventory, got %+v", got)
 	}
 }
 
@@ -35,19 +45,16 @@ func TestBuildCostPostingLinesUsesSelectedAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	accts := costPostingAccounts{Debit: 11, CreditMaterial: 22, CreditConversion: 33}
+	accts := costPostingAccounts{Debit: 11, CreditConversion: 33}
 	lines := buildCostPostingLines(costs, accts)
-	if len(lines) != 3 {
-		t.Fatalf("lines=%d want 3", len(lines))
+	if len(lines) != 2 {
+		t.Fatalf("lines=%d want 2", len(lines))
 	}
-	if lines[0].AccountID != 11 || lines[0].Debit != 175 || lines[0].Credit != 0 {
+	if lines[0].AccountID != 11 || lines[0].Debit != 55 || lines[0].Credit != 0 {
 		t.Fatalf("unexpected debit line: %+v", lines[0])
 	}
-	if lines[1].AccountID != 22 || lines[1].Credit != 120 {
-		t.Fatalf("unexpected material line: %+v", lines[1])
-	}
-	if lines[2].AccountID != 33 || lines[2].Credit != 55 {
-		t.Fatalf("unexpected conversion line: %+v", lines[2])
+	if lines[1].AccountID != 33 || lines[1].Credit != 55 {
+		t.Fatalf("unexpected absorption line: %+v", lines[1])
 	}
 	var debit, credit float64
 	for _, line := range lines {
@@ -59,9 +66,9 @@ func TestBuildCostPostingLinesUsesSelectedAccounts(t *testing.T) {
 	}
 
 	materialOnly, _ := normalizeManufacturingCosts(50, 0, 0, 0)
-	lines = buildCostPostingLines(materialOnly, costPostingAccounts{Debit: 11, CreditMaterial: 22})
-	if len(lines) != 2 {
-		t.Fatalf("material-only job should have 2 lines, got %d", len(lines))
+	lines = buildCostPostingLines(materialOnly, costPostingAccounts{Debit: 11, CreditConversion: 33})
+	if len(lines) != 0 {
+		t.Fatalf("material-only job should have 0 lines, got %d", len(lines))
 	}
 	for _, line := range lines {
 		if line.AccountID == 0 {

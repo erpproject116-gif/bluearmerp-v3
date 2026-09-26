@@ -59,6 +59,7 @@ type JournalPreview = {
     other_cost: number;
     total_cost: number;
   };
+  lines?: { label: string; debit: number; credit: number }[];
 };
 
 const searchBoms = (q: string) => lookupBomsForOrderType("recipe", q);
@@ -110,8 +111,6 @@ export default function NewRecipeOrderWizard() {
 
   const additionalCost = () =>
     (Number(labor()) || 0) + (Number(overhead()) || 0) + (Number(otherCost()) || 0);
-  const estimatedTotalCost = () => (journalPreview()?.costs.material_cost ?? 0) + additionalCost();
-
   const hasShortage = () => materialNeedsHasShortage(needs()?.lines ?? []);
   const canDraftShortagePo = () =>
     hasPermission(auth.me, "purchase_order.purchase_orders", "write") &&
@@ -162,8 +161,13 @@ export default function NewRecipeOrderWizard() {
   };
 
   const loadJournalPreview = async (id: number) => {
+    const qs = new URLSearchParams({
+      labor_cost: String(Number(labor()) || 0),
+      overhead_cost: String(Number(overhead()) || 0),
+      other_cost: String(Number(otherCost()) || 0),
+    });
     const res = await apiFetch<JournalPreview>(
-      `/api/v1/manufacturing/work-orders/${id}/journal-preview`,
+      `/api/v1/manufacturing/work-orders/${id}/journal-preview?${qs}`,
       undefined,
       { silent: true },
     );
@@ -597,7 +601,7 @@ export default function NewRecipeOrderWizard() {
             </Field>
             <p class="text-sm font-medium">Total additional: {formatPeso(additionalCost())}</p>
             <p class="text-[11px] text-text-secondary">
-              These costs are capitalized into the finished-goods estimate when you post.
+              Labor, overhead, and other cost post as an expense. Material cost stays on the job and is not booked again.
             </p>
           </div>
           <div class="rounded-xl border border-stroke bg-white p-4">
@@ -618,19 +622,20 @@ export default function NewRecipeOrderWizard() {
                 }
               >
                 <div class="mt-2 space-y-1 text-xs">
-                  <div class="flex justify-between gap-3">
-                    <span>Dr Finished goods inventory</span>
-                    <span class="tabular-nums">{formatPeso(estimatedTotalCost())}</span>
-                  </div>
-                  <div class="flex justify-between gap-3">
-                    <span>Cr Materials inventory</span>
-                    <span class="tabular-nums">{formatPeso(journalPreview()?.costs.material_cost ?? 0)}</span>
-                  </div>
-                  <Show when={additionalCost() > 0}>
-                    <div class="flex justify-between gap-3">
-                      <span>Cr Production cost absorption</span>
-                      <span class="tabular-nums">{formatPeso(additionalCost())}</span>
-                    </div>
+                  <Show
+                    when={(journalPreview()?.lines?.length ?? 0) > 0}
+                    fallback={<p class="text-text-secondary">No production cost to post.</p>}
+                  >
+                    <For each={journalPreview()?.lines ?? []}>
+                      {(line) => (
+                        <div class="flex justify-between gap-3">
+                          <span>
+                            {line.debit > 0 ? "Dr" : "Cr"} {line.label}
+                          </span>
+                          <span class="tabular-nums">{formatPeso(line.debit > 0 ? line.debit : line.credit)}</span>
+                        </div>
+                      )}
+                    </For>
                   </Show>
                 </div>
                 <Show when={!journalPreview()?.accounting_enabled}>
