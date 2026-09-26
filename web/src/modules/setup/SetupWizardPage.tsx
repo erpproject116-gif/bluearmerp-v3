@@ -5,7 +5,6 @@ import { apiFetch } from "../../shared/api";
 import { useSetupReadiness } from "../../shared/usePlatform";
 import {
   GETTING_STARTED_COPY,
-  resolveGettingStarted,
   wizardFoundationPercent,
   wizardFoundationSteps,
 } from "../../shared/setupProgress";
@@ -13,63 +12,59 @@ import { PageCoachMark } from "../../shared/PageCoachMark";
 
 const STEP_COPY: Record<string, { title: string; why: string; action: string; link?: string; ackStep?: string }> = {
   company: {
-    title: "Your business",
-    why: "Your company name appears on invoices, receipts, and reports. Update branding, then confirm.",
-    action: "Open branding settings",
+    title: "Business name and logo",
+    why: "Add the name people see on your papers. A logo is optional.",
+    action: "Add your business name",
     link: "/app/settings/branding",
-    ackStep: "company",
   },
   chart_of_accounts: {
-    title: "Chart of accounts",
-    why: "A standard Philippine SME chart was loaded for this workspace. Review the accounts and default mappings (cash, A/R, A/P, sales, VAT), then confirm. Bank accounts for banking are separate from this general ledger.",
-    action: "Review accounts",
+    title: "List of money accounts",
+    why: "These are the accounts your sales and bills use. If they are already here, this step is done.",
+    action: "Look at the accounts",
     link: "/app/finance/acct-i/chart-of-accounts",
-    ackStep: "chart_of_accounts",
   },
   currency_tax: {
-    title: "Currency & taxes",
-    why: "We seeded PHP and standard VAT types. Open the list, adjust if needed, then confirm.",
-    action: "Review tax types",
+    title: "Peso and sales tax",
+    why: "Set the peso, and the sales tax you charge. If they are already here, this step is done.",
+    action: "Look at peso and sales tax",
     link: "/app/quotation/tax-mngt/tax-types",
-    ackStep: "currency_tax",
   },
   process_policies: {
-    title: "Process policies",
-    why: "Control whether quotations, sales orders, goods receipts, and reservations are required before the next document.",
-    action: "Review process policies",
+    title: "The order you use for selling and buying",
+    why: "Look at the order your papers follow. When it looks right, continue.",
+    action: "Look at the order",
     link: "/app/user-management/process-policies",
     ackStep: "process_policies",
   },
   location: {
-    title: "Stock location",
-    why: "A default Main location was created. Confirm it or add branches before moving stock.",
-    action: "Review locations",
+    title: "Where you keep products",
+    why: "This is the place your products sit. If a place is already here, this step is done.",
+    action: "Look at the place",
     link: "/app/inventory/locations",
-    ackStep: "location",
   },
   partners: {
-    title: "Customers & suppliers",
-    why: "Add at least one partner before creating quotes or purchase requests. Importing many from CSV/Excel in Migration Center is optional.",
-    action: "Add a partner",
+    title: "A person or company you sell to or buy from",
+    why: "Add at least one.",
+    action: "Add someone",
     link: "/app/inventory/partners",
   },
   items: {
-    title: "Products",
-    why: "Add your first product, or optionally bulk-import from CSV/Excel in Migration Center. Enable Track serial if you will scan serial numbers later.",
+    title: "Something you sell",
+    why: "Add at least one product.",
     action: "Add a product",
     link: "/app/inventory/items",
   },
   team: {
     title: "Invite your team",
-    why: "Optional — invite colleagues when you are ready. If you are cutting over from another ERP, Migration Center can import remaining unpaid documents after masters — skip it if you are starting fresh.",
-    action: "Manage users",
+    why: "Optional. You can do this later. You do not need a second person to finish.",
+    action: "Invite someone",
     link: "/app/user-management/users",
   },
   ready: {
-    title: "You are ready",
-    why: "Foundation setup is complete. Next: Day 1 on Stocks — places, products, and opening stock — then pay to unlock buying and selling.",
-    action: "Open Day 1 Stocks setup",
-    link: "/app/inventory",
+    title: "The workspace is ready",
+    why: "The required steps are done. You can start using this workspace.",
+    action: "Go to the home page",
+    link: "/app/dashboard",
   },
 };
 
@@ -104,21 +99,10 @@ export default function SetupWizardPage() {
       label: GETTING_STARTED_COPY[s.id]?.label ?? s.label,
     }));
   const currentStep = () => steps().find((s) => s.id === currentId());
-  const homeProgress = () => resolveGettingStarted(readiness.data);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["setup-readiness"] });
     void qc.invalidateQueries({ queryKey: ["onboarding"] });
-  };
-
-  const ackCOA = async () => {
-    setAcking(true);
-    try {
-      await apiFetch("/api/v1/platform/setup-readiness/ack-coa", { method: "POST" });
-      refresh();
-    } finally {
-      setAcking(false);
-    }
   };
 
   const ackStep = async (stepId: string) => {
@@ -134,8 +118,7 @@ export default function SetupWizardPage() {
     }
   };
 
-  const goNext = () => {
-    refresh();
+  const advance = () => {
     const data = readiness.data;
     if (!data) return;
     const wizard = [...wizardFoundationSteps(data), ...(data.steps ?? []).filter((s) => s.id === "ready")];
@@ -148,6 +131,15 @@ export default function SetupWizardPage() {
     }
   };
 
+  const goNext = () => {
+    if (currentId() === "process_policies" && !currentStep()?.done) {
+      void ackStep("process_policies").then(() => advance());
+      return;
+    }
+    refresh();
+    advance();
+  };
+
   const skipWizard = async () => {
     await apiFetch("/api/v1/platform/setup-readiness/skip", { method: "POST" }, { silent: true });
     refresh();
@@ -158,9 +150,7 @@ export default function SetupWizardPage() {
     <div class="mx-auto max-w-2xl p-6">
       <PageCoachMark
         storageKey="bluearm:coach:setup-wizard"
-        message="Finish foundation here first — then use Home → Onboarding for the self-paced module playbook at your own speed."
-        actionHref="/app/dashboard/onboarding"
-        actionLabel="Open playbook"
+        message="Finish the steps with a dot still open. When the bar is full, this workspace is ready. Inviting someone is optional."
       />
       <div class="mb-6">
         <p class="text-xs font-medium uppercase tracking-wide text-brand-600">Workspace setup</p>
@@ -191,6 +181,9 @@ export default function SetupWizardPage() {
                 }}
               >
                 {step.label}
+                <Show when={!step.required}>
+                  <span class="ml-1 text-text-secondary">(optional)</span>
+                </Show>
               </A>
             </li>
           )}
@@ -210,24 +203,14 @@ export default function SetupWizardPage() {
               {copy().action}
             </A>
           </Show>
-          <Show when={currentId() === "chart_of_accounts"}>
+          <Show when={copy().ackStep}>
             <button
               type="button"
               disabled={acking()}
-              class="mt-4 block text-sm text-brand-600 hover:underline disabled:opacity-50"
-              onClick={() => void ackCOA()}
+              class="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              onClick={goNext}
             >
-              Looks good — continue
-            </button>
-          </Show>
-          <Show when={copy().ackStep && currentId() !== "chart_of_accounts"}>
-            <button
-              type="button"
-              disabled={acking() || currentStep()?.done}
-              class="mt-4 block text-sm text-brand-600 hover:underline disabled:opacity-50"
-              onClick={() => void ackStep(copy().ackStep!)}
-            >
-              {currentStep()?.done ? "Confirmed" : "Confirm — continue"}
+              This looks right
             </button>
           </Show>
           <button
@@ -249,40 +232,11 @@ export default function SetupWizardPage() {
 
       <Show when={currentId() === "ready" || readiness.data?.required_complete}>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-6">
-          <h2 class="text-lg font-semibold text-emerald-900">Foundation complete</h2>
-          <p class="mt-2 text-sm text-emerald-800">
-            Next: finish Day 1 on Stocks (places, products, opening stock). Buying and selling unlock after GCash
-            payment is confirmed by Bluearm. The onboarding playbook covers every module after that.
-          </p>
+          <h2 class="text-lg font-semibold text-emerald-900">The workspace is ready</h2>
+          <p class="mt-2 text-sm text-emerald-800">The required steps are done. You can start using this workspace.</p>
           <div class="mt-4 flex flex-wrap gap-3">
-            <A
-              href="/app/inventory"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            >
-              Day 1: open Stocks
-            </A>
-            <A
-              href="/app/dashboard/onboarding"
-              class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
-            >
-              Open onboarding playbook
-            </A>
-            <A
-              href="/app/pos/manage"
-              class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
-            >
-              Configure POS
-            </A>
-            <Show when={homeProgress().visible}>
-              <A
-                href={homeProgress().next?.href ?? "/app/dashboard/onboarding"}
-                class="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
-              >
-                Home: {homeProgress().next?.label ?? "Onboarding"}
-              </A>
-            </Show>
-            <A href="/app/dashboard" class="text-sm text-brand-700 hover:underline">
-              Open dashboard
+            <A href="/app/dashboard" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+              Go to the home page
             </A>
           </div>
         </div>

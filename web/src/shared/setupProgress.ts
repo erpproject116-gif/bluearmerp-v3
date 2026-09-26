@@ -12,43 +12,43 @@ export type GettingStartedStep = {
 /** Shared copy for Home Getting started, setup wizard, and onboarding panel. */
 export const GETTING_STARTED_COPY: Record<string, { label: string; blurb: string; href: string }> = {
   company: {
-    label: "Company name & logo",
-    blurb: "Shows on invoices, receipts, and reports.",
+    label: "Business name and logo",
+    blurb: "The name people see on your papers. A logo is optional.",
     href: "/app/settings/branding",
   },
   chart_of_accounts: {
-    label: "Chart of accounts",
-    blurb: "Accounts used when sales and purchases post.",
+    label: "List of money accounts",
+    blurb: "The accounts your sales and bills use.",
     href: "/app/finance/acct-i/chart-of-accounts",
   },
   currency_tax: {
-    label: "Currency & tax",
-    blurb: "PHP and VAT types for quotations and invoices.",
+    label: "Peso and sales tax",
+    blurb: "The peso, and the sales tax you charge.",
     href: "/app/quotation/tax-mngt/tax-types",
   },
   process_policies: {
-    label: "Process policies",
-    blurb: "Which documents are required before the next step.",
+    label: "The order you use for selling and buying",
+    blurb: "Look at the order, then say it looks right.",
     href: "/app/user-management/process-policies",
   },
   location: {
-    label: "Stock location",
-    blurb: "Warehouse or branch before you move inventory.",
+    label: "Where you keep products",
+    blurb: "The place your products sit.",
     href: "/app/inventory/locations",
   },
   partners: {
-    label: "First customer or vendor",
-    blurb: "Someone you sell to or buy from.",
+    label: "A person or company you sell to or buy from",
+    blurb: "Add at least one.",
     href: "/app/inventory/partners",
   },
   items: {
-    label: "First product",
-    blurb: "What you sell or stock.",
+    label: "Something you sell",
+    blurb: "Add at least one product.",
     href: "/app/inventory/items",
   },
   team: {
     label: "Invite your team",
-    blurb: "Optional — you can finish this later.",
+    blurb: "Optional. You can do this later.",
     href: "/app/user-management/users",
   },
   first_sale: {
@@ -123,7 +123,7 @@ export function wizardFoundationSteps(setup: SetupReadiness | null | undefined) 
 }
 
 export function wizardFoundationPercent(setup: SetupReadiness | null | undefined): number {
-  const steps = wizardFoundationSteps(setup);
+  const steps = wizardFoundationSteps(setup).filter((s) => s.required);
   if (steps.length === 0) return 0;
   const done = steps.filter((s) => s.done).length;
   return Math.round((done * 100) / steps.length);

@@ -26,17 +26,17 @@ type StepDef struct {
 }
 
 var WizardSteps = []StepDef{
-	{ID: "company", Label: "Set your company name and logo", Href: "/app/setup/company", Required: true},
-	{ID: "chart_of_accounts", Label: "Set up your chart of accounts", Href: "/app/setup/chart-of-accounts", Required: true},
-	{ID: "currency_tax", Label: "Confirm currency and tax types", Href: "/app/setup/currency-tax", Required: true},
-	{ID: "process_policies", Label: "Review process policies", Href: "/app/setup/process-policies", Required: true},
-	{ID: "location", Label: "Confirm your stock location", Href: "/app/setup/location", Required: true},
-	{ID: "partners", Label: "Add a customer or supplier", Href: "/app/setup/partners", Required: true},
-	{ID: "items", Label: "Add your first product", Href: "/app/setup/items", Required: true},
+	{ID: "company", Label: "Business name and logo", Href: "/app/setup/company", Required: true},
+	{ID: "chart_of_accounts", Label: "List of money accounts", Href: "/app/setup/chart-of-accounts", Required: true},
+	{ID: "currency_tax", Label: "Peso and sales tax", Href: "/app/setup/currency-tax", Required: true},
+	{ID: "process_policies", Label: "The order you use for selling and buying", Href: "/app/setup/process-policies", Required: true},
+	{ID: "location", Label: "Where you keep products", Href: "/app/setup/location", Required: true},
+	{ID: "partners", Label: "A person or company you sell to or buy from", Href: "/app/setup/partners", Required: true},
+	{ID: "items", Label: "Something you sell", Href: "/app/setup/items", Required: true},
 	{ID: "team", Label: "Invite your team", Href: "/app/setup/team", Required: false},
 	{ID: "first_sale", Label: "Create your first invoice", Href: "/app/sales/sales/new", Required: false},
 	{ID: "bank", Label: "Add a bank or cash account", Href: "/app/finance/banking", Required: false},
-	{ID: "ready", Label: "You are ready", Href: "/app/setup/ready", Required: false},
+	{ID: "ready", Label: "The workspace is ready", Href: "/app/setup/ready", Required: false},
 }
 
 type Step struct {
@@ -110,7 +110,6 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Payload, err
 	steps := make([]Step, 0, len(WizardSteps))
 	requiredDone := 0
 	requiredTotal := 0
-	doneCount := 0
 	var next *NextStep
 
 	for _, def := range WizardSteps {
@@ -121,9 +120,7 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Payload, err
 				requiredDone++
 			}
 		}
-		if isDone {
-			doneCount++
-		} else if next == nil && def.ID != "ready" && def.ID != "first_sale" && def.ID != "bank" {
+		if !isDone && next == nil && def.ID != "ready" && def.ID != "first_sale" && def.ID != "bank" && def.ID != "team" {
 			next = &NextStep{ID: def.ID, Label: def.Label, Href: def.Href}
 		}
 		steps = append(steps, Step{
@@ -132,8 +129,8 @@ func Load(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (Payload, err
 	}
 
 	pct := 0
-	if len(WizardSteps) > 0 {
-		pct = (doneCount * 100) / len(WizardSteps)
+	if requiredTotal > 0 {
+		pct = (requiredDone * 100) / requiredTotal
 	}
 	requiredComplete := requiredDone == requiredTotal
 	ready := requiredComplete
@@ -213,13 +210,13 @@ func detect(ctx context.Context, pool *pgxpool.Pool, tenantID int64, store progr
 	_ = pool.QueryRow(ctx, `
 		select coalesce(settings->'receipt'->>'company_name', '')
 		from public.tenant_branding where tenant_id = $1`, tenantID).Scan(&brandingName)
-	out["company"] = (companyName != "" || brandingName != "") && store.CompanyAck
+	out["company"] = companyName != "" || brandingName != ""
 
 	coaReady, err := financedefaults.HasMinimumCoreAccounts(ctx, pool, tenantID, minCOAAccounts, minCOATypes)
 	if err != nil {
 		return nil, err
 	}
-	out["chart_of_accounts"] = coaReady && store.ChartOfAccountsAck
+	out["chart_of_accounts"] = coaReady
 
 	var currencies int
 	_ = pool.QueryRow(ctx, `
@@ -229,7 +226,7 @@ func detect(ctx context.Context, pool *pgxpool.Pool, tenantID int64, store progr
 	_ = pool.QueryRow(ctx, `
 		select count(*)::int from public.quo_tax_types
 		where tenant_id = $1 and status = 'active'`, tenantID).Scan(&taxes)
-	out["currency_tax"] = currencies >= 1 && taxes >= 1 && store.CurrencyTaxAck
+	out["currency_tax"] = currencies >= 1 && taxes >= 1
 
 	out["process_policies"] = store.ProcessPoliciesAck
 
@@ -237,7 +234,7 @@ func detect(ctx context.Context, pool *pgxpool.Pool, tenantID int64, store progr
 	_ = pool.QueryRow(ctx, `
 		select count(*)::int from public.inv_locations
 		where tenant_id = $1 and deleted_at is null`, tenantID).Scan(&locations)
-	out["location"] = locations >= 1 && store.LocationAck
+	out["location"] = locations >= 1
 
 	var partners int
 	_ = pool.QueryRow(ctx, `
@@ -304,20 +301,20 @@ func AckFoundationStep(ctx context.Context, pool *pgxpool.Pool, tenantID int64, 
 func blockingMessage(stepID string) string {
 	switch stepID {
 	case "company":
-		return "Set your company name before creating purchase or POS transactions."
+		return "Add your business name before you continue."
 	case "chart_of_accounts":
-		return "Set up your chart of accounts (at least one active account each for asset, liability, income, and expense). Sales documents can be saved now; complete COA for posting, VAT, and Purchases/COGS mapping."
+		return "Add your list of money accounts before you continue."
 	case "currency_tax":
-		return "Configure currency and tax types before creating purchase or POS transactions."
+		return "Set the peso and a sales tax before you continue."
 	case "process_policies":
-		return "Review process policies before creating purchase or POS transactions."
+		return "Look at the order you use for selling and buying, then say it looks right."
 	case "location":
-		return "Add at least one stock location before creating purchase or POS transactions."
+		return "Add the place where you keep products before you continue."
 	case "partners":
-		return "Add at least one customer or supplier before creating purchase or POS transactions."
+		return "Add a person or company you sell to or buy from before you continue."
 	case "items":
-		return "Add at least one product before creating purchase or POS transactions."
+		return "Add something you sell before you continue."
 	default:
-		return "Complete workspace setup before creating purchase or POS transactions."
+		return "Finish the required steps before you continue."
 	}
 }
