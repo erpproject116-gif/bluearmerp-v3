@@ -58,17 +58,45 @@ type PeriodSummary = {
   overdue_alerts: NamedAmount[];
 };
 
+function reportsLead(d: PeriodSummary) {
+  if ((d.ar_overdue ?? 0) > 0) {
+    const first = d.overdue_alerts?.[0];
+    const named = first ? ` The largest is ${first.label} at ${formatPeso(first.amount)}.` : "";
+    return {
+      sentence: `Customers still owe ${formatPeso(d.ar_overdue)}.${named}`,
+      href: "/app/finance/reports/ar-aging",
+      focus: "ar" as const,
+    };
+  }
+  if ((d.ap_overdue ?? 0) > 0) {
+    return {
+      sentence: `You still owe ${formatPeso(d.ap_overdue)}.`,
+      href: "/app/finance/reports/ap-aging",
+      focus: "ap" as const,
+    };
+  }
+  return {
+    sentence: `Sales in this period are ${formatPeso(d.sales_in_window)}. Cash in was ${formatPeso(d.cash_inflow_mtd)} and cash out was ${formatPeso(d.cash_outflow_mtd)}.`,
+    href: "/app/sales/sales",
+    focus: "sales" as const,
+  };
+}
+
 function int(n: number | undefined) {
   return (n ?? 0).toLocaleString("en-PH", { maximumFractionDigits: 0 });
 }
 
-function Kpi(props: { label: string; value: string; href?: string; warn?: boolean }) {
+function Kpi(props: { label: string; value: string; href?: string; warn?: boolean; emphasis?: boolean }) {
   const body = (
     <div
-      class={`rounded-xl border border-stroke bg-white p-4 shadow-sm ${props.warn ? "border-amber-300" : ""}`}
+      class={`rounded-xl border bg-white p-4 shadow-sm ${
+        props.emphasis ? "border-brand-500 bg-brand-50 ring-2 ring-brand-200" : props.warn ? "border-amber-300" : "border-stroke"
+      }`}
     >
       <div class="text-xs font-semibold uppercase tracking-wide text-text-secondary">{props.label}</div>
-      <div class={`mt-2 text-xl font-bold ${props.warn ? "text-amber-700" : "text-brand-600"}`}>{props.value}</div>
+      <div class={`mt-2 text-xl font-bold ${props.emphasis ? "text-text-primary" : props.warn ? "text-amber-700" : "text-brand-600"}`}>
+        {props.value}
+      </div>
     </div>
   );
   return props.href ? (
@@ -122,7 +150,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
           <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Dashboard &amp; charts</p>
           <h2 class="text-xl font-bold text-text-primary">Business intelligence</h2>
           <p class="mt-1 text-sm text-text-secondary">
-            Operational snapshot (booked sales, pipeline, stock). Accounting Revenue / Net Profit live under{" "}
+            Sales, cash, and what is still unpaid. Profit after everything from the posted books is on{" "}
             <A href="/app/finance/acct-i/financial-insights" class="font-medium text-brand-700 hover:underline">
               Financial Insights
             </A>
@@ -163,38 +191,57 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
       <Show when={q.data}>
         {(d) => (
           <>
+            <section class="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+              <p class="text-sm font-medium text-text-primary">{reportsLead(d()).sentence}</p>
+              <A href={reportsLead(d()).href} class="mt-1 inline-block text-sm font-medium text-brand-700 hover:underline">
+                {reportsLead(d()).focus === "ar"
+                  ? "Open who owes you"
+                  : reportsLead(d()).focus === "ap"
+                    ? "Open who you owe"
+                    : "Open sales"}
+              </A>
+            </section>
+
             <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Kpi label="Booked sales (window)" value={formatPeso(d().sales_in_window)} href="/app/sales/sales" />
-              <Kpi label="Booked sales MTD" value={formatPeso(d().sales_mtd)} href="/app/sales/sales" />
-              <Kpi label="Booked sales YTD" value={formatPeso(d().sales_ytd)} href="/app/sales/sales" />
-              <Kpi label="Cash net YTD (ops)" value={formatPeso(d().cash_net_ytd)} href="/app/finance/collections" />
               <Kpi
-                label="Cash in / out MTD (ops)"
+                label="Sales in this period"
+                value={formatPeso(d().sales_in_window)}
+                href="/app/sales/sales"
+                emphasis={reportsLead(d()).focus === "sales"}
+              />
+              <Kpi label="Sales this month" value={formatPeso(d().sales_mtd)} href="/app/sales/sales" />
+              <Kpi label="Sales this year" value={formatPeso(d().sales_ytd)} href="/app/sales/sales" />
+              <Kpi label="Cash this year" value={formatPeso(d().cash_net_ytd)} href="/app/finance/collections" />
+              <Kpi
+                label="Cash in and cash out this month"
                 value={`${formatPeso(d().cash_inflow_mtd)} / ${formatPeso(d().cash_outflow_mtd)}`}
                 href="/app/finance/disbursements"
+                emphasis={reportsLead(d()).focus === "sales"}
               />
             </section>
 
             <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Kpi
-                label="AR total / overdue"
-                value={`${formatPeso(d().ar_total)} / ${formatPeso(d().ar_overdue)}`}
+                label="Money customers owe"
+                value={`${formatPeso(d().ar_total)} / ${formatPeso(d().ar_overdue)} overdue`}
                 href="/app/finance/reports/ar-aging"
                 warn={(d().ar_overdue ?? 0) > 0}
+                emphasis={reportsLead(d()).focus === "ar"}
               />
               <Kpi
-                label="AP total / overdue"
-                value={`${formatPeso(d().ap_total)} / ${formatPeso(d().ap_overdue)}`}
+                label="Money you owe"
+                value={`${formatPeso(d().ap_total)} / ${formatPeso(d().ap_overdue)} overdue`}
                 href="/app/finance/reports/ap-aging"
                 warn={(d().ap_overdue ?? 0) > 0}
+                emphasis={reportsLead(d()).focus === "ap"}
               />
               <Kpi
-                label="Pending SO / PO / PR"
-                value={`${int(d().pending_so)} / ${int(d().pending_po)} / ${int(d().pending_pr)}`}
+                label="Orders still open"
+                value={`${int(d().pending_so)} sales / ${int(d().pending_po)} purchases / ${int(d().pending_pr)} requests`}
                 href="/app/sales-order/sales-orders"
               />
               <Kpi
-                label="Low / zero stock"
+                label="Low stock and none left"
                 value={`${int(d().low_stock_count)} / ${int(d().zero_stock_count)}`}
                 href="/app/inventory/find-stock"
                 warn={(d().low_stock_count ?? 0) + (d().zero_stock_count ?? 0) > 0}
@@ -203,7 +250,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
 
             <section>
               <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold text-text-primary">Posted P&amp;L (window)</h3>
+                <h3 class="text-sm font-semibold text-text-primary">Profit in the books</h3>
                 <div class="flex flex-wrap gap-3 text-xs">
                   <A
                     href={withReportDateQuery(
@@ -223,7 +270,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                     )}
                     class="font-medium text-brand-700 hover:underline"
                   >
-                    Open full P&amp;L
+                    Open the profit and loss
                   </A>
                 </div>
               </div>
@@ -231,7 +278,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                 when={d().has_journal_pnl}
                 fallback={
                   <p class="rounded-lg border border-dashed border-stroke bg-white px-3 py-3 text-sm text-text-secondary">
-                    No posted journal P&amp;L in this window yet.{" "}
+                    No posted books in this window yet.{" "}
                     <A
                       href={withReportDateQuery(
                         "/app/finance/acct-i/reports/profit-and-loss",
@@ -240,7 +287,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                       )}
                       class="font-medium text-brand-700 hover:underline"
                     >
-                      Open Profit &amp; Loss
+                      Open the profit and loss
                     </A>{" "}
                     or post journals under Bookkeeping.
                   </p>
@@ -248,7 +295,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
               >
                 <div class="grid gap-3 sm:grid-cols-3">
                   <Kpi
-                    label="Income"
+                    label="Sales in the books"
                     value={formatPeso(d().pnl_income)}
                     href={withReportDateQuery(
                       "/app/finance/acct-i/reports/profit-and-loss",
@@ -257,7 +304,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                     )}
                   />
                   <Kpi
-                    label="Expense"
+                    label="Costs in the books"
                     value={formatPeso(d().pnl_expense)}
                     href={withReportDateQuery(
                       "/app/finance/acct-i/reports/profit-and-loss",
@@ -266,7 +313,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                     )}
                   />
                   <Kpi
-                    label="Net"
+                    label="Profit after everything"
                     value={formatPeso(d().pnl_net)}
                     href={withReportDateQuery(
                       "/app/finance/acct-i/reports/profit-and-loss",
@@ -343,7 +390,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
 
             <Show when={(d().overdue_alerts?.length ?? 0) > 0}>
               <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
-                <h3 class="mb-3 text-sm font-semibold text-text-primary">Top overdue AR</h3>
+                <h3 class="mb-3 text-sm font-semibold text-text-primary">Who still owes you</h3>
                 <ul class="space-y-2">
                   <For each={d().overdue_alerts ?? []}>
                     {(row) => (
