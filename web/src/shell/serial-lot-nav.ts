@@ -47,12 +47,6 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "overflow",
   },
   {
-    label: "Receive station",
-    href: "/app/inventory/serial-lot/receive-station",
-    permissionCode: "inventory.receive_station",
-    headerPriority: "overflow",
-  },
-  {
     /** Deep-link / typed lookup; open a row from Serials for day-to-day work. */
     label: "Serial detail",
     href: "/app/inventory/serial-lot/trace",

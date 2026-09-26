@@ -1,5 +1,6 @@
 import { PageSizeSelect } from "../../../shared/pageSize";
 import { createEffect, createSignal, For, on, onMount, Show, untrack } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { apiFetch } from "../../../shared/api";
@@ -64,8 +65,14 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 export default function SerialAdjustmentPage() {
   const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
-  const [draft, setDraft] = createSignal<SerialAdjustmentFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<SerialAdjustmentFilters>(defaultFilters());
+  const [searchParams] = useSearchParams();
+  const presetSerial = () => String(searchParams.serial_no ?? "").trim();
+  const initialFilters = (): SerialAdjustmentFilters => ({
+    ...defaultFilters(),
+    serial_no: presetSerial(),
+  });
+  const [draft, setDraft] = createSignal<SerialAdjustmentFilters>(initialFilters());
+  const [submitted, setSubmitted] = createSignal<SerialAdjustmentFilters>(initialFilters());
   const [page, setPage] = createSignal(1);
   const sort = () => "serial_no" as const;
   const order = () => "asc" as const;
@@ -204,8 +211,7 @@ export default function SerialAdjustmentPage() {
       <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p class="font-medium">Corrections only</p>
         <p class="mt-1 text-amber-900/90">
-          After Purchase Receive is Completed, find units in Serials. This screen lists candidates so you can fix quantity
-          exceptions — it is not the post-receive destination.
+          Quantity can only end at 0 or 1. A negative amount voids the unit.
         </p>
       </div>
       <CollapsibleFilterPanel

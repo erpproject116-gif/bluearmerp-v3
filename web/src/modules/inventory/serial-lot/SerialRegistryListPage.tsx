@@ -279,6 +279,20 @@ export default function SerialRegistryListPage() {
               ),
             },
             {
+              key: "fix_unit",
+              header: "",
+              sortable: false,
+              render: (r) => (
+                <A
+                  href={`/app/inventory/serial-lot/adjustment?serial_no=${encodeURIComponent(r.serial_no)}`}
+                  class="text-xs font-medium text-brand-600 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Fix this unit
+                </A>
+              ),
+            },
+            {
               key: "history",
               header: "History",
               sortable: false,

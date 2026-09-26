@@ -212,11 +212,19 @@ export default function WorkOrdersPage() {
   const [bulkBusy, setBulkBusy] = createSignal(false);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [savedCosts, setSavedCosts] = createSignal<{ labor_cost: number; overhead_cost: number; other_cost: number } | null>(null);
+  type IssuedTraceRow = { item_code?: string; number: string; qty?: number };
+  const [issuedTrace, setIssuedTrace] = createSignal<{
+    issue_serials: IssuedTraceRow[];
+    issue_lots: IssuedTraceRow[];
+    output_serials: IssuedTraceRow[];
+    output_lots: IssuedTraceRow[];
+  } | null>(null);
   const [editing, setEditing] = createSignal<WorkOrder | null>(null);
   createEffect(() => {
     const ed = editing();
     if (!modalOpen() || !ed || ed.status !== "completed") {
       setSavedCosts(null);
+      setIssuedTrace(null);
       return;
     }
     const id = ed.id;
@@ -227,6 +235,15 @@ export default function WorkOrdersPage() {
     ).then((res) => {
       if (editing()?.id !== id) return;
       setSavedCosts(res.success && res.data ? res.data.costs : null);
+    });
+    void apiFetch<{
+      issue_serials: IssuedTraceRow[];
+      issue_lots: IssuedTraceRow[];
+      output_serials: IssuedTraceRow[];
+      output_lots: IssuedTraceRow[];
+    }>(`/api/v1/manufacturing/work-orders/${id}/issued-trace`, undefined, { silent: true }).then((res) => {
+      if (editing()?.id !== id) return;
+      setIssuedTrace(res.success && res.data ? res.data : null);
     });
   });
   const [bomId, setBomId] = createSignal<number | null>(null);
@@ -1315,6 +1332,42 @@ export default function WorkOrdersPage() {
                     <span class="text-text-secondary">Other <span class="font-medium text-text-primary">{formatMoney(costs().other_cost)}</span></span>
                   </div>
                 )}
+              </Show>
+              <Show when={editing()?.status === "completed" && issuedTrace()}>
+                {(trace) => {
+                  const groups = () =>
+                    [
+                      { title: "Issued serials", rows: trace().issue_serials },
+                      { title: "Issued lots", rows: trace().issue_lots },
+                      { title: "Finished serials", rows: trace().output_serials },
+                      { title: "Finished lots", rows: trace().output_lots },
+                    ].filter((g) => g.rows.length > 0);
+                  return (
+                    <Show when={groups().length > 0}>
+                      <div class="rounded-lg border border-stroke bg-slate-50 p-3 text-sm">
+                        <p class="font-medium text-text-primary">Serials and lots on this job</p>
+                        <For each={groups()}>
+                          {(group) => (
+                            <div class="mt-2">
+                              <p class="text-xs font-medium text-text-secondary">{group.title}</p>
+                              <ul class="mt-1 space-y-0.5 text-xs text-text-primary">
+                                <For each={group.rows}>
+                                  {(row) => (
+                                    <li>
+                                      {row.item_code ? `${row.item_code} · ` : ""}
+                                      {row.number}
+                                      {row.qty && row.qty !== 1 ? ` · ${row.qty}` : ""}
+                                    </li>
+                                  )}
+                                </For>
+                              </ul>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                  );
+                }}
               </Show>
               <p class="text-sm font-medium text-text-primary">
                 {mode() === "disassembly" ? copy().materialsOutputLabel : "Materials needed"}

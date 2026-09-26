@@ -56,11 +56,8 @@ export default function SerialLotSettingsPage() {
       <section class="rounded-xl border border-stroke bg-white p-8 shadow-sm">
         <h2 class="text-lg font-semibold text-text-primary">Serial &amp; lot tracking</h2>
         <p class="mt-2 max-w-2xl text-sm text-text-secondary">
-          Configure tracking per item, then capture serials and lots on{" "}
-          <strong class="font-medium text-text-primary">Purchase Receive</strong> (inbound) and{" "}
-          <strong class="font-medium text-text-primary">sales invoice</strong> or{" "}
-          <strong class="font-medium text-text-primary">POS</strong> (outbound). Purchase orders and sales orders
-          only store planned serial numbers — physical scan happens at receive and sale.
+          Purchase Receive captures new numbers. The sales invoice, POS, and sales-order release pick them when required.
+          Serials and Lots are on-hand lists. Quantity changes start from those lists.
         </p>
 
         <div class="mt-6 grid gap-3 md:grid-cols-2">

@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, on, onMount, untrack } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -44,8 +45,11 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
 export default function LotAdjustmentPage() {
   const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
-  const [draft, setDraft] = createSignal<LotAdjustmentFilters>(defaultFilters());
-  const [submitted, setSubmitted] = createSignal<LotAdjustmentFilters>(defaultFilters());
+  const [searchParams] = useSearchParams();
+  const presetQuery = () => String(searchParams.q ?? "").trim();
+  const initialFilters = (): LotAdjustmentFilters => ({ q: presetQuery() });
+  const [draft, setDraft] = createSignal<LotAdjustmentFilters>(initialFilters());
+  const [submitted, setSubmitted] = createSignal<LotAdjustmentFilters>(initialFilters());
   const [page, setPage] = createSignal(1);
   const [editableRows, setEditableRows] = createSignal<EditableRow[]>([]);
   const [reason, setReason] = createSignal("");

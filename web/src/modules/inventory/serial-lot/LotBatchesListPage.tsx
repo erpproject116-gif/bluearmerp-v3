@@ -1,5 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
-import { useNavigate, useSearchParams } from "@solidjs/router";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { DateInput } from "../../../shared/DateInput";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
@@ -309,6 +309,20 @@ export default function LotBatchesListPage() {
             },
             { key: "expiry_date", header: "Expiry", render: (r) => r.expiry_date?.slice(0, 10) ?? "—" },
             { key: "updated_at", header: "Updated", render: (r) => r.updated_at.slice(0, 10) },
+            {
+              key: "change_qty",
+              header: "",
+              sortable: false,
+              render: (r) => (
+                <A
+                  href={`/app/inventory/serial-lot/lot-adjustment?q=${encodeURIComponent(r.lot_no)}`}
+                  class="text-xs font-medium text-brand-600 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Change quantity
+                </A>
+              ),
+            },
             {
               key: "history",
               header: "History",

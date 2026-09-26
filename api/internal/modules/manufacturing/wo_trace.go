@@ -1153,6 +1153,92 @@ type woRecordedOutputLot struct {
 	CreatedAt       string  `json:"created_at"`
 }
 
+type issuedTraceRow struct {
+	ItemCode string  `json:"item_code,omitempty"`
+	Number   string  `json:"number"`
+	Qty      float64 `json:"qty,omitempty"`
+}
+
+// listWorkOrderIssuedTrace returns serials and lots already stored on a job, including completed jobs.
+func listWorkOrderIssuedTrace(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		woID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var exists int
+		if err := pool.QueryRow(r.Context(), `select 1 from public.mfg_work_orders where id=$1 and tenant_id=$2`, woID, tu.TenantID).Scan(&exists); err != nil {
+			response.Err(w, http.StatusNotFound, "Work order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		issueSerials, err := loadIssuedNumbers(r.Context(), pool, `
+			select coalesce(i.item_code, ''), su.serial_no, 1::float8
+			from public.mfg_wo_issue_serials wis
+			join public.inv_serial_units su on su.id = wis.serial_unit_id
+			left join public.inv_items i on i.id = wis.component_item_id
+			where wis.tenant_id = $1 and wis.work_order_id = $2
+			order by wis.id`, tu.TenantID, woID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load issued serials.", "ERR_INTERNAL")
+			return
+		}
+		issueLots, err := loadIssuedNumbers(r.Context(), pool, `
+			select coalesce(i.item_code, ''), lb.lot_no, wil.qty::float8
+			from public.mfg_wo_issue_lots wil
+			join public.inv_lot_batches lb on lb.id = wil.lot_batch_id
+			left join public.inv_items i on i.id = wil.component_item_id
+			where wil.tenant_id = $1 and wil.work_order_id = $2
+			order by wil.id`, tu.TenantID, woID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load issued lots.", "ERR_INTERNAL")
+			return
+		}
+		outputSerials, err := loadIssuedNumbers(r.Context(), pool, `
+			select '', serial_no, 1::float8
+			from public.mfg_wo_output_serials
+			where tenant_id = $1 and work_order_id = $2 and status in ('staged', 'posted')
+			order by id`, tu.TenantID, woID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load finished serials.", "ERR_INTERNAL")
+			return
+		}
+		outputLots, err := loadIssuedNumbers(r.Context(), pool, `
+			select '', lot_no, coalesce(nullif(catch_weight, 0), qty)::float8
+			from public.mfg_wo_output_lots
+			where tenant_id = $1 and work_order_id = $2 and status in ('staged', 'posted')
+			order by id`, tu.TenantID, woID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load finished lots.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{
+			"issue_serials":  issueSerials,
+			"issue_lots":     issueLots,
+			"output_serials": outputSerials,
+			"output_lots":    outputLots,
+		}, "OK")
+	}
+}
+
+func loadIssuedNumbers(ctx context.Context, pool *pgxpool.Pool, query string, tenantID, woID int64) ([]issuedTraceRow, error) {
+	rows, err := pool.Query(ctx, query, tenantID, woID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []issuedTraceRow{}
+	for rows.Next() {
+		var row issuedTraceRow
+		if err := rows.Scan(&row.ItemCode, &row.Number, &row.Qty); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 // listWorkOrderOutputLots returns the parts or finished lots recorded on a job (not voided).
 func listWorkOrderOutputLots(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

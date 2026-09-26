@@ -184,7 +184,7 @@ export const documentationSections: DocSection[] = [
       },
       {
         type: "paragraph",
-        text: "When an item uses serial numbers, you scan or enter each unit when goods arrive. That unit appears under Serial & Lot → Serials as in stock. When you release a sales order, you pick which serial numbers go to the customer. With delivery receipts enabled, posting a DR issues stock; with legacy combined release, release deducts stock immediately and DR is documentary. When you invoice the sale, those units are marked as sold.",
+        text: "Purchase Receive captures new numbers. The sales invoice, POS, and sales-order release pick them when required. Serials and Lots are on-hand lists. Quantity changes start from those lists.",
       },
       {
         type: "paragraph",
