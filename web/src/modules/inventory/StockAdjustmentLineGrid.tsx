@@ -2,7 +2,9 @@ import { Index, Show } from "solid-js";
 import type { Accessor, Setter } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
+import { ModalField } from "../../shared/ModalField";
 import { inputClass } from "../../shared/SpreadsheetGrid";
+import { fieldVisible, type FormFieldSetting } from "../../shared/useFormFieldSettings";
 
 export type StockAdjustmentLineRow = {
   line_no: number;
@@ -42,6 +44,7 @@ type Props = {
   lines: Accessor<StockAdjustmentLineRow[]>;
   onChange: Setter<StockAdjustmentLineRow[]>;
   disabled?: boolean;
+  settings: () => Record<string, FormFieldSetting>;
 };
 
 export function StockAdjustmentLineGrid(props: Props) {
@@ -59,6 +62,9 @@ export function StockAdjustmentLineGrid(props: Props) {
     );
   };
 
+  const header = (key: string, fallback: string) => props.settings()[key]?.label?.trim() || fallback;
+  const show = (key: string) => fieldVisible(props.settings()[key], true);
+
   return (
     <div class="col-span-full space-y-2">
       <div class="flex items-center justify-between">
@@ -74,9 +80,9 @@ export function StockAdjustmentLineGrid(props: Props) {
           <thead class="bg-slate-50 text-text-secondary">
             <tr>
               <th class="px-2 py-2">#</th>
-              <th class="px-2 py-2">Item</th>
-              <th class="px-2 py-2">Location</th>
-              <th class="px-2 py-2">Qty change</th>
+              <th class="px-2 py-2" classList={{ hidden: !show("item_id") }}>{header("item_id", "Item")}</th>
+              <th class="px-2 py-2" classList={{ hidden: !show("location_id") }}>{header("location_id", "Location")}</th>
+              <th class="px-2 py-2" classList={{ hidden: !show("qty_delta") }}>{header("qty_delta", "Quantity change")}</th>
               <th class="px-2 py-2" />
             </tr>
           </thead>
@@ -85,40 +91,54 @@ export function StockAdjustmentLineGrid(props: Props) {
               {(line, idx) => (
                 <tr class="border-t border-stroke">
                   <td class="px-2 py-2 align-top">{line().line_no}</td>
-                  <td class="min-w-[220px] px-2 py-2 align-top">
-                    <LookupCombo
-                      label=""
-                      value={() => line().item_label}
-                      selectedId={() => line().item_id}
-                      onInput={(v) => updateLine(idx, { item_label: v })}
-                      onSelect={(o) => updateLine(idx, { item_id: o.id, item_label: o.label })}
-                      onClear={() => updateLine(idx, { item_id: null, item_label: "" })}
-                      fetchOptions={fetchItems}
-                      disabled={props.disabled}
-                    />
-                  </td>
-                  <td class="min-w-[180px] px-2 py-2 align-top">
-                    <LookupCombo
-                      label=""
-                      value={() => line().location_label}
-                      selectedId={() => line().location_id}
-                      onInput={(v) => updateLine(idx, { location_label: v })}
-                      onSelect={(o) => updateLine(idx, { location_id: o.id, location_label: o.label })}
-                      onClear={() => updateLine(idx, { location_id: null, location_label: "" })}
-                      fetchOptions={fetchLocations}
-                      disabled={props.disabled}
-                    />
-                  </td>
-                  <td class="min-w-[120px] px-2 py-2 align-top">
-                    <input
-                      type="number"
-                      step="any"
-                      class={inputClass}
-                      value={line().qty_delta}
-                      disabled={props.disabled}
-                      onInput={(e) => updateLine(idx, { qty_delta: e.currentTarget.value })}
-                    />
-                  </td>
+                  <td class="min-w-[220px] px-2 py-2 align-top" classList={{ hidden: !show("item_id") }}>
+                      <ModalField settings={props.settings} fieldKey="item_id" fallbackLabel="Item" fallbackRequired bare>
+                        {(m) => (
+                          <LookupCombo
+                            label=""
+                            value={() => line().item_label}
+                            selectedId={() => line().item_id}
+                            onInput={(v) => updateLine(idx, { item_label: v })}
+                            onSelect={(o) => updateLine(idx, { item_id: o.id, item_label: o.label })}
+                            onClear={() => updateLine(idx, { item_id: null, item_label: "" })}
+                            fetchOptions={fetchItems}
+                            disabled={props.disabled || m.disabled}
+                          />
+                        )}
+                      </ModalField>
+                    </td>
+                    <td class="min-w-[180px] px-2 py-2 align-top" classList={{ hidden: !show("location_id") }}>
+                      <ModalField settings={props.settings} fieldKey="location_id" fallbackLabel="Location" fallbackRequired bare>
+                        {(m) => (
+                          <LookupCombo
+                            label=""
+                            value={() => line().location_label}
+                            selectedId={() => line().location_id}
+                            onInput={(v) => updateLine(idx, { location_label: v })}
+                            onSelect={(o) => updateLine(idx, { location_id: o.id, location_label: o.label })}
+                            onClear={() => updateLine(idx, { location_id: null, location_label: "" })}
+                            fetchOptions={fetchLocations}
+                            disabled={props.disabled || m.disabled}
+                          />
+                        )}
+                      </ModalField>
+                    </td>
+                    <td class="min-w-[120px] px-2 py-2 align-top" classList={{ hidden: !show("qty_delta") }}>
+                      <ModalField settings={props.settings} fieldKey="qty_delta" fallbackLabel="Quantity change" fallbackRequired bare>
+                        {(m) => (
+                          <input
+                            type="number"
+                            step="any"
+                            class={inputClass}
+                            value={line().qty_delta}
+                            disabled={props.disabled || m.disabled}
+                            placeholder={m.placeholder}
+                            onInput={(e) => updateLine(idx, { qty_delta: e.currentTarget.value })}
+                            {...m.inputProps}
+                          />
+                        )}
+                      </ModalField>
+                    </td>
                   <td class="px-2 py-2 align-top">
                     <Show when={!props.disabled && props.lines().length > 1}>
                       <button type="button" class="text-xs text-red-600 hover:underline" onClick={() => removeLine(idx)}>

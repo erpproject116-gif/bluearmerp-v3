@@ -1,9 +1,9 @@
 package columnlabels
 
 type StandardColumn struct {
-	ColumnKey      string `json:"column_key"`
-	Label          string `json:"label"`
-	SortOrder      int    `json:"sort_order"`
+	ColumnKey string `json:"column_key"`
+	Label     string `json:"label"`
+	SortOrder int    `json:"sort_order"`
 	// DefaultHidden hides the column until a tenant explicitly enables it in settings.
 	DefaultHidden bool `json:"-"`
 }
@@ -125,6 +125,31 @@ var standardRegistry = map[string][]StandardColumn{
 		{ColumnKey: "pic_name", Label: "PIC Name", SortOrder: 140},
 		{ColumnKey: "history", Label: "History", SortOrder: 150},
 		{ColumnKey: "lifecycle", Label: "Manage", SortOrder: 160},
+	},
+	"inv_stock_adjustment.list": {
+		{ColumnKey: "created_at", Label: "When", SortOrder: 10},
+		{ColumnKey: "item_code", Label: "Item", SortOrder: 20},
+		{ColumnKey: "item_name", Label: "Item name", SortOrder: 30},
+		{ColumnKey: "location_name", Label: "Location / branch", SortOrder: 40},
+		{ColumnKey: "qty_before", Label: "Qty from", SortOrder: 50},
+		{ColumnKey: "qty_delta", Label: "Change", SortOrder: 60},
+		{ColumnKey: "qty_after", Label: "Qty to", SortOrder: 70},
+		{ColumnKey: "status", Label: "Status", SortOrder: 80},
+		{ColumnKey: "reason", Label: "Reason", SortOrder: 90},
+		{ColumnKey: "created_by_name", Label: "Submitted by", SortOrder: 100},
+		{ColumnKey: "decided_by_name", Label: "Approved / rejected by", SortOrder: 110},
+		{ColumnKey: "decided_at", Label: "Decided at", SortOrder: 120},
+		{ColumnKey: "actions", Label: "Actions", SortOrder: 130},
+	},
+	"inv_stock_movement.list": {
+		{ColumnKey: "created_at", Label: "When", SortOrder: 10},
+		{ColumnKey: "item_code", Label: "Item Code", SortOrder: 20},
+		{ColumnKey: "item_name", Label: "Item Name", SortOrder: 30},
+		{ColumnKey: "location_name", Label: "Location", SortOrder: 40},
+		{ColumnKey: "qty_delta", Label: "Qty Δ", SortOrder: 50},
+		{ColumnKey: "movement_type", Label: "Type", SortOrder: 60},
+		{ColumnKey: "reason", Label: "Reason", SortOrder: 70},
+		{ColumnKey: "history", Label: "History", SortOrder: 80},
 	},
 }
 

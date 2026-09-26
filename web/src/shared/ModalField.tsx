@@ -44,6 +44,8 @@ type Props = {
   span?: "full";
   /** Passed to Field — div for rich-text so a wrapping label does not block typing. */
   as?: "label" | "div";
+  /** Line grids already have a column header. Still apply visibility, required, and disabled. */
+  bare?: boolean;
   children: (meta: ModalFieldMeta) => JSX.Element;
 };
 
@@ -97,17 +99,22 @@ export function ModalField(props: Props) {
 
   return (
     <Show when={visible()}>
-      <Field
-        label={plainLabel()}
-        required={required()}
-        span={props.span}
-        as={props.as}
-        controlId={props.as === "div" ? aria().id : undefined}
-        error={error()}
-        errorId={aria().errorId}
+      <Show
+        when={!props.bare}
+        fallback={props.children(meta())}
       >
-        {props.children(meta())}
-      </Field>
+        <Field
+          label={plainLabel()}
+          required={required()}
+          span={props.span}
+          as={props.as}
+          controlId={props.as === "div" ? aria().id : undefined}
+          error={error()}
+          errorId={aria().errorId}
+        >
+          {props.children(meta())}
+        </Field>
+      </Show>
     </Show>
   );
 }

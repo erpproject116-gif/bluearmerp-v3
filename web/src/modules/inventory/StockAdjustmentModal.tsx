@@ -1,6 +1,9 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
-import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { EntityModal, inputClass } from "../../shared/SpreadsheetGrid";
+import { ModalField } from "../../shared/ModalField";
+import { CustomFieldsSection, collectCustomFieldErrors } from "../../shared/CustomFieldsSection";
+import { useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { submitEntity, collectRequiredFieldErrors, handleSaveResult, showClientValidationBlocker } from "../../shared/handleSaveResult";
@@ -56,8 +59,12 @@ function linesFromInitialItems(items: StockAdjustmentInitialItem[]): StockAdjust
   }));
 }
 
+const STOCK_ADJUSTMENT_ENTITY = "inv_stock_adjustment";
+
 export function StockAdjustmentModal(props: Props) {
   const toast = useToast();
+  const { byKey, fields } = useFormFieldSettings(STOCK_ADJUSTMENT_ENTITY);
+  const [customValues, setCustomValues] = createSignal<Record<string, unknown>>({});
   const [saving, setSaving] = createSignal(false);
   const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [lines, setLines] = createSignal<StockAdjustmentLineRow[]>([emptyStockAdjustmentLine(1)]);
@@ -72,6 +79,7 @@ export function StockAdjustmentModal(props: Props) {
     setFieldErrors({});
     setLines([emptyStockAdjustmentLine(1)]);
     setReason("");
+    setCustomValues({});
     setDraftRequestId(null);
     setRequestStatus(null);
   };
@@ -108,6 +116,7 @@ export function StockAdjustmentModal(props: Props) {
       id: number;
       reason: string;
       status: string;
+      custom_values?: Record<string, unknown>;
       lines?: Array<{
         line_no: number;
         item_id: number;
@@ -128,6 +137,7 @@ export function StockAdjustmentModal(props: Props) {
     setDraftRequestId(res.data.id);
     setRequestStatus(res.data.status);
     setReason(res.data.reason);
+    setCustomValues(res.data.custom_values ?? {});
     const loaded = res.data.lines?.length
       ? res.data.lines.map((ln) => ({
           line_no: ln.line_no,
@@ -158,11 +168,13 @@ export function StockAdjustmentModal(props: Props) {
     getPayload: () => ({
       lines: lines(),
       reason: reason(),
+      custom_values: customValues(),
       request_id: draftRequestId(),
     }),
     onApply: (payload) => {
       setLines(payload.lines?.length ? payload.lines : [emptyStockAdjustmentLine(1)]);
       setReason(payload.reason);
+      setCustomValues(payload.custom_values ?? {});
       if (payload.request_id) setDraftRequestId(payload.request_id);
     },
     enabled: () => props.open && !props.requestId,
@@ -172,8 +184,12 @@ export function StockAdjustmentModal(props: Props) {
 
   const validate = () => {
     setFieldErrors({});
+    const customDefs = fields()
+      .filter((f) => f.kind === "custom" && f.is_active && f.is_visible)
+      .map((f) => ({ field_key: f.field_key, label: f.label, is_required: f.is_required }));
     const errors: Record<string, string | undefined> = {
-      ...collectRequiredFieldErrors({ reason: reason().trim() }, [{ key: "reason", label: "Reason" }]),
+      ...collectRequiredFieldErrors({ reason: reason().trim() }, [{ key: "reason", label: byKey().reason?.label?.trim() || "Reason" }]),
+      ...collectCustomFieldErrors(customValues(), customDefs),
     };
     const rowLines = lines();
     for (const ln of rowLines) {
@@ -201,6 +217,7 @@ export function StockAdjustmentModal(props: Props) {
     const body: Record<string, unknown> = {
       reason: reason().trim(),
       lines: payloadLines,
+      custom_values: customValues(),
     };
     if (payloadLines.length === 1) {
       body.item_id = payloadLines[0].item_id;
@@ -216,6 +233,16 @@ export function StockAdjustmentModal(props: Props) {
     setSaving(true);
 
     if (draftRequestId() && requestStatus() === "draft") {
+      const saved = await apiFetch<{ id: number }>(
+        "/api/v1/inventory/stock-adjustments/draft",
+        { method: "POST", body: JSON.stringify(buildBody()) },
+        { silent: true },
+      );
+      if (!saved.success) {
+        setSaving(false);
+        handleSaveResult(saved, toast, "Draft saved.", { onFieldErrors: setFieldErrors });
+        return;
+      }
       const ok = await submitEntity(
         () =>
           apiFetch(`/api/v1/inventory/stock-adjustment-requests/${draftRequestId()}/submit`, {
@@ -317,28 +344,39 @@ export function StockAdjustmentModal(props: Props) {
           Status: <span class="font-medium text-text-primary">{requestStatus()}</span>
         </p>
       </Show>
-      <Field label="Reason *" span="full" error={fieldErrors().reason}>
-        <textarea
-          class={inputClass}
-          rows={2}
-          value={reason()}
-          disabled={readOnly()}
-          onInput={(e) => {
-            setFieldErrors((prev) => {
-              const next = { ...prev };
-              delete next.reason;
-              return next;
-            });
-            setReason(e.currentTarget.value);
-          }}
-        />
-      </Field>
+      <ModalField settings={byKey} fieldKey="reason" fallbackLabel="Reason" fallbackRequired span="full" errors={fieldErrors}>
+        {(m) => (
+          <textarea
+            class={inputClass}
+            rows={2}
+            value={reason()}
+            disabled={readOnly() || m.disabled}
+            placeholder={m.placeholder}
+            onInput={(e) => {
+              setFieldErrors((prev) => {
+                const next = { ...prev };
+                delete next.reason;
+                return next;
+              });
+              setReason(e.currentTarget.value);
+            }}
+            {...m.inputProps}
+          />
+        )}
+      </ModalField>
       <Show when={fieldErrors().lines}>
         <p class="col-span-full text-sm text-red-700" role="alert">
           {fieldErrors().lines}
         </p>
       </Show>
-      <StockAdjustmentLineGrid lines={lines} onChange={setLines} disabled={readOnly()} />
+      <StockAdjustmentLineGrid lines={lines} onChange={setLines} disabled={readOnly()} settings={byKey} />
+      <div class="col-span-full">
+        <CustomFieldsSection
+          entityType={STOCK_ADJUSTMENT_ENTITY}
+          values={customValues}
+          onChange={(key, value) => setCustomValues((prev) => ({ ...prev, [key]: value }))}
+        />
+      </div>
       <Show when={draftRequestId()}>
         <div class="col-span-full">
           <AttachmentsField

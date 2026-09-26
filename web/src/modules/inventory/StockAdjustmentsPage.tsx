@@ -12,6 +12,7 @@ import { useListState } from "../../shared/useListState";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
 import { InvBookLedgerModal, type InvBookLedgerTarget } from "./reports/InvBookLedgerModal";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { applyColumnLabels, listViewKey, useColumnLabelSettings } from "../../shared/useColumnLabelSettings";
 
 export type StockAdjustmentRequestRow = {
   id: number;
@@ -94,6 +95,7 @@ function defaultDateRange(): { from: string; to: string } {
 
 export default function StockAdjustmentsPage() {
   const auth = useAuth();
+  const listCols = useColumnLabelSettings(listViewKey("inv_stock_adjustment"));
   const toast = useToast();
   const qc = useQueryClient();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("created_at", 25, {
@@ -246,7 +248,7 @@ export default function StockAdjustmentsPage() {
       </CollapsibleFilterPanel>
 
       <SpreadsheetGrid<StockAdjustmentRequestRow>
-        columns={[
+        columns={applyColumnLabels([
           { key: "created_at", header: "When", render: (r) => formatWhen(r.created_at) },
           {
             key: "item_code",
@@ -369,7 +371,7 @@ export default function StockAdjustmentsPage() {
               </div>
             ),
           },
-        ]}
+        ], listCols.columnLabel).filter((c) => listCols.isColumnVisible(c.key))}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
         selectedId={selectedId()}

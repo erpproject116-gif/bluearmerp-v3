@@ -7,6 +7,7 @@ import { CollapsibleFilterPanel } from "../../shared/CollapsibleFilterPanel";
 import { Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { useListState } from "../../shared/useListState";
+import { applyColumnLabels, listViewKey, useColumnLabelSettings } from "../../shared/useColumnLabelSettings";
 import { StockAdjustmentModal } from "./StockAdjustmentModal";
 import { InvBookLedgerModal, type InvBookLedgerTarget } from "./reports/InvBookLedgerModal";
 
@@ -68,6 +69,7 @@ function defaultDateRange(): { from: string; to: string } {
 }
 
 export default function StockMovementsPage() {
+  const listCols = useColumnLabelSettings(listViewKey("inv_stock_movement"));
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("created_at", 25, { defaultOrder: "desc" });
@@ -168,7 +170,7 @@ export default function StockMovementsPage() {
       </CollapsibleFilterPanel>
 
       <SpreadsheetGrid
-        columns={[
+        columns={applyColumnLabels([
           { key: "created_at", header: "When", render: (r) => formatWhen(r.created_at) },
           {
             key: "item_code",
@@ -208,7 +210,7 @@ export default function StockMovementsPage() {
               );
             },
           },
-        ]}
+        ], listCols.columnLabel).filter((c) => listCols.isColumnVisible(c.key))}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
         selectedId={selectedId()}

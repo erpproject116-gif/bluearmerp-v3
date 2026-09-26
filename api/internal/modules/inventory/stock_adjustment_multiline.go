@@ -29,12 +29,15 @@ type stockAdjustmentLineRow struct {
 }
 
 type stockAdjustmentCreateBody struct {
-	ItemID     int64                     `json:"item_id"`
-	LocationID int64                     `json:"location_id"`
-	QtyDelta   float64                   `json:"qty_delta"`
-	Reason     string                    `json:"reason"`
-	Lines      []stockAdjustmentLineBody `json:"lines"`
+	ItemID       int64                     `json:"item_id"`
+	LocationID   int64                     `json:"location_id"`
+	QtyDelta     float64                   `json:"qty_delta"`
+	Reason       string                    `json:"reason"`
+	Lines        []stockAdjustmentLineBody `json:"lines"`
+	CustomValues map[string]any            `json:"custom_values"`
 }
+
+const trackedItemAdjustmentMessage = "This item tracks serials or lots. Use Fix this unit or Change quantity."
 
 func normalizedStockAdjLines(body stockAdjustmentCreateBody) []stockAdjustmentLineBody {
 	if len(body.Lines) > 0 {
@@ -82,6 +85,17 @@ func ensureStockAdjLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 		if errs := ensureItemLocation(ctx, pool, tenantID, ln.ItemID, ln.LocationID); errs != nil {
 			for k, v := range errs {
 				return map[string]string{fmt.Sprintf("lines[%d].%s", i, k): v}
+			}
+		}
+		var trackSerial, trackLot bool
+		_ = pool.QueryRow(ctx, `
+			select coalesce(track_serial, false), coalesce(track_lot, false)
+			from public.inv_items
+			where id = $1 and tenant_id = $2 and deleted_at is null`,
+			ln.ItemID, tenantID).Scan(&trackSerial, &trackLot)
+		if trackSerial || trackLot {
+			return map[string]string{
+				fmt.Sprintf("lines[%d].item_id", i): trackedItemAdjustmentMessage,
 			}
 		}
 	}

@@ -26,6 +26,8 @@ type Props = {
   entityType: string;
   featureLabel: string;
   listHref: string;
+  /** Lists with no document form. Shows registered list columns only. */
+  listColumnsOnly?: boolean;
 };
 
 function slugKey(label: string) {
@@ -292,14 +294,16 @@ export function EntityFormSettingsPage(props: Props) {
         </div>
         <Show when={canEdit()}>
           <div class="flex flex-wrap gap-2">
-            <button
-              type="button"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              disabled={saving() || !dirty()}
-              onClick={() => void save()}
-            >
-              {uiLabel("form_settings.save_fields")}
-            </button>
+            <Show when={!props.listColumnsOnly}>
+              <button
+                type="button"
+                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                disabled={saving() || !dirty()}
+                onClick={() => void save()}
+              >
+                {uiLabel("form_settings.save_fields")}
+              </button>
+            </Show>
             <Show when={showLineColumns()}>
               <button
                 type="button"
@@ -349,6 +353,7 @@ export function EntityFormSettingsPage(props: Props) {
         )}
       </Show>
 
+      <Show when={!props.listColumnsOnly}>
       <div class="overflow-x-auto rounded-xl border border-stroke bg-white shadow-sm">
         <div class="border-b border-stroke px-4 py-3">
           <h3 class="text-sm font-semibold text-text-primary">{uiLabel("form_settings.form_fields_heading")}</h3>
@@ -459,6 +464,7 @@ export function EntityFormSettingsPage(props: Props) {
           </tbody>
         </table>
       </div>
+      </Show>
 
       <Show when={showLineColumns()}>
         <div class="mt-10 overflow-x-auto rounded-xl border border-stroke bg-white shadow-sm">
@@ -556,7 +562,7 @@ export function EntityFormSettingsPage(props: Props) {
         </div>
       </Show>
 
-      <Show when={canEdit()}>
+      <Show when={canEdit() && !props.listColumnsOnly}>
         <div class="mt-8">
           <h3 class="mb-3 text-sm font-semibold text-text-primary">{uiLabel("form_settings.add_custom_field")}</h3>
           <div class="grid grid-cols-1 gap-3 rounded-xl border border-dashed border-brand-200 bg-brand-50/40 p-4 sm:grid-cols-2 lg:grid-cols-3">

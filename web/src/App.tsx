@@ -43,7 +43,9 @@ import {
   RegisterRepairStatusPage,
   RegisterRepairConsumptionPage,
   StockMovementsPage,
+  StockMovementSettingsPage,
   StockAdjustmentsPage,
+  StockAdjustmentSettingsPage,
   StockEntriesPage,
   StockReconciliationPage,
   PriceListsPage,
@@ -540,7 +542,9 @@ export default function App() {
           <Route path="/inventory/reports/inventory-status" component={InventoryStatusReportPage} />
           <Route path="/inventory/reports/inv-book" component={InvBookReportPage} />
           <Route path="/inventory/stock-movements" component={StockMovementsPage} />
+          <Route path="/inventory/stock-movements/settings" component={StockMovementSettingsPage} />
           <Route path="/inventory/stock-adjustments" component={StockAdjustmentsPage} />
+          <Route path="/inventory/stock-adjustments/settings" component={StockAdjustmentSettingsPage} />
           <Route path="/inventory/stock-entries" component={StockEntriesPage} />
           <Route path="/inventory/stock-reconciliation" component={StockReconciliationPage} />
           <Route path="/inventory/price-lists" component={PriceListsPage} />

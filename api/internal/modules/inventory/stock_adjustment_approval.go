@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -23,6 +24,7 @@ import (
 
 const (
 	entityStockAdjustmentRequest     = "inv_stock_adjustment_request"
+	stockAdjustmentFormEntity        = "inv_stock_adjustment"
 	permissionStockAdjustmentApprove = "inventory.stock_adjustment_approve"
 )
 
@@ -45,6 +47,7 @@ type stockAdjustmentRequestRow struct {
 	DecidedByName   string                   `json:"decided_by_name,omitempty"`
 	DecidedAt       *string                  `json:"decided_at,omitempty"`
 	Decision        string                   `json:"decision,omitempty"` // approve | reject when decided
+	CustomValues    map[string]any           `json:"custom_values,omitempty"`
 	CreatedAt       string                   `json:"created_at"`
 	UpdatedAt       string                   `json:"updated_at"`
 	Actions         []any                    `json:"actions,omitempty"`
@@ -113,6 +116,15 @@ func ensureItemLocation(ctx context.Context, pool *pgxpool.Pool, tenantID, itemI
 // postStockAdjustment applies balance + movement inside an open transaction.
 // Returns movement id and the on-hand qty before/after the change.
 func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID, requestID int64, itemID, locationID int64, qtyDelta float64, reason string) (movementID int64, qtyBefore, qtyAfter float64, validation map[string]string, err error) {
+	var trackSerial, trackLot bool
+	_ = tx.QueryRow(ctx, `
+		select coalesce(track_serial, false), coalesce(track_lot, false)
+		from public.inv_items
+		where id = $1 and tenant_id = $2 and deleted_at is null`,
+		itemID, tenantID).Scan(&trackSerial, &trackLot)
+	if trackSerial || trackLot {
+		return 0, 0, 0, map[string]string{"item_id": trackedItemAdjustmentMessage}, nil
+	}
 	err = tx.QueryRow(ctx, `
 		select qty_on_hand::float8
 		from public.inv_item_location_balances
@@ -303,6 +315,10 @@ func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save adjustment lines.", "ERR_INTERNAL")
 			return
 		}
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, stockAdjustmentFormEntity, requestID, body.CustomValues); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
+			return
+		}
 		if err := submitStockAdjForApproval(r.Context(), tx, tu, requestID, reason); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to submit for approval.", "ERR_INTERNAL")
 			return
@@ -387,6 +403,10 @@ func saveStockAdjustmentDraft(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to save draft lines.", "ERR_INTERNAL")
 				return
 			}
+			if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, stockAdjustmentFormEntity, *body.ID, body.CustomValues); len(cerrs) > 0 {
+				response.Validation(w, cerrs)
+				return
+			}
 			if err := tx.Commit(r.Context()); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to save draft.", "ERR_INTERNAL")
 				return
@@ -418,6 +438,10 @@ func saveStockAdjustmentDraft(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := insertStockAdjustmentLines(r.Context(), tx, id, tu.TenantID, lines); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save draft lines.", "ERR_INTERNAL")
+			return
+		}
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, stockAdjustmentFormEntity, id, body.CustomValues); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
@@ -653,6 +677,9 @@ func getStockAdjustmentRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		row.Lines = lines
 		row.LineCount = len(lines)
+		if vals, err := customfields.LoadValues(r.Context(), pool, tu.TenantID, stockAdjustmentFormEntity, id); err == nil && len(vals) > 0 {
+			row.CustomValues = vals
+		}
 		actions, err := loadStockAdjActions(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load timeline.", "ERR_INTERNAL")
