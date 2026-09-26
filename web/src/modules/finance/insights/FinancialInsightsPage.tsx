@@ -237,6 +237,31 @@ function writeWhyCache(key: string, text: string) {
   }
 }
 
+const BAIKO_ACTION_PREFIX = "baiko-insights-action:";
+
+function readActionCache(key: string) {
+  if (!key) return null;
+  try {
+    const raw = sessionStorage.getItem(BAIKO_ACTION_PREFIX + key);
+    if (!raw || /audited/i.test(raw)) return null;
+    return plainBaikoSentences(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeActionCache(key: string, text: string) {
+  try {
+    sessionStorage.setItem(BAIKO_ACTION_PREFIX + key, text);
+  } catch {
+    /* private mode */
+  }
+}
+
+function insightsActionKey(ov: Overview) {
+  return ["insights", ov.current_from, ov.current_to, ov.compare_from, ov.compare_to, ov.reading ?? ""].join("|");
+}
+
 function plainBaikoSentences(msg: string) {
   return msg
     .replace(/^#{1,6}\s+/gm, "")
@@ -259,6 +284,7 @@ export default function FinancialInsightsPage() {
   const interval = createMemo(() => queryParamFirst(params.interval) || "month");
   const whyMetric = createMemo(() => queryParamFirst(params.why_metric) || "revenue");
   const [askedMetric, setAskedMetric] = createSignal<string | null>(null);
+  const [actionAsked, setActionAsked] = createSignal(false);
   const [compareFrom, setCompareFrom] = createSignal(queryParamFirst(params.compare_from) || "");
   const [compareTo, setCompareTo] = createSignal(queryParamFirst(params.compare_to) || "");
 
@@ -403,6 +429,66 @@ export default function FinancialInsightsPage() {
 
   const baikoParagraph = createMemo(() => cachedWhy() || (askedMetric() === whyMetric() ? baikoWhy.data ?? "" : ""));
 
+  const actionKey = createMemo(() => {
+    const ov = overview.data;
+    if (!ov?.reading) return "";
+    return insightsActionKey(ov);
+  });
+  const cachedAction = createMemo(() => readActionCache(actionKey()));
+
+  const baikoAction = createQuery(() => {
+    const key = actionKey();
+    return {
+      queryKey: ["finance-insights-baiko-action", key],
+      enabled: Boolean(key) && actionAsked() && !readActionCache(key),
+      retry: false,
+      staleTime: Infinity,
+      queryFn: async () => {
+        const ov = overview.data;
+        if (!ov?.reading || insightsActionKey(ov) !== key) return null;
+        const focus = new Set(ov.reading_focus ?? []);
+        const facts: Record<string, unknown> = {
+          reading: ov.reading,
+          current_from: ov.current_from,
+          current_to: ov.current_to,
+          compare_from: ov.compare_from,
+          compare_to: ov.compare_to,
+          focus_lines: (ov.metrics ?? [])
+            .filter((m) => focus.has(m.key))
+            .map((m) => ({
+              key: m.key,
+              label: plainMetricLabel(m.key, m.label),
+              current: m.current,
+              previous: m.previous,
+              change: m.change,
+            })),
+        };
+        if (ov.data_quality?.incomplete && ov.data_quality.message && ov.reading.includes(ov.data_quality.message)) {
+          facts.data_quality_warning = ov.data_quality.message;
+        }
+        const res = await apiFetch<{ message?: string; used_ai?: boolean }>(
+          "/api/v1/copilot/ask",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              query: "Say what to do next in plain sentences. Use only these figures. Do not add a heading.",
+              pathname: "/app/finance/acct-i/financial-insights",
+              page_facts: facts,
+            }),
+          },
+          { silent: true },
+        );
+        const msg = plainBaikoSentences(res.data?.message ?? "");
+        if (!res.success || !res.data?.used_ai || !msg || /audited/i.test(msg)) return null;
+        if (insightsActionKey(ov) !== key) return null;
+        writeActionCache(key, msg);
+        return msg;
+      },
+    };
+  });
+
+  const actionParagraph = createMemo(() => cachedAction() || (actionAsked() ? baikoAction.data ?? "" : ""));
+
   const openWhy = (key: string) => {
     const metric = key === "gross_profit" ? "cogs" : key;
     setAskedMetric(metric);
@@ -544,9 +630,19 @@ export default function FinancialInsightsPage() {
               </Show>
 
               <Show when={!!d().reading}>
-                <p class="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-text-primary">
-                  {d().reading}
-                </p>
+                <div class="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+                  <p class="text-sm font-medium text-text-primary">{d().reading}</p>
+                  <button
+                    type="button"
+                    class="mt-2 text-sm font-medium text-brand-700 hover:underline"
+                    onClick={() => setActionAsked(true)}
+                  >
+                    What should I do?
+                  </button>
+                  <Show when={!!actionParagraph()}>
+                    <p class="mt-2 text-sm text-text-secondary">{actionParagraph()}</p>
+                  </Show>
+                </div>
               </Show>
 
               <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

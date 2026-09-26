@@ -1,5 +1,5 @@
 import { A, useSearchParams } from "@solidjs/router";
-import { For, Show, createMemo } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { formatPeso } from "../../shared/money";
@@ -86,6 +86,38 @@ function int(n: number | undefined) {
   return (n ?? 0).toLocaleString("en-PH", { maximumFractionDigits: 0 });
 }
 
+const REPORTS_ACTION_PREFIX = "baiko-reports-action:";
+
+function plainActionSentences(msg: string) {
+  return msg
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function reportsActionStorageKey(from: string, to: string, sentence: string) {
+  return ["reports", from, to, sentence].join("|");
+}
+
+function readReportsAction(key: string) {
+  if (!key) return null;
+  try {
+    const raw = sessionStorage.getItem(REPORTS_ACTION_PREFIX + key);
+    if (!raw || /audited/i.test(raw)) return null;
+    return plainActionSentences(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeReportsAction(key: string, text: string) {
+  try {
+    sessionStorage.setItem(REPORTS_ACTION_PREFIX + key, text);
+  } catch {
+    /* private mode */
+  }
+}
+
 function Kpi(props: { label: string; value: string; href?: string; warn?: boolean; emphasis?: boolean }) {
   const body = (
     <div
@@ -114,6 +146,7 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
   const opsVariant = () => props.opsVariant ?? "full";
 
   const range = createMemo(() => reportsDateRangeFromQuery(params));
+  const [actionAsked, setActionAsked] = createSignal(false);
 
   const q = createQuery(() => ({
     queryKey: ["dashboard-period-summary", range().from, range().to],
@@ -129,6 +162,64 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
     },
     staleTime: 60_000,
   }));
+
+  const actionKey = createMemo(() => {
+    const snap = q.data;
+    if (!snap) return "";
+    return reportsActionStorageKey(range().from, range().to, reportsLead(snap).sentence);
+  });
+  const cachedReportsAction = createMemo(() => readReportsAction(actionKey()));
+
+  const baikoAction = createQuery(() => {
+    const key = actionKey();
+    return {
+      queryKey: ["reports-baiko-action", key],
+      enabled: Boolean(key) && actionAsked() && !readReportsAction(key),
+      retry: false,
+      staleTime: Infinity,
+      queryFn: async () => {
+        const snap = q.data;
+        if (!snap) return null;
+        const lead = reportsLead(snap);
+        if (reportsActionStorageKey(range().from, range().to, lead.sentence) !== key) return null;
+        const facts: Record<string, unknown> = {
+          sentence: lead.sentence,
+          date_from: range().from,
+          date_to: range().to,
+        };
+        if (lead.focus === "ar") {
+          facts.money_customers_owe_overdue = snap.ar_overdue;
+          const first = snap.overdue_alerts?.[0];
+          if (first) facts.largest_overdue = { name: first.label, amount: first.amount };
+        } else if (lead.focus === "ap") {
+          facts.money_you_owe_overdue = snap.ap_overdue;
+        } else {
+          facts.sales_in_this_period = snap.sales_in_window;
+          facts.cash_in_this_month = snap.cash_inflow_mtd;
+          facts.cash_out_this_month = snap.cash_outflow_mtd;
+        }
+        const res = await apiFetch<{ message?: string; used_ai?: boolean }>(
+          "/api/v1/copilot/ask",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              query: "Say what to do next in plain sentences. Use only these figures. Do not add a heading.",
+              pathname: "/app/reports",
+              page_facts: facts,
+            }),
+          },
+          { silent: true },
+        );
+        const msg = plainActionSentences(res.data?.message ?? "");
+        if (!res.success || !res.data?.used_ai || !msg || /audited/i.test(msg)) return null;
+        if (reportsActionStorageKey(range().from, range().to, lead.sentence) !== key) return null;
+        writeReportsAction(key, msg);
+        return msg;
+      },
+    };
+  });
+
+  const actionParagraph = createMemo(() => cachedReportsAction() || (actionAsked() ? baikoAction.data ?? "" : ""));
 
   const applyRange = (preset: ReportDatePresetId, next: { date_from: string; date_to: string }) => {
     setParams(
@@ -200,6 +291,16 @@ export function ReportsBiDashboard(props: { opsVariant?: "full" | "period" }) {
                     ? "Open who you owe"
                     : "Open sales"}
               </A>
+              <button
+                type="button"
+                class="mt-2 block text-sm font-medium text-brand-700 hover:underline"
+                onClick={() => setActionAsked(true)}
+              >
+                What should I do?
+              </button>
+              <Show when={!!actionParagraph()}>
+                <p class="mt-2 text-sm text-text-secondary">{actionParagraph()}</p>
+              </Show>
             </section>
 
             <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
