@@ -180,6 +180,69 @@ function tone(fav: boolean | null | undefined) {
   return fav ? "text-emerald-700" : "text-rose-700";
 }
 
+const BAIKO_WHY_PREFIX = "baiko-insights-why:";
+
+function metricSlice(metrics: MetricRow[] | undefined, key: string) {
+  return metrics?.find((m) => m.key === key);
+}
+
+function whyLineFingerprint(ov: Overview, metric: string, overdue: OverdueInvoice[] | undefined) {
+  const row = metricSlice(ov.metrics, metric);
+  const parts = [
+    ov.current_from,
+    ov.current_to,
+    ov.compare_from,
+    ov.compare_to,
+    metric,
+    String(row?.current ?? ""),
+    String(row?.previous ?? ""),
+    String(row?.change ?? ""),
+  ];
+  if (ov.data_quality?.incomplete) parts.push(ov.data_quality.message ?? "incomplete");
+  if (metric === "cogs" || metric === "gross_profit" || metric === "net_profit") {
+    const shop = metricSlice(ov.metrics, "operating_expenses");
+    const otherKey = metric === "net_profit" ? "gross_profit" : "net_profit";
+    const other = metricSlice(ov.metrics, otherKey);
+    parts.push(String(shop?.current ?? ""), String(shop?.change ?? ""), String(other?.current ?? ""), String(other?.change ?? ""));
+  }
+  if (metric === "accounts_receivable") {
+    const cash = metricSlice(ov.metrics, "cash");
+    parts.push(String(cash?.change ?? ""));
+    const names = (overdue ?? [])
+      .map((a) => `${a.customer_name}|${a.sales_no}|${a.balance}|${a.due_date}`)
+      .sort()
+      .join(",");
+    parts.push(names);
+  }
+  return parts.join("|");
+}
+
+function readWhyCache(key: string) {
+  if (!key) return null;
+  try {
+    const raw = sessionStorage.getItem(BAIKO_WHY_PREFIX + key);
+    if (!raw || /audited/i.test(raw)) return null;
+    return plainBaikoSentences(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeWhyCache(key: string, text: string) {
+  try {
+    sessionStorage.setItem(BAIKO_WHY_PREFIX + key, text);
+  } catch {
+    /* private mode */
+  }
+}
+
+function plainBaikoSentences(msg: string) {
+  return msg
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function FinancialInsightsPage() {
   const [params, setParams] = useSearchParams();
   const defaults = defaultReportDateRange();
@@ -194,6 +257,7 @@ export default function FinancialInsightsPage() {
   const comparison = createMemo(() => queryParamFirst(params.comparison) || "previous_month");
   const interval = createMemo(() => queryParamFirst(params.interval) || "month");
   const whyMetric = createMemo(() => queryParamFirst(params.why_metric) || "revenue");
+  const [askedMetric, setAskedMetric] = createSignal<string | null>(null);
   const [compareFrom, setCompareFrom] = createSignal(queryParamFirst(params.compare_from) || "");
   const [compareTo, setCompareTo] = createSignal(queryParamFirst(params.compare_to) || "");
 
@@ -259,70 +323,90 @@ export default function FinancialInsightsPage() {
     staleTime: 60_000,
   }));
 
-  const baikoRetell = createQuery(() => ({
-    queryKey: [
-      "finance-insights-baiko",
-      overview.data?.reading ?? "",
-      trends.data?.buckets?.length ?? 0,
-      overdueCustomers.data?.overdue_alerts?.length ?? 0,
-    ],
-    enabled: Boolean(overview.data?.reading),
-    retry: false,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const ov = overview.data;
-      if (!ov?.reading) return null;
-      const sales = (ov.metrics ?? []).find((m) => m.key === "revenue");
-      const facts = {
-        reading: ov.reading,
-        current_from: ov.current_from,
-        current_to: ov.current_to,
-        compare_from: ov.compare_from,
-        compare_to: ov.compare_to,
-        sales_change_label: sales?.change_pct_label ?? "",
-        metrics: (ov.metrics ?? []).map((m) => ({
-          key: m.key,
-          current: m.current,
-          previous: m.previous,
-          change: m.change,
-          change_pct_label: m.change_pct_label ?? "",
-        })),
-        trend_buckets: (trends.data?.buckets ?? []).map((b) => ({
-          label: b.label,
-          has_journal_data: b.has_journal_data,
-          revenue: b.revenue,
-          cogs: b.cogs ?? 0,
-          gross_profit: b.gross_profit,
-          operating_expenses: b.operating_expenses,
-          net_profit: b.net_profit,
-          cash: b.cash,
-          accounts_receivable: b.accounts_receivable,
-          accounts_payable: b.accounts_payable,
-        })),
-        overdue_names: (overdueCustomers.data?.overdue_alerts ?? []).map((a) => ({
-          customer_name: a.customer_name,
-          sales_no: a.sales_no,
-          balance: a.balance,
-          due_date: a.due_date,
-        })),
-      };
-      const res = await apiFetch<{ message?: string; used_ai?: boolean }>(
-        "/api/v1/copilot/ask",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            query: "Retell the financial insights reading in plain words. Use only the page figures.",
-            pathname: "/app/finance/acct-i/financial-insights",
-            page_facts: facts,
-          }),
-        },
-        { silent: true },
-      );
-      const msg = res.data?.message?.trim() ?? "";
-      if (!res.success || !res.data?.used_ai || !msg || /audited/i.test(msg)) return null;
-      return msg;
-    },
-  }));
+  const whyKey = createMemo(() => {
+    const ov = overview.data;
+    if (!ov) return "";
+    return whyLineFingerprint(ov, whyMetric(), overdueCustomers.data?.overdue_alerts);
+  });
+  const cachedWhy = createMemo(() => readWhyCache(whyKey()));
+  const arReady = createMemo(
+    () => whyMetric() !== "accounts_receivable" || overdueCustomers.isFetched || overdueCustomers.isError,
+  );
+
+  const baikoWhy = createQuery(() => {
+    const key = whyKey();
+    const asked = askedMetric() === whyMetric();
+    return {
+      queryKey: ["finance-insights-baiko-line", key],
+      enabled: Boolean(key) && asked && arReady() && !readWhyCache(key),
+      retry: false,
+      staleTime: Infinity,
+      queryFn: async () => {
+        const ov = overview.data;
+        const metric = whyMetric();
+        if (!ov || whyLineFingerprint(ov, metric, overdueCustomers.data?.overdue_alerts) !== key) return null;
+        const row = metricSlice(ov.metrics, metric);
+        const facts: Record<string, unknown> = {
+          metric,
+          label: plainMetricLabel(metric, row?.label ?? ""),
+          current_from: ov.current_from,
+          current_to: ov.current_to,
+          compare_from: ov.compare_from,
+          compare_to: ov.compare_to,
+          current: row?.current ?? 0,
+          previous: row?.previous ?? 0,
+          change: row?.change ?? 0,
+          change_pct_label: row?.change_pct_label ?? "",
+        };
+        if (ov.data_quality?.incomplete && ov.data_quality.message) {
+          facts.data_quality_warning = ov.data_quality.message;
+        }
+        if (metric === "cogs" || metric === "gross_profit" || metric === "net_profit") {
+          const shop = metricSlice(ov.metrics, "operating_expenses");
+          const other = metricSlice(ov.metrics, metric === "net_profit" ? "gross_profit" : "net_profit");
+          facts.shop_costs_current = shop?.current ?? 0;
+          facts.shop_costs_change = shop?.change ?? 0;
+          facts.other_profit_current = other?.current ?? 0;
+          facts.other_profit_change = other?.change ?? 0;
+        }
+        if (metric === "accounts_receivable") {
+          const cash = metricSlice(ov.metrics, "cash");
+          facts.cash_change = cash?.change ?? 0;
+          facts.overdue_names = (overdueCustomers.data?.overdue_alerts ?? []).map((a) => ({
+            customer_name: a.customer_name,
+            sales_no: a.sales_no,
+            balance: a.balance,
+            due_date: a.due_date,
+          }));
+        }
+        const res = await apiFetch<{ message?: string; used_ai?: boolean }>(
+          "/api/v1/copilot/ask",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              query: "Explain this one line in plain sentences. Use only these figures. Do not add a heading.",
+              pathname: "/app/finance/acct-i/financial-insights",
+              page_facts: facts,
+            }),
+          },
+          { silent: true },
+        );
+        const msg = plainBaikoSentences(res.data?.message ?? "");
+        if (!res.success || !res.data?.used_ai || !msg || /audited/i.test(msg)) return null;
+        if (whyLineFingerprint(ov, metric, overdueCustomers.data?.overdue_alerts) !== key) return null;
+        writeWhyCache(key, msg);
+        return msg;
+      },
+    };
+  });
+
+  const baikoParagraph = createMemo(() => cachedWhy() || (askedMetric() === whyMetric() ? baikoWhy.data ?? "" : ""));
+
+  const openWhy = (key: string) => {
+    const metric = key === "gross_profit" ? "cogs" : key;
+    setAskedMetric(metric);
+    setParams({ ...params, why_metric: metric }, { replace: true });
+  };
 
   const applyRange = (preset: ReportDatePresetId, next: { date_from: string; date_to: string }) => {
     setParams(
@@ -489,8 +573,8 @@ export default function FinancialInsightsPage() {
 
               <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
                 <h2 class="mb-3 text-sm font-semibold text-text-primary">Key changes</h2>
-                <Show when={!!(baikoRetell.data || d().reading)}>
-                  <p class="mb-3 text-sm text-text-secondary">{baikoRetell.data || d().reading}</p>
+                <Show when={!!d().reading}>
+                  <p class="mb-3 text-sm text-text-secondary">{d().reading}</p>
                 </Show>
                 <Show when={(d().key_changes?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No material movements in this comparison.</p>}>
                   <ul class="space-y-2">
@@ -517,7 +601,7 @@ export default function FinancialInsightsPage() {
                           <button
                             type="button"
                             class="text-xs font-medium text-brand-700 hover:underline"
-                            onClick={() => setParams({ ...params, why_metric: kc.key === "gross_profit" ? "cogs" : kc.key }, { replace: true })}
+                            onClick={() => openWhy(kc.key)}
                           >
                             Why did this change?
                           </button>
@@ -534,7 +618,7 @@ export default function FinancialInsightsPage() {
                   <select
                     class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
                     value={whyMetric()}
-                    onChange={(e) => setParams({ ...params, why_metric: e.currentTarget.value }, { replace: true })}
+                    onChange={(e) => openWhy(e.currentTarget.value)}
                   >
                     <For each={WHY_METRICS}>{(m) => <option value={m.value}>{m.label}</option>}</For>
                   </select>
@@ -573,6 +657,9 @@ export default function FinancialInsightsPage() {
                       {contributors.data?.href_label || "Open the report"}
                     </A>
                   </Show>
+                </Show>
+                <Show when={!!baikoParagraph()}>
+                  <p class="mt-3 text-sm text-text-secondary">{baikoParagraph()}</p>
                 </Show>
                 <Show when={whyMetric() === "accounts_receivable" && (overdueCustomers.data?.overdue_alerts?.length ?? 0) > 0}>
                   <p class="mb-2 mt-4 text-sm font-medium text-text-primary">Who still owes you</p>
