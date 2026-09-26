@@ -89,6 +89,20 @@ export default function PlatformCustomersPage() {
   const [busy, setBusy] = createSignal(false);
   const [removingId, setRemovingId] = createSignal<number | null>(null);
   const q = usePlatformCustomers({ q: () => search(), tenantStatus: () => tenantStatus() });
+  const owners = () => (q.data ?? []).filter((c) => c.is_workspace_owner || !c.tenant_id);
+  const memberGroups = () => {
+    const groups = new Map<number, { workspace: string; people: PlatformCustomer[] }>();
+    for (const c of q.data ?? []) {
+      if (!c.tenant_id || c.is_workspace_owner) continue;
+      const current = groups.get(c.tenant_id) ?? {
+        workspace: c.company_code || c.company_name || `Workspace ${c.tenant_id}`,
+        people: [],
+      };
+      current.people.push(c);
+      groups.set(c.tenant_id, current);
+    }
+    return [...groups.values()];
+  };
   const summaryQ = usePlatformBillingSummary();
   const commandQ = usePlatformCommandOverview();
   const plansQ = usePlatformPlansAdmin();
@@ -422,13 +436,14 @@ export default function PlatformCustomersPage() {
                   <th class="px-4 py-3">Customer</th>
                   <th class="px-4 py-3">Workspace</th>
                   <th class="hidden px-4 py-3 md:table-cell">Plan</th>
+                  <th class="hidden px-4 py-3 md:table-cell">Subscription</th>
                   <th class="hidden px-4 py-3 lg:table-cell">Urgency</th>
                   <th class="hidden px-4 py-3 lg:table-cell">Days left</th>
                   <th class="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
-                <For each={q.data ?? []}>
+                <For each={owners()}>
                   {(c) => (
                     <tr class="border-b border-stroke last:border-0">
                       <td class="px-4 py-3">
@@ -461,6 +476,7 @@ export default function PlatformCustomersPage() {
                         </Show>
                       </td>
                       <td class="hidden px-4 py-3 md:table-cell">{c.plan_kind ?? "—"}</td>
+                      <td class="hidden px-4 py-3 md:table-cell">{c.subscription_status ?? "—"}</td>
                       <td class="hidden px-4 py-3 lg:table-cell">
                         <span class={`rounded-full px-2 py-0.5 text-xs ${urgencyBadge[c.urgency_label] ?? "bg-slate-100"}`}>
                           {c.urgency_label.replace(/_/g, " ")}
@@ -490,6 +506,39 @@ export default function PlatformCustomersPage() {
               </tbody>
             </table>
           </div>
+          <Show when={memberGroups().length > 0}>
+            <section class="mt-8">
+              <h2 class="text-lg font-semibold text-text-primary">Team members</h2>
+              <p class="mt-1 text-sm text-text-secondary">People invited into a workspace. They are not billed as customers.</p>
+              <div class="mt-4 space-y-4">
+                <For each={memberGroups()}>
+                  {(group) => (
+                    <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
+                      <p class="border-b border-stroke bg-slate-50 px-4 py-2 text-sm font-medium text-text-primary">{group.workspace}</p>
+                      <table class="w-full text-left text-sm">
+                        <thead class="text-xs uppercase text-text-secondary">
+                          <tr>
+                            <th class="px-4 py-2">Name</th>
+                            <th class="px-4 py-2">Email</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <For each={group.people}>
+                            {(person) => (
+                              <tr class="border-t border-stroke">
+                                <td class="px-4 py-2">{person.full_name || "—"}</td>
+                                <td class="px-4 py-2 text-text-secondary">{person.email}</td>
+                              </tr>
+                            )}
+                          </For>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </section>
+          </Show>
         }>
           <p class="text-sm text-red-600">Failed to load customers.</p>
         </Show>

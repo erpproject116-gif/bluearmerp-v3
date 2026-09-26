@@ -45,14 +45,14 @@ func ResolveTrialDays(trialDays int) int {
 }
 
 type UpsertParams struct {
-	Email        string
-	AuthUserID   string
-	FullName     string
-	CompanyName  string
-	Mobile       string
-	EntrySource  string
-	DemoSignupID *int64
-	LeadNote     string
+	Email         string
+	AuthUserID    string
+	FullName      string
+	CompanyName   string
+	Mobile        string
+	EntrySource   string
+	DemoSignupID  *int64
+	LeadNote      string
 	CRMLeadSource string
 }
 
@@ -170,19 +170,33 @@ func LinkTenantByEmail(ctx context.Context, pool *pgxpool.Pool, email, authUserI
 	return err
 }
 
-// EnsureCustomerForLinkedUser records invite/google autolink without duplicating.
+// EnsureCustomerForLinkedUser records invite/google autolink for the workspace owner.
+// Linked users who are not tenants.owner_user_id do not get a new platform_customers row.
 func EnsureCustomerForLinkedUser(ctx context.Context, pool *pgxpool.Pool, leadgenTenantID int64, authUserID, email, fullName, entrySource string, tenantID int64) error {
 	email = strings.ToLower(strings.TrimSpace(email))
-	if email == "" {
+	if email == "" || tenantID <= 0 {
+		return nil
+	}
+	var owner bool
+	if err := pool.QueryRow(ctx, `
+		select exists (
+			select 1
+			from public.tenants t
+			join public.users u on u.id = t.owner_user_id
+			where t.id = $1 and lower(u.email) = $2
+		)`, tenantID, email).Scan(&owner); err != nil {
+		return err
+	}
+	if !owner {
 		return nil
 	}
 	res, err := UpsertCustomerLead(ctx, pool, leadgenTenantID, UpsertParams{
-		Email:       email,
-		AuthUserID:  authUserID,
-		FullName:    fullName,
-		EntrySource: entrySource,
+		Email:         email,
+		AuthUserID:    authUserID,
+		FullName:      fullName,
+		EntrySource:   entrySource,
 		CRMLeadSource: entrySource,
-		LeadNote:    fmt.Sprintf("Linked via %s. Tenant #%d.", entrySource, tenantID),
+		LeadNote:      fmt.Sprintf("Linked via %s. Tenant #%d.", entrySource, tenantID),
 	})
 	if err != nil {
 		return err

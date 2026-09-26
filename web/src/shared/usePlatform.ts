@@ -32,6 +32,7 @@ export type PlatformCustomer = {
   is_operator_workspace?: boolean;
   access_label?: string | null;
   workspace_label?: string | null;
+  is_workspace_owner?: boolean;
 };
 
 export type PlatformBillingSummary = {

@@ -79,7 +79,13 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 		             and ui.revoked_at is null
 		             and ui.accepted_at is null
 		         )
-		       ) as likely_misjoin
+		       ) as likely_misjoin,
+		       exists (
+		         select 1
+		         from public.users ou
+		         where ou.id = t.owner_user_id
+		           and lower(ou.email) = lower(pc.email)
+		       ) as is_workspace_owner
 		from public.platform_customers pc
 		left join public.tenants t on t.id = pc.tenant_id
 		left join lateral (
@@ -104,16 +110,17 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0)
 	for rows.Next() {
 		var (
-			id                                                      int64
-			email, fullName, entrySource, urgency, tenantStatusVal  string
-			company, companyCode, planKind, subStatus               *string
-			tenantID, leadID                                        *int64
-			endsAt                                                  *time.Time
-			createdAt                                               time.Time
-			likelyMisjoin                                           bool
+			id                                                     int64
+			email, fullName, entrySource, urgency, tenantStatusVal string
+			company, companyCode, planKind, subStatus              *string
+			tenantID, leadID                                       *int64
+			endsAt                                                 *time.Time
+			createdAt                                              time.Time
+			likelyMisjoin                                          bool
+			isWorkspaceOwner                                       bool
 		)
 		if err := rows.Scan(&id, &email, &fullName, &company, &entrySource, &urgency, &tenantID,
-			&companyCode, &tenantStatusVal, &planKind, &subStatus, &endsAt, &leadID, &createdAt, &likelyMisjoin); err != nil {
+			&companyCode, &tenantStatusVal, &planKind, &subStatus, &endsAt, &leadID, &createdAt, &likelyMisjoin, &isWorkspaceOwner); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to read customer.", "ERR_INTERNAL")
 			return
 		}
@@ -123,6 +130,7 @@ func (s *service) listCustomers(w http.ResponseWriter, r *http.Request) {
 			"tenant_id": tenantID, "company_code": companyCode, "tenant_status": tenantStatusVal,
 			"plan_kind": planKind, "subscription_status": subStatus, "ends_at": endsAt,
 			"crm_lead_id": leadID, "created_at": createdAt, "likely_misjoin": likelyMisjoin,
+			"is_workspace_owner": isWorkspaceOwner,
 		}
 		code := ""
 		if companyCode != nil {
