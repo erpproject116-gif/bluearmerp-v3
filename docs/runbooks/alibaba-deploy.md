@@ -32,6 +32,22 @@ The PAT is used only on ECS for `git fetch` (read-only). It is not the Actions `
 
 Manual deploy: **Actions → API ECS deploy → Run workflow**.
 
+## Staging API
+
+Staging is a second stack. It does not use the production ECS instance, the `bluearm-api` container, or the production Supabase database.
+
+| Piece | Staging |
+|--------|---------|
+| ECS | A separate instance. Set repository variable `ECS_STAGING_INSTANCE_ID`. |
+| Container | `bluearm-api-staging` on that instance, port 8080 |
+| Database | A separate empty Supabase project. Put its pooler URI in the container env as `DATABASE_URL`. Set `MIGRATE_ON_START=true` so `api/migrations/` builds the schema on start. |
+| Public URL | Repository variable `STAGING_API_PUBLIC_URL` (for example `https://api-staging.bluearmerp.com`) |
+| Web | A future Vercel project whose `VITE_API_BASE_URL` is that staging API host |
+
+Pushes to `staging` that touch `api/**` or `deploy/alibaba/**` run [`.github/workflows/api-ecs-staging-deploy.yml`](../../.github/workflows/api-ecs-staging-deploy.yml). The workflow fails closed when `ECS_STAGING_INSTANCE_ID` is empty, and it refuses the production instance. After deploy, `GET $STAGING_API_PUBLIC_URL/health/schema` must return `healthy: true`.
+
+Create the Supabase project, ECS instance, DNS name, and Vercel project in those consoles. This repo does not create them. Do not restore a production database dump. Sample rows, if needed later, come from `scripts/seed-demo-*.sql`.
+
 ### RAM policy for GitHub deploy user
 
 If the deploy job fails with `Forbidden.RAM` / `ecs:RunCommand` / `ImplicitDeny`, the AccessKey in GitHub secrets belongs to a RAM user **without** RunCommand rights — or you updated a **different** user than the one in GitHub secrets.
