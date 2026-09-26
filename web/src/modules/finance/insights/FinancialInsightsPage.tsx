@@ -72,6 +72,7 @@ type Overview = {
   metrics: MetricRow[];
   key_changes: KeyChange[];
   reading?: string;
+  reading_focus?: string[];
   data_quality: DataQuality;
 };
 
@@ -542,12 +543,22 @@ export default function FinancialInsightsPage() {
                 </p>
               </Show>
 
+              <Show when={!!d().reading}>
+                <p class="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-text-primary">
+                  {d().reading}
+                </p>
+              </Show>
+
               <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <For each={primary()}>
                   {(row) => (
                     <A
                       href={row.href || "/app/finance/acct-i/reports/profit-and-loss"}
-                      class="block rounded-xl border border-stroke bg-white p-4 shadow-sm transition hover:border-brand-300"
+                      class={`block rounded-xl border p-4 shadow-sm transition hover:border-brand-300 ${
+                        (d().reading_focus ?? []).includes(row.key)
+                          ? "border-brand-500 bg-brand-50 ring-2 ring-brand-200"
+                          : "border-stroke bg-white"
+                      }`}
                     >
                       <div class="text-xs font-semibold uppercase tracking-wide text-text-secondary">{row.label}</div>
                       <div class="mt-2 text-xl font-bold text-text-primary">{fmtMetric(row, row.current)}</div>
@@ -561,26 +572,21 @@ export default function FinancialInsightsPage() {
                 </For>
               </section>
 
-              <section class="space-y-4">
+              <section>
                 <InsightsMonthChart dateFrom={range().from} dateTo={range().to} interval={interval()} height={280} />
-                <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
-                  <h2 class="mb-3 text-sm font-semibold text-text-primary">Margins %</h2>
-                  <Show when={(trends.data?.buckets?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No margin points.</p>}>
-                    <BiChart type="bar" labels={trendLabels()} datasets={marginDatasets()} height={240} legend />
-                  </Show>
-                </div>
               </section>
 
               <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
                 <h2 class="mb-3 text-sm font-semibold text-text-primary">Key changes</h2>
-                <Show when={!!d().reading}>
-                  <p class="mb-3 text-sm text-text-secondary">{d().reading}</p>
-                </Show>
                 <Show when={(d().key_changes?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No material movements in this comparison.</p>}>
                   <ul class="space-y-2">
                     <For each={d().key_changes ?? []}>
                       {(kc) => (
-                        <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <li
+                          class={`flex flex-wrap items-center justify-between gap-2 text-sm ${
+                            (d().reading_focus ?? []).includes(kc.key) ? "rounded-lg bg-brand-50 px-2 py-1" : ""
+                          }`}
+                        >
                           <span class="font-medium text-text-primary">
                             {plainMetricLabel(kc.key, kc.label)}{" "}
                             <span class={tone(kc.favorable)}>
@@ -718,6 +724,13 @@ export default function FinancialInsightsPage() {
                   </tbody>
                 </table>
               </section>
+
+              <div class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+                <h2 class="mb-3 text-sm font-semibold text-text-primary">Margins %</h2>
+                <Show when={(trends.data?.buckets?.length ?? 0) > 0} fallback={<p class="text-sm text-text-secondary">No margin points.</p>}>
+                  <BiChart type="bar" labels={trendLabels()} datasets={marginDatasets()} height={240} legend />
+                </Show>
+              </div>
 
               <p class="text-xs text-text-secondary">
                 Drill:{" "}

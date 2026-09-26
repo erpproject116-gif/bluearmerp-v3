@@ -45,6 +45,32 @@ func BuildInsightsReading(metrics []insightsMetricRow, dq insightsDataQuality) s
 	return strings.Join(parts, " ")
 }
 
+// InsightsReadingFocus lists the metric keys named by the reading rules.
+// The data-quality warning is a banner, so it is not a focus key.
+func InsightsReadingFocus(metrics []insightsMetricRow) []string {
+	var keys []string
+	if sales := metricByKey(metrics, MetricRevenue); sales != nil && salesStarted(*sales) {
+		keys = append(keys, string(MetricRevenue))
+	}
+	gross := metricByKey(metrics, MetricGrossProfit)
+	net := metricByKey(metrics, MetricNetProfit)
+	if sameProfitPercent(gross, net) {
+		keys = append(keys, string(MetricOperatingExpenses))
+	}
+	ar := metricByKey(metrics, MetricAccountsReceivable)
+	cash := metricByKey(metrics, MetricCash)
+	if customersOweMuchMore(ar, cash) {
+		keys = append(keys, string(MetricAccountsReceivable))
+	}
+	if ap := metricByKey(metrics, MetricAccountsPayable); ap != nil && ap.Change > 1e-9 {
+		keys = append(keys, string(MetricAccountsPayable))
+	}
+	if keys == nil {
+		return []string{}
+	}
+	return keys
+}
+
 func metricByKey(metrics []insightsMetricRow, key MetricKey) *insightsMetricRow {
 	for i := range metrics {
 		if metrics[i].Key == string(key) {

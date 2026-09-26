@@ -51,6 +51,7 @@ type insightsOverview struct {
 	Metrics        []insightsMetricRow `json:"metrics"`
 	KeyChanges     []KeyChange         `json:"key_changes"`
 	Reading        string              `json:"reading"`
+	ReadingFocus   []string            `json:"reading_focus"`
 	DataQuality    insightsDataQuality `json:"data_quality"`
 }
 
@@ -168,6 +169,7 @@ func financialInsightsOverview(pool *pgxpool.Pool) http.HandlerFunc {
 			Metrics:        metrics,
 			KeyChanges:     BuildKeyChanges(metrics, 6),
 			Reading:        BuildInsightsReading(metrics, dq),
+			ReadingFocus:   InsightsReadingFocus(metrics),
 			DataQuality:    dq,
 		}, "OK")
 	}

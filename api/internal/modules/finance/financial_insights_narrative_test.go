@@ -16,6 +16,10 @@ func TestInsightsReadingSalesStartedLeadsWithPesos(t *testing.T) {
 	if strings.Contains(note, "%") {
 		t.Fatalf("percent leaked into a from-zero sales note: %q", note)
 	}
+	focus := InsightsReadingFocus(metrics)
+	if len(focus) != 1 || focus[0] != string(MetricRevenue) {
+		t.Fatalf("focus = %v", focus)
+	}
 }
 
 func TestInsightsReadingMatchingProfitPercents(t *testing.T) {
@@ -26,6 +30,10 @@ func TestInsightsReadingMatchingProfitPercents(t *testing.T) {
 	note := BuildInsightsReading(metrics, insightsDataQuality{})
 	if !strings.Contains(note, "Shop costs may be missing") {
 		t.Fatalf("note = %q", note)
+	}
+	focus := InsightsReadingFocus(metrics)
+	if len(focus) != 1 || focus[0] != string(MetricOperatingExpenses) {
+		t.Fatalf("focus = %v", focus)
 	}
 }
 
@@ -41,6 +49,10 @@ func TestInsightsReadingUncollectedAndPayable(t *testing.T) {
 	}
 	if !strings.Contains(note, "Check what is due this week") {
 		t.Fatalf("payable action missing: %q", note)
+	}
+	focus := InsightsReadingFocus(metrics)
+	if len(focus) != 2 || focus[0] != string(MetricAccountsReceivable) || focus[1] != string(MetricAccountsPayable) {
+		t.Fatalf("focus = %v", focus)
 	}
 }
 
@@ -69,6 +81,10 @@ func TestInsightsReadingDataQualityFirst(t *testing.T) {
 	note := BuildInsightsReading(metrics, dq)
 	if !strings.HasPrefix(note, dq.Message) {
 		t.Fatalf("warning was not first: %q", note)
+	}
+	focus := InsightsReadingFocus(metrics)
+	if len(focus) != 1 || focus[0] != string(MetricAccountsPayable) {
+		t.Fatalf("warning must not be a focus key: %v", focus)
 	}
 }
 
