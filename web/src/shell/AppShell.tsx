@@ -208,6 +208,35 @@ function HeaderFeatureTabs(props: {
   );
 }
 
+function masterListTab(pathname: string): { href: string; label: string } | undefined {
+  if (pathname === "/app/inventory/partners" || pathname.startsWith("/app/inventory/partners/")) {
+    return { href: "/app/inventory/partners", label: "Customers & vendors" };
+  }
+  if (pathname === "/app/inventory/locations" || pathname.startsWith("/app/inventory/locations/")) {
+    return { href: "/app/inventory/locations", label: "Locations" };
+  }
+  return undefined;
+}
+
+function MasterListHeaderNav() {
+  const loc = useLocation();
+  return (
+    <Show when={masterListTab(loc.pathname)}>
+      {(tab) => (
+        <nav class="erp-header-features mt-3 items-center" aria-label={tab().label}>
+          <A
+            href={tab().href}
+            class="rounded-lg bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600"
+            aria-current="page"
+          >
+            {tab().label}
+          </A>
+        </nav>
+      )}
+    </Show>
+  );
+}
+
 function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const loc = useLocation();
   const auth = useAuth();
@@ -262,7 +291,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
   const featureNavModule = () => {
     const mod = activeModule();
-    if (!mod || activeSubBranch() || isReviewPurchasesPath(loc.pathname)) return undefined;
+    if (!mod || activeSubBranch() || isReviewPurchasesPath(loc.pathname) || masterListTab(loc.pathname)) return undefined;
     return mod;
   };
 
@@ -274,6 +303,9 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
       if (kind === "customer") return "Customers";
       if (kind === "vendor") return "Vendors";
       return "Customers & vendors";
+    }
+    if (loc.pathname.startsWith("/app/inventory/locations")) {
+      return loc.pathname === "/app/inventory/locations/settings" ? "Locations settings" : "Locations";
     }
     const mod = activeModule();
     if (!mod) return "Home";
@@ -515,6 +547,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <Show when={!shell.viewport.isStandalone()}>
             <TaxMngtHeaderNav />
             <CollectiveInvoicingHeaderNav />
+            <MasterListHeaderNav />
             <SerialLotHeaderNav />
             <WmsHeaderNav />
             <ReviewPurchasesHeaderNav />

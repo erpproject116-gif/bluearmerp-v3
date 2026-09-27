@@ -47,8 +47,35 @@ export const navGroups: NavGroup[] = [
     defaultExpanded: true,
     entries: [
       { kind: "module", moduleId: "inventory" },
+      {
+        kind: "link",
+        moduleId: "inventory",
+        label: "Customers & vendors",
+        href: "/app/inventory/partners",
+        basePath: "/app/inventory/partners",
+      },
+      {
+        kind: "link",
+        moduleId: "inventory",
+        label: "Locations",
+        href: "/app/inventory/locations",
+        basePath: "/app/inventory/locations",
+      },
+      {
+        kind: "link",
+        moduleId: "inventory",
+        label: "Serials",
+        href: "/app/inventory/serial-lot/registry",
+        basePath: "/app/inventory/serial-lot/registry",
+      },
+      {
+        kind: "link",
+        moduleId: "inventory",
+        label: "Lots",
+        href: "/app/inventory/serial-lot/lots",
+        basePath: "/app/inventory/serial-lot/lots",
+      },
       { kind: "module", moduleId: "after_sales" },
-      { kind: "subBranch", moduleId: "inventory", featureCode: "inventory.serial_lot", branchLabel: "Serial / Lot" },
     ],
   },
   {

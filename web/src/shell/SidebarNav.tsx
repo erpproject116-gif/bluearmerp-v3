@@ -12,6 +12,7 @@ import {
   HOME_SIDEBAR_AREAS,
   type HomeSidebarArea,
 } from "./ecount-top-nav";
+import { isLotNavPath } from "./serial-lot-nav";
 import { useChatUnreadTotal } from "../modules/comms/useChatUnreadTotal";
 import { canManageWorkspaceSetup } from "../shared/resolveAppEntryPath";
 
@@ -265,7 +266,8 @@ export function SidebarNav() {
         (p === "/app/inventory" || p.startsWith("/app/inventory/")) &&
         !p.startsWith("/app/inventory/serial-lot") &&
         !p.startsWith("/app/inventory/wms") &&
-        !p.startsWith("/app/inventory/partners")
+        !p.startsWith("/app/inventory/partners") &&
+        !p.startsWith("/app/inventory/locations")
       );
     }
     if (area.id === "after_sales") {
@@ -273,6 +275,18 @@ export function SidebarNav() {
     }
     if (area.id === "warehouse") {
       return pathStarts(p, ["/app/inventory/wms"]);
+    }
+    if (area.id === "customers_vendors") {
+      return pathStarts(p, ["/app/inventory/partners"]);
+    }
+    if (area.id === "locations") {
+      return pathStarts(p, ["/app/inventory/locations"]);
+    }
+    if (area.id === "serials") {
+      return p.startsWith("/app/inventory/serial-lot") && !isLotNavPath(p);
+    }
+    if (area.id === "lots") {
+      return isLotNavPath(p);
     }
     if (area.id === "serial_lot") {
       return pathStarts(p, ["/app/inventory/serial-lot"]);

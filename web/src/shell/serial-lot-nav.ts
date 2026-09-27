@@ -9,7 +9,24 @@ export type SerialLotNavLink = {
 
 export const SERIAL_LOT_PREFIX = "/app/inventory/serial-lot";
 
-export const serialLotNavLinks: SerialLotNavLink[] = [
+const LOT_NAV_BASES = [
+  "/app/inventory/serial-lot/lots",
+  "/app/inventory/serial-lot/lot-adjustment",
+  "/app/inventory/serial-lot/reports/lot-book",
+];
+
+export function isLotNavPath(pathname: string): boolean {
+  return LOT_NAV_BASES.some((base) => pathname === base || pathname.startsWith(`${base}/`));
+}
+
+const serialSettingsLink: SerialLotNavLink = {
+  label: "Settings",
+  href: "/app/inventory/serial-lot/settings",
+  permissionCode: "inventory.serial_settings",
+  headerPriority: "overflow",
+};
+
+export const serialNavLinks: SerialLotNavLink[] = [
   {
     label: "Serials",
     href: "/app/inventory/serial-lot/registry",
@@ -23,9 +40,15 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
-    label: "Lots",
-    href: "/app/inventory/serial-lot/lots",
-    permissionCode: "inventory.serial_registry",
+    label: "Movements",
+    href: "/app/inventory/serial-lot/movements",
+    permissionCode: "inventory.serial_movements",
+    headerPriority: "primary",
+  },
+  {
+    label: "Qty fix (serials)",
+    href: "/app/inventory/serial-lot/adjustment",
+    permissionCode: "inventory.serial_adjustment",
     headerPriority: "primary",
   },
   {
@@ -34,18 +57,7 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     permissionCode: "inventory.serial_movements",
     headerPriority: "primary",
   },
-  {
-    label: "Lot Inv. Book",
-    href: "/app/inventory/serial-lot/reports/lot-book",
-    permissionCode: "inventory.serial_movements",
-    headerPriority: "primary",
-  },
-  {
-    label: "Settings",
-    href: "/app/inventory/serial-lot/settings",
-    permissionCode: "inventory.serial_settings",
-    headerPriority: "overflow",
-  },
+  serialSettingsLink,
   {
     /** Deep-link / typed lookup; open a row from Serials for day-to-day work. */
     label: "Serial detail",
@@ -63,24 +75,6 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
     label: "Receive (legacy)",
     href: "/app/inventory/serial-lot/receive",
     permissionCode: "inventory.serial_receive",
-    headerPriority: "overflow",
-  },
-  {
-    label: "Movements",
-    href: "/app/inventory/serial-lot/movements",
-    permissionCode: "inventory.serial_movements",
-    headerPriority: "overflow",
-  },
-  {
-    label: "Qty fix (serials)",
-    href: "/app/inventory/serial-lot/adjustment",
-    permissionCode: "inventory.serial_adjustment",
-    headerPriority: "overflow",
-  },
-  {
-    label: "Qty fix (lots)",
-    href: "/app/inventory/serial-lot/lot-adjustment",
-    permissionCode: "inventory.serial_adjustment",
     headerPriority: "overflow",
   },
   {
@@ -103,6 +97,28 @@ export const serialLotNavLinks: SerialLotNavLink[] = [
   },
 ];
 
+export const lotNavLinks: SerialLotNavLink[] = [
+  {
+    label: "Lots",
+    href: "/app/inventory/serial-lot/lots",
+    permissionCode: "inventory.serial_registry",
+    headerPriority: "primary",
+  },
+  {
+    label: "Qty fix (lots)",
+    href: "/app/inventory/serial-lot/lot-adjustment",
+    permissionCode: "inventory.serial_adjustment",
+    headerPriority: "primary",
+  },
+  {
+    label: "Lot Inv. Book",
+    href: "/app/inventory/serial-lot/reports/lot-book",
+    permissionCode: "inventory.serial_movements",
+    headerPriority: "primary",
+  },
+  serialSettingsLink,
+];
+
 export function isSerialLotPath(pathname: string): boolean {
   return pathname.startsWith(SERIAL_LOT_PREFIX);
 }
@@ -113,8 +129,9 @@ export function isSerialLotNavLinkActive(pathname: string, link: SerialLotNavLin
 }
 
 export function serialLotHeaderTitle(pathname: string): string {
-  const link = serialLotNavLinks.find((l) => isSerialLotNavLinkActive(pathname, l));
-  if (!link) return "Serial & Lot";
+  const links = isLotNavPath(pathname) ? lotNavLinks : serialNavLinks;
+  const link = links.find((l) => isSerialLotNavLinkActive(pathname, l));
+  if (!link) return isLotNavPath(pathname) ? "Lots" : "Serials";
   if (link.settingsHref && pathname === link.settingsHref) return `${link.label} settings`;
   return link.label;
 }

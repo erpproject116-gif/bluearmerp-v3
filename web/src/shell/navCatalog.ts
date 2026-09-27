@@ -27,6 +27,12 @@ const PARTNER_FIND_ENTRIES: NavCatalogEntry[] = [
     group: "Stock",
     keywords: ["partner", "partners", "customer", "vendor", "supplier", "client"],
   },
+  {
+    label: "Locations",
+    href: "/app/inventory/locations",
+    group: "Stock",
+    keywords: ["location", "locations", "warehouse", "branch"],
+  },
 ];
 
 export function buildCatalog(): NavCatalogEntry[] {

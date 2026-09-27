@@ -2,9 +2,11 @@ import { A, useLocation } from "@solidjs/router";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { hasModuleAccess, hasPermission, useAuth } from "../shared/auth-context";
 import {
+  isLotNavPath,
   isSerialLotNavLinkActive,
   isSerialLotPath,
-  serialLotNavLinks,
+  lotNavLinks,
+  serialNavLinks,
   type SerialLotNavLink,
 } from "./serial-lot-nav";
 
@@ -14,7 +16,7 @@ export function SerialLotHeaderNav() {
   const [moreOpen, setMoreOpen] = createSignal(false);
 
   const visibleLinks = () =>
-    serialLotNavLinks.filter((link) => {
+    (isLotNavPath(loc.pathname) ? lotNavLinks : serialNavLinks).filter((link) => {
       if (link.permissionCode?.startsWith("manufacturing.") && !hasModuleAccess(auth.me, "manufacturing")) {
         return false;
       }
@@ -53,7 +55,10 @@ export function SerialLotHeaderNav() {
 
   return (
     <Show when={isSerialLotPath(loc.pathname)}>
-      <nav class="erp-header-features mt-3 items-center" aria-label="Serial & Lot features">
+      <nav
+        class="erp-header-features mt-3 items-center"
+        aria-label={isLotNavPath(loc.pathname) ? "Lots" : "Serials"}
+      >
         <For each={primary()}>
           {(link) => (
             <A href={link.href} class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors" classList={linkClass(link)}>
