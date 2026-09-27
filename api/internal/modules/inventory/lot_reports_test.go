@@ -59,6 +59,9 @@ func TestLotBookSummarySQLInventoryQtyFilter(t *testing.T) {
 	if !strings.Contains(q, "= 1") {
 		t.Errorf("expected inventory qty filter in summary SQL:\n%s", q)
 	}
+	if !strings.Contains(q, "when 'adjusted'") || !strings.Contains(q, "to_location_id is not null and e.from_location_id is null") {
+		t.Errorf("summary must count an adjusted row by its location:\n%s", q)
+	}
 }
 
 func TestLotBookSummarySQLValidityFilters(t *testing.T) {
@@ -94,8 +97,8 @@ func TestLotEventTypeForQtyDelta(t *testing.T) {
 		kind  string
 		want  string
 	}{
-		{1, "adjusted", "received"},
-		{-1, "adjusted", "sold"},
+		{1, "adjusted", "adjusted"},
+		{-1, "adjusted", "adjusted"},
 		{2, "produced", "produced"},
 		{-2, "consumed", "consumed"},
 		{3, "returned", "returned"},

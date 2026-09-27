@@ -23,6 +23,11 @@ const lotEventQtyDelta = `case e.event_type
   when 'sold' then -e.qty
   when 'voided' then -e.qty
   when 'consumed' then -e.qty
+  when 'adjusted' then case
+    when e.to_location_id is not null and e.from_location_id is null then e.qty
+    when e.from_location_id is not null then -e.qty
+    else 0
+  end
   else 0
 end`
 
@@ -417,15 +422,15 @@ func lotBookSummarySQL(tenantID int64, dateFrom, dateTo time.Time, f lotReportFi
 		) opening on true
 		left join lateral (
 		  select
-		    sum(case when e.event_type in ('received', 'returned', 'produced') then e.qty else 0 end)::float8 as recv_qty,
-		    sum(case when e.event_type in ('sold', 'voided', 'consumed') then e.qty else 0 end)::float8 as issued_qty
+		    sum(case when (%s) > 0 then (%s) else 0 end)::float8 as recv_qty,
+		    sum(case when (%s) < 0 then -(%s) else 0 end)::float8 as issued_qty
 		  from public.inv_lot_events e
 		  where e.lot_batch_id = lb.id
 		    and e.created_at >= $2::timestamptz
 		    and e.created_at < ($3::date + interval '1 day')
 		) period on true
 		where %s
-		%s`, closingExpr, lotEventQtyDelta, where, having)
+		%s`, closingExpr, lotEventQtyDelta, lotEventQtyDelta, lotEventQtyDelta, lotEventQtyDelta, lotEventQtyDelta, where, having)
 	return q, args
 }
 

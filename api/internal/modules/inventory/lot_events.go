@@ -62,8 +62,12 @@ func InsertLotEvent(ctx context.Context, tx pgx.Tx, in LotEventInput) error {
 }
 
 // LotEventTypeForQtyDelta maps a signed qty change to a ledger event type.
-// Sign is encoded in event_type (qty is always stored absolute).
+// Receipts, sales, and the other kinds keep their sign in the event type.
+// A quantity fix is always "adjusted"; the lot book reads its sign from the location on the row.
 func LotEventTypeForQtyDelta(delta float64, kind string) string {
+	if kind == "adjusted" {
+		return "adjusted"
+	}
 	if delta > 0 {
 		switch kind {
 		case "produced":
