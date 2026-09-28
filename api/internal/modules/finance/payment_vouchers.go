@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
@@ -33,21 +34,21 @@ type PaymentApplication struct {
 }
 
 type PaymentVoucher struct {
-	ID              int64                    `json:"id"`
-	PaymentDate     string                   `json:"payment_date"`
-	DateSeq         int                      `json:"date_seq"`
-	DateNoDisplay   string                   `json:"date_no_display"`
-	PaymentNo       string                   `json:"payment_no"`
-	PartnerID       int64                    `json:"partner_id"`
-	VendorName      string                   `json:"vendor_name"`
-	CurrencyID      int64                    `json:"currency_id"`
-	CurrencyCode    string                   `json:"currency_code,omitempty"`
-	PaymentMethod   string                   `json:"payment_method"`
-	ReferenceNo     *string                  `json:"reference_no,omitempty"`
-	Notes           *string                  `json:"notes,omitempty"`
-	AmountTotal     float64                  `json:"amount_total"`
-	CreatedByName   string                   `json:"created_by_name,omitempty"`
-	Applications    []PaymentApplication     `json:"applications,omitempty"`
+	ID               int64                     `json:"id"`
+	PaymentDate      string                    `json:"payment_date"`
+	DateSeq          int                       `json:"date_seq"`
+	DateNoDisplay    string                    `json:"date_no_display"`
+	PaymentNo        string                    `json:"payment_no"`
+	PartnerID        int64                     `json:"partner_id"`
+	VendorName       string                    `json:"vendor_name"`
+	CurrencyID       int64                     `json:"currency_id"`
+	CurrencyCode     string                    `json:"currency_code,omitempty"`
+	PaymentMethod    string                    `json:"payment_method"`
+	ReferenceNo      *string                   `json:"reference_no,omitempty"`
+	Notes            *string                   `json:"notes,omitempty"`
+	AmountTotal      float64                   `json:"amount_total"`
+	CreatedByName    string                    `json:"created_by_name,omitempty"`
+	Applications     []PaymentApplication      `json:"applications,omitempty"`
 	WithholdingLines []WithholdingLineResponse `json:"withholding_lines,omitempty"`
 }
 
@@ -551,6 +552,7 @@ func createPaymentVoucherFromBody(ctx context.Context, pool *pgxpool.Pool, tu au
 	if err := tx.Commit(ctx); err != nil {
 		return PaymentVoucher{}, "Failed to save.", http.StatusInternalServerError, "ERR_INTERNAL"
 	}
+	aggcache.InvalidateTenant(tu.TenantID)
 
 	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "finance.payment_voucher.create", "fin_payment_voucher", &id, nil, body)
 	pv, _ := loadPaymentVoucher(ctx, pool, tu.TenantID, id)

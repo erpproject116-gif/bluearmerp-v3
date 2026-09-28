@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/finance"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -50,24 +51,24 @@ type overdueInvoiceAlert struct {
 }
 
 type pipelinePulse struct {
-	OpenOpportunities      int64   `json:"open_opportunities"`
-	WeightedPipelineValue  float64 `json:"weighted_pipeline_value"`
-	ExpectedPipelineValue  float64 `json:"expected_pipeline_value"`
-	FollowUpsDue           int64   `json:"follow_ups_due"`
-	OpenQuotationsValue    float64 `json:"open_quotations_value"`
-	QuotesExpiring7d       int64   `json:"quotes_expiring_7d"`
+	OpenOpportunities     int64   `json:"open_opportunities"`
+	WeightedPipelineValue float64 `json:"weighted_pipeline_value"`
+	ExpectedPipelineValue float64 `json:"expected_pipeline_value"`
+	FollowUpsDue          int64   `json:"follow_ups_due"`
+	OpenQuotationsValue   float64 `json:"open_quotations_value"`
+	QuotesExpiring7d      int64   `json:"quotes_expiring_7d"`
 }
 
 type profitRow struct {
-	Key         string  `json:"key"`
-	Label       string  `json:"label"`
-	Revenue     float64 `json:"revenue"`
-	Cost        float64 `json:"cost"`
-	Margin      float64 `json:"margin"`
-	MarginPct   float64 `json:"margin_pct"`
-	TxnCount    int64   `json:"txn_count,omitempty"`
-	ItemID      *int64  `json:"item_id,omitempty"`
-	ProjectID   *int64  `json:"project_id,omitempty"`
+	Key       string  `json:"key"`
+	Label     string  `json:"label"`
+	Revenue   float64 `json:"revenue"`
+	Cost      float64 `json:"cost"`
+	Margin    float64 `json:"margin"`
+	MarginPct float64 `json:"margin_pct"`
+	TxnCount  int64   `json:"txn_count,omitempty"`
+	ItemID    *int64  `json:"item_id,omitempty"`
+	ProjectID *int64  `json:"project_id,omitempty"`
 }
 
 type recurringRow struct {
@@ -90,22 +91,26 @@ type recurringPulse struct {
 }
 
 type financialHealthResponse struct {
-	AsOf             string                `json:"as_of"`
-	Cash             cashPulse             `json:"cash"`
-	Receivables      agingBuckets          `json:"receivables"`
-	Payables         agingBuckets          `json:"payables"`
-	OverdueAlerts    []overdueInvoiceAlert `json:"overdue_alerts"`
-	OverdueAlertCount int64                `json:"overdue_alert_count"`
-	Pipeline         pipelinePulse         `json:"pipeline"`
-	ProfitByProduct  []profitRow           `json:"profit_by_product"`
-	ProfitByProject  []profitRow           `json:"profit_by_project"`
-	Recurring        recurringPulse        `json:"recurring"`
+	AsOf              string                `json:"as_of"`
+	Cash              cashPulse             `json:"cash"`
+	Receivables       agingBuckets          `json:"receivables"`
+	Payables          agingBuckets          `json:"payables"`
+	OverdueAlerts     []overdueInvoiceAlert `json:"overdue_alerts"`
+	OverdueAlertCount int64                 `json:"overdue_alert_count"`
+	Pipeline          pipelinePulse         `json:"pipeline"`
+	ProfitByProduct   []profitRow           `json:"profit_by_product"`
+	ProfitByProject   []profitRow           `json:"profit_by_project"`
+	Recurring         recurringPulse        `json:"recurring"`
 }
 
 func financialHealthHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		out := LoadFinancialHealth(r.Context(), pool, tu.TenantID)
+		out, err := loadFinancialHealthCached(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load financial health.", "ERR_INTERNAL")
+			return
+		}
 		w.Header().Set("Cache-Control", "private, max-age=30")
 		response.OK(w, out, "OK")
 	}
@@ -113,6 +118,26 @@ func financialHealthHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // LoadFinancialHealth builds the dashboard financial-health payload (also used by Copilot tools).
 func LoadFinancialHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64) financialHealthResponse {
+	out, err := loadFinancialHealthCached(ctx, pool, tenantID)
+	if err != nil {
+		return financialHealthResponse{
+			OverdueAlerts:   []overdueInvoiceAlert{},
+			ProfitByProduct: []profitRow{},
+			ProfitByProject: []profitRow{},
+			Recurring:       recurringPulse{Items: []recurringRow{}},
+			Cash:            cashPulse{Months: []cashPulseMonth{}},
+		}
+	}
+	return out
+}
+
+func loadFinancialHealthCached(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (financialHealthResponse, error) {
+	return aggcache.Load(aggcache.Key(tenantID, "financial-health", ""), false, func() (financialHealthResponse, error) {
+		return buildFinancialHealth(ctx, pool, tenantID)
+	})
+}
+
+func buildFinancialHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (financialHealthResponse, error) {
 	today := todayDate()
 	out := financialHealthResponse{
 		AsOf:            today.Format("2006-01-02"),
@@ -122,7 +147,11 @@ func LoadFinancialHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 		Recurring:       recurringPulse{Items: []recurringRow{}},
 		Cash:            cashPulse{Months: []cashPulseMonth{}},
 	}
-	out.Cash = loadCashPulse(ctx, pool, tenantID, today)
+	cash, err := loadCashPulse(ctx, pool, tenantID, today)
+	if err != nil {
+		return out, err
+	}
+	out.Cash = cash
 	out.Receivables = loadARBuckets(ctx, pool, tenantID, today)
 	out.Payables = loadAPBuckets(ctx, pool, tenantID, today)
 	out.OverdueAlerts, out.OverdueAlertCount = loadOverdueAlerts(ctx, pool, tenantID, today, 12)
@@ -130,39 +159,40 @@ func LoadFinancialHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 	out.ProfitByProduct = loadProfitByProduct(ctx, pool, tenantID, 90, 8)
 	out.ProfitByProject = loadProfitByProject(ctx, pool, tenantID, 90, 8)
 	out.Recurring = loadRecurringPulse(ctx, pool, tenantID)
-	return out
+	return out, nil
 }
 
-func loadCashPulse(ctx context.Context, pool *pgxpool.Pool, tenantID int64, today time.Time) cashPulse {
+func loadCashPulse(ctx context.Context, pool *pgxpool.Pool, tenantID int64, today time.Time) (cashPulse, error) {
 	var out cashPulse
 	out.Months = []cashPulseMonth{}
 
-	_ = pool.QueryRow(ctx, `
-		select coalesce(sum(amount_total), 0)::float8
-		from public.fin_official_receipts
-		where tenant_id = $1 and deleted_at is null
-		  and receipt_date >= date_trunc('year', $2::date)::date
-		  and receipt_date <= $2::date`, tenantID, today).Scan(&out.InflowYTD)
-	_ = pool.QueryRow(ctx, `
-		select coalesce(sum(amount_total), 0)::float8
-		from public.fin_payment_vouchers
-		where tenant_id = $1 and deleted_at is null
-		  and payment_date >= date_trunc('year', $2::date)::date
-		  and payment_date <= $2::date`, tenantID, today).Scan(&out.OutflowYTD)
+	err := pool.QueryRow(ctx, `
+		select
+		  (select coalesce(sum(amount_total), 0)::float8
+		   from public.fin_official_receipts
+		   where tenant_id = $1 and deleted_at is null
+		     and receipt_date >= date_trunc('year', $2::date)::date
+		     and receipt_date <= $2::date),
+		  (select coalesce(sum(amount_total), 0)::float8
+		   from public.fin_payment_vouchers
+		   where tenant_id = $1 and deleted_at is null
+		     and payment_date >= date_trunc('year', $2::date)::date
+		     and payment_date <= $2::date),
+		  (select coalesce(sum(amount_total), 0)::float8
+		   from public.fin_official_receipts
+		   where tenant_id = $1 and deleted_at is null
+		     and receipt_date >= date_trunc('month', $2::date)::date
+		     and receipt_date <= $2::date),
+		  (select coalesce(sum(amount_total), 0)::float8
+		   from public.fin_payment_vouchers
+		   where tenant_id = $1 and deleted_at is null
+		     and payment_date >= date_trunc('month', $2::date)::date
+		     and payment_date <= $2::date)`, tenantID, today).Scan(
+		&out.InflowYTD, &out.OutflowYTD, &out.InflowMTD, &out.OutflowMTD)
+	if err != nil {
+		return out, err
+	}
 	out.NetYTD = out.InflowYTD - out.OutflowYTD
-
-	_ = pool.QueryRow(ctx, `
-		select coalesce(sum(amount_total), 0)::float8
-		from public.fin_official_receipts
-		where tenant_id = $1 and deleted_at is null
-		  and receipt_date >= date_trunc('month', $2::date)::date
-		  and receipt_date <= $2::date`, tenantID, today).Scan(&out.InflowMTD)
-	_ = pool.QueryRow(ctx, `
-		select coalesce(sum(amount_total), 0)::float8
-		from public.fin_payment_vouchers
-		where tenant_id = $1 and deleted_at is null
-		  and payment_date >= date_trunc('month', $2::date)::date
-		  and payment_date <= $2::date`, tenantID, today).Scan(&out.OutflowMTD)
 	out.NetMTD = out.InflowMTD - out.OutflowMTD
 
 	rows, err := pool.Query(ctx, `
@@ -197,7 +227,7 @@ func loadCashPulse(ctx context.Context, pool *pgxpool.Pool, tenantID int64, toda
 		left join outflows on outflows.m = months.m
 		order by months.m`, tenantID, today)
 	if err != nil {
-		return out
+		return out, err
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -208,7 +238,7 @@ func loadCashPulse(ctx context.Context, pool *pgxpool.Pool, tenantID int64, toda
 		m.Net = m.Inflow - m.Outflow
 		out.Months = append(out.Months, m)
 	}
-	return out
+	return out, rows.Err()
 }
 
 func loadARBuckets(ctx context.Context, pool *pgxpool.Pool, tenantID int64, today time.Time) agingBuckets {

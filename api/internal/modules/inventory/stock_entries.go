@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
@@ -558,6 +559,7 @@ func createStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save entry.", "ERR_INTERNAL")
 			return
 		}
+		aggcache.InvalidateTenant(tu.TenantID)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_entry_create", "inv_stock_entry", &entryID, nil, body)
 		entry, _ := loadStockEntry(r.Context(), pool, tu.TenantID, entryID)
@@ -776,6 +778,7 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to post entry.", "ERR_INTERNAL")
 			return
 		}
+		aggcache.InvalidateTenant(tu.TenantID)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.stock_entry_post", "inv_stock_entry", &id, nil, nil)
 		_, _, _ = day1commercial.EvaluateAndTransition(r.Context(), pool, tu.TenantID)

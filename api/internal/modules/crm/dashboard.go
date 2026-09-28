@@ -1,12 +1,15 @@
 package crm
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -40,44 +43,69 @@ func registerDashboardRoutes(r chi.Router, pool *pgxpool.Pool) {
 func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		ctx := r.Context()
-		var s dashboardSummary
-		s.ScopedView = !tu.CanViewAllCRM()
-		s.TopSellingItems = []topItemRow{}
-		s.TopQuotedItems = []topItemRow{}
+		extra := strconv.FormatInt(tu.AppUserID, 10)
+		if tu.CanViewAllCRM() {
+			extra += "|all"
+		}
+		if tu.CanViewCrmAnalytics() {
+			extra += "|analytics"
+		}
+		s, err := aggcache.Load(aggcache.Key(tu.TenantID, "crm-dashboard", extra), false, func() (dashboardSummary, error) {
+			return loadCRMDashboard(r.Context(), pool, tu)
+		})
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load CRM dashboard.", "ERR_INTERNAL")
+			return
+		}
+		w.Header().Set("Cache-Control", "private, max-age=30")
+		response.OK(w, s, "OK")
+	}
+}
 
-		today := todayDate()
-		analytics := tu.CanViewCrmAnalytics()
+func loadCRMDashboard(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) (dashboardSummary, error) {
+	var s dashboardSummary
+	s.ScopedView = !tu.CanViewAllCRM()
+	s.TopSellingItems = []topItemRow{}
+	s.TopQuotedItems = []topItemRow{}
 
-		qArgs := []any{tu.TenantID}
-		qN := 2
-		qScope, qN := tu.PicOrCreatedScopeSQL("q", qN, &qArgs)
-		qArgs = append(qArgs, today)
-		todayArg := qN
-		qN++
+	today := todayDate()
+	analytics := tu.CanViewCrmAnalytics()
 
-		_ = pool.QueryRow(ctx, fmt.Sprintf(`
+	qArgs := []any{tu.TenantID}
+	qN := 2
+	qScope, qN := tu.PicOrCreatedScopeSQL("q", qN, &qArgs)
+	qArgs = append(qArgs, today)
+	todayArg := qN
+	qN++
+
+	if err := pool.QueryRow(ctx, fmt.Sprintf(`
 			select count(*) from public.quo_quotations q
 			where q.tenant_id = $1 and q.deleted_at is null%s
 			  and q.valid_until is not null and q.valid_until < $%d::date`, qScope, todayArg),
-			qArgs...).Scan(&s.ExpiredQuotationsCount)
+		qArgs...).Scan(&s.ExpiredQuotationsCount); err != nil {
+		return s, err
+	}
 
-		_ = pool.QueryRow(ctx, fmt.Sprintf(`
+	if err := pool.QueryRow(ctx, fmt.Sprintf(`
 			select count(*) from public.quo_quotations q
 			where q.tenant_id = $1 and q.deleted_at is null%s
 			  and q.valid_until is not null
 			  and q.valid_until >= $%d::date and q.valid_until <= ($%d::date + interval '7 days')::date`,
-			qScope, todayArg, todayArg),
-			qArgs...).Scan(&s.QuotesExpiring7d)
+		qScope, todayArg, todayArg),
+		qArgs...).Scan(&s.QuotesExpiring7d); err != nil {
+		return s, err
+	}
 
-		_ = pool.QueryRow(ctx, fmt.Sprintf(`
+	if err := pool.QueryRow(ctx, fmt.Sprintf(`
 			select count(*) from public.quo_quotations q
 			where q.tenant_id = $1 and q.deleted_at is null%s
 			  and q.voucher_status = 'none'`, qScope),
-			qArgs[:len(qArgs)-1]...).Scan(&s.QuotesNotConvertedToSO)
+		qArgs[:len(qArgs)-1]...).Scan(&s.QuotesNotConvertedToSO); err != nil {
+		return s, err
+	}
 
-		if analytics {
-			_ = pool.QueryRow(ctx, `
+	if analytics {
+		if err := pool.QueryRow(ctx, `
 				select count(distinct so.id) from public.so_sales_orders so
 				join public.so_sales_order_lines ln on ln.sales_order_id = so.id
 				left join (
@@ -87,12 +115,14 @@ func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				) slip on slip.sales_order_line_id = ln.id
 				where so.tenant_id = $1 and so.deleted_at is null
 				  and ln.qty - coalesce(slip.qty_sold, 0) > 0.0001`,
-				tu.TenantID).Scan(&s.QuotesNotConvertedToSales)
-		} else {
-			soArgs := []any{tu.TenantID}
-			soN := 2
-			soScope, _ := tu.PicOrCreatedScopeSQL("so", soN, &soArgs)
-			_ = pool.QueryRow(ctx, fmt.Sprintf(`
+			tu.TenantID).Scan(&s.QuotesNotConvertedToSales); err != nil {
+			return s, err
+		}
+	} else {
+		soArgs := []any{tu.TenantID}
+		soN := 2
+		soScope, _ := tu.PicOrCreatedScopeSQL("so", soN, &soArgs)
+		if err := pool.QueryRow(ctx, fmt.Sprintf(`
 				select count(distinct so.id) from public.so_sales_orders so
 				join public.so_sales_order_lines ln on ln.sales_order_id = so.id
 				left join (
@@ -102,44 +132,54 @@ func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				) slip on slip.sales_order_line_id = ln.id
 				where so.tenant_id = $1 and so.deleted_at is null%s
 				  and ln.qty - coalesce(slip.qty_sold, 0) > 0.0001`, soScope),
-				soArgs...).Scan(&s.QuotesNotConvertedToSales)
+			soArgs...).Scan(&s.QuotesNotConvertedToSales); err != nil {
+			return s, err
 		}
+	}
 
-		if analytics {
-			_ = pool.QueryRow(ctx, `
+	if analytics {
+		if err := pool.QueryRow(ctx, `
 				select count(distinct bal.item_id || ':' || bal.location_id::text)
 				from public.inv_item_location_balances bal
 				join public.inv_items i on i.id = bal.item_id and i.tenant_id = bal.tenant_id
 				where bal.tenant_id = $1
 				  and coalesce(bal.reorder_level, i.reorder_level) is not null
 				  and bal.qty_on_hand < coalesce(bal.reorder_level, i.reorder_level)`,
-				tu.TenantID).Scan(&s.LowStockSKUCount)
+			tu.TenantID).Scan(&s.LowStockSKUCount); err != nil {
+			return s, err
 		}
+	}
 
-		tArgs := []any{tu.TenantID}
-		tN := 2
-		tScope, _ := tu.PicOrCreatedScopeSQL("t", tN, &tArgs)
-		_ = pool.QueryRow(ctx, fmt.Sprintf(`
+	tArgs := []any{tu.TenantID}
+	tN := 2
+	tScope, _ := tu.PicOrCreatedScopeSQL("t", tN, &tArgs)
+	if err := pool.QueryRow(ctx, fmt.Sprintf(`
 			select count(*) from public.crm_follow_up_tasks t
 			where t.tenant_id = $1 and t.stage in ('due_soon', 'overdue')
 			  and t.task_type = 'warranty_follow_up'%s`, tScope),
-			tArgs...).Scan(&s.WarrantyFollowUpsDue)
+		tArgs...).Scan(&s.WarrantyFollowUpsDue); err != nil {
+		return s, err
+	}
 
-		_ = pool.QueryRow(ctx, `
+	if err := pool.QueryRow(ctx, `
 			select count(*) from public.crm_notifications n
 			where n.tenant_id = $1 and n.read_at is null
 			  and (n.user_id is null or n.user_id = $2)
 			  and (n.actor_user_id is null or n.actor_user_id <> $2)`,
-			tu.TenantID, tu.AppUserID).Scan(&s.UnreadNotificationsCount)
+		tu.TenantID, tu.AppUserID).Scan(&s.UnreadNotificationsCount); err != nil {
+		return s, err
+	}
 
-		_ = pool.QueryRow(ctx, fmt.Sprintf(`
+	if err := pool.QueryRow(ctx, fmt.Sprintf(`
 			select count(*) from public.quo_quotations q
 			where q.tenant_id = $1 and q.deleted_at is null%s
 			  and q.valid_until is null`, qScope),
-			qArgs[:len(qArgs)-1]...).Scan(&s.QuotesMissingValidityCount)
+		qArgs[:len(qArgs)-1]...).Scan(&s.QuotesMissingValidityCount); err != nil {
+		return s, err
+	}
 
-		if analytics {
-			_ = pool.QueryRow(ctx, `
+	if analytics {
+		if err := pool.QueryRow(ctx, `
 				select count(*) from (
 				  select s.partner_id
 				  from public.sa_sales s
@@ -153,9 +193,11 @@ func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				  group by s.partner_id
 				  having coalesce(sum(s.grand_total), 0) - coalesce(sum(recv.received), 0) > 0
 				) ar`,
-				tu.TenantID).Scan(&s.CustomersWithARBalance)
+			tu.TenantID).Scan(&s.CustomersWithARBalance); err != nil {
+			return s, err
+		}
 
-			sellRows, err := pool.Query(ctx, `
+		sellRows, err := pool.Query(ctx, `
 				select ln.item_id, ln.item_code, ln.item_name, sum(ln.qty)::float8 as qty
 				from public.sa_sales_lines ln
 				join public.sa_sales s on s.id = ln.sales_id
@@ -164,17 +206,17 @@ func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				group by ln.item_id, ln.item_code, ln.item_name
 				order by qty desc
 				limit 5`, tu.TenantID)
-			if err == nil {
-				defer sellRows.Close()
-				for sellRows.Next() {
-					var row topItemRow
-					if err := sellRows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.Qty); err == nil {
-						s.TopSellingItems = append(s.TopSellingItems, row)
-					}
+		if err == nil {
+			defer sellRows.Close()
+			for sellRows.Next() {
+				var row topItemRow
+				if err := sellRows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.Qty); err == nil {
+					s.TopSellingItems = append(s.TopSellingItems, row)
 				}
 			}
+		}
 
-			quoteRows, err := pool.Query(ctx, `
+		quoteRows, err := pool.Query(ctx, `
 				select ln.item_id, ln.item_code, ln.item_name, sum(ln.qty)::float8 as qty
 				from public.quo_quotation_lines ln
 				join public.quo_quotations q on q.id = ln.quotation_id
@@ -183,20 +225,20 @@ func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				group by ln.item_id, ln.item_code, ln.item_name
 				order by qty desc
 				limit 5`, tu.TenantID)
-			if err == nil {
-				defer quoteRows.Close()
-				for quoteRows.Next() {
-					var row topItemRow
-					if err := quoteRows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.Qty); err == nil {
-						s.TopQuotedItems = append(s.TopQuotedItems, row)
-					}
+		if err == nil {
+			defer quoteRows.Close()
+			for quoteRows.Next() {
+				var row topItemRow
+				if err := quoteRows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.Qty); err == nil {
+					s.TopQuotedItems = append(s.TopQuotedItems, row)
 				}
 			}
-		} else {
-			sArgs := []any{tu.TenantID}
-			sN := 2
-			sScope, _ := tu.PicOrCreatedScopeSQL("s", sN, &sArgs)
-			sellRows, err := pool.Query(ctx, fmt.Sprintf(`
+		}
+	} else {
+		sArgs := []any{tu.TenantID}
+		sN := 2
+		sScope, _ := tu.PicOrCreatedScopeSQL("s", sN, &sArgs)
+		sellRows, err := pool.Query(ctx, fmt.Sprintf(`
 				select ln.item_id, ln.item_code, ln.item_name, sum(ln.qty)::float8 as qty
 				from public.sa_sales_lines ln
 				join public.sa_sales s on s.id = ln.sales_id
@@ -205,17 +247,17 @@ func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				group by ln.item_id, ln.item_code, ln.item_name
 				order by qty desc
 				limit 5`, sScope), sArgs...)
-			if err == nil {
-				defer sellRows.Close()
-				for sellRows.Next() {
-					var row topItemRow
-					if err := sellRows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.Qty); err == nil {
-						s.TopSellingItems = append(s.TopSellingItems, row)
-					}
+		if err == nil {
+			defer sellRows.Close()
+			for sellRows.Next() {
+				var row topItemRow
+				if err := sellRows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.Qty); err == nil {
+					s.TopSellingItems = append(s.TopSellingItems, row)
 				}
 			}
+		}
 
-			quoteRows, err := pool.Query(ctx, fmt.Sprintf(`
+		quoteRows, err := pool.Query(ctx, fmt.Sprintf(`
 				select ln.item_id, ln.item_code, ln.item_name, sum(ln.qty)::float8 as qty
 				from public.quo_quotation_lines ln
 				join public.quo_quotations q on q.id = ln.quotation_id
@@ -224,18 +266,16 @@ func dashboardSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				group by ln.item_id, ln.item_code, ln.item_name
 				order by qty desc
 				limit 5`, qScope), qArgs[:len(qArgs)-1]...)
-			if err == nil {
-				defer quoteRows.Close()
-				for quoteRows.Next() {
-					var row topItemRow
-					if err := quoteRows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.Qty); err == nil {
-						s.TopQuotedItems = append(s.TopQuotedItems, row)
-					}
+		if err == nil {
+			defer quoteRows.Close()
+			for quoteRows.Next() {
+				var row topItemRow
+				if err := quoteRows.Scan(&row.ItemID, &row.ItemCode, &row.ItemName, &row.Qty); err == nil {
+					s.TopQuotedItems = append(s.TopQuotedItems, row)
 				}
 			}
 		}
-
-		w.Header().Set("Cache-Control", "private, max-age=30")
-		response.OK(w, s, "OK")
 	}
+
+	return s, nil
 }

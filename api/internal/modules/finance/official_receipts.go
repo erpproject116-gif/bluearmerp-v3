@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
@@ -404,6 +405,9 @@ func createOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		rec, msg, status, errCode := createOfficialReceiptFromBody(r.Context(), pool, tu, body)
+		if errCode == "" {
+			aggcache.InvalidateTenant(tu.TenantID)
+		}
 		if errCode != "" {
 			if status == http.StatusConflict {
 				response.Err(w, status, msg, errCode)

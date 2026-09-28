@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +18,9 @@ const UserActivityHeader = "X-User-Activity"
 
 // ErrSessionIdle is returned when the user has been inactive longer than the idle timeout.
 var ErrSessionIdle = errors.New("session idle")
+
+// activityNow is overridden in tests so cache expiry does not need a real sleep.
+var activityNow = time.Now
 
 func sessionIdleTimeout() time.Duration {
 	if v := strings.TrimSpace(os.Getenv("SESSION_IDLE_MINUTES")); v != "" {
@@ -37,6 +41,20 @@ func activityWriteInterval() time.Duration {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 			secs = n
 		}
+	}
+	return time.Duration(secs) * time.Second
+}
+
+// activityReadCacheTTL is the process-local lifetime of a not-idle stamp.
+// SESSION_ACTIVITY_READ_CACHE_SECONDS=0 disables it. Idle denials are never stored.
+func activityReadCacheTTL() time.Duration {
+	secs := 10
+	if v := strings.TrimSpace(os.Getenv("SESSION_ACTIVITY_READ_CACHE_SECONDS")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return 0
+		}
+		secs = n
 	}
 	return time.Duration(secs) * time.Second
 }
@@ -74,63 +92,162 @@ func shouldBumpSessionActivity(r *http.Request) bool {
 	return strings.TrimSpace(r.Header.Get(UserActivityHeader)) == "1"
 }
 
-func enforceSessionActivity(ctx context.Context, pool *pgxpool.Pool, authUserID string, bump bool) error {
-	timeout := sessionIdleTimeout()
+// activityStore is the last_activity_at read/write path. Tests substitute a fake.
+type activityStore interface {
+	loadActivity(ctx context.Context, authUserID string) (time.Time, bool, error)
+	touchActivity(ctx context.Context, authUserID string) error
+}
 
+type poolActivityStore struct {
+	pool *pgxpool.Pool
+}
+
+func (s poolActivityStore) loadActivity(ctx context.Context, authUserID string) (time.Time, bool, error) {
 	var lastActivity time.Time
-	err := pool.QueryRow(ctx, `
+	err := s.pool.QueryRow(ctx, `
 		select last_activity_at
 		from public.auth_session_activity
 		where auth_user_id = $1::uuid`,
 		authUserID,
 	).Scan(&lastActivity)
-
 	if err == pgx.ErrNoRows {
-		if bump {
-			_, _ = pool.Exec(ctx, `
-				insert into public.auth_session_activity (auth_user_id, last_activity_at)
-				values ($1::uuid, now())
-				on conflict (auth_user_id) do update set last_activity_at = now()`,
-				authUserID,
-			)
-		}
-		return nil
+		return time.Time{}, false, nil
 	}
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	return lastActivity, true, nil
+}
+
+func (s poolActivityStore) touchActivity(ctx context.Context, authUserID string) error {
+	_, err := s.pool.Exec(ctx, `
+		insert into public.auth_session_activity (auth_user_id, last_activity_at)
+		values ($1::uuid, now())
+		on conflict (auth_user_id) do update set last_activity_at = now()`,
+		authUserID,
+	)
+	return err
+}
+
+type activityCacheEntry struct {
+	lastActivity time.Time
+	expiresAt    time.Time
+}
+
+var (
+	activityCacheMu sync.RWMutex
+	activityCache   = map[string]activityCacheEntry{}
+)
+
+func activityCacheGet(authUserID string, now time.Time) (time.Time, bool) {
+	if activityReadCacheTTL() <= 0 {
+		return time.Time{}, false
+	}
+	activityCacheMu.RLock()
+	e, ok := activityCache[authUserID]
+	activityCacheMu.RUnlock()
+	if !ok || now.After(e.expiresAt) {
+		if ok {
+			activityCacheMu.Lock()
+			delete(activityCache, authUserID)
+			activityCacheMu.Unlock()
+		}
+		return time.Time{}, false
+	}
+	timeout := sessionIdleTimeout()
+	remaining := timeout - now.Sub(e.lastActivity)
+	near := activityWriteInterval()
+	if near <= 0 {
+		near = time.Second
+	}
+	// Too close to the idle deadline to trust a cached stamp.
+	if remaining <= near {
+		return time.Time{}, false
+	}
+	return e.lastActivity, true
+}
+
+func activityCacheSet(authUserID string, lastActivity, now time.Time) {
+	ttl := activityReadCacheTTL()
+	if ttl <= 0 {
+		return
+	}
+	activityCacheMu.Lock()
+	activityCache[authUserID] = activityCacheEntry{lastActivity: lastActivity, expiresAt: now.Add(ttl)}
+	activityCacheMu.Unlock()
+}
+
+func activityCacheDelete(authUserID string) {
+	activityCacheMu.Lock()
+	delete(activityCache, authUserID)
+	activityCacheMu.Unlock()
+}
+
+func resetActivityCache() {
+	activityCacheMu.Lock()
+	activityCache = map[string]activityCacheEntry{}
+	activityCacheMu.Unlock()
+}
+
+func enforceSessionActivity(ctx context.Context, pool *pgxpool.Pool, authUserID string, bump bool) error {
+	return enforceSessionActivityStore(ctx, poolActivityStore{pool: pool}, authUserID, bump)
+}
+
+func enforceSessionActivityStore(ctx context.Context, store activityStore, authUserID string, bump bool) error {
+	now := activityNow()
+	timeout := sessionIdleTimeout()
+
+	if cached, ok := activityCacheGet(authUserID, now); ok {
+		return applyActivityStamp(ctx, store, authUserID, cached, true, bump, now, timeout)
+	}
+
+	lastActivity, found, err := store.loadActivity(ctx, authUserID)
 	if err != nil {
 		return err
 	}
-
-	if time.Since(lastActivity) > timeout {
+	if !found {
 		if bump {
-			_, err = pool.Exec(ctx, `
-				insert into public.auth_session_activity (auth_user_id, last_activity_at)
-				values ($1::uuid, now())
-				on conflict (auth_user_id) do update set last_activity_at = now()`,
-				authUserID,
-			)
-			return err
+			if err := store.touchActivity(ctx, authUserID); err != nil {
+				return err
+			}
+			activityCacheSet(authUserID, now, now)
+		}
+		return nil
+	}
+	return applyActivityStamp(ctx, store, authUserID, lastActivity, false, bump, now, timeout)
+}
+
+func applyActivityStamp(ctx context.Context, store activityStore, authUserID string, lastActivity time.Time, fromCache, bump bool, now time.Time, timeout time.Duration) error {
+	if now.Sub(lastActivity) > timeout {
+		if bump {
+			if err := store.touchActivity(ctx, authUserID); err != nil {
+				return err
+			}
+			activityCacheSet(authUserID, now, now)
+			return nil
 		}
 		return ErrSessionIdle
 	}
 
-	if bump {
-		// Already stamped recently — the session is provably not idle, so skip the write.
-		// Worst-case drift is one interval, far below the idle timeout.
-		if !shouldStampActivity(lastActivity, time.Now()) {
-			return nil
-		}
-		_, err = pool.Exec(ctx, `
-			update public.auth_session_activity
-			set last_activity_at = now()
-			where auth_user_id = $1::uuid`,
-			authUserID,
-		)
+	if !fromCache {
+		activityCacheSet(authUserID, lastActivity, now)
+	}
+
+	if !bump {
+		return nil
+	}
+	if !shouldStampActivity(lastActivity, now) {
+		return nil
+	}
+	if err := store.touchActivity(ctx, authUserID); err != nil {
 		return err
 	}
+	activityCacheSet(authUserID, now, now)
 	return nil
 }
 
 // ClearSessionActivity removes idle tracking on sign-out (optional hygiene).
 func ClearSessionActivity(ctx context.Context, pool *pgxpool.Pool, authUserID string) {
+	activityCacheDelete(authUserID)
 	_, _ = pool.Exec(ctx, `delete from public.auth_session_activity where auth_user_id = $1::uuid`, authUserID)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/periodbi"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -27,13 +28,24 @@ func periodSummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if !toOK {
 			to, toOK = parseISODate(r.URL.Query().Get("to_date"))
 		}
-		var out periodbi.Report
-		if fromOK && toOK {
-			out = periodbi.LoadWindow(r.Context(), pool, tu.TenantID, kind, from, to)
-		} else {
-			out = periodbi.Load(r.Context(), pool, tu.TenantID, kind)
+		extra := string(kind) + "|" + from.Format("2006-01-02") + "|" + to.Format("2006-01-02")
+		if !(fromOK && toOK) {
+			extra = string(kind)
 		}
-		out.CompanyName = periodbi.CompanyName(r.Context(), pool, tu.TenantID)
+		out, err := aggcache.Load(aggcache.Key(tu.TenantID, "period-summary", extra), false, func() (periodbi.Report, error) {
+			var report periodbi.Report
+			if fromOK && toOK {
+				report = periodbi.LoadWindow(r.Context(), pool, tu.TenantID, kind, from, to)
+			} else {
+				report = periodbi.Load(r.Context(), pool, tu.TenantID, kind)
+			}
+			report.CompanyName = periodbi.CompanyName(r.Context(), pool, tu.TenantID)
+			return report, nil
+		})
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load period summary.", "ERR_INTERNAL")
+			return
+		}
 		w.Header().Set("Cache-Control", "private, max-age=60")
 		response.OK(w, out, "OK")
 	}

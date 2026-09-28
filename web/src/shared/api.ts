@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { invalidateAfterMutation } from "./queryInvalidation";
 import { getGlobalToast } from "./toast";
 import { getActiveTenantId, getActiveBranchIdCurrent } from "./activeContext";
+import { shouldHandleServerSessionIdle } from "./sessionIdleDecision";
 
 const url = import.meta.env.VITE_SUPABASE_URL ?? "";
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
@@ -153,6 +154,7 @@ export async function apiFetch<T>(
   if (!options?.silent && !options?.background) {
     headers.set("X-User-Activity", "1");
   }
+  const startPath = typeof window !== "undefined" ? window.location.pathname : "";
   const base = apiBase || "";
   let res: Response;
   try {
@@ -176,13 +178,9 @@ export async function apiFetch<T>(
     };
   }
   const result = { ...body, status: res.status, ok: res.ok };
-  if (body.code === "ERR_SESSION_IDLE" && !options?.background) {
-    const path = window.location.pathname;
-    const onAuthFlow = path.startsWith("/signin") || path.startsWith("/auth/callback");
-    if (!onAuthFlow) {
-      const { handleServerSessionIdle } = await import("./sessionIdleClient");
-      void handleServerSessionIdle();
-    }
+  if (body.code === "ERR_SESSION_IDLE" && shouldHandleServerSessionIdle(options, startPath)) {
+    const { handleServerSessionIdle } = await import("./sessionIdleClient");
+    void handleServerSessionIdle();
     return result;
   }
   if (body.code === "ERR_COMMERCIAL_LOCKED") {

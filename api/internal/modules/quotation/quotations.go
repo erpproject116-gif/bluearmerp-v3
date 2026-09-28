@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
@@ -545,6 +546,7 @@ func createQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
 		}
+		aggcache.InvalidateTenant(tu.TenantID)
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "quotation.create", "quo_quotation", &id, nil, body)
 		q, _ := loadQuotation(r.Context(), pool, tu.TenantID, id)
@@ -649,6 +651,7 @@ func updateQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
 		}
+		aggcache.InvalidateTenant(tu.TenantID)
 
 		after, _ := loadQuotation(r.Context(), pool, tu.TenantID, id)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "quotation.update", "quo_quotation", &id, before, after)

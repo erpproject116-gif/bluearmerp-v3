@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/financedefaults"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
@@ -33,53 +34,53 @@ type booksHealthPolicies struct {
 }
 
 type booksHealthFiscal struct {
-	PeriodID   *int64  `json:"period_id,omitempty"`
-	PeriodCode string  `json:"period_code,omitempty"`
-	IsClosed   bool    `json:"is_closed"`
-	YearCode   string  `json:"year_code,omitempty"`
+	PeriodID   *int64 `json:"period_id,omitempty"`
+	PeriodCode string `json:"period_code,omitempty"`
+	IsClosed   bool   `json:"is_closed"`
+	YearCode   string `json:"year_code,omitempty"`
 }
 
 type booksHealthSignoffLinks struct {
-	TrialBalance              string `json:"trial_balance"`
-	ProfitAndLoss             string `json:"profit_and_loss"`
-	BalanceSheet              string `json:"balance_sheet"`
-	BankReconciliation        string `json:"bank_reconciliation"`
-	ArByCustomer              string `json:"ar_by_customer"`
-	ApByVendor                string `json:"ap_by_vendor"`
+	TrialBalance                string `json:"trial_balance"`
+	ProfitAndLoss               string `json:"profit_and_loss"`
+	BalanceSheet                string `json:"balance_sheet"`
+	BankReconciliation          string `json:"bank_reconciliation"`
+	ArByCustomer                string `json:"ar_by_customer"`
+	ApByVendor                  string `json:"ap_by_vendor"`
 	AcctInventoryReconciliation string `json:"acct_inventory_reconciliation"`
-	JournalEntries            string `json:"journal_entries"`
-	CreditNotes               string `json:"credit_notes"`
-	VendorCredits             string `json:"vendor_credits"`
-	SalesPreInvoicing         string `json:"sales_pre_invoicing"`
-	PurchasePreInvoicing      string `json:"purchase_pre_invoicing"`
-	ChartOfAccountsDefaults   string `json:"chart_of_accounts"`
-	FinanceSetup              string `json:"finance_setup"`
+	JournalEntries              string `json:"journal_entries"`
+	CreditNotes                 string `json:"credit_notes"`
+	VendorCredits               string `json:"vendor_credits"`
+	SalesPreInvoicing           string `json:"sales_pre_invoicing"`
+	PurchasePreInvoicing        string `json:"purchase_pre_invoicing"`
+	ChartOfAccountsDefaults     string `json:"chart_of_accounts"`
+	FinanceSetup                string `json:"finance_setup"`
 }
 
 type booksHealthResponse struct {
-	AsOf                       string                  `json:"as_of"`
-	ReadyToClose               bool                    `json:"ready_to_close"`
-	DraftJournalEntries        int64                   `json:"draft_journal_entries"`
-	ConfirmedSalesDraftOrMissingJE int64               `json:"confirmed_sales_draft_or_missing_je"`
-	ConfirmedBillsDraftOrMissingJE int64               `json:"confirmed_bills_draft_or_missing_je"`
-	UnmatchedBankLines         int64                   `json:"unmatched_bank_lines"`
-	AuditOnlyPending           int64                   `json:"audit_only_pending"`
-	CreditsMissingJE           int64                   `json:"credits_missing_je"`
-	CreditNotesMissingJE       int64                   `json:"credit_notes_missing_je"`
-	VendorCreditsMissingJE     int64                   `json:"vendor_credits_missing_je"`
-	ArCustomers                int64                   `json:"ar_customers"`
-	UnpaidSupplierInvoices     int64                   `json:"unpaid_supplier_invoices"`
-	ApOverApplication          int64                   `json:"ap_over_application"`
-	SalesUnbilledLines         int64                   `json:"sales_unbilled_lines"`
-	PurchaseUnbilledGRLines    int64                   `json:"purchase_unbilled_gr_lines"`
-	InventoryClosingDifference float64                 `json:"inventory_closing_difference"`
-	HybridInventoryUnmapped    bool                    `json:"hybrid_inventory_unmapped"`
-	Policies                   booksHealthPolicies     `json:"policies"`
-	Fiscal                     booksHealthFiscal       `json:"fiscal"`
-	Exceptions                 []booksHealthException  `json:"exceptions"`
-	SignoffLinks               booksHealthSignoffLinks `json:"signoff_links"`
+	AsOf                           string                  `json:"as_of"`
+	ReadyToClose                   bool                    `json:"ready_to_close"`
+	DraftJournalEntries            int64                   `json:"draft_journal_entries"`
+	ConfirmedSalesDraftOrMissingJE int64                   `json:"confirmed_sales_draft_or_missing_je"`
+	ConfirmedBillsDraftOrMissingJE int64                   `json:"confirmed_bills_draft_or_missing_je"`
+	UnmatchedBankLines             int64                   `json:"unmatched_bank_lines"`
+	AuditOnlyPending               int64                   `json:"audit_only_pending"`
+	CreditsMissingJE               int64                   `json:"credits_missing_je"`
+	CreditNotesMissingJE           int64                   `json:"credit_notes_missing_je"`
+	VendorCreditsMissingJE         int64                   `json:"vendor_credits_missing_je"`
+	ArCustomers                    int64                   `json:"ar_customers"`
+	UnpaidSupplierInvoices         int64                   `json:"unpaid_supplier_invoices"`
+	ApOverApplication              int64                   `json:"ap_over_application"`
+	SalesUnbilledLines             int64                   `json:"sales_unbilled_lines"`
+	PurchaseUnbilledGRLines        int64                   `json:"purchase_unbilled_gr_lines"`
+	InventoryClosingDifference     float64                 `json:"inventory_closing_difference"`
+	HybridInventoryUnmapped        bool                    `json:"hybrid_inventory_unmapped"`
+	Policies                       booksHealthPolicies     `json:"policies"`
+	Fiscal                         booksHealthFiscal       `json:"fiscal"`
+	Exceptions                     []booksHealthException  `json:"exceptions"`
+	SignoffLinks                   booksHealthSignoffLinks `json:"signoff_links"`
 	// SignoffChecklist is the Sale/PR → books verification matrix for operators.
-	SignoffChecklist           []string                `json:"signoff_checklist"`
+	SignoffChecklist []string `json:"signoff_checklist"`
 }
 
 func registerBooksHealthRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -99,7 +100,9 @@ func booksHealthHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			asOf = d
 		}
-		out, err := loadBooksHealth(r.Context(), pool, tu.TenantID, asOf)
+		out, err := aggcache.Load(aggcache.Key(tu.TenantID, "books-health", asOf.UTC().Format("2006-01-02")), false, func() (booksHealthResponse, error) {
+			return loadBooksHealth(r.Context(), pool, tu.TenantID, asOf)
+		})
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load books health: "+err.Error(), "ERR_INTERNAL")
 			return
@@ -130,92 +133,94 @@ func loadBooksHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64, as
 		},
 	}
 
-	_ = pool.QueryRow(ctx, `
-		select count(*) from public.fin_journal_entries
-		where tenant_id = $1 and status = 'draft'`, tenantID).Scan(&out.DraftJournalEntries)
-
-	// Confirmed sales whose A/R journal is missing or still draft — BS/P&L/Ledger won't move.
-	_ = pool.QueryRow(ctx, `
-		select count(*)
-		from public.sa_sales s
-		left join public.fin_journal_entries je on je.id = s.invoice_journal_entry_id
-		where s.tenant_id = $1 and s.deleted_at is null
-		  and s.grand_total > 0.0001
-		  and coalesce(s.progress_status, '') in ('completed', 'confirm', 'e_approval', 'confirmed', 'approved', 'released', 'shipped')
-		  and (s.invoice_journal_entry_id is null or coalesce(je.status, 'draft') = 'draft')`,
-		tenantID).Scan(&out.ConfirmedSalesDraftOrMissingJE)
-
-	_ = pool.QueryRow(ctx, `
-		select count(*)
-		from public.fin_supplier_invoices si
-		left join public.fin_journal_entries je on je.id = si.invoice_journal_entry_id
-		where si.tenant_id = $1 and si.deleted_at is null
-		  and si.grand_total > 0.0001
-		  and coalesce(si.progress_status, '') in ('completed', 'confirm', 'e_approval')
-		  and (si.invoice_journal_entry_id is null or coalesce(je.status, 'draft') = 'draft')`,
-		tenantID).Scan(&out.ConfirmedBillsDraftOrMissingJE)
-
-	_ = pool.QueryRow(ctx, `
-		select count(*) from public.fin_bank_statement_lines
-		where tenant_id = $1 and matched_payment_id is null`, tenantID).Scan(&out.UnmatchedBankLines)
-
-	if n, err := countAuditOnlyPending(ctx, pool, tenantID); err == nil {
-		out.AuditOnlyPending = n
+	// One round trip for the tenant-scoped counts. The as-of goods-receipt
+	// count stays its own statement because it takes the cutoff date.
+	if err := pool.QueryRow(ctx, `
+		select
+		  (select count(*) from public.fin_journal_entries
+		    where tenant_id = $1 and status = 'draft'),
+		  (select count(*)
+		    from public.sa_sales s
+		    left join public.fin_journal_entries je on je.id = s.invoice_journal_entry_id
+		    where s.tenant_id = $1 and s.deleted_at is null
+		      and s.grand_total > 0.0001
+		      and coalesce(s.progress_status, '') in ('completed', 'confirm', 'e_approval', 'confirmed', 'approved', 'released', 'shipped')
+		      and (s.invoice_journal_entry_id is null or coalesce(je.status, 'draft') = 'draft')),
+		  (select count(*)
+		    from public.fin_supplier_invoices si
+		    left join public.fin_journal_entries je on je.id = si.invoice_journal_entry_id
+		    where si.tenant_id = $1 and si.deleted_at is null
+		      and si.grand_total > 0.0001
+		      and coalesce(si.progress_status, '') in ('completed', 'confirm', 'e_approval')
+		      and (si.invoice_journal_entry_id is null or coalesce(je.status, 'draft') = 'draft')),
+		  (select count(*) from public.fin_bank_statement_lines
+		    where tenant_id = $1 and matched_payment_id is null),
+		  (select count(*) from public.fin_credit_notes
+		    where tenant_id = $1 and deleted_at is null and status = 'open'
+		      and journal_entry_id is null and amount_total > 0.0001),
+		  (select count(*) from public.fin_vendor_credits
+		    where tenant_id = $1 and deleted_at is null and status = 'open'
+		      and journal_entry_id is null and amount_total > 0.0001),
+		  (select count(*) from (
+		    select s.partner_id
+		    from public.sa_sales s
+		    left join lateral (
+		      select coalesce(sum(a.applied_amount), 0)::float8 as received
+		      from public.fin_receipt_applications a
+		      join public.fin_official_receipts r on r.id = a.official_receipt_id
+		      where a.sales_id = s.id and r.deleted_at is null
+		    ) recv on true
+		    where s.tenant_id = $1 and s.deleted_at is null
+		    group by s.partner_id
+		    having coalesce(sum(s.grand_total), 0) - coalesce(sum(recv.received), 0) > 0
+		  ) ar),
+		  (select count(*)
+		    from public.fin_supplier_invoices si
+		    left join lateral (
+		      select coalesce(sum(a.applied_amount), 0)::float8 as paid
+		      from public.fin_payment_applications a
+		      join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
+		      where a.supplier_invoice_id = si.id and pv.deleted_at is null
+		    ) paid on true
+		    where si.tenant_id = $1 and si.deleted_at is null
+		      and coalesce(paid.paid, 0) > si.grand_total + 0.0001),
+		  (select count(*)
+		    from public.sa_sales s
+		    where s.tenant_id = $1 and s.deleted_at is null
+		      and coalesce(s.invoicing_status, false) = false
+		      and s.progress_status in ('confirmed', 'approved', 'released', 'shipped', 'completed'))`,
+		tenantID).Scan(
+		&out.DraftJournalEntries,
+		&out.ConfirmedSalesDraftOrMissingJE,
+		&out.ConfirmedBillsDraftOrMissingJE,
+		&out.UnmatchedBankLines,
+		&out.CreditNotesMissingJE,
+		&out.VendorCreditsMissingJE,
+		&out.ArCustomers,
+		&out.ApOverApplication,
+		&out.SalesUnbilledLines,
+	); err != nil {
+		return out, err
 	}
-
-	_ = pool.QueryRow(ctx, `
-		select count(*) from public.fin_credit_notes
-		where tenant_id = $1 and deleted_at is null and status = 'open'
-		  and journal_entry_id is null and amount_total > 0.0001`, tenantID).Scan(&out.CreditNotesMissingJE)
-	_ = pool.QueryRow(ctx, `
-		select count(*) from public.fin_vendor_credits
-		where tenant_id = $1 and deleted_at is null and status = 'open'
-		  and journal_entry_id is null and amount_total > 0.0001`, tenantID).Scan(&out.VendorCreditsMissingJE)
 	out.CreditsMissingJE = out.CreditNotesMissingJE + out.VendorCreditsMissingJE
 
-	_ = pool.QueryRow(ctx, `
-		select count(*) from (
-		  select s.partner_id
-		  from public.sa_sales s
-		  left join lateral (
-		    select coalesce(sum(a.applied_amount), 0)::float8 as received
-		    from public.fin_receipt_applications a
-		    join public.fin_official_receipts r on r.id = a.official_receipt_id
-		    where a.sales_id = s.id and r.deleted_at is null
-		  ) recv on true
-		  where s.tenant_id = $1 and s.deleted_at is null
-		  group by s.partner_id
-		  having coalesce(sum(s.grand_total), 0) - coalesce(sum(recv.received), 0) > 0
-		) ar`, tenantID).Scan(&out.ArCustomers)
+	n, err := countAuditOnlyPending(ctx, pool, tenantID)
+	if err != nil {
+		return out, err
+	}
+	out.AuditOnlyPending = n
 
-	_ = pool.QueryRow(ctx, `
+	if err := pool.QueryRow(ctx, `
 		select count(*)
 		from public.fin_supplier_invoices si
 		`+supplierInvoiceAppliedLateralSQLAsOf("si", "")+`
 		where si.tenant_id = $1
 		  and si.deleted_at is null
-		  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001`, tenantID).Scan(&out.UnpaidSupplierInvoices)
+		  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001`, tenantID).Scan(&out.UnpaidSupplierInvoices); err != nil {
+		return out, err
+	}
 
-	_ = pool.QueryRow(ctx, `
-		select count(*)
-		from public.fin_supplier_invoices si
-		left join lateral (
-		  select coalesce(sum(a.applied_amount), 0)::float8 as paid
-		  from public.fin_payment_applications a
-		  join public.fin_payment_vouchers pv on pv.id = a.payment_voucher_id
-		  where a.supplier_invoice_id = si.id and pv.deleted_at is null
-		) paid on true
-		where si.tenant_id = $1 and si.deleted_at is null
-		  and coalesce(paid.paid, 0) > si.grand_total + 0.0001`, tenantID).Scan(&out.ApOverApplication)
-
-	_ = pool.QueryRow(ctx, `
-		select count(*)
-		from public.sa_sales s
-		where s.tenant_id = $1 and s.deleted_at is null
-		  and coalesce(s.invoicing_status, false) = false
-		  and s.progress_status in ('confirmed', 'approved', 'released', 'shipped', 'completed')`, tenantID).Scan(&out.SalesUnbilledLines)
-
-	_ = pool.QueryRow(ctx, `
+	if err := pool.QueryRow(ctx, `
 		select count(*)
 		from public.gr_goods_receipt_lines grl
 		join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
@@ -228,7 +233,9 @@ func loadBooksHealth(ctx context.Context, pool *pgxpool.Pool, tenantID int64, as
 		where gr.tenant_id = $1 and gr.status = 'posted'
 		  and gr.receipt_date <= $2::date
 		  and (grl.received_qty - coalesce(sl.billed, 0)) > 0.0001`,
-		tenantID, asOfDay.Format("2006-01-02")).Scan(&out.PurchaseUnbilledGRLines)
+		tenantID, asOfDay.Format("2006-01-02")).Scan(&out.PurchaseUnbilledGRLines); err != nil {
+		return out, err
+	}
 
 	policy, err := processpolicy.Load(ctx, pool, tenantID)
 	if err == nil {

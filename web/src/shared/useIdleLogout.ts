@@ -10,12 +10,28 @@ import {
   readLocalActivity,
   touchLocalActivity,
 } from "./sessionIdleClient";
+import { mountActivityBase } from "./sessionIdleDecision";
 import { buildSignInHref, captureReturnTo } from "./authReturnTo";
 
 const ACTIVITY_EVENTS = ["mousedown", "keydown", "touchstart", "scroll"] as const;
 const THROTTLE_MS = 5_000;
 
+function dropStaleMountStamp() {
+  const decision = mountActivityBase(Date.now(), readLocalActivity(), IDLE_LOGOUT_MS);
+  if (!decision.replaceStored) return decision.baseMs;
+  try {
+    localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  touchLocalActivity();
+  return decision.baseMs;
+}
+
 export function useIdleLogout() {
+  // Run before effects so a leftover stamp cannot schedule logout at 0ms.
+  dropStaleMountStamp();
+
   const auth = useAuth();
   const loc = useLocation();
   const [showWarning, setShowWarning] = createSignal(false);
@@ -101,9 +117,9 @@ export function useIdleLogout() {
     };
     document.addEventListener("visibilitychange", onVis);
 
-    const initial = readLocalActivity();
-    scheduleFrom(initial > 0 ? initial : Date.now());
-    if (initial <= 0) touchLocalActivity();
+    const initialBase = dropStaleMountStamp();
+    scheduleFrom(initialBase);
+    if (readLocalActivity() <= 0) touchLocalActivity();
 
     onCleanup(() => {
       for (const ev of ACTIVITY_EVENTS) {

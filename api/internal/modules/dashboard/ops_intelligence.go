@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -93,33 +94,42 @@ type opsIntelligenceResponse struct {
 func opsIntelligenceHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		ctx := r.Context()
-		today := todayDate()
-		out := opsIntelligenceResponse{AsOf: today.Format("2006-01-02")}
-		out.Inventory.InboundTrend = []trendPoint{}
-		out.Inventory.InboundByType = []namedCount{}
-		out.Sales.Trend = []trendPoint{}
-		out.Sales.TopCustomers = []namedAmountRow{}
-		out.Sales.TopItems = []namedAmountRow{}
-		out.SalesOrders.ByReason = emptyReasonCounts(soReasonOrder)
-		out.SalesOrders.Top = []classifiedDocRow{}
-		out.PurchaseOrders.ByReason = emptyReasonCounts(poReasonOrder)
-		out.PurchaseOrders.Top = []classifiedDocRow{}
-		out.Purchases.TopVendors = []namedAmountRow{}
-		out.FollowUp.ByStage = []namedCount{}
-		out.FollowUp.ByType = []namedCount{}
-		out.FollowUp.Top = []followUpTopRow{}
-
-		loadOpsInventory(ctx, pool, tu.TenantID, &out)
-		loadOpsSales(ctx, pool, tu.TenantID, &out)
-		loadOpsSalesOrders(ctx, pool, tu.TenantID, today, &out)
-		loadOpsPurchaseOrders(ctx, pool, tu.TenantID, today, &out)
-		loadOpsPurchases(ctx, pool, tu.TenantID, &out)
-		loadOpsFollowUp(ctx, pool, tu.TenantID, today, &out)
-
+		out, err := aggcache.Load(aggcache.Key(tu.TenantID, "ops-intelligence", ""), false, func() (opsIntelligenceResponse, error) {
+			return buildOpsIntelligence(r.Context(), pool, tu.TenantID)
+		})
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load operations intelligence.", "ERR_INTERNAL")
+			return
+		}
 		w.Header().Set("Cache-Control", "private, max-age=60")
 		response.OK(w, out, "OK")
 	}
+}
+
+func buildOpsIntelligence(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (opsIntelligenceResponse, error) {
+	today := todayDate()
+	out := opsIntelligenceResponse{AsOf: today.Format("2006-01-02")}
+	out.Inventory.InboundTrend = []trendPoint{}
+	out.Inventory.InboundByType = []namedCount{}
+	out.Sales.Trend = []trendPoint{}
+	out.Sales.TopCustomers = []namedAmountRow{}
+	out.Sales.TopItems = []namedAmountRow{}
+	out.SalesOrders.ByReason = emptyReasonCounts(soReasonOrder)
+	out.SalesOrders.Top = []classifiedDocRow{}
+	out.PurchaseOrders.ByReason = emptyReasonCounts(poReasonOrder)
+	out.PurchaseOrders.Top = []classifiedDocRow{}
+	out.Purchases.TopVendors = []namedAmountRow{}
+	out.FollowUp.ByStage = []namedCount{}
+	out.FollowUp.ByType = []namedCount{}
+	out.FollowUp.Top = []followUpTopRow{}
+
+	loadOpsInventory(ctx, pool, tenantID, &out)
+	loadOpsSales(ctx, pool, tenantID, &out)
+	loadOpsSalesOrders(ctx, pool, tenantID, today, &out)
+	loadOpsPurchaseOrders(ctx, pool, tenantID, today, &out)
+	loadOpsPurchases(ctx, pool, tenantID, &out)
+	loadOpsFollowUp(ctx, pool, tenantID, today, &out)
+	return out, nil
 }
 
 func emptyReasonCounts(list []reasonMeta) []namedCount {

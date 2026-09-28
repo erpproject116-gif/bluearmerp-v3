@@ -37,7 +37,7 @@ async function recordIntake(email: string, fullName: string) {
       method: "POST",
       body: JSON.stringify({ full_name: fullName, email }),
     },
-    { silent: true },
+    { silent: true, background: true },
   );
 }
 
@@ -73,7 +73,6 @@ export default function AuthCallbackPage() {
     window.history.replaceState({}, document.title, "/auth/callback");
 
     const { email, fullName } = profileFromSession(data.session);
-    void recordIntake(email, fullName);
 
     try {
       let me = await fetchMeWithRetry();
@@ -98,6 +97,8 @@ export default function AuthCallbackPage() {
         );
         return;
       }
+
+      void recordIntake(email, fullName);
 
       await auth.refresh();
       const href = await resolvePostLoginPath(auth.me);
