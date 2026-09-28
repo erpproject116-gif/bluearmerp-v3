@@ -61,6 +61,63 @@ export default function StockWorkspacePage() {
         </p>
       </section>
 
+      <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-text-primary">Serials and lots</h2>
+        <p class="mt-2 text-sm text-text-secondary">One item uses serials or lots, not both.</p>
+        <div class="mt-4 space-y-4 text-sm leading-relaxed text-text-secondary">
+          <p>
+            <span class="font-medium text-text-primary">Each piece has its own number.</span> Use{" "}
+            <A href="/app/inventory/serial-lot/registry" class="font-medium text-brand-700 hover:underline">
+              Serials
+            </A>
+            . One serial is one unit. Create it from{" "}
+            <A href="/app/inventory/serial-lot/receive-station" class="font-medium text-brand-700 hover:underline">
+              Receive Station
+            </A>{" "}
+            or a{" "}
+            <A href="/app/purchases/purchase-receive" class="font-medium text-brand-700 hover:underline">
+              purchase receive
+            </A>
+            . A sale marks it sold.{" "}
+            <A href="/app/inventory/serial-lot/adjustment" class="font-medium text-brand-700 hover:underline">
+              Qty fix (serials)
+            </A>{" "}
+            only voids a unit or puts a voided unit back.
+          </p>
+          <p>
+            <span class="font-medium text-text-primary">Many pieces share one batch.</span> Use{" "}
+            <A href="/app/inventory/serial-lot/lots" class="font-medium text-brand-700 hover:underline">
+              Lots
+            </A>
+            . You type the lot number. Quantity can be more than one. The same item, lot number, and location add
+            onto that lot. A sale takes some off. Expiry sits on the lot.{" "}
+            <A href="/app/inventory/serial-lot/lot-adjustment" class="font-medium text-brand-700 hover:underline">
+              Qty fix (lots)
+            </A>{" "}
+            changes how many are on that lot.
+          </p>
+          <p>
+            <span class="font-medium text-text-primary">You only need a count.</span> Leave both off. Use{" "}
+            <A href="/app/inventory/items" class="font-medium text-brand-700 hover:underline">
+              Items
+            </A>
+            ,{" "}
+            <A href="/app/inventory/stock-movements" class="font-medium text-brand-700 hover:underline">
+              stock movements
+            </A>
+            , and{" "}
+            <A href="/app/inventory/find-stock" class="font-medium text-brand-700 hover:underline">
+              Inv. Balance by Location
+            </A>
+            .{" "}
+            <A href="/app/inventory/stock-adjustments" class="font-medium text-brand-700 hover:underline">
+              Stock Adjustments
+            </A>{" "}
+            refuses an item that tracks serials or lots.
+          </p>
+        </div>
+      </section>
+
       <StocksDay1Setup summary={workspace.data} loading={workspace.isLoading} />
 
       <ReconciliationBanner />
