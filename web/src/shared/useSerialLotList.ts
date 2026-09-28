@@ -232,6 +232,8 @@ export function useInvalidateSerialLotLists() {
     void client.invalidateQueries({ queryKey: ["serial-units"] });
     void client.invalidateQueries({ queryKey: ["serial-events"] });
     void client.invalidateQueries({ queryKey: ["lot-batches"] });
+    void client.invalidateQueries({ queryKey: ["lot-adjustment-candidates"] });
+    void client.invalidateQueries({ queryKey: ["serial-adjustment-candidates"] });
     void client.invalidateQueries({ queryKey: ["serial-trace"] });
   };
 }

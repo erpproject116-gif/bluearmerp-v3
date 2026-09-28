@@ -88,6 +88,16 @@ export default function LotAdjustmentPage() {
     ),
   );
 
+  const keepRowsForReload = () => {
+    setEditableRows((rows) => rows.map((r) => ({ ...r, dirty: false })));
+  };
+
+  createEffect(() => {
+    const q = presetQuery();
+    setDraft((prev) => (prev.q === q ? prev : { ...prev, q }));
+    setSubmitted((prev) => (prev.q === q ? prev : { ...prev, q }));
+  });
+
   const patch = (p: Partial<LotAdjustmentFilters>) => setDraft((prev) => ({ ...prev, ...p }));
 
   const search = () => {
@@ -97,19 +107,20 @@ export default function LotAdjustmentPage() {
       location_id: locationId() ?? undefined,
     });
     setPage(1);
-    setEditableRows([]);
+    keepRowsForReload();
+    invalidate();
   };
 
   const reset = () => {
     setDraft(defaultFilters());
     setSubmitted(defaultFilters());
     setPage(1);
-    setEditableRows([]);
     setReason("");
     setItemId(null);
     setItemLabel("");
     setLocationId(null);
     setLocationLabel("");
+    keepRowsForReload();
     invalidate();
   };
 

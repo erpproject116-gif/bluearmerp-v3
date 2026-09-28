@@ -72,8 +72,12 @@ export async function registerLotBatch(body: {
   qty: number;
   expiry_date?: string | null;
 }) {
-  return apiFetch<{ id: number; lot_no: string }>("/api/v1/inventory/lot-batches/register", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return apiFetch<{ id: number; lot_no: string; added_to_existing?: boolean }>(
+    "/api/v1/inventory/lot-batches/register",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    { silent: true },
+  );
 }

@@ -8,7 +8,7 @@ import { DecimalInput } from "../../../shared/DecimalInput";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
-import { submitEntity } from "../../../shared/handleSaveResult";
+import { handleSaveResult } from "../../../shared/handleSaveResult";
 import { parseNum } from "../../../shared/money";
 import { useToast } from "../../../shared/toast";
 import { registerLotBatch } from "../../../shared/useLotAdjustment";
@@ -35,6 +35,13 @@ async function fetchLocations(q: string): Promise<LookupOption[]> {
   if (q) qs.set("q", q);
   const res = await apiFetch<{ id: number; location_name: string }[]>(`/api/v1/inventory/locations?${qs}`);
   return (res.data ?? []).map((l) => ({ id: l.id, label: l.location_name }));
+}
+
+async function fetchLotItems(q: string): Promise<LookupOption[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active", track_lot: "true" });
+  if (q) qs.set("q", q);
+  const res = await apiFetch<{ id: number; item_code: string; item_name: string }[]>(`/api/v1/inventory/items?${qs}`);
+  return (res.data ?? []).map((i) => ({ id: i.id, label: `${i.item_code} — ${i.item_name}`, sublabel: i.item_code }));
 }
 
 async function fetchItems(q: string): Promise<LookupOption[]> {
@@ -173,19 +180,19 @@ export default function LotBatchesListPage() {
       return;
     }
     setRegSaving(true);
-    const ok = await submitEntity(
-      () =>
-        registerLotBatch({
-          item_id: regItemId()!,
-          location_id: regLocationId()!,
-          lot_no: regLotNo().trim(),
-          qty,
-          expiry_date: regExpiry() || null,
-        }),
-      toast,
-      "Lot registered.",
-    );
+    const res = await registerLotBatch({
+      item_id: regItemId()!,
+      location_id: regLocationId()!,
+      lot_no: regLotNo().trim(),
+      qty,
+      expiry_date: regExpiry() || null,
+    });
     setRegSaving(false);
+    const ok = handleSaveResult(
+      res,
+      toast,
+      res.data?.added_to_existing ? "Quantity was added to that lot." : "Lot registered.",
+    );
     if (!ok) return;
     setRegisterOpen(false);
     setRegLotNo("");
@@ -346,7 +353,7 @@ export default function LotBatchesListPage() {
           total={list.data?.total ?? 0}
           onPageChange={setPage}
           onRefresh={invalidate}
-          onNew={() => {}}
+          onNew={() => setRegisterOpen(true)}
           onEdit={() => {}}
         />
       </div>
@@ -366,7 +373,7 @@ export default function LotBatchesListPage() {
               setRegItemId(null);
               setRegItemLabel("");
             }}
-            fetchOptions={fetchItems}
+            fetchOptions={fetchLotItems}
           />
           <LookupCombo
             label="Location"

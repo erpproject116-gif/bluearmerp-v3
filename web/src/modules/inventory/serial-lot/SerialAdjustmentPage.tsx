@@ -113,6 +113,10 @@ export default function SerialAdjustmentPage() {
     ),
   );
 
+  const keepRowsForReload = () => {
+    setEditableRows((rows) => rows.map((r) => ({ ...r, dirty: false })));
+  };
+
   const patch = (p: Partial<SerialAdjustmentFilters>) => setDraft((prev) => ({ ...prev, ...p }));
 
   const search = () => {
@@ -122,19 +126,20 @@ export default function SerialAdjustmentPage() {
       location_id: locationId() ?? undefined,
     });
     setPage(1);
-    setEditableRows([]);
+    keepRowsForReload();
+    invalidate();
   };
 
   const reset = () => {
     setDraft(defaultFilters());
     setSubmitted(defaultFilters());
     setPage(1);
-    setEditableRows([]);
     setReason("");
     setItemId(null);
     setItemLabel("");
     setLocationId(null);
     setLocationLabel("");
+    keepRowsForReload();
     invalidate();
   };
 
@@ -182,7 +187,6 @@ export default function SerialAdjustmentPage() {
       } else {
         toast.success(res.message ?? "Serials adjusted.");
       }
-      setEditableRows([]);
       setReason("");
       invalidate();
       search();

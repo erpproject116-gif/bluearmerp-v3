@@ -2,10 +2,12 @@ package inventory
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
@@ -319,6 +321,17 @@ func registerLotBatch(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		var existingID int64
+		err = tx.QueryRow(r.Context(), `
+			select id from public.inv_lot_batches
+			where tenant_id = $1 and item_id = $2 and lot_no = $3 and location_id = $4`,
+			tu.TenantID, body.ItemID, lotNo, body.LocationID).Scan(&existingID)
+		addedToExisting := err == nil
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			response.Err(w, http.StatusInternalServerError, "Failed to register lot.", "ERR_INTERNAL")
+			return
+		}
+
 		var lotID int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.inv_lot_batches (tenant_id, item_id, lot_no, location_id, qty_on_hand, expiry_date)
@@ -378,6 +391,14 @@ func registerLotBatch(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.lot.register", "inv_lot_batch", &lotID, nil, body)
-		response.OK(w, map[string]any{"id": lotID, "lot_no": lotNo}, "Lot registered.")
+		message := "Lot registered."
+		if addedToExisting {
+			message = "Quantity was added to that lot."
+		}
+		response.OK(w, map[string]any{
+			"id":                lotID,
+			"lot_no":            lotNo,
+			"added_to_existing": addedToExisting,
+		}, message)
 	}
 }
