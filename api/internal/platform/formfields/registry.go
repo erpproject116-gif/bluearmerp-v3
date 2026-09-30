@@ -152,6 +152,16 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "reference", Label: "Reference", FieldType: "text", SortOrder: 30},
 		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 40},
 	},
+	"rfq_request": {
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 10},
+	},
+	"vendor_credit": {
+		{FieldKey: "credit_date", Label: "Date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "vendor_name", Label: "Vendor", FieldType: "text", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "amount_total", Label: "Amount", FieldType: "number", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "reason", Label: "Reason", FieldType: "text", SortOrder: 40},
+		{FieldKey: "notes", Label: "Notes", FieldType: "textarea", SortOrder: 50},
+	},
 	"fin_supplier_invoice": {
 		{FieldKey: "invoice_date", Label: "Invoice date", FieldType: "date", DefaultRequired: true, SortOrder: 10},
 		{FieldKey: "partner_id", Label: "Vendor", FieldType: "select", DefaultRequired: true, SortOrder: 20},

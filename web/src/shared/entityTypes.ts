@@ -47,6 +47,7 @@ export const PURCHASE_REQUEST_ENTITY = {
   purchaseOrder: "po_purchase_order",
   goodsReceipt: "gr_goods_receipt",
   supplierInvoice: "fin_supplier_invoice",
+  rfq: "rfq_request",
 } as const;
 
 export const PURCHASE_REQUEST_SETTINGS_HREF = {
@@ -54,6 +55,7 @@ export const PURCHASE_REQUEST_SETTINGS_HREF = {
   purchaseOrder: "/app/purchase-order/purchase-orders/settings",
   goodsReceipt: "/app/purchase-order/goods-receipt/settings",
   supplierInvoice: "/app/purchases/purchase-receive/settings",
+  rfq: "/app/purchase-order/rfq/settings",
 } as const;
 
 export type PurchaseRequestFeature = keyof typeof PURCHASE_REQUEST_ENTITY;
@@ -65,10 +67,12 @@ export const PURCHASE_RECEIVE_LEGACY_PATH = "/app/purchases/purchases";
 
 export const PURCHASES_ENTITY = {
   purchases: "fin_supplier_invoice",
+  vendorCredit: "vendor_credit",
 } as const;
 
 export const PURCHASES_SETTINGS_HREF = {
   purchases: `${PURCHASE_RECEIVE_PATH}/settings`,
+  vendorCredit: "/app/purchases/vendor-credits/settings",
 } as const;
 
 export type PurchasesFeature = keyof typeof PURCHASES_ENTITY;

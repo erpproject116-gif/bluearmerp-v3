@@ -70,11 +70,12 @@ func transferOwnership(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var email, fullName, status string
+		var supportSessionID *int64
 		err = tx.QueryRow(r.Context(), `
-			select email, coalesce(full_name, ''), status
+			select email, coalesce(full_name, ''), status, support_session_id
 			from public.users
 			where id = $1 and tenant_id = $2
-			for update`, newOwnerID, tu.TenantID).Scan(&email, &fullName, &status)
+			for update`, newOwnerID, tu.TenantID).Scan(&email, &fullName, &status, &supportSessionID)
 		if err == pgx.ErrNoRows {
 			response.Err(w, http.StatusNotFound, "That user is not in this company.", "ERR_NOT_FOUND")
 			return
@@ -87,12 +88,23 @@ func transferOwnership(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusBadRequest, "Ownership can only move to an active user. Restore or invite them first.", "ERR_BAD_REQUEST")
 			return
 		}
+		if supportSessionID != nil && *supportSessionID > 0 {
+			response.Err(w, http.StatusBadRequest, "Cannot transfer ownership to an active support ghost user.", "ERR_BAD_REQUEST")
+			return
+		}
 		if currentOwnerID != nil && *currentOwnerID == newOwnerID {
 			response.Err(w, http.StatusBadRequest, email+" is already the company owner.", "ERR_BAD_REQUEST")
 			return
 		}
 		if msg := operatorOwnerLockMessage(companyCode, email); msg != "" {
 			response.Err(w, http.StatusBadRequest, msg, "ERR_BAD_REQUEST")
+			return
+		}
+		// Platform console emails may own BLUEARM only — never customer companies.
+		if !auth.IsOperatorCompanyCode(companyCode) && auth.IsPlatformConsoleEmail(email) {
+			response.Err(w, http.StatusBadRequest,
+				"Platform superadmins cannot become the commercial owner of a customer workspace. Transfer to the customer's billing contact instead.",
+				"ERR_BAD_REQUEST")
 			return
 		}
 

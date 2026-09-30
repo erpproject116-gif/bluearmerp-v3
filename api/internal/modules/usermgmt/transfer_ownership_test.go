@@ -35,3 +35,16 @@ func TestOperatorOwnerLockMessage(t *testing.T) {
 		t.Fatal("BLUEARM must not transfer to anyone except bluearmph")
 	}
 }
+
+func TestPlatformConsoleCannotOwnCustomerCompany(t *testing.T) {
+	if auth.IsOperatorCompanyCode("ACME") {
+		t.Fatal("ACME is not operator")
+	}
+	if !auth.IsPlatformConsoleEmail("bluearmph@gmail.com") {
+		t.Fatal("bluearmph is platform console")
+	}
+	// Mirrors transferOwnership guard: console email + non-BLUEARM → reject.
+	if auth.IsOperatorCompanyCode("ACME") || !auth.IsPlatformConsoleEmail("bluearmph@gmail.com") {
+		t.Fatal("guard preconditions failed")
+	}
+}

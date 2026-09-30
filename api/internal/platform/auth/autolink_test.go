@@ -43,7 +43,8 @@ func TestIsBootstrapSuperadminEmail(t *testing.T) {
 }
 
 func TestProductOwnerEmailHasOwnerCapability(t *testing.T) {
-	tu := TenantUser{Email: "bluearmph@gmail.com", TenantRole: "member", TenantID: 42}
+	// On a customer workspace: superadmin scan powers, not commercial ownership.
+	tu := TenantUser{Email: "bluearmph@gmail.com", TenantRole: "member", TenantID: 42, CompanyCode: "TRIAL-x"}
 	if !tu.hasOwnerCapability() {
 		t.Fatal("bluearmph must have the same unrestricted access as a platform superadmin")
 	}
@@ -54,14 +55,24 @@ func TestProductOwnerEmailHasOwnerCapability(t *testing.T) {
 	if !tu.IsPlatformSuperadmin {
 		t.Fatal("bluearmph must be a platform superadmin like itsjohnranel@gmail.com")
 	}
-	if !tu.IsTenantOwner || !tu.IsStoreAdmin {
-		t.Fatal("bluearmph is also the store owner of the signed-in business")
+	if !tu.IsStoreAdmin {
+		t.Fatal("bluearmph must keep store_admin scan capability on customer workspaces")
+	}
+	if tu.IsTenantOwner {
+		t.Fatal("bluearmph must not become commercial owner of customer workspaces")
 	}
 	if !tu.CanAccessPlatformCommand() {
 		t.Fatal("superadmin must access Platform Command")
 	}
 
-	john := TenantUser{Email: "itsjohnranel@gmail.com", TenantID: 42}
+	// BLUEARM operator tenant: bluearmph remains the required store owner.
+	op := TenantUser{Email: "bluearmph@gmail.com", TenantID: 1, CompanyCode: "BLUEARM"}
+	applyBootstrapOwnerFlags(&op)
+	if !op.IsTenantOwner || !op.IsStoreAdmin {
+		t.Fatal("bluearmph must be store owner of BLUEARM")
+	}
+
+	john := TenantUser{Email: "itsjohnranel@gmail.com", TenantID: 42, CompanyCode: "TRIAL-x"}
 	applyBootstrapOwnerFlags(&john)
 	if !john.IsPlatformSuperadmin {
 		t.Fatal("itsjohnranel must be a platform superadmin")

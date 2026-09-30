@@ -90,6 +90,7 @@ export const PurchaseRequestListPage = lazy(() => import("../modules/purchase-re
 export const PurchaseRequestNewPage = lazy(() => import("../modules/purchase-request/purchase-request/PurchaseRequestNewPage"));
 export const PurchaseRequestSettingsPage = lazy(() => import("../modules/purchase-request/purchase-request/PurchaseRequestSettingsPage"));
 export const PurchaseOrderSettingsPage = lazy(() => import("../modules/purchase-request/purchase-order/PurchaseOrderSettingsPage"));
+export const RfqSettingsPage = lazy(() => import("../modules/purchase-request/purchase-order/RfqSettingsPage"));
 export const GoodsReceiptSettingsPage = lazy(() => import("../modules/purchase-request/goods-receipt/GoodsReceiptSettingsPage"));
 export const SupplierInvoiceSettingsPage = lazy(() => import("../modules/finance/supplier-invoices/SupplierInvoiceSettingsPage"));
 export const PurchaseRequestStatusPage = lazy(() => import("../modules/purchase-request/purchase-request/PurchaseRequestStatusPage"));
@@ -300,6 +301,7 @@ export const DisbursementsHubPage = lazy(() => import("../modules/finance/collec
 export const ExpensesPage = lazy(() => import("../modules/buying/expenses/ExpensesPage"));
 export const RecurringExpensesPage = lazy(() => import("../modules/buying/recurring-expenses/RecurringExpensesPage"));
 export const VendorCreditsPage = lazy(() => import("../modules/buying/vendor-credits/VendorCreditsPage"));
+export const VendorCreditSettingsPage = lazy(() => import("../modules/buying/vendor-credits/VendorCreditSettingsPage"));
 export const VendorCreditPrintPage = lazy(() => import("../modules/buying/vendor-credits/VendorCreditPrintPage"));
 export const AcctInventoryReconciliationPage = lazy(() => import("../modules/finance/reports/AcctInventoryReconciliationPage"));
 export const PaymentEntriesPage = lazy(() => import("../modules/finance/PaymentEntriesPage"));

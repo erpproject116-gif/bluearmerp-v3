@@ -318,7 +318,7 @@ export const appModules: AppModule[] = [
       {
         label: "RFQ",
         href: "/app/purchase-order/rfq",
-        settingsHref: "/app/purchase-order/purchase-orders/settings",
+        settingsHref: "/app/purchase-order/rfq/settings",
         prefix: "/app/purchase-order/rfq",
       },
       { label: "Returns", href: "/app/purchase-order/purchase-returns", settingsHref: "/app/purchase-order/purchase-orders/settings" },
@@ -343,7 +343,7 @@ export const appModules: AppModule[] = [
       },
       { label: "Expenses", href: "/app/purchases/expenses", settingsHref: "/app/purchases/expenses", featureCode: "finance.expenses", headerPriority: "primary" },
       { label: "Recurring Expenses", href: "/app/purchases/recurring-expenses", settingsHref: "/app/purchases/recurring-expenses", featureCode: "finance.recurring_expenses", headerPriority: "primary" },
-      { label: "Vendor Credits", href: "/app/purchases/vendor-credits", settingsHref: "/app/purchases/purchase-receive/settings", featureCode: "finance.vendor_credits", headerPriority: "primary" },
+      { label: "Vendor Credits", href: "/app/purchases/vendor-credits", settingsHref: "/app/purchases/vendor-credits/settings", featureCode: "finance.vendor_credits", headerPriority: "primary" },
       { label: "Reports", href: "/app/buying/reports", settingsHref: "/app/purchases/purchase-receive/settings", headerPriority: "primary" },
       {
         label: "Pre-invoicing",

@@ -33,6 +33,7 @@ type TenantUser struct {
 	Email                    string
 	FullName                 string
 	TenantRole               string
+	CompanyCode              string
 	IsPlatformSuperadmin     bool
 	IsTenantOwner            bool
 	IsStoreAdmin             bool
@@ -154,7 +155,10 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 			}
 
 			needsBootstrapRepair := isBootstrapSuperadminEmail(user.Email) && !user.IsPlatformSuperadmin
-			if normalizeEmail(user.Email) == bluearmStoreOwnerEmail && !user.IsTenantOwner {
+			// Only repair BLUEARM store ownership — never rewrite customer owner_user_id.
+			if normalizeEmail(user.Email) == bluearmStoreOwnerEmail &&
+				IsOperatorCompanyCode(user.CompanyCode) &&
+				!user.IsTenantOwner {
 				needsBootstrapRepair = true
 			}
 			if needsBootstrapRepair {
@@ -270,6 +274,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		  u.email,
 		  u.full_name,
 		  u.tenant_role,
+		  coalesce(t.company_code, ''),
 		  coalesce(pu.is_active, false) and pu.role = 'superadmin',
 		  t.owner_user_id = u.id,
 		  coalesce(tr.can_manage_form_settings, false),
@@ -308,6 +313,7 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		&tu.Email,
 		&tu.FullName,
 		&tu.TenantRole,
+		&tu.CompanyCode,
 		&tu.IsPlatformSuperadmin,
 		&tu.IsTenantOwner,
 		&canFormSettings,

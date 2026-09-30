@@ -122,6 +122,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/purchases/expenses": "finance.expenses",
   "/app/buying/expenses": "finance.expenses",
   "/app/purchases/recurring-expenses": "finance.recurring_expenses",
+  "/app/purchases/vendor-credits/settings": "finance.vendor_credits",
   "/app/purchases/vendor-credits": "finance.vendor_credits",
   "/app/buying/vendor-credits": "finance.vendor_credits",
   "/app/sales/credit-notes": "finance.credit_notes",

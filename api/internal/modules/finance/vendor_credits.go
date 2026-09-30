@@ -15,8 +15,11 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
+
+const vendorCreditFormEntity = "vendor_credit"
 
 type vendorCreditLine struct {
 	ID        int64   `json:"id,omitempty"`
@@ -48,6 +51,7 @@ type vendorCreditRow struct {
 	RefundOfficialReceiptID *int64             `json:"refund_official_receipt_id,omitempty"`
 	JournalEntryID          *int64             `json:"journal_entry_id,omitempty"`
 	Lines                   []vendorCreditLine `json:"lines,omitempty"`
+	CustomValues            map[string]any     `json:"custom_values,omitempty"`
 }
 
 type vendorCreditBody struct {
@@ -60,6 +64,7 @@ type vendorCreditBody struct {
 	Notes                   string             `json:"notes"`
 	Status                  string             `json:"status"`
 	Lines                   []vendorCreditLine `json:"lines"`
+	CustomValues            map[string]any     `json:"custom_values"`
 }
 
 type vendorCreditApplyBody struct {
@@ -105,9 +110,9 @@ func getVendorCredit(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func loadVendorCredit(ctx context.Context, q pgxQueryable, tenantID, id int64) (vendorCreditRow, error) {
+func loadVendorCredit(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (vendorCreditRow, error) {
 	var row vendorCreditRow
-	err := q.QueryRow(ctx, `
+	err := pool.QueryRow(ctx, `
 		select c.id, c.credit_date::text, c.credit_no, c.partner_id, c.vendor_name, c.source_supplier_invoice_id,
 		  c.amount_total::float8, c.remaining_amount::float8, c.status, c.reason, c.notes,
 		  c.refunded_at::text, c.refund_method, c.refund_reference, c.refund_official_receipt_id, c.journal_entry_id
@@ -120,11 +125,14 @@ func loadVendorCredit(ctx context.Context, q pgxQueryable, tenantID, id int64) (
 	if err != nil {
 		return vendorCreditRow{}, err
 	}
-	lines, err := loadVendorCreditLines(ctx, q, id)
+	lines, err := loadVendorCreditLines(ctx, pool, id)
 	if err != nil {
 		return vendorCreditRow{}, err
 	}
 	row.Lines = lines
+	if vals, err := customfields.LoadValues(ctx, pool, tenantID, vendorCreditFormEntity, id); err == nil && len(vals) > 0 {
+		row.CustomValues = vals
+	}
 	return row, nil
 }
 
@@ -320,6 +328,10 @@ func createVendorCredit(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 		}
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, vendorCreditFormEntity, id, body.CustomValues); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
+			return
+		}
 		if status == "open" {
 			if err := postVendorCreditJournal(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
 				response.Err(w, http.StatusBadRequest, "Vendor credit journal failed: "+err.Error(), "ERR_BAD_REQUEST")
@@ -384,6 +396,10 @@ func updateVendorCredit(pool *pgxpool.Pool) http.HandlerFunc {
 					return
 				}
 			}
+		}
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, vendorCreditFormEntity, id, body.CustomValues); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
+			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")

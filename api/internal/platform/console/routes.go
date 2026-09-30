@@ -24,6 +24,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, cfg config.Config) {
 
 		// Customers (existing + projections)
 		cr.With(requirePlatformPermission("platform.customers.read")).Get("/platform/console/customers", svc.listCustomers)
+		cr.With(requirePlatformPermission("platform.customers.read")).Get("/platform/console/workspaces", svc.listCustomerWorkspaces)
 		cr.With(requirePlatformPermission("platform.customers.read")).Get("/platform/console/customers/{id}", svc.getCustomer)
 		cr.With(requirePlatformPermission("platform.customers.read")).Get("/platform/console/customers/{id}/overview", svc.customerOverview)
 		cr.With(requirePlatformPermission("platform.users.read")).Get("/platform/console/customers/{id}/users", svc.customerUsers)

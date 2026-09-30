@@ -1,11 +1,17 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Index, onMount, Show } from "solid-js";
-import { useNavigate, useSearchParams } from "@solidjs/router";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
+import { CustomFieldsSection, collectCustomFieldErrors } from "../../../shared/CustomFieldsSection";
 import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
+import { ModalField } from "../../../shared/ModalField";
 import { modalDismissClass } from "../../../shared/Modal";
 import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
+import { PURCHASE_REQUEST_ENTITY, PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
+import { inputClass } from "../../../shared/SpreadsheetGrid";
+import { useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { takeDocSeed } from "../../../shared/docSeed";
@@ -50,8 +56,11 @@ export default function RfqListPage() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { byKey, fields } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.rfq);
   const [createOpen, setCreateOpen] = createSignal(false);
   const [lines, setLines] = createSignal<RfqLineDraft[]>([emptyRfqLine()]);
+  const [notes, setNotes] = createSignal("");
+  const [customValues, setCustomValues] = createSignal<Record<string, unknown>>({});
   const [creating, setCreating] = createSignal(false);
 
   // Baiko approve-to-seed handoff: staged RFQ lines open the create panel prefilled.
@@ -93,7 +102,22 @@ export default function RfqListPage() {
 
   const addLine = () => setLines((prev) => [...prev, emptyRfqLine()]);
 
+  const resetCreate = () => {
+    setLines([emptyRfqLine()]);
+    setNotes("");
+    setCustomValues({});
+    setCreateOpen(false);
+  };
+
   const createRfq = async () => {
+    const customDefs = fields()
+      .filter((f) => f.kind === "custom" && f.is_active && f.is_visible)
+      .map((f) => ({ field_key: f.field_key, label: f.label, is_required: f.is_required }));
+    const customErrs = collectCustomFieldErrors(customValues(), customDefs);
+    if (Object.keys(customErrs).length > 0) {
+      toast.warning(Object.values(customErrs)[0] ?? "Check custom fields.");
+      return;
+    }
     const payload = lines()
       .map((ln) => ({
         item_id: ln.item_id ?? undefined,
@@ -109,9 +133,14 @@ export default function RfqListPage() {
       return;
     }
     setCreating(true);
+    const notesTrim = notes().trim();
     const res = await apiFetch<{ rfq_no: string }>("/api/v1/purchase-order/rfq", {
       method: "POST",
-      body: JSON.stringify({ lines: payload }),
+      body: JSON.stringify({
+        notes: notesTrim || undefined,
+        custom_values: customValues(),
+        lines: payload,
+      }),
     });
     setCreating(false);
     if (!res.success) {
@@ -119,22 +148,38 @@ export default function RfqListPage() {
       return;
     }
     toast.success(`RFQ ${res.data?.rfq_no ?? "created"}. Open it to add suppliers and collect quotes.`);
-    setLines([emptyRfqLine()]);
-    setCreateOpen(false);
+    resetCreate();
     invalidate();
   };
 
   return (
     <div class="space-y-4">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between gap-2">
         <h1 class="text-xl font-semibold text-slate-900">Request for Quotation</h1>
-        <button
-          type="button"
-          class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          onClick={() => setCreateOpen(true)}
-        >
-          New RFQ
-        </button>
+        <div class="flex items-center gap-2">
+          <A
+            href={PURCHASE_REQUEST_SETTINGS_HREF.rfq}
+            class="inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-stroke text-text-secondary transition hover:erp-panel hover:text-brand-600"
+            title="Form settings"
+            aria-label="Form settings"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </A>
+          <button
+            type="button"
+            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+            onClick={() => setCreateOpen(true)}
+          >
+            New RFQ
+          </button>
+        </div>
       </div>
 
       <Show when={!list.isLoading} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
@@ -145,6 +190,7 @@ export default function RfqListPage() {
               <th class="px-3 py-2 text-left">Date</th>
               <th class="px-3 py-2 text-left">Status</th>
               <th class="px-3 py-2 text-right">Lines</th>
+              <th class="px-3 py-2 text-left">History</th>
             </tr>
           </thead>
           <tbody>
@@ -158,6 +204,14 @@ export default function RfqListPage() {
                   <td class="px-3 py-2">{row.rfq_date}</td>
                   <td class="px-3 py-2 capitalize">{row.status}</td>
                   <td class="px-3 py-2 text-right">{row.line_count}</td>
+                  <td class="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <ActivityHistoryLink
+                      module="purchase_order"
+                      targetType="rfq_request"
+                      targetId={row.id}
+                      title={`History — ${row.rfq_no}`}
+                    />
+                  </td>
                 </tr>
               )}
             </For>
@@ -170,13 +224,31 @@ export default function RfqListPage() {
           <div class="w-full max-w-2xl rounded-2xl border border-stroke bg-white p-6 shadow-xl">
             <div class="mb-4 flex items-center justify-between">
               <h2 class="text-lg font-semibold">New RFQ</h2>
-              <button type="button" class={modalDismissClass} onClick={() => setCreateOpen(false)}>
+              <button type="button" class={modalDismissClass} onClick={resetCreate}>
                 Close
               </button>
             </div>
             <p class="mb-3 text-xs text-text-secondary">
               Free-text products are allowed on RFQ. Register items in Inventory before converting to a Purchase Order.
             </p>
+            <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
+              {(m) => (
+                <textarea
+                  rows={2}
+                  class={inputClass}
+                  value={notes()}
+                  disabled={m.disabled}
+                  placeholder={m.placeholder || "Optional notes for suppliers"}
+                  onInput={(e) => setNotes(e.currentTarget.value)}
+                  {...m.inputProps}
+                />
+              )}
+            </ModalField>
+            <CustomFieldsSection
+              entityType={PURCHASE_REQUEST_ENTITY.rfq}
+              values={customValues}
+              onChange={(key, value) => setCustomValues((prev) => ({ ...prev, [key]: value }))}
+            />
             <Index each={lines()}>
               {(ln, idx) => (
                 <div class="mb-3 space-y-2 rounded-lg border border-stroke p-3">
@@ -311,7 +383,7 @@ export default function RfqListPage() {
               + Add line
             </button>
             <div class="mt-6 flex justify-end gap-2">
-              <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={() => setCreateOpen(false)}>
+              <button type="button" class="rounded-lg border border-stroke px-4 py-2 text-sm" onClick={resetCreate}>
                 Cancel
               </button>
               <button

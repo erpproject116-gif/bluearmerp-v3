@@ -6,11 +6,13 @@ import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import {
   usePlatformCommandOverview,
-  usePlatformCustomers,
+  usePlatformWorkspaces,
   usePlatformPlansAdmin,
   usePlatformBillingSummary,
   type PlatformCustomer,
   type PlatformPlan,
+  type PlatformWorkspace,
+  type PlatformWorkspacePerson,
 } from "../../shared/usePlatform";
 import { LoadingText } from "../../shared/LoadingText";
 import { PLATFORM_CONSOLE_EMAILS } from "../../shared/auth-context";
@@ -54,25 +56,55 @@ function isProtectedContact(c: PlatformCustomer) {
   );
 }
 
-function CustomerAccessBadges(props: { c: PlatformCustomer }) {
+function isProtectedEmail(email: string) {
+  return PLATFORM_CONSOLE_EMAILS.has((email || "").trim().toLowerCase());
+}
+
+function WorkspaceFlags(props: { w: PlatformWorkspace }) {
+  const f = () => props.w.flags ?? {};
   return (
-    <div class="mt-1 flex flex-wrap gap-1">
-      <Show when={props.c.is_product_owner || props.c.is_platform_superadmin || props.c.access_label}>
-        <span class="inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-900">
-          {props.c.access_label || "Product owner / superadmin"}
+    <div class="flex flex-wrap gap-1">
+      <Show when={f().owner_is_support_ghost}>
+        <span class="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900">
+          Owner is support ghost
         </span>
       </Show>
-      <Show when={props.c.is_operator_workspace || props.c.workspace_label}>
-        <span class="inline-block rounded-full bg-slate-800 px-2 py-0.5 text-xs font-medium text-white">
-          {props.c.workspace_label || "Operator (BLUEARM)"}
+      <Show when={!f().owner_is_support_ghost && f().owner_disabled}>
+        <span class="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900">
+          Owner disabled
         </span>
       </Show>
-      <Show when={props.c.likely_misjoin}>
+      <Show when={f().billing_is_not_owner}>
+        <span class="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+          Billing ≠ owner
+        </span>
+      </Show>
+      <Show when={f().likely_misjoin}>
         <span class="inline-block rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900">
           Likely mis-join
         </span>
       </Show>
+      <Show when={f().no_active_sub}>
+        <span class="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+          No active sub
+        </span>
+      </Show>
     </div>
+  );
+}
+
+function personKindBadge(kind?: string | null) {
+  if (kind === "owner") {
+    return (
+      <span class="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">
+        Owner
+      </span>
+    );
+  }
+  return (
+    <span class="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+      Member
+    </span>
   );
 }
 
@@ -88,27 +120,31 @@ export default function PlatformCustomersPage() {
   const [form, setForm] = createSignal<ProvisionForm>(emptyForm());
   const [busy, setBusy] = createSignal(false);
   const [removingId, setRemovingId] = createSignal<number | null>(null);
-  const q = usePlatformCustomers({ q: () => search(), tenantStatus: () => tenantStatus() });
-  const owners = () => (q.data ?? []).filter((c) => c.is_workspace_owner || !c.tenant_id);
-  const memberGroups = () => {
-    const groups = new Map<number, { workspace: string; people: PlatformCustomer[] }>();
-    for (const c of q.data ?? []) {
-      if (!c.tenant_id || c.is_workspace_owner) continue;
-      const current = groups.get(c.tenant_id) ?? {
-        workspace: c.company_code || c.company_name || `Workspace ${c.tenant_id}`,
-        people: [],
-      };
-      current.people.push(c);
-      groups.set(c.tenant_id, current);
-    }
-    return [...groups.values()];
-  };
+  const [expanded, setExpanded] = createSignal<Set<number>>(new Set());
+  const q = usePlatformWorkspaces({ q: () => search(), tenantStatus: () => tenantStatus() });
   const summaryQ = usePlatformBillingSummary();
   const commandQ = usePlatformCommandOverview();
   const plansQ = usePlatformPlansAdmin();
   const queryClient = useQueryClient();
   const toast = useToast();
   const pendingApprovals = () => commandQ.data?.counts?.pending_approvals ?? 0;
+
+  const toggleExpanded = (tenantId: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(tenantId)) next.delete(tenantId);
+      else next.add(tenantId);
+      return next;
+    });
+  };
+
+  const workspaceViewId = (w: PlatformWorkspace): number | null => {
+    if (w.billing_customer?.customer_id) return w.billing_customer.customer_id;
+    for (const p of w.people ?? []) {
+      if (p.customer_id) return p.customer_id;
+    }
+    return null;
+  };
 
   const removeCustomer = async (c: PlatformCustomer) => {
     if (isProtectedContact(c)) {
@@ -169,8 +205,26 @@ export default function PlatformCustomersPage() {
       return;
     }
     toast.success(res.message ?? "Customer removed.");
+    void queryClient.invalidateQueries({ queryKey: ["platform-workspaces"] });
     void queryClient.invalidateQueries({ queryKey: ["platform-customers"] });
     await q.refetch();
+  };
+
+  const removePerson = (w: PlatformWorkspace, p: PlatformWorkspacePerson) => {
+    if (!p.customer_id) return;
+    if (isProtectedEmail(p.email)) {
+      toast.warning("Product owner / superadmin contacts and BLUEARM cannot be removed from this list.");
+      return;
+    }
+    void removeCustomer({
+      id: p.customer_id,
+      email: p.email,
+      full_name: p.full_name ?? p.email,
+      entry_source: "",
+      urgency_label: "",
+      tenant_id: w.tenant_id,
+      company_code: w.company_code,
+    } as PlatformCustomer);
   };
 
   const planOptions = () => {
@@ -267,6 +321,7 @@ export default function PlatformCustomersPage() {
 
     setShowModal(false);
     setForm(emptyForm());
+    void queryClient.invalidateQueries({ queryKey: ["platform-workspaces"] });
     void queryClient.invalidateQueries({ queryKey: ["platform-customers"] });
     await q.refetch();
   };
@@ -276,7 +331,7 @@ export default function PlatformCustomersPage() {
       <div class="mb-2 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 class="text-xl font-semibold text-text-primary">Customers</h1>
-          <p class="text-sm text-text-secondary">Subscription registry and CRM traceability</p>
+          <p class="text-sm text-text-secondary">Companies, billing, and people</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <button
@@ -299,7 +354,7 @@ export default function PlatformCustomersPage() {
           </select>
           <input
             type="search"
-            placeholder="Search email or company…"
+            placeholder="Search email, company, or code…"
             class="rounded-lg border border-stroke px-3 py-2 text-sm"
             value={search()}
             onInput={(e) => setSearch(e.currentTarget.value)}
@@ -431,38 +486,48 @@ export default function PlatformCustomersPage() {
         <Show when={q.isError} fallback={
           <>
           <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
-            <table class="w-full min-w-[40rem] text-left text-sm">
+            <table class="w-full min-w-[52rem] text-left text-sm">
               <thead class="border-b border-stroke bg-slate-50 text-xs uppercase text-text-secondary">
                 <tr>
-                  <th class="px-4 py-3">Customer</th>
-                  <th class="px-4 py-3">Workspace</th>
+                  <th class="px-4 py-3">Company</th>
+                  <th class="px-4 py-3">Status</th>
                   <th class="hidden px-4 py-3 md:table-cell">Plan</th>
-                  <th class="hidden px-4 py-3 md:table-cell">Subscription</th>
-                  <th class="hidden px-4 py-3 lg:table-cell">Urgency</th>
-                  <th class="hidden px-4 py-3 lg:table-cell">Days left</th>
+                  <th class="hidden px-4 py-3 md:table-cell">Owner</th>
+                  <th class="hidden px-4 py-3 lg:table-cell">Billing contact</th>
+                  <th class="px-4 py-3">Health</th>
                   <th class="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
-                <For each={owners()}>
-                  {(c) => (
+                <For each={q.data?.workspaces ?? []}>
+                  {(w) => (
+                    <>
                     <tr class="border-b border-stroke last:border-0">
                       <td class="px-4 py-3">
-                        <div class="font-medium">{c.full_name || c.email}</div>
-                        <div class="text-xs text-text-secondary">{c.email}</div>
-                        <Show when={c.company_code}>
-                          <div class="text-xs text-text-secondary">{c.company_code}</div>
-                        </Show>
-                        <CustomerAccessBadges c={c} />
+                        <button
+                          type="button"
+                          class="text-left font-medium text-text-primary hover:underline"
+                          onClick={() => toggleExpanded(w.tenant_id)}
+                        >
+                          {w.company_name || w.company_code || `Workspace ${w.tenant_id}`}
+                        </button>
+                        <div class="text-xs text-text-secondary">{w.company_code}</div>
+                        <button
+                          type="button"
+                          class="mt-1 text-xs text-brand-600 hover:underline"
+                          onClick={() => toggleExpanded(w.tenant_id)}
+                        >
+                          {expanded().has(w.tenant_id) ? "Hide people" : `People (${w.people_count ?? 0})`}
+                        </button>
                       </td>
                       <td class="px-4 py-3">
                         <Show
-                          when={c.tenant_status === "pending_approval"}
+                          when={w.tenant_status === "pending_approval"}
                           fallback={
                             <Show
-                              when={c.tenant_status === "suspended"}
+                              when={w.tenant_status === "suspended"}
                               fallback={
-                                <span class="capitalize text-text-secondary">{(c.tenant_status || "—").replace(/_/g, " ")}</span>
+                                <span class="capitalize text-text-secondary">{(w.tenant_status || "—").replace(/_/g, " ")}</span>
                               }
                             >
                               <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-800">
@@ -476,67 +541,166 @@ export default function PlatformCustomersPage() {
                           </span>
                         </Show>
                       </td>
-                      <td class="hidden px-4 py-3 md:table-cell">{c.plan_kind ?? "—"}</td>
-                      <td class="hidden px-4 py-3 md:table-cell">{c.subscription_status ?? "—"}</td>
-                      <td class="hidden px-4 py-3 lg:table-cell">
-                        <span class={`rounded-full px-2 py-0.5 text-xs ${urgencyBadge[c.urgency_label] ?? "bg-slate-100"}`}>
-                          {c.urgency_label.replace(/_/g, " ")}
-                        </span>
+                      <td class="hidden px-4 py-3 md:table-cell">
+                        <div>{w.plan_kind ?? "—"}</div>
+                        <div class="text-xs text-text-secondary">
+                          {(w.subscription_status ?? "—")}{w.days_remaining != null ? ` · ${w.days_remaining}d left` : ""}
+                        </div>
                       </td>
-                      <td class="hidden px-4 py-3 lg:table-cell">{c.days_remaining ?? "—"}</td>
+                      <td class="hidden px-4 py-3 md:table-cell">
+                        <div class="font-medium">{w.owner?.full_name || w.owner?.email || "—"}</div>
+                        <div class="text-xs text-text-secondary">{w.owner?.email}</div>
+                      </td>
+                      <td class="hidden px-4 py-3 lg:table-cell">
+                        <Show when={w.billing_customer} fallback={<span class="text-text-secondary">—</span>}>
+                          <div class="font-medium">{w.billing_customer?.full_name || w.billing_customer?.email}</div>
+                          <div class="text-xs text-text-secondary">{w.billing_customer?.email}</div>
+                        </Show>
+                      </td>
+                      <td class="px-4 py-3">
+                        <WorkspaceFlags w={w} />
+                      </td>
                       <td class="px-4 py-3 text-right">
                         <div class="flex flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
-                          <A href={`/app/platform-command/customers/${c.id}`} class="text-brand-600 hover:underline">
-                            View
-                          </A>
-                          <Show when={!isProtectedContact(c)}>
-                            <button
-                              type="button"
-                              class="text-red-700 hover:underline disabled:opacity-50"
-                              disabled={removingId() === c.id || busy()}
-                              onClick={() => void removeCustomer(c)}
-                            >
-                              {removingId() === c.id ? "Removing…" : "Remove"}
-                            </button>
+                          <Show when={workspaceViewId(w) != null}>
+                            <A href={`/app/platform-command/customers/${workspaceViewId(w)}`} class="text-brand-600 hover:underline">
+                              View
+                            </A>
                           </Show>
                         </div>
                       </td>
                     </tr>
+                    <Show when={expanded().has(w.tenant_id)}>
+                      <tr class="border-b border-stroke bg-slate-50/60">
+                        <td class="px-4 py-2" colSpan={7}>
+                          <p class="px-1 py-1 text-xs font-medium uppercase text-text-secondary">
+                            People in {w.company_name || w.company_code}
+                          </p>
+                          <table class="w-full text-left text-sm">
+                            <thead class="text-xs uppercase text-text-secondary">
+                              <tr>
+                                <th class="px-3 py-2">Name</th>
+                                <th class="px-3 py-2">Email</th>
+                                <th class="px-3 py-2">Role</th>
+                                <th class="hidden px-3 py-2 md:table-cell">Plan</th>
+                                <th class="px-3 py-2" />
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <For each={w.people ?? []}>
+                                {(p) => (
+                                  <tr class="border-t border-stroke">
+                                    <td class="px-3 py-2">
+                                      {p.full_name || "—"}
+                                      <Show when={p.is_support_ghost}>
+                                        <span class="ml-2 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-900">
+                                          Support
+                                        </span>
+                                      </Show>
+                                      <Show when={p.likely_misjoin}>
+                                        <span class="ml-2 inline-block rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900">
+                                          Likely mis-join
+                                        </span>
+                                      </Show>
+                                    </td>
+                                    <td class="px-3 py-2 text-text-secondary">{p.email}</td>
+                                    <td class="px-3 py-2">{personKindBadge(p.kind)}</td>
+                                    <td class="hidden px-3 py-2 md:table-cell">{p.plan_kind ?? "—"}</td>
+                                    <td class="px-3 py-2 text-right">
+                                      <div class="flex items-center justify-end gap-3">
+                                        <Show when={p.customer_id}>
+                                          <A href={`/app/platform-command/customers/${p.customer_id}`} class="text-brand-600 hover:underline">
+                                            View
+                                          </A>
+                                          <Show when={!isProtectedEmail(p.email)}>
+                                            <button
+                                              type="button"
+                                              class="text-red-700 hover:underline disabled:opacity-50"
+                                              disabled={removingId() === p.customer_id}
+                                              onClick={() => removePerson(w, p)}
+                                            >
+                                              {removingId() === p.customer_id ? "Removing…" : "Remove"}
+                                            </button>
+                                          </Show>
+                                        </Show>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </For>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </Show>
+                    </>
                   )}
                 </For>
               </tbody>
             </table>
           </div>
-          <Show when={memberGroups().length > 0}>
+          <Show when={(q.data?.unlinked ?? []).length > 0}>
             <section class="mt-8">
-              <h2 class="text-lg font-semibold text-text-primary">Team members</h2>
-              <p class="mt-1 text-sm text-text-secondary">People invited into a workspace. They are not billed as customers.</p>
-              <div class="mt-4 space-y-4">
-                <For each={memberGroups()}>
-                  {(group) => (
-                    <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
-                      <p class="border-b border-stroke bg-slate-50 px-4 py-2 text-sm font-medium text-text-primary">{group.workspace}</p>
-                      <table class="w-full text-left text-sm">
-                        <thead class="text-xs uppercase text-text-secondary">
-                          <tr>
-                            <th class="px-4 py-2">Name</th>
-                            <th class="px-4 py-2">Email</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <For each={group.people}>
-                            {(person) => (
-                              <tr class="border-t border-stroke">
-                                <td class="px-4 py-2">{person.full_name || "—"}</td>
-                                <td class="px-4 py-2 text-text-secondary">{person.email}</td>
-                              </tr>
-                            )}
-                          </For>
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </For>
+              <h2 class="text-lg font-semibold text-text-primary">Leads without a workspace</h2>
+              <p class="mt-1 text-sm text-text-secondary">Contacts not linked to any company yet. Provision from here or the header button.</p>
+              <div class="mt-4 overflow-x-auto rounded-xl border border-stroke bg-white">
+                <table class="w-full text-left text-sm">
+                  <thead class="text-xs uppercase text-text-secondary">
+                    <tr>
+                      <th class="px-4 py-2">Name</th>
+                      <th class="px-4 py-2">Email</th>
+                      <th class="hidden px-4 py-2 md:table-cell">Urgency</th>
+                      <th class="px-4 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={q.data?.unlinked ?? []}>
+                      {(p) => (
+                        <tr class="border-t border-stroke">
+                          <td class="px-4 py-2">{p.full_name || "—"}</td>
+                          <td class="px-4 py-2 text-text-secondary">{p.email}</td>
+                          <td class="hidden px-4 py-2 md:table-cell">
+                            <Show when={p.urgency_label} fallback={<span class="text-text-secondary">—</span>}>
+                              <span class={`rounded-full px-2 py-0.5 text-xs ${urgencyBadge[p.urgency_label ?? ""] ?? "bg-slate-100"}`}>
+                                {(p.urgency_label ?? "").replace(/_/g, " ")}
+                              </span>
+                            </Show>
+                          </td>
+                          <td class="px-4 py-2 text-right">
+                            <div class="flex items-center justify-end gap-3">
+                              <Show when={p.customer_id}>
+                                <A href={`/app/platform-command/customers/${p.customer_id}`} class="text-brand-600 hover:underline">
+                                  View
+                                </A>
+                                <Show when={!isProtectedEmail(p.email)}>
+                                  <button
+                                    type="button"
+                                    class="text-red-700 hover:underline disabled:opacity-50"
+                                    disabled={removingId() === p.customer_id}
+                                    onClick={() => {
+                                      if (!p.customer_id) return;
+                                      void removeCustomer({
+                                        id: p.customer_id,
+                                        email: p.email,
+                                        full_name: p.full_name ?? p.email,
+                                        entry_source: "",
+                                        urgency_label: "",
+                                        tenant_id: null,
+                                        company_code: null,
+                                      } as PlatformCustomer);
+                                    }}
+                                  >
+                                    {removingId() === p.customer_id ? "Removing…" : "Remove"}
+                                  </button>
+                                </Show>
+                              </Show>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
               </div>
             </section>
           </Show>

@@ -328,6 +328,7 @@ export default function StockEntriesPage() {
           if (row) openRow(row);
         }}
         onNew={openNew}
+        settingsHref="/app/inventory/stock-entries/settings"
         codeKey="entry_no"
         nameKey="item_name"
         sortKey={sort()}

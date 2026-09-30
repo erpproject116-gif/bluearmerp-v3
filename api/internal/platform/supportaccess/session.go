@@ -263,6 +263,9 @@ func ExtendSession(ctx context.Context, pool *pgxpool.Pool, sessionID int64) (*S
 	return GetByID(ctx, pool, sessionID)
 }
 
+// Start opens a support ghost membership in the customer workspace.
+// It must never change tenants.owner_user_id — commercial ownership stays with
+// the customer; ghosts scan via store_admin + platform superadmin powers.
 func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, error) {
 	reason := strings.TrimSpace(in.Reason)
 	if len(reason) < 5 {

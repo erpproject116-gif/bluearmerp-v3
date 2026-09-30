@@ -19,7 +19,8 @@ const bluearmStoreOwnerEmail = "bluearmph@gmail.com"
 
 // platformConsoleOwnerEmails are platform superadmins (same Command Center +
 // unrestricted ERP as itsjohnranel@gmail.com). bluearmph@gmail.com is also the
-// store owner of every tenant they belong to. Must match seed-platform-owners.sql.
+// store owner of the BLUEARM operator tenant only — never customer workspaces.
+// Must match seed-platform-owners.sql.
 var platformConsoleOwnerEmails = map[string]struct{}{
 	"itsjohnranel@gmail.com":  {},
 	"bluearmph@gmail.com":     {},
@@ -55,18 +56,21 @@ func IsPlatformConsoleEmail(email string) bool {
 
 // applyBootstrapOwnerFlags grants allowlisted emails the same in-request
 // capabilities as a platform superadmin, even if DB rows are still catching up.
+// Commercial ownership (IsTenantOwner) is only forced on the BLUEARM operator
+// tenant; customer workspaces keep their real owner_user_id. Superadmins still
+// scan customer stores via IsPlatformSuperadmin + support ghosts.
 func applyBootstrapOwnerFlags(tu *TenantUser) {
 	if tu == nil || !isBootstrapSuperadminEmail(tu.Email) {
 		return
 	}
 	tu.IsPlatformSuperadmin = true
+	tu.IsStoreAdmin = true
 	if tu.PlatformRole == "" {
 		tu.PlatformRole = "superadmin"
 	}
-	// bluearmph is the store owner of the business they are signed into.
-	if normalizeEmail(tu.Email) == bluearmStoreOwnerEmail && tu.TenantID > 0 {
+	// bluearmph is the required store owner of BLUEARM only.
+	if normalizeEmail(tu.Email) == bluearmStoreOwnerEmail && IsOperatorCompanyCode(tu.CompanyCode) {
 		tu.IsTenantOwner = true
-		tu.IsStoreAdmin = true
 	}
 }
 
@@ -237,19 +241,23 @@ func ensureBootstrapTenantMembership(ctx context.Context, tx pgx.Tx, authUserID,
 	return nil
 }
 
-// ensureStoreOwnerMemberships makes bluearmph@gmail.com the tenant owner (store
-// owner) of every company they already belong to, with store_admin on those rows.
+// ensureStoreOwnerMemberships makes bluearmph@gmail.com the store owner of the
+// BLUEARM operator tenant only. Customer workspaces must keep their commercial
+// owner; support ghosts use store_admin + platform superadmin for scanning.
 func ensureStoreOwnerMemberships(ctx context.Context, tx pgx.Tx, authUserID, email string) error {
 	if _, err := tx.Exec(ctx, `
 		update public.users u
 		set tenant_role = 'store_admin',
 		    status = 'active',
 		    updated_at = now()
-		where u.auth_user_id = $1::uuid
+		from public.tenants t
+		where u.tenant_id = t.id
+		  and t.company_code = $3
+		  and u.auth_user_id = $1::uuid
 		  and lower(u.email) = $2
 		  and u.status in ('active', 'invited')
 		  and (u.tenant_role is distinct from 'store_admin' or u.status is distinct from 'active')`,
-		authUserID, email); err != nil {
+		authUserID, email, bluearmOperatorTenantCode); err != nil {
 		return err
 	}
 
@@ -261,8 +269,9 @@ func ensureStoreOwnerMemberships(ctx context.Context, tx pgx.Tx, authUserID, ema
 		  and lower(u.email) = $2
 		  and u.status = 'active'
 		  and t.id = u.tenant_id
+		  and t.company_code = $3
 		  and t.owner_user_id is distinct from u.id`,
-		authUserID, email)
+		authUserID, email, bluearmOperatorTenantCode)
 	return err
 }
 
@@ -290,8 +299,8 @@ func ensureBootstrapPlatformUser(ctx context.Context, tx pgx.Tx, authUserID, ema
 }
 
 // repairBootstrapPlatformAccess restores superadmin ERP + platform access
-// (BLUEARM store_admin, platform_users.superadmin, and store owner on every
-// tenant bluearmph@gmail.com already belongs to).
+// (BLUEARM store_admin, platform_users.superadmin, and BLUEARM store ownership
+// for bluearmph@gmail.com only — never customer tenant ownership).
 func repairBootstrapPlatformAccess(ctx context.Context, pool *pgxpool.Pool, tu TenantUser) error {
 	if !isBootstrapSuperadminEmail(tu.Email) {
 		return nil

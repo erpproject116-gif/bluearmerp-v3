@@ -163,6 +163,72 @@ export function usePlatformCustomers(opts?: { q?: () => string; tenantStatus?: (
   });
 }
 
+export type PlatformWorkspacePerson = {
+  customer_id?: number | null;
+  email: string;
+  full_name?: string | null;
+  company_name?: string | null;
+  tenant_role?: string | null;
+  status?: string | null;
+  plan_kind?: string | null;
+  subscription_status?: string | null;
+  days_remaining?: number | null;
+  likely_misjoin?: boolean;
+  is_workspace_owner?: boolean;
+  is_support_ghost?: boolean;
+  kind?: string | null;
+};
+
+export type PlatformWorkspace = {
+  tenant_id: number;
+  company_code?: string | null;
+  company_name?: string | null;
+  tenant_status?: string | null;
+  plan_kind?: string | null;
+  subscription_status?: string | null;
+  ends_at?: string | null;
+  days_remaining?: number | null;
+  owner?: {
+    user_id?: number | null;
+    email?: string | null;
+    full_name?: string | null;
+    status?: string | null;
+    tenant_role?: string | null;
+    is_support_ghost?: boolean;
+  } | null;
+  billing_customer?: { customer_id: number; email: string; full_name?: string | null } | null;
+  people?: PlatformWorkspacePerson[];
+  people_count?: number;
+  flags?: {
+    owner_disabled?: boolean;
+    owner_is_support_ghost?: boolean;
+    billing_is_not_owner?: boolean;
+    likely_misjoin?: boolean;
+    no_active_sub?: boolean;
+  };
+};
+
+export function usePlatformWorkspaces(opts?: { q?: () => string; tenantStatus?: () => string }) {
+  return createQuery(() => {
+    const q = opts?.q?.() ?? "";
+    const tenantStatus = opts?.tenantStatus?.() ?? "";
+    return {
+      queryKey: ["platform-workspaces", q, tenantStatus],
+      queryFn: async () => {
+        const params = new URLSearchParams();
+        if (q.trim()) params.set("q", q.trim());
+        if (tenantStatus) params.set("tenant_status", tenantStatus);
+        const search = params.toString() ? `?${params}` : "";
+        const res = await apiFetch<{ workspaces: PlatformWorkspace[]; unlinked: PlatformWorkspacePerson[] }>(
+          `/api/v1/platform/console/workspaces${search}`,
+        );
+        if (!res.ok) throw new Error(res.message ?? "Failed to load workspaces");
+        return { workspaces: res.data?.workspaces ?? [], unlinked: res.data?.unlinked ?? [] };
+      },
+    };
+  });
+}
+
 export function usePlatformCustomer(id: () => number | undefined) {
   return createQuery(() => ({
     queryKey: ["platform-customer", id()],

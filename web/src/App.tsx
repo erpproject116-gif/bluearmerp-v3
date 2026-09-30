@@ -89,6 +89,7 @@ import {
   PurchaseRequestNewPage,
   PurchaseRequestSettingsPage,
   PurchaseOrderSettingsPage,
+  RfqSettingsPage,
   GoodsReceiptSettingsPage,
   SupplierInvoiceSettingsPage,
   PurchaseRequestStatusPage,
@@ -304,6 +305,7 @@ import {
   ExpensesPage,
   RecurringExpensesPage,
   VendorCreditsPage,
+  VendorCreditSettingsPage,
   VendorCreditPrintPage,
   SellingWorkspacePage,
   SellingReportsPage,
@@ -683,6 +685,7 @@ export default function App() {
           <Route path="/purchase-order/purchase-orders/outstanding" component={() => <Navigate href="/app/purchase-order/purchase-orders?view=outstanding" />} />
           <Route path="/purchase-order/reports/items-to-receive" component={ItemsToReceiveReportPage} />
           <Route path="/purchase-order/purchase-orders" component={PurchaseOrderHubPage} />
+          <Route path="/purchase-order/rfq/settings" component={RfqSettingsPage} />
           <Route path="/purchase-order/rfq" component={RfqListPage} />
           <Route path="/purchase-order/rfq/:id" component={RfqDetailPage} />
           <Route path="/purchase-order/purchase-returns" component={PurchaseReturnsPage} />
@@ -751,6 +754,7 @@ export default function App() {
           <Route path="/finance/disbursements" component={DisbursementsHubPage} />
           <Route path="/purchases/expenses" component={ExpensesPage} />
           <Route path="/purchases/recurring-expenses" component={RecurringExpensesPage} />
+          <Route path="/purchases/vendor-credits/settings" component={VendorCreditSettingsPage} />
           <Route path="/purchases/vendor-credits" component={VendorCreditsPage} />
           <Route path="/buying/expenses" component={ExpensesPage} />
           <Route path="/buying/vendor-credits" component={VendorCreditsPage} />

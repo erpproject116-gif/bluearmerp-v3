@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { formatMoney } from "../../../shared/money";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { useToast } from "../../../shared/toast";
 import { SupplierQuotationModal } from "./SupplierQuotationModal";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
@@ -27,6 +28,7 @@ type RfqDetail = {
   status: string;
   purchase_request_id?: number | null;
   notes?: string | null;
+  custom_values?: Record<string, unknown>;
   lines: RfqLine[];
 };
 
@@ -132,6 +134,14 @@ export default function RfqDetailPage() {
           Back to RFQ list
         </A>
         <div class="flex flex-wrap gap-2">
+          <Show when={rfq.data?.id}>
+            <RecordHistoryButton
+              variant="button"
+              targetType="rfq_request"
+              targetId={rfq.data!.id}
+              title={`History — ${rfq.data!.rfq_no}`}
+            />
+          </Show>
           <button
             type="button"
             class="rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50"
@@ -187,6 +197,18 @@ export default function RfqDetailPage() {
               </div>
               <Show when={x.notes}>
                 <p class="mt-2 text-sm text-text-secondary">{x.notes}</p>
+              </Show>
+              <Show when={x.custom_values && Object.keys(x.custom_values).length > 0}>
+                <dl class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <For each={Object.entries(x.custom_values ?? {})}>
+                    {([key, val]) => (
+                      <div class="rounded border border-stroke px-2 py-1.5 text-sm">
+                        <dt class="text-xs text-text-secondary">{key}</dt>
+                        <dd class="text-text-primary">{val == null ? "—" : String(val)}</dd>
+                      </div>
+                    )}
+                  </For>
+                </dl>
               </Show>
 
               <EmailHistoryPanel docType="rfq" docId={x.id} />

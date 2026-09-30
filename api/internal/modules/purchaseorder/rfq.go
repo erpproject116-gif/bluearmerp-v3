@@ -15,18 +15,22 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
+const rfqFormEntity = "rfq_request"
+
 type RFQ struct {
-	ID                int64     `json:"id"`
-	RfqNo             string    `json:"rfq_no"`
-	RfqDate           string    `json:"rfq_date"`
-	Status            string    `json:"status"`
-	PurchaseRequestID *int64    `json:"purchase_request_id,omitempty"`
-	Notes             *string   `json:"notes,omitempty"`
-	LineCount         int       `json:"line_count,omitempty"`
-	Lines             []RFQLine `json:"lines,omitempty"`
+	ID                int64          `json:"id"`
+	RfqNo             string         `json:"rfq_no"`
+	RfqDate           string         `json:"rfq_date"`
+	Status            string         `json:"status"`
+	PurchaseRequestID *int64         `json:"purchase_request_id,omitempty"`
+	Notes             *string        `json:"notes,omitempty"`
+	LineCount         int            `json:"line_count,omitempty"`
+	Lines             []RFQLine      `json:"lines,omitempty"`
+	CustomValues      map[string]any `json:"custom_values,omitempty"`
 }
 
 type RFQLine struct {
@@ -126,6 +130,9 @@ func loadRFQ(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (RFQ, 
 		hdr.Lines = []RFQLine{}
 	}
 	hdr.LineCount = len(hdr.Lines)
+	if vals, err := customfields.LoadValues(ctx, pool, tenantID, rfqFormEntity, id); err == nil && len(vals) > 0 {
+		hdr.CustomValues = vals
+	}
 	return hdr, nil
 }
 
@@ -133,8 +140,9 @@ func createRFQ(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		var body struct {
-			PurchaseRequestID *int64  `json:"purchase_request_id"`
-			Notes             *string `json:"notes"`
+			PurchaseRequestID *int64         `json:"purchase_request_id"`
+			Notes             *string        `json:"notes"`
+			CustomValues      map[string]any `json:"custom_values"`
 			Lines             []struct {
 				ItemID   *int64  `json:"item_id"`
 				ItemCode string  `json:"item_code"`
@@ -205,6 +213,11 @@ func createRFQ(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to insert line.", "ERR_INTERNAL")
 				return
 			}
+		}
+
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, rfqFormEntity, rfqID, body.CustomValues); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
+			return
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {
@@ -318,6 +331,11 @@ func createRFQFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to insert RFQ line.", "ERR_INTERNAL")
 				return
 			}
+		}
+
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, rfqFormEntity, rfqID, nil); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
+			return
 		}
 
 		if err := tx.Commit(r.Context()); err != nil {

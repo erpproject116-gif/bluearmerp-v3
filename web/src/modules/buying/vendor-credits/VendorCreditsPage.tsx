@@ -2,13 +2,18 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { A } from "@solidjs/router";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { CustomFieldsSection, collectCustomFieldErrors } from "../../../shared/CustomFieldsSection";
 import { handleSaveResult } from "../../../shared/handleSaveResult";
+import { ModalField } from "../../../shared/ModalField";
 import { formatPeso } from "../../../shared/money";
 import { modalDismissClass } from "../../../shared/Modal";
+import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import {
   SupplierInvoicePickerModal,
   type SupplierInvoicePickerRow,
 } from "../../../shared/SupplierInvoicePickerModal";
+import { PURCHASES_ENTITY } from "../../../shared/entityTypes";
+import { useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { useToast } from "../../../shared/toast";
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import {
@@ -34,6 +39,7 @@ type VendorCredit = {
 export default function VendorCreditsPage() {
   const toast = useToast();
   const client = useQueryClient();
+  const { byKey, fields } = useFormFieldSettings(PURCHASES_ENTITY.vendorCredit);
   const [status, setStatus] = createSignal("");
   const [createOpen, setCreateOpen] = createSignal(false);
   const [applyOpen, setApplyOpen] = createSignal<VendorCredit | null>(null);
@@ -45,6 +51,8 @@ export default function VendorCreditsPage() {
   const [amount, setAmount] = createSignal("0");
   const [reason, setReason] = createSignal("");
   const [creditDate, setCreditDate] = createSignal(new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = createSignal("");
+  const [customValues, setCustomValues] = createSignal<Record<string, unknown>>({});
   const [siId, setSiId] = createSignal<number | null>(null);
   const [siLabel, setSiLabel] = createSignal("");
   const [applyAmount, setApplyAmount] = createSignal("");
@@ -76,6 +84,16 @@ export default function VendorCreditsPage() {
     setSiLabel(`${row.invoice_no} · ${row.partner_name || row.vendor_name || ""} · ${formatPeso(row.grand_total)}`);
   };
 
+  const resetCreate = () => {
+    setCreateOpen(false);
+    setVendorName("");
+    setPartnerId(null);
+    setAmount("0");
+    setReason("");
+    setNotes("");
+    setCustomValues({});
+  };
+
   const create = async () => {
     const amt = Number(amount());
     if (!vendorName().trim()) {
@@ -84,6 +102,14 @@ export default function VendorCreditsPage() {
     }
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.warning("Enter a valid amount.");
+      return;
+    }
+    const customDefs = fields()
+      .filter((f) => f.kind === "custom" && f.is_active && f.is_visible)
+      .map((f) => ({ field_key: f.field_key, label: f.label, is_required: f.is_required }));
+    const customErrs = collectCustomFieldErrors(customValues(), customDefs);
+    if (Object.keys(customErrs).length > 0) {
+      toast.warning(Object.values(customErrs)[0] ?? "Check custom fields.");
       return;
     }
     setSaving(true);
@@ -95,16 +121,14 @@ export default function VendorCreditsPage() {
         partner_id: partnerId(),
         amount_total: amt,
         reason: reason().trim(),
+        notes: notes().trim() || undefined,
         status: "open",
+        custom_values: customValues(),
       }),
     });
     setSaving(false);
     if (!handleSaveResult(res, toast, "Vendor credit created.")) return;
-    setCreateOpen(false);
-    setVendorName("");
-    setPartnerId(null);
-    setAmount("0");
-    setReason("");
+    resetCreate();
     invalidate();
   };
 
@@ -236,6 +260,11 @@ export default function VendorCreditsPage() {
                       <button type="button" class="text-brand-600 hover:underline" onClick={() => openVendorCreditPrint(row.id)}>
                         Print
                       </button>
+                      <RecordHistoryButton
+                        targetType="vendor_credit"
+                        targetId={row.id}
+                        title={`History — ${row.credit_no}`}
+                      />
                       <Show when={row.status === "draft"}>
                         <button type="button" class="text-brand-600 hover:underline disabled:opacity-50" disabled={busyId() === row.id} onClick={() => void post(row)}>
                           Open
@@ -272,35 +301,82 @@ export default function VendorCreditsPage() {
           <div class="w-full max-w-lg rounded-2xl border border-stroke bg-white p-6 shadow-xl">
             <div class="mb-4 flex items-center justify-between">
               <h2 class="text-lg font-semibold">New Vendor Credit</h2>
-              <button type="button" class={modalDismissClass} onClick={() => setCreateOpen(false)}>Close</button>
+              <button type="button" class={modalDismissClass} onClick={resetCreate}>Close</button>
             </div>
-            <label class="mb-3 block text-sm">
-              <span class="text-text-secondary">Date</span>
-              <input type="date" class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={creditDate()} onInput={(e) => setCreditDate(e.currentTarget.value)} />
-            </label>
-            <label class="mb-3 block text-sm">
-              <span class="text-text-secondary">Vendor</span>
-              <div class="mt-1 flex gap-2">
+            <ModalField settings={byKey} fieldKey="credit_date" fallbackLabel="Date" fallbackRequired>
+              {(m) => (
                 <input
-                  class="w-full rounded border border-stroke px-2 py-1.5"
-                  value={vendorName()}
-                  onInput={(e) => setVendorName(e.currentTarget.value)}
-                  placeholder="Vendor name"
+                  type="date"
+                  class="mt-1 w-full rounded border border-stroke px-2 py-1.5"
+                  value={creditDate()}
+                  disabled={m.disabled}
+                  onInput={(e) => setCreditDate(e.currentTarget.value)}
+                  {...m.inputProps}
                 />
-                <button type="button" class="shrink-0 rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50" onClick={() => setPartnerPickerOpen(true)}>
-                  Find…
-                </button>
-              </div>
-            </label>
-            <label class="mb-3 block text-sm">
-              <span class="text-text-secondary">Amount</span>
-              <input type="number" min="0" step="0.01" class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={amount()} onInput={(e) => setAmount(e.currentTarget.value)} />
-            </label>
-            <label class="mb-4 block text-sm">
-              <span class="text-text-secondary">Reason</span>
-              <input class="mt-1 w-full rounded border border-stroke px-2 py-1.5" value={reason()} onInput={(e) => setReason(e.currentTarget.value)} placeholder="Overpayment, price adjustment…" />
-            </label>
-            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" disabled={saving()} onClick={() => void create()}>
+              )}
+            </ModalField>
+            <ModalField settings={byKey} fieldKey="vendor_name" fallbackLabel="Vendor" fallbackRequired>
+              {(m) => (
+                <div class="mt-1 flex gap-2">
+                  <input
+                    class="w-full rounded border border-stroke px-2 py-1.5"
+                    value={vendorName()}
+                    disabled={m.disabled}
+                    onInput={(e) => setVendorName(e.currentTarget.value)}
+                    placeholder={m.placeholder || "Vendor name"}
+                    {...m.inputProps}
+                  />
+                  <button type="button" class="shrink-0 rounded-lg border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50" onClick={() => setPartnerPickerOpen(true)}>
+                    Find…
+                  </button>
+                </div>
+              )}
+            </ModalField>
+            <ModalField settings={byKey} fieldKey="amount_total" fallbackLabel="Amount" fallbackRequired>
+              {(m) => (
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="mt-1 w-full rounded border border-stroke px-2 py-1.5"
+                  value={amount()}
+                  disabled={m.disabled}
+                  onInput={(e) => setAmount(e.currentTarget.value)}
+                  {...m.inputProps}
+                />
+              )}
+            </ModalField>
+            <ModalField settings={byKey} fieldKey="reason" fallbackLabel="Reason">
+              {(m) => (
+                <input
+                  class="mt-1 w-full rounded border border-stroke px-2 py-1.5"
+                  value={reason()}
+                  disabled={m.disabled}
+                  onInput={(e) => setReason(e.currentTarget.value)}
+                  placeholder={m.placeholder || "Overpayment, price adjustment…"}
+                  {...m.inputProps}
+                />
+              )}
+            </ModalField>
+            <ModalField settings={byKey} fieldKey="notes" fallbackLabel="Notes" span="full">
+              {(m) => (
+                <textarea
+                  rows={2}
+                  class="mt-1 w-full rounded border border-stroke px-2 py-1.5"
+                  value={notes()}
+                  disabled={m.disabled}
+                  placeholder={m.placeholder || "Optional notes"}
+                  onInput={(e) => setNotes(e.currentTarget.value)}
+                  {...m.inputProps}
+                />
+              )}
+            </ModalField>
+            <CustomFieldsSection
+              entityType={PURCHASES_ENTITY.vendorCredit}
+              values={customValues}
+              onChange={(key, value) => setCustomValues((prev) => ({ ...prev, [key]: value }))}
+            />
+            <button type="button" class="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50" disabled={saving()} onClick={() => void create()}>
               {saving() ? "Saving…" : "Create"}
             </button>
           </div>
