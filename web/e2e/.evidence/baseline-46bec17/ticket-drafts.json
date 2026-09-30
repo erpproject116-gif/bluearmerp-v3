@@ -1,8 +1,0 @@
-{
-  "generatedAt": "2026-09-16T03:42:39.241Z",
-  "runId": "baseline-46bec17",
-  "policy": "review_then_submit",
-  "note": "Do not POST to /api/v1/support/tickets until human/agent review + Support list/export dedupe.",
-  "draftCount": 0,
-  "drafts": []
-}

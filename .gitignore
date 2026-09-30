@@ -9,3 +9,6 @@ web/.env.local
 api/bin/
 .tmp-perf.json
 .DS_Store
+web/e2e/.auth/
+web/e2e/.evidence/
+web/e2e/fixtures/*.local.json

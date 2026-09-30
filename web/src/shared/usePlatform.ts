@@ -172,6 +172,7 @@ export type PlatformWorkspacePerson = {
   status?: string | null;
   plan_kind?: string | null;
   subscription_status?: string | null;
+  urgency_label?: string | null;
   days_remaining?: number | null;
   likely_misjoin?: boolean;
   is_workspace_owner?: boolean;
