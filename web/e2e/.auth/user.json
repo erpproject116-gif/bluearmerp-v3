@@ -1,0 +1,22 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "https://app.bluearmerp.com",
+      "localStorage": [
+        {
+          "name": "sb-hqmhlvahlvrtxtwecdip-auth-token",
+          "value": "{\"access_token\":\"eyJhbGciOiJFUzI1NiIsImtpZCI6ImM3Yjg0MjMyLTMzNjMtNDMyZC1iYjE5LTU3Y2E5Y2ZmZmUwNCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2hxbWhsdmFobHZydHh0d2VjZGlwLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIxMjQzODA0Zi00NDdjLTRmOTgtOWRlNy01YjYwYTY1ODMyZTciLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzg5NTMyMTA2LCJpYXQiOjE3ODk1Mjg1MDYsImVtYWlsIjoiZG93aXRocmFuZWxAZ21haWwuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJnb29nbGUiLCJwcm92aWRlcnMiOlsiZ29vZ2xlIl19LCJ1c2VyX21ldGFkYXRhIjp7ImF2YXRhcl91cmwiOiJodHRwczovL2xoMy5nb29nbGV1c2VyY29udGVudC5jb20vYS9BQ2c4b2NJWE1VTlFMd2w3aWdYcnQtS0F4cXRaZUVsNU1IMWdzV3ppSGYtTXp5eGE4Z3dJUEE9czk2LWMiLCJlbWFpbCI6ImRvd2l0aHJhbmVsQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmdWxsX25hbWUiOiJSYW5lbCIsImlzcyI6Imh0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbSIsIm5hbWUiOiJSYW5lbCIsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lYTVVOUUx3bDdpZ1hydC1LQXhxdFplRWw1TUgxZ3NXemlIZi1Nenl4YThnd0lQQT1zOTYtYyIsInByb3ZpZGVyX2lkIjoiMTAyNDk1NDYzMDkyMzE5MDY3Mjg1Iiwic3ViIjoiMTAyNDk1NDYzMDkyMzE5MDY3Mjg1In0sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoib2F1dGgiLCJ0aW1lc3RhbXAiOjE3ODk1Mjg1MDZ9XSwic2Vzc2lvbl9pZCI6IjQ1MzM4YTI4LTkyY2EtNDQ0My1hYTE5LTk4YzNiMjU1ZWMyZCIsImlzX2Fub255bW91cyI6ZmFsc2V9.sKWYTwlHGjefadfEZ_28pFaa9UIJ34kgj-FDODEaBrHS_OKFjmbV10MOe6UyRWB1LFYInZHxDXOZJOvJB6qoxw\",\"token_type\":\"bearer\",\"expires_in\":3600,\"expires_at\":1789532106,\"refresh_token\":\"hki3vm6onih3\",\"user\":{\"id\":\"1243804f-447c-4f98-9de7-5b60a65832e7\",\"aud\":\"authenticated\",\"role\":\"authenticated\",\"email\":\"dowithranel@gmail.com\"}}"
+        },
+        {
+          "name": "bluearm.activeTenantId",
+          "value": "32"
+        },
+        {
+          "name": "bluearm.activeBranch.32",
+          "value": "{\"id\":2001,\"name\":\"Backroom / Service Bench\"}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+﻿{
+  "name": "cordova-computer-hub-live",
+  "tenantCode": "TRIAL-90f0ad",
+  "tenantId": 32,
+  "partnerQuery": "Cordova Tech",
+  "supplierQuery": "Visayas Tech",
+  "itemQuery": "USB-C",
+  "serialItemQuery": "USB-C",
+  "locationQuery": "Cordova",
+  "expectedBranch": "Main Store - Cordova",
+  "openPoCodes": ["260913001"]
+}

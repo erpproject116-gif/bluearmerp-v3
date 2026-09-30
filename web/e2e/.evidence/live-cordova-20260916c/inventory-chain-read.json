@@ -1,0 +1,12 @@
+{
+  "steps": [
+    "/app/inventory/partners",
+    "/app/inventory/items",
+    "/app/inventory/locations",
+    "/app/inventory/find-stock",
+    "/app/inventory/serial-lot/registry",
+    "/app/inventory/reports/on-hand",
+    "/app/inventory/reports/stock-balance"
+  ],
+  "result": "ok"
+}
