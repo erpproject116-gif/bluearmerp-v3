@@ -56,6 +56,14 @@ function statusLabel(status: string) {
   switch (status) {
     case "draft":
       return "Draft";
+    case "pending_approval":
+      return "Pending approval";
+    case "approved":
+      return "Approved";
+    case "in_transit":
+      return "In transit";
+    case "received":
+      return "Received";
     case "posted":
       return "Posted";
     case "cancelled":
@@ -69,6 +77,13 @@ function statusClass(status: string) {
   switch (status) {
     case "draft":
       return "bg-slate-100 text-slate-700";
+    case "pending_approval":
+      return "bg-amber-50 text-amber-800";
+    case "approved":
+      return "bg-sky-50 text-sky-800";
+    case "in_transit":
+      return "bg-indigo-50 text-indigo-800";
+    case "received":
     case "posted":
       return "bg-emerald-50 text-emerald-800";
     case "cancelled":
@@ -194,6 +209,10 @@ export default function StockEntriesPage() {
             >
               <option value="">All</option>
               <option value="draft">Draft</option>
+              <option value="pending_approval">Pending approval</option>
+              <option value="approved">Approved</option>
+              <option value="in_transit">In transit</option>
+              <option value="received">Received</option>
               <option value="posted">Posted</option>
               <option value="cancelled">Cancelled</option>
             </select>

@@ -90,6 +90,7 @@ export default defineConfig(({ mode }) => {
           // behind old paywall UI after deploy). Documents are NetworkFirst below.
           globPatterns: ["**/*.{js,css,ico,png,svg,woff2,webmanifest}"],
           globIgnores: ["**/tess/**", "**/index.html"],
+          importScripts: ["push-sw.js"],
           cleanupOutdatedCaches: true,
           skipWaiting: true,
           clientsClaim: true,

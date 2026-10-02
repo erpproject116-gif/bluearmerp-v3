@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -71,6 +72,11 @@ func getPurchaseOrderPrint(pool *pgxpool.Pool) http.HandlerFunc {
 		po, err := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Purchase order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, po.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
 			return
 		}
 		tenant, err := loadTenantParty(r.Context(), pool, tu.TenantID)

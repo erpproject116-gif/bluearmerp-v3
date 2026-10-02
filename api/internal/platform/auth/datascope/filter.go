@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 )
 
 // ListFilter configures optional column references for data-scope filtering.
@@ -34,16 +35,40 @@ func applyExplicitLocationSQL(f ListFilter, argIdx int, args *[]any) (string, in
 // ApplyUserScopesSQL appends AND fragments when the user's role enforces data scopes.
 // Owners, platform superadmins, and roles without apply_user_scopes still honor
 // ExplicitLocationID so voluntary UI filters work company-wide.
+// When tenant_process_policies.strict_branch_isolation is on, non-owners also get
+// commercial location filtering (home/assigned) even if apply_user_scopes is off.
 func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f ListFilter, argIdx int, args *[]any) (string, int, error) {
+	var frag strings.Builder
+
+	appendIso := func() error {
+		isoFrag, next, isoErr := branchiso.ApplyCommercialLocationSQL(ctx, pool, tu, f.LocationColumn, argIdx, args)
+		if isoErr != nil {
+			return isoErr
+		}
+		frag.WriteString(isoFrag)
+		argIdx = next
+		return nil
+	}
+
 	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
-		frag, argIdx := applyExplicitLocationSQL(f, argIdx, args)
-		return frag, argIdx, nil
+		ex, next := applyExplicitLocationSQL(f, argIdx, args)
+		argIdx = next
+		frag.WriteString(ex)
+		if err := appendIso(); err != nil {
+			return "", argIdx, err
+		}
+		return frag.String(), argIdx, nil
 	}
 	// apply_user_scopes rides on TenantUser (loaded with the session), so a handler
 	// that filters several queries no longer repeats the tenant_roles lookup.
 	if !tu.ApplyUserScopes {
-		frag, argIdx := applyExplicitLocationSQL(f, argIdx, args)
-		return frag, argIdx, nil
+		ex, next := applyExplicitLocationSQL(f, argIdx, args)
+		argIdx = next
+		frag.WriteString(ex)
+		if err := appendIso(); err != nil {
+			return "", argIdx, err
+		}
+		return frag.String(), argIdx, nil
 	}
 
 	rows, err := pool.Query(ctx, `
@@ -82,7 +107,6 @@ func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 		return " and 1=0", argIdx, nil
 	}
 
-	var frag strings.Builder
 	if len(customers) > 0 && f.CustomerColumn != "" {
 		placeholders := make([]string, len(customers))
 		for i, id := range customers {
@@ -107,6 +131,10 @@ func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 		frag.WriteString(fmt.Sprintf(" and %s = $%d", f.LocationColumn, argIdx))
 		*args = append(*args, *locID)
 		argIdx++
+	}
+
+	if err := appendIso(); err != nil {
+		return "", argIdx, err
 	}
 	return frag.String(), argIdx, nil
 }

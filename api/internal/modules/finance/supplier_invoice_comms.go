@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/pdf"
@@ -100,6 +101,13 @@ func getSupplierInvoicePDF(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Purchase not found.", "ERR_NOT_FOUND")
 			return
+		}
+		if payload.SupplierInvoice.LocationID != nil && *payload.SupplierInvoice.LocationID > 0 {
+			if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, *payload.SupplierInvoice.LocationID); err != nil {
+				code, msg, errCode := branchiso.HTTPStatus(err)
+				response.Err(w, code, msg, errCode)
+				return
+			}
 		}
 		in := siToPDF(payload)
 		in.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)

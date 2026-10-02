@@ -158,6 +158,30 @@ export const knowledgebaseArticles: KbArticle[] = [
     relatedGuideIds: ["inventory"],
   },
   {
+    id: "strict-branch-isolation",
+    title: "What does Strict branch isolation change?",
+    scenario: "Your business runs multiple branches and you need clear commercial boundaries without hiding stock inquiry.",
+    intro:
+      "Strict branch isolation (tenant process policy, default off) limits commercial documents by home/assigned branch for store admins and team members. Inventory read across branches stays allowed.",
+    blocks: [
+      {
+        type: "paragraph",
+        text: "With isolation on: store admins and members cannot browse or write other-branch sales, POs, receipts, and related commercial docs. Owners keep company-wide commercial access. Support sessions may bypass with a support-tagged audit.",
+      },
+      {
+        type: "paragraph",
+        text: "Inventory inquiry (Inv. Balance by Location, on-hand, movements, adjustment lists) can still show other-branch quantities. Commercial document links on foreign movements are redacted. RMA and In Transit locations are not operating branches in stock matrices or low-stock widgets.",
+      },
+      {
+        type: "tip",
+        text: "Assign each user a home branch (and receive permission where needed) before enabling isolation on a pilot tenant. See also location transfers when Transfer handoff v2 is enabled.",
+      },
+    ],
+    primaryHref: "/app/inventory/locations",
+    primaryLabel: "Manage locations",
+    relatedGuideIds: ["inventory"],
+  },
+  {
     id: "switch-active-branch",
     title: "How do I work in a different branch?",
     scenario: "You have multiple locations and want new documents and stock inquiry defaults to reflect one branch.",
@@ -174,7 +198,7 @@ export const knowledgebaseArticles: KbArticle[] = [
       },
       {
         type: "paragraph",
-        text: "Company-wide roles (owner, store_admin without Apply user data scopes) keep seeing all branch documents. Branch-only staff need Apply user data scopes plus assigned locations. Use Inv Per Branch to inquire qty across branches.",
+        text: "When Strict branch isolation is on (tenant process policy), store admins and team members only see commercial documents for their home/assigned branches. Inventory inquiry (Inv. Balance by Location / movements) can still show other-branch qty; commercial links on foreign movements are redacted. Owners and support sessions keep company-wide commercial access.",
       },
       {
         type: "tip",
@@ -190,29 +214,30 @@ export const knowledgebaseArticles: KbArticle[] = [
     title: "How do I move inventory from one branch to another?",
     scenario: "Physical stock is moving between your warehouses or stores.",
     intro:
-      "Use a stock transfer entry to decrease quantity at the sending branch and increase it at the receiving branch in one posted transaction.",
+      "When Transfer handoff v2 is enabled, stock moves between branches with Submit → Approve → Ship → Receive (in-transit), not a single Post. Serial/lot items must be attached when policy requires them.",
     blocks: [
       {
         type: "flow",
-        items: ["Create transfer draft", "Select from / to locations", "Post entry", "Verify balances"],
+        items: ["Draft + reason", "Submit", "Approve", "Ship (leaves source → In Transit)", "Receive (In Transit → destination)"],
       },
       {
         type: "steps",
         items: [
-          "Open Stock → Stock Entries.",
-          "Click New entry and choose Transfer as the entry type.",
-          "Select the source location (from) and destination location (to).",
-          "Add the item and quantity being moved, then save the draft.",
-          "Click Post on the entry. Posted transfers update on-hand stock at both locations immediately.",
+          "Open Stock → Stocks Transfer.",
+          "Create a draft: from/to locations, reason (required), optional attachments, lines (scan serials/lots when required).",
+          "Save & submit for approval (store admin / owner).",
+          "Approver opens the transfer and clicks Approve (warns if same user).",
+          "Ship moves qty from source into the system In Transit location.",
+          "Destination staff (or store admin) clicks Receive to land qty at the destination.",
         ],
       },
       {
         type: "paragraph",
-        text: "You cannot transfer more than the available quantity at the source location. Check Stock balance or Stock ledger reports if you need to confirm on-hand qty before posting.",
+        text: "With handoff off (legacy), Save & post still teleports stock in one step. Cross-branch commercial browsing stays separate from inventory inquiry under Strict branch isolation.",
       },
       {
         type: "tip",
-        text: "For adjustments without a second location (for example cycle-count corrections), use Stock → Stock Movements → New adjustment instead of a transfer.",
+        text: "Do not use stock adjustments to move qty between two branches when handoff is on — use a transfer. Cycle-count corrections stay same-location adjustments.",
       },
     ],
     primaryHref: "/app/inventory/stock-entries",

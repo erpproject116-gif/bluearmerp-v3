@@ -1,7 +1,13 @@
 import type { InventoryStatusRow } from "../../../shared/reports/useModuleReports";
 
 export type AuthBranch = { id: number; location_name: string; location_code?: string; location_type?: string };
-export type LocationOpt = { id: number; location_name: string; is_rma?: boolean | string | number; status?: string };
+export type LocationOpt = {
+  id: number;
+  location_name: string;
+  is_rma?: boolean | string | number;
+  location_type?: string;
+  status?: string;
+};
 
 /** One matrix column; may merge multiple location ids that share the same display name. */
 export type BranchCol = { key: string; id: number; name: string; locationIds: number[] };
@@ -9,6 +15,14 @@ export type BranchCol = { key: string; id: number; name: string; locationIds: nu
 export function isRmaLocation(l: { is_rma?: boolean | string | number }): boolean {
   const v = l.is_rma;
   return v === true || v === 1 || v === "1" || v === "true";
+}
+
+export function isInTransitLocation(l: { location_type?: string | null; location_code?: string | null; location_name?: string }): boolean {
+  const t = String(l.location_type || "").toLowerCase();
+  if (t === "in_transit") return true;
+  const code = String(l.location_code || "").toUpperCase();
+  if (code === "INTRN" || code === "IN-TRANSIT") return true;
+  return /^in\s*transit$/i.test(String(l.location_name || "").trim());
 }
 
 export function isActiveLocation(l: { status?: string | null }): boolean {
@@ -43,10 +57,11 @@ export function buildBranchCols(
   // Sidebar branches first — always includes HQ for owners/operators even when
   // inventory.locations permission is missing or the current item page has zeros.
   for (const b of authBranches) {
+    if (isInTransitLocation(b)) continue;
     push(b.id, b.location_name);
   }
   for (const l of locs) {
-    if (isRmaLocation(l) || !isActiveLocation(l)) continue;
+    if (isRmaLocation(l) || isInTransitLocation(l) || !isActiveLocation(l)) continue;
     push(l.id, l.location_name);
   }
   for (const r of rows) {

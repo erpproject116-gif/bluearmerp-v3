@@ -113,7 +113,7 @@ func onHandSQL(tenantID int64, asOf time.Time, minQty, maxQty *float64, belowSaf
 		  on bal.tenant_id = $1 and bal.item_id = q.item_id and bal.location_id = q.location_id`,
 		reservedExpr, safetyExpr, safetyExpr, safetyExpr)
 
-	where := ""
+	where := ` and coalesce(l.is_rma, false) = false and coalesce(l.location_type, 'location') <> 'in_transit'`
 	if itemID != nil {
 		where += fmt.Sprintf(" and i.id = $%d", argN)
 		args = append(args, *itemID)

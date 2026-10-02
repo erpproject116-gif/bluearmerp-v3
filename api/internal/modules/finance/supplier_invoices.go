@@ -19,6 +19,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fulfillment"
@@ -712,6 +713,13 @@ func getSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Supplier invoice not found.", "ERR_NOT_FOUND")
 			return
+		}
+		if inv.LocationID != nil && *inv.LocationID > 0 {
+			if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, *inv.LocationID); err != nil {
+				code, msg, errCode := branchiso.HTTPStatus(err)
+				response.Err(w, code, msg, errCode)
+				return
+			}
 		}
 		response.OK(w, inv, "OK")
 	}

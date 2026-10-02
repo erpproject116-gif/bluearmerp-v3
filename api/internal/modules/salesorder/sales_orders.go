@@ -20,6 +20,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
@@ -383,6 +384,11 @@ func getSalesOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		so, err := loadSalesOrder(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Sales order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, so.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
 			return
 		}
 		response.OK(w, so, "OK")

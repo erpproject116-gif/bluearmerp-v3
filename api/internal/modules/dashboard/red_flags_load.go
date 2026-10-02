@@ -27,7 +27,10 @@ func loadRedFlags(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (redF
 		  (select count(distinct bal.item_id || ':' || bal.location_id::text)
 		   from public.inv_item_location_balances bal
 		   join public.inv_items i on i.id = bal.item_id and i.tenant_id = bal.tenant_id
+		   join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id
 		   where bal.tenant_id = $1
+		     and coalesce(l.is_rma, false) = false
+		     and coalesce(l.location_type, 'location') <> 'in_transit'
 		     and coalesce(bal.reorder_level, i.reorder_level) is not null
 		     and bal.qty_on_hand < coalesce(bal.reorder_level, i.reorder_level)),
 		  (select count(*) from public.quo_quotations q

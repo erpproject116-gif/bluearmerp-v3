@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -125,6 +126,20 @@ func listStockMovements(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer rows.Close()
 
+		var commercialLocs []int64
+		redactForeignRefs := tu.StrictBranchIsolation && !branchiso.CanViewAllBranchCommercial(tu)
+		if redactForeignRefs {
+			commercialLocs, _ = branchiso.CommercialLocationIDs(r.Context(), pool, tu)
+		}
+		inCommercial := func(loc int64) bool {
+			for _, id := range commercialLocs {
+				if id == loc {
+					return true
+				}
+			}
+			return false
+		}
+
 		var out []StockMovement
 		var total int64
 		for rows.Next() {
@@ -140,6 +155,11 @@ func listStockMovements(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			total = totalCount
 			row.CreatedAt = createdAt.Format(time.RFC3339)
+			// Epic C: cross-branch stock read OK; redact commercial doc links off home/assigned.
+			if redactForeignRefs && !inCommercial(row.LocationID) {
+				row.RefType = ""
+				row.RefID = 0
+			}
 			out = append(out, row)
 		}
 		if out == nil {

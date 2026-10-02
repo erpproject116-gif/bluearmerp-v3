@@ -278,6 +278,10 @@ func createStockAdjustment(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		lines := normalizedStockAdjLines(body)
+		if errs := rejectCrossLocationAdjustAsTransfer(tu.TransferHandoffV2, lines); len(errs) > 0 {
+			response.Validation(w, errs)
+			return
+		}
 		if errs := ensureStockAdjLines(r.Context(), pool, tu.TenantID, lines); errs != nil {
 			response.Validation(w, errs)
 			return
@@ -354,6 +358,10 @@ func saveStockAdjustmentDraft(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		lines := normalizedStockAdjLines(body.stockAdjustmentCreateBody)
+		if errs := rejectCrossLocationAdjustAsTransfer(tu.TransferHandoffV2, lines); len(errs) > 0 {
+			response.Validation(w, errs)
+			return
+		}
 		if errs := ensureStockAdjLines(r.Context(), pool, tu.TenantID, lines); errs != nil {
 			response.Validation(w, errs)
 			return

@@ -95,6 +95,9 @@ function listPathForEntityType(entityType: string): string | null {
     case "inv_stock_adjustment_request":
     case "inv_serial_adjustment_request":
       return "/app/inventory/stock-adjustments";
+    case "inv_stock_entry_transfer":
+    case "inv_stock_entry":
+      return "/app/inventory/stock-entries";
     case "fin_account":
       return "/app/finance/acct-i/chart-of-accounts";
     case "wm_work_item":

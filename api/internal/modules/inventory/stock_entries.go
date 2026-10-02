@@ -16,6 +16,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/aggcache"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/day1commercial"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
@@ -45,6 +46,11 @@ type StockEntry struct {
 	ApprovedByName    string           `json:"approved_by_name,omitempty"`
 	ApprovedAt        *string          `json:"approved_at,omitempty"`
 	PostedAt          *string          `json:"posted_at,omitempty"`
+	InTransitLocationID *int64         `json:"in_transit_location_id,omitempty"`
+	ShippedAt         *string          `json:"shipped_at,omitempty"`
+	ShippedByUserID   *int64           `json:"shipped_by_user_id,omitempty"`
+	ReceivedAt        *string          `json:"received_at,omitempty"`
+	ReceivedByUserID  *int64           `json:"received_by_user_id,omitempty"`
 	UpdatedAt         string           `json:"updated_at,omitempty"`
 	Lines             []StockEntryLine `json:"lines,omitempty"`
 	CustomValues      map[string]any   `json:"custom_values,omitempty"`
@@ -133,6 +139,7 @@ func registerStockEntryRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("inventory.stock_entries", auth.AccessWrite)).Patch("/stock-entries/{id}", updateStockEntry(pool))
 	r.With(auth.RequirePermission("inventory.stock_entries", auth.AccessWrite)).Delete("/stock-entries/{id}", deleteStockEntry(pool))
 	r.With(auth.RequireSubmit("inventory.stock_entries_post")).Post("/stock-entries/{id}/post", postStockEntry(pool))
+	registerStockTransferHandoffRoutes(r, pool)
 	registerStockEntryAttachmentRoutes(r, pool)
 }
 
@@ -240,6 +247,23 @@ func listStockTransferLines(pool *pgxpool.Pool) http.HandlerFunc {
 		where := "e.tenant_id = $1 and e.entry_type = 'transfer'"
 		args := []any{tu.TenantID}
 		argN := 2
+		// Epic E: parties or store_admin+/owner when handoff/isolation is on.
+		if (tu.TransferHandoffV2 || tu.StrictBranchIsolation) && !branchiso.CanOperateTransfer(tu) {
+			commercialLocs, _ := branchiso.CommercialLocationIDs(r.Context(), pool, tu)
+			if commercialLocs == nil {
+				commercialLocs = []int64{}
+			}
+			where += fmt.Sprintf(` and (
+			  e.requested_by_user_id = $%d
+			  or e.approved_by_user_id = $%d
+			  or e.shipped_by_user_id = $%d
+			  or e.received_by_user_id = $%d
+			  or e.from_location_id = any($%d)
+			  or e.to_location_id = any($%d)
+			)`, argN, argN, argN, argN, argN+1, argN+1)
+			args = append(args, tu.AppUserID, commercialLocs)
+			argN += 2
+		}
 		if st := strings.TrimSpace(r.URL.Query().Get("status")); st != "" {
 			where += fmt.Sprintf(" and e.status = $%d", argN)
 			args = append(args, st)
@@ -356,7 +380,7 @@ func getStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 func loadStockEntry(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (StockEntry, error) {
 	var e StockEntry
 	var d time.Time
-	var requestedAt, approvedAt, postedAt *time.Time
+	var requestedAt, approvedAt, postedAt, shippedAt, receivedAt *time.Time
 	var updatedAt time.Time
 	err := pool.QueryRow(ctx, `
 		select e.id, e.entry_no, e.entry_date, e.entry_type,
@@ -367,7 +391,9 @@ func loadStockEntry(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 		  e.project_id, coalesce(e.project_name, ''),
 		  e.requested_by_user_id, coalesce(ru.full_name, ''),
 		  e.requested_at, e.approved_by_user_id, coalesce(au.full_name, ''),
-		  e.approved_at, e.posted_at, e.updated_at
+		  e.approved_at, e.posted_at, e.updated_at,
+		  e.in_transit_location_id, e.shipped_at, e.shipped_by_user_id,
+		  e.received_at, e.received_by_user_id
 		from public.inv_stock_entries e
 		left join public.inv_locations fl on fl.id = e.from_location_id
 		left join public.inv_locations tl on tl.id = e.to_location_id
@@ -381,7 +407,9 @@ func loadStockEntry(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 		&e.ProjectID, &e.ProjectName,
 		&e.RequestedByUserID, &e.RequestedByName,
 		&requestedAt, &e.ApprovedByUserID, &e.ApprovedByName,
-		&approvedAt, &postedAt, &updatedAt)
+		&approvedAt, &postedAt, &updatedAt,
+		&e.InTransitLocationID, &shippedAt, &e.ShippedByUserID,
+		&receivedAt, &e.ReceivedByUserID)
 	if err != nil {
 		return StockEntry{}, err
 	}
@@ -389,6 +417,8 @@ func loadStockEntry(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 	e.RequestedAt = formatTSPtr(requestedAt)
 	e.ApprovedAt = formatTSPtr(approvedAt)
 	e.PostedAt = formatTSPtr(postedAt)
+	e.ShippedAt = formatTSPtr(shippedAt)
+	e.ReceivedAt = formatTSPtr(receivedAt)
 	e.UpdatedAt = updatedAt.Format(time.RFC3339)
 
 	rows, err := pool.Query(ctx, `
@@ -433,7 +463,7 @@ func loadStockEntry(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64)
 	return e, nil
 }
 
-func validateStockEntryBody(body stockEntryBody) map[string]string {
+func validateStockEntryBody(body stockEntryBody, handoffOn bool) map[string]string {
 	errs := map[string]string{}
 	entryType := strings.TrimSpace(body.EntryType)
 	switch entryType {
@@ -460,9 +490,16 @@ func validateStockEntryBody(body stockEntryBody) map[string]string {
 		if body.FromLocationID == nil || *body.FromLocationID <= 0 {
 			errs["from_location_id"] = "Source location is required for issue."
 		}
+		// Epic D: once Transfer v2 is on, do not disguise inter-branch moves as issue+destination.
+		if handoffOn && body.ToLocationID != nil && *body.ToLocationID > 0 {
+			errs["to_location_id"] = "Use a location transfer to move stock between branches."
+		}
 	case "receipt":
 		if body.ToLocationID == nil || *body.ToLocationID <= 0 {
 			errs["to_location_id"] = "Destination location is required for receipt."
+		}
+		if handoffOn && body.FromLocationID != nil && *body.FromLocationID > 0 {
+			errs["from_location_id"] = "Use a location transfer to move stock between branches."
 		}
 	default:
 		errs["entry_type"] = "Use transfer, issue, or receipt."
@@ -492,8 +529,12 @@ func createStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if errs := validateStockEntryBody(body); errs != nil {
+		if errs := validateStockEntryBody(body, tu.TransferHandoffV2); errs != nil {
 			response.Validation(w, errs)
+			return
+		}
+		if body.EntryType == "transfer" && tu.TransferHandoffV2 && !branchiso.CanOperateTransfer(tu) {
+			response.Err(w, http.StatusForbidden, "Only store admins and owners can create location transfers.", "ERR_FORBIDDEN")
 			return
 		}
 
@@ -583,7 +624,7 @@ func updateStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
-		if errs := validateStockEntryBody(body); errs != nil {
+		if errs := validateStockEntryBody(body, tu.TransferHandoffV2); errs != nil {
 			response.Validation(w, errs)
 			return
 		}
@@ -693,6 +734,13 @@ func postStockEntry(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if entry.Status != "draft" {
 			response.Validation(w, map[string]string{"status": "Only draft entries can be posted."})
+			return
+		}
+		// Epic E: when Transfer v2 is on, forbid draft→posted teleport for transfers.
+		if entry.EntryType == "transfer" && tu.TransferHandoffV2 {
+			response.Validation(w, map[string]string{
+				"status": "Transfer handoff is enabled. Use Submit → Approve → Ship → Receive instead of Post.",
+			})
 			return
 		}
 		if ed, err := parseDate(entry.EntryDate); err == nil {

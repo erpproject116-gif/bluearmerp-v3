@@ -20,6 +20,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/creditlimit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/fiscalyear"
@@ -396,6 +397,11 @@ func getSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Sales not found.", "ERR_NOT_FOUND")
 			return
 		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, sale.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
+			return
+		}
 		response.OK(w, sale, "OK")
 	}
 }
@@ -532,6 +538,11 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if errs := validateSaleBody(body, true); errs != nil {
 			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
+			return
+		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, body.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
 			return
 		}
 		if body.SalesCategory != nil && *body.SalesCategory != "" && !salesCategoryActive(r.Context(), pool, tu.TenantID, *body.SalesCategory) {
@@ -761,6 +772,11 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if errs := validateSaleBody(body, false); errs != nil {
 			response.ValidationSmartContext(w, errs, saleAssistLinks(body.SourceSalesOrderID))
+			return
+		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, body.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
 			return
 		}
 		if body.SalesCategory != nil && *body.SalesCategory != "" && !salesCategoryActive(r.Context(), pool, tu.TenantID, *body.SalesCategory) {

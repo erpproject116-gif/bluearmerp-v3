@@ -13,6 +13,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/comms"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/pdf"
@@ -149,6 +150,11 @@ func getQuotationPrint(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Quotation not found.", "ERR_NOT_FOUND")
 			return
 		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, payload.Quotation.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
+			return
+		}
 		response.OK(w, payload, "OK")
 	}
 }
@@ -162,9 +168,14 @@ func getQuotationPDF(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_, pdfIn, err := loadQuotationPrintPayload(r.Context(), pool, tu.TenantID, id)
+		payload, pdfIn, err := loadQuotationPrintPayload(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Quotation not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, payload.Quotation.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
 			return
 		}
 		pdfIn.Chrome = branding.LoadPDFChrome(r.Context(), pool, tu.TenantID)

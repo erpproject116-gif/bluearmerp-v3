@@ -99,6 +99,8 @@ func ApproverPermissionForEntity(entityType string) string {
 		return "inventory.serial_adjustment_approve"
 	case "inv_stock_adjustment_request":
 		return "inventory.stock_adjustment_approve"
+	case "inv_stock_entry_transfer":
+		return "inventory.stock_entries"
 	default:
 		return "purchase_request.approve"
 	}
@@ -139,9 +141,9 @@ func pendingApprovalRecipientEmails(ctx context.Context, pool *pgxpool.Pool, ten
 		return nil, err
 	}
 
-	// Owner is notified on inventory adjustment submissions (even without approve permission).
+	// Owner is notified on inventory adjustment / transfer submissions (even without approve permission).
 	switch strings.TrimSpace(entityType) {
-	case "inv_stock_adjustment_request", "inv_serial_adjustment_request":
+	case "inv_stock_adjustment_request", "inv_serial_adjustment_request", "inv_stock_entry_transfer":
 		var ownerEmail string
 		err := pool.QueryRow(ctx, `
 			select lower(trim(u.email))

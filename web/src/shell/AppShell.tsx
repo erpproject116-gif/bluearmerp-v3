@@ -265,6 +265,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     };
     document.addEventListener("keydown", onKey);
     onCleanup(() => document.removeEventListener("keydown", onKey));
+    void import("../shared/pushSubscribe").then((m) => m.subscribeWebPushIfConfigured());
   });
 
   const activeModule = () => resolveModule(loc.pathname);

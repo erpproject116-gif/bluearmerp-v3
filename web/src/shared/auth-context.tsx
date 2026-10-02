@@ -22,6 +22,9 @@ export type MeData = {
     is_platform_superadmin?: boolean;
     is_tenant_owner?: boolean;
     is_store_admin?: boolean;
+    home_location_id?: number;
+    strict_branch_isolation?: boolean;
+    transfer_handoff_v2?: boolean;
     can_manage_users?: boolean;
     can_manage_custom_fields?: boolean;
     can_manage_branding?: boolean;

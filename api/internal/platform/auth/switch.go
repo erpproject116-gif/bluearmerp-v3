@@ -17,6 +17,7 @@ func RegisterAuthRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/auth/switch-tenant", switchTenantHandler(pool))
 	r.Post("/auth/session-ended", sessionEndedHandler(pool))
 	r.Get("/auth/branches", branchesHandler(pool))
+	RegisterPushRoutes(r, pool)
 }
 
 func sessionEndedHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -112,13 +113,34 @@ func branchesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		scoped := tu.ApplyUserScopes && !tu.IsPlatformSuperadmin && !tu.IsTenantOwner
+		isolated := tu.StrictBranchIsolation && !tu.IsTenantOwner && !tu.IsPlatformSuperadmin && tu.SupportSessionID == 0
 
 		var (
 			rows pgx.Rows
 			err  error
 		)
-		if scoped {
-			// Only the user's assigned location/warehouse scopes.
+		// Operating-branch picker: exclude RMA and in-transit (not commercial branches).
+		switch {
+		case isolated:
+			rows, err = pool.Query(r.Context(), `
+				select l.id, l.location_code, l.location_name, l.location_type
+				from public.inv_locations l
+				where l.tenant_id = $1
+				  and l.status = 'active'
+				  and l.deleted_at is null
+				  and coalesce(l.is_rma, false) = false
+				  and coalesce(l.location_type, '') <> 'in_transit'
+				  and (
+				    ($3::bigint > 0 and l.id = $3)
+				    or exists (
+				      select 1 from public.user_data_scopes s
+				      where s.tenant_id = l.tenant_id and s.user_id = $2
+				        and s.scope_type in ('location', 'warehouse')
+				        and s.record_id = l.id
+				    )
+				  )
+				order by l.location_name`, tu.TenantID, tu.AppUserID, tu.HomeLocationID)
+		case scoped:
 			rows, err = pool.Query(r.Context(), `
 				select l.id, l.location_code, l.location_name, l.location_type
 				from public.inv_locations l
@@ -130,9 +152,10 @@ func branchesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				  and l.status = 'active'
 				  and l.deleted_at is null
 				  and coalesce(l.is_rma, false) = false
+				  and coalesce(l.location_type, '') <> 'in_transit'
 				  and s.user_id = $2
 				order by l.location_name`, tu.TenantID, tu.AppUserID)
-		} else {
+		default:
 			rows, err = pool.Query(r.Context(), `
 				select l.id, l.location_code, l.location_name, l.location_type
 				from public.inv_locations l
@@ -140,6 +163,7 @@ func branchesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				  and l.status = 'active'
 				  and l.deleted_at is null
 				  and coalesce(l.is_rma, false) = false
+				  and coalesce(l.location_type, '') <> 'in_transit'
 				order by l.location_name`, tu.TenantID)
 		}
 		if err != nil {

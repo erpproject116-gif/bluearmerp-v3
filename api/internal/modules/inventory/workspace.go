@@ -52,25 +52,36 @@ func inventoryWorkspaceHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = pool.QueryRow(ctx, `
 			select count(*)
 			from public.inv_locations
-			where tenant_id = $1 and deleted_at is null and status = 'active'`, tu.TenantID).Scan(&out.ActiveLocations)
+			where tenant_id = $1 and deleted_at is null and status = 'active'
+			  and coalesce(is_rma, false) = false
+			  and coalesce(location_type, 'location') <> 'in_transit'`, tu.TenantID).Scan(&out.ActiveLocations)
 
 		_ = pool.QueryRow(ctx, `
 			select count(distinct bal.item_id)
 			from public.inv_item_location_balances bal
-			where bal.tenant_id = $1 and bal.qty_on_hand > 0.0001`, tu.TenantID).Scan(&out.ItemsWithStock)
+			join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id
+			where bal.tenant_id = $1 and bal.qty_on_hand > 0.0001
+			  and coalesce(l.is_rma, false) = false
+			  and coalesce(l.location_type, 'location') <> 'in_transit'`, tu.TenantID).Scan(&out.ItemsWithStock)
 
 		_ = pool.QueryRow(ctx, `
 			select count(distinct bal.item_id)
 			from public.inv_item_location_balances bal
 			join public.inv_items i on i.id = bal.item_id and i.tenant_id = bal.tenant_id
+			join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id
 			where bal.tenant_id = $1
+			  and coalesce(l.is_rma, false) = false
+			  and coalesce(l.location_type, 'location') <> 'in_transit'
 			  and coalesce(bal.reorder_level, i.reorder_level) is not null
 			  and bal.qty_on_hand < coalesce(bal.reorder_level, i.reorder_level)`, tu.TenantID).Scan(&out.LowStockSkus)
 
 		_ = pool.QueryRow(ctx, `
-			select count(distinct item_id)
-			from public.inv_item_location_balances
-			where tenant_id = $1 and qty_on_hand < 0`, tu.TenantID).Scan(&out.NegativeStockSkus)
+			select count(distinct bal.item_id)
+			from public.inv_item_location_balances bal
+			join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id
+			where bal.tenant_id = $1 and bal.qty_on_hand < 0
+			  and coalesce(l.is_rma, false) = false
+			  and coalesce(l.location_type, 'location') <> 'in_transit'`, tu.TenantID).Scan(&out.NegativeStockSkus)
 
 		_ = pool.QueryRow(ctx, `
 			select count(*)
@@ -102,6 +113,8 @@ func lowStockAlertsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.inv_items i on i.id = bal.item_id and i.tenant_id = bal.tenant_id
 			join public.inv_locations l on l.id = bal.location_id
 			where bal.tenant_id = $1
+			  and coalesce(l.is_rma, false) = false
+			  and coalesce(l.location_type, 'location') <> 'in_transit'
 			  and %s is not null
 			  and bal.qty_on_hand < %s
 			order by shortfall desc, i.item_code asc

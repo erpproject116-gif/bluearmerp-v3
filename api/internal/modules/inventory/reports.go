@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -33,6 +34,7 @@ type stockLedgerRow struct {
 	CreatedAt      string  `json:"created_at"`
 	ItemCode       string  `json:"item_code"`
 	ItemName       string  `json:"item_name"`
+	LocationID     int64   `json:"location_id,omitempty"`
 	LocationName   string  `json:"location_name"`
 	QtyDelta       float64 `json:"qty_delta"`
 	RunningBalance float64 `json:"running_balance"`
@@ -83,7 +85,9 @@ func stockBalanceSQL(tenantID int64) string {
 		from public.inv_item_location_balances bal
 		join public.inv_items i on i.id = bal.item_id and i.tenant_id = bal.tenant_id
 		join public.inv_locations l on l.id = bal.location_id
-		where bal.tenant_id = $1`
+		where bal.tenant_id = $1
+		  and coalesce(l.is_rma, false) = false
+		  and coalesce(l.location_type, 'location') <> 'in_transit'`
 }
 
 func listStockBalance(pool *pgxpool.Pool) http.HandlerFunc {
@@ -183,7 +187,7 @@ func stockLedgerWhere(tenantID int64, dateFrom, dateTo *time.Time, itemID, locat
 func stockLedgerSQL(tenantID int64, dateFrom, dateTo *time.Time, itemID, locationID *int64, q string) (string, []any) {
 	where, args := stockLedgerWhere(tenantID, dateFrom, dateTo, itemID, locationID, q)
 	qry := fmt.Sprintf(`
-		select sm.id, sm.created_at::text, i.item_code, i.item_name, l.location_name,
+		select sm.id, sm.created_at::text, i.item_code, i.item_name, sm.location_id, l.location_name,
 		  sm.qty_delta::float8,
 		  sum(sm.qty_delta) over (partition by sm.item_id, sm.location_id order by sm.created_at, sm.id)::float8,
 		  sm.movement_type, sm.ref_type, sm.ref_id,
@@ -228,13 +232,30 @@ func listStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer rows.Close()
+		var commercialLocs []int64
+		redactForeignRefs := tu.StrictBranchIsolation && !branchiso.CanViewAllBranchCommercial(tu)
+		if redactForeignRefs {
+			commercialLocs, _ = branchiso.CommercialLocationIDs(r.Context(), pool, tu)
+		}
+		inCommercial := func(loc int64) bool {
+			for _, id := range commercialLocs {
+				if id == loc {
+					return true
+				}
+			}
+			return false
+		}
 		var out []stockLedgerRow
 		for rows.Next() {
 			var row stockLedgerRow
-			if err := rows.Scan(&row.ID, &row.CreatedAt, &row.ItemCode, &row.ItemName, &row.LocationName,
+			if err := rows.Scan(&row.ID, &row.CreatedAt, &row.ItemCode, &row.ItemName, &row.LocationID, &row.LocationName,
 				&row.QtyDelta, &row.RunningBalance, &row.MovementType, &row.RefType, &row.RefID, &row.Reason); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read report.", "ERR_INTERNAL")
 				return
+			}
+			if redactForeignRefs && !inCommercial(row.LocationID) {
+				row.RefType = ""
+				row.RefID = nil
 			}
 			out = append(out, row)
 		}
@@ -267,11 +288,28 @@ func exportStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Disposition", `attachment; filename="stock-ledger.csv"`)
 		cw := csv.NewWriter(w)
 		_ = cw.Write([]string{"Date", "Item Code", "Item Name", "Location", "Qty Delta", "Running Balance", "Type", "Ref", "Ref ID", "Reason"})
+		var commercialLocs []int64
+		redactForeignRefs := tu.StrictBranchIsolation && !branchiso.CanViewAllBranchCommercial(tu)
+		if redactForeignRefs {
+			commercialLocs, _ = branchiso.CommercialLocationIDs(r.Context(), pool, tu)
+		}
+		inCommercial := func(loc int64) bool {
+			for _, id := range commercialLocs {
+				if id == loc {
+					return true
+				}
+			}
+			return false
+		}
 		for rows.Next() {
 			var row stockLedgerRow
-			if err := rows.Scan(&row.ID, &row.CreatedAt, &row.ItemCode, &row.ItemName, &row.LocationName,
+			if err := rows.Scan(&row.ID, &row.CreatedAt, &row.ItemCode, &row.ItemName, &row.LocationID, &row.LocationName,
 				&row.QtyDelta, &row.RunningBalance, &row.MovementType, &row.RefType, &row.RefID, &row.Reason); err != nil {
 				return
+			}
+			if redactForeignRefs && !inCommercial(row.LocationID) {
+				row.RefType = ""
+				row.RefID = nil
 			}
 			refID := ""
 			if row.RefID != nil {
@@ -313,6 +351,8 @@ func stockAgeingSQL() string {
 		 and sm.location_id = bal.location_id
 		where bal.tenant_id = $1
 		  and bal.qty_on_hand > 0
+		  and coalesce(l.is_rma, false) = false
+		  and coalesce(l.location_type, 'location') <> 'in_transit'
 		group by i.id, i.item_code, i.item_name, l.id, l.location_name, bal.qty_on_hand, bal.updated_at, bal.created_at`
 }
 

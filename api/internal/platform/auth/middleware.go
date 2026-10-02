@@ -51,8 +51,13 @@ type TenantUser struct {
 	ApplyUserScopes           bool
 	AuthRevision              int64
 	ActiveBranchID            int64
-	permissions               map[string]string
-	submitPerms               map[string]bool
+	// HomeLocationID is the user's primary operating branch (branch isolation).
+	HomeLocationID int64
+	// StrictBranchIsolation / TransferHandoffV2 mirror tenant_process_policies (default false).
+	StrictBranchIsolation bool
+	TransferHandoffV2     bool
+	permissions           map[string]string
+	submitPerms           map[string]bool
 	// Platform Command Center identity (may exist alongside a tenant membership).
 	PlatformUserID      int64
 	PlatformRole        string
@@ -288,11 +293,15 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		  coalesce(tr.apply_user_scopes, false),
 		  t.auto_enable_all_modules,
 		  u.auth_revision,
-		  coalesce(u.support_session_id, 0)
+		  coalesce(u.support_session_id, 0),
+		  coalesce(u.home_location_id, 0),
+		  coalesce(tpp.strict_branch_isolation, false),
+		  coalesce(tpp.transfer_handoff_v2, false)
 		from public.users u
 		join public.tenants t on t.id = u.tenant_id
 		left join public.tenant_roles tr
 		  on tr.tenant_id = u.tenant_id and tr.role_code = u.tenant_role and tr.is_active = true
+		left join public.tenant_process_policies tpp on tpp.tenant_id = u.tenant_id
 		left join public.platform_users pu on pu.auth_user_id = u.auth_user_id
 		left join public.user_active_tenant uat on uat.auth_user_id = u.auth_user_id
 		where u.auth_user_id = $1::uuid
@@ -328,6 +337,9 @@ func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, 
 		&tu.AutoEnableAllModules,
 		&tu.AuthRevision,
 		&tu.SupportSessionID,
+		&tu.HomeLocationID,
+		&tu.StrictBranchIsolation,
+		&tu.TransferHandoffV2,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {

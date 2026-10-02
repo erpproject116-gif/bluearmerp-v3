@@ -80,6 +80,26 @@ func validateStockAdjustmentCreate(body stockAdjustmentCreateBody) map[string]st
 	return errs
 }
 
+// rejectCrossLocationAdjustAsTransfer blocks multi-location adjustments used as a
+// transfer substitute when Transfer handoff v2 is enabled (Epic D).
+func rejectCrossLocationAdjustAsTransfer(handoffOn bool, lines []stockAdjustmentLineBody) map[string]string {
+	if !handoffOn {
+		return nil
+	}
+	locs := map[int64]struct{}{}
+	for _, ln := range lines {
+		if ln.LocationID > 0 {
+			locs[ln.LocationID] = struct{}{}
+		}
+	}
+	if len(locs) > 1 {
+		return map[string]string{
+			"lines": "Use a location transfer to move stock between branches. Adjustments must stay on one location.",
+		}
+	}
+	return nil
+}
+
 func ensureStockAdjLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64, lines []stockAdjustmentLineBody) map[string]string {
 	for i, ln := range lines {
 		if errs := ensureItemLocation(ctx, pool, tenantID, ln.ItemID, ln.LocationID); errs != nil {

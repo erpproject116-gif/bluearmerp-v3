@@ -1,5 +1,6 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { useAuth } from "../../shared/auth-context";
 import { AttachmentsField } from "../../shared/AttachmentsField";
 import { DateInput } from "../../shared/DateInput";
 import { FormErrorSummary } from "../../shared/FormErrorSummary";
@@ -98,6 +99,8 @@ type Props = {
 const STOCK_ENTRY_ENTITY = "inv_stock_entry";
 
 export function LocationTransferModal(props: Props) {
+  const auth = useAuth();
+  const handoffV2 = () => Boolean(auth.me?.user?.transfer_handoff_v2);
   const toast = useToast();
   const { byKey, fields } = useFormFieldSettings(STOCK_ENTRY_ENTITY);
   const [customValues, setCustomValues] = createSignal<Record<string, unknown>>({});
@@ -122,7 +125,29 @@ export function LocationTransferModal(props: Props) {
   const [approvedBy, setApprovedBy] = createSignal("");
   const [approvedAt, setApprovedAt] = createSignal<string | null>(null);
 
-  const readOnly = () => status() === "posted" || status() === "cancelled";
+  const readOnly = () => {
+    const s = status();
+    return s !== "" && s !== "draft";
+  };
+
+  const runHandoff = async (action: string, okLabel: string) => {
+    const id = entryId();
+    if (!id) return;
+    setSaving(true);
+    const res = await apiFetch<LocationTransferDetail>(
+      `/api/v1/inventory/stock-entries/${id}/${action}`,
+      { method: "POST" },
+      { silent: true },
+    );
+    setSaving(false);
+    if (!res.success || !res.data) {
+      handleSaveResult(res, toast, `Transfer ${okLabel}.`, { onFieldErrors: setFieldErrors });
+      return;
+    }
+    hydrate(res.data);
+    toast.success(`Transfer ${res.data.entry_no} ${okLabel}.`);
+    props.onSaved();
+  };
 
   const hydrate = (ed: LocationTransferDetail) => {
     setEntryId(ed.id);
@@ -272,6 +297,23 @@ export function LocationTransferModal(props: Props) {
     hydrate(res.data);
 
     if (andPost) {
+      if (handoffV2()) {
+        const sub = await apiFetch<LocationTransferDetail>(
+          `/api/v1/inventory/stock-entries/${res.data.id}/submit-transfer`,
+          { method: "POST" },
+          { silent: true },
+        );
+        setSaving(false);
+        if (!sub.success || !sub.data) {
+          handleSaveResult(sub, toast, "Transfer submitted.", { onFieldErrors: setFieldErrors });
+          props.onSaved();
+          return;
+        }
+        hydrate(sub.data);
+        toast.success(`Transfer ${sub.data.entry_no} submitted for approval.`);
+        props.onSaved();
+        return;
+      }
       const postRes = await apiFetch<LocationTransferDetail>(
         `/api/v1/inventory/stock-entries/${res.data.id}/post`,
         { method: "POST" },
@@ -314,14 +356,44 @@ export function LocationTransferModal(props: Props) {
               title={entryNo() ? `History — ${entryNo()}` : "History"}
             />
           </Show>
-          <Show when={!readOnly()}>
+          <Show when={!readOnly() && status() === "draft"}>
             <button
               type="button"
               class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               disabled={saving()}
               onClick={() => void save(true)}
             >
-              {saving() ? "Saving…" : "Save & post"}
+              {saving() ? "Saving…" : handoffV2() ? "Save & submit" : "Save & post"}
+            </button>
+          </Show>
+          <Show when={handoffV2() && entryId() && status() === "pending_approval"}>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              disabled={saving()}
+              onClick={() => void runHandoff("approve-transfer", "approved")}
+            >
+              Approve
+            </button>
+          </Show>
+          <Show when={handoffV2() && entryId() && status() === "approved"}>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              disabled={saving()}
+              onClick={() => void runHandoff("ship-transfer", "shipped")}
+            >
+              Ship
+            </button>
+          </Show>
+          <Show when={handoffV2() && entryId() && status() === "in_transit"}>
+            <button
+              type="button"
+              class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              disabled={saving()}
+              onClick={() => void runHandoff("receive-transfer", "received")}
+            >
+              Receive
             </button>
           </Show>
         </>

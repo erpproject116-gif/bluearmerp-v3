@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -37,6 +38,13 @@ func getSupplierInvoicePrint(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Purchase not found.", "ERR_NOT_FOUND")
 			return
+		}
+		if inv.LocationID != nil && *inv.LocationID > 0 {
+			if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, *inv.LocationID); err != nil {
+				code, msg, errCode := branchiso.HTTPStatus(err)
+				response.Err(w, code, msg, errCode)
+				return
+			}
 		}
 		var tenant siPrintParty
 		err = pool.QueryRow(r.Context(), `

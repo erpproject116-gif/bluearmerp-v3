@@ -19,6 +19,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -215,6 +216,13 @@ func getOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Official receipt not found.", "ERR_NOT_FOUND")
 			return
+		}
+		if rec.LocationID != nil && *rec.LocationID > 0 {
+			if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, *rec.LocationID); err != nil {
+				code, msg, errCode := branchiso.HTTPStatus(err)
+				response.Err(w, code, msg, errCode)
+				return
+			}
 		}
 		response.OK(w, rec, "OK")
 	}

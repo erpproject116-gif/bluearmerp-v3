@@ -114,4 +114,7 @@ func TestInventoryStatusMatrixExpandSQL(t *testing.T) {
 	if !strings.Contains(sql, "i.id = any($2)") {
 		t.Fatalf("expected item id filter: %s", sql)
 	}
+	if !strings.Contains(sql, "in_transit") {
+		t.Fatalf("expected in_transit location exclusion: %s", sql)
+	}
 }

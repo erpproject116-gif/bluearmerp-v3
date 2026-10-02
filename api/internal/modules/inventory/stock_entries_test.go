@@ -56,7 +56,7 @@ func TestValidateStockEntryBody_transfer(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		errs := validateStockEntryBody(tc.body)
+		errs := validateStockEntryBody(tc.body, false)
 		if tc.wantKey == "" {
 			if errs != nil {
 				t.Errorf("%s: unexpected errs %v", tc.name, errs)
@@ -66,6 +66,28 @@ func TestValidateStockEntryBody_transfer(t *testing.T) {
 		if errs == nil || errs[tc.wantKey] == "" {
 			t.Errorf("%s: expected key %q, got %v", tc.name, tc.wantKey, errs)
 		}
+	}
+}
+
+func TestValidateStockEntryBodyHandoffBlocksIssueDestination(t *testing.T) {
+	from, to := int64(1), int64(2)
+	errs := validateStockEntryBody(stockEntryBody{
+		EntryType:      "issue",
+		FromLocationID: &from,
+		ToLocationID:   &to,
+		Lines:          []stockEntryLineIn{{ItemID: 10, Qty: 1}},
+	}, true)
+	if errs == nil || errs["to_location_id"] == "" {
+		t.Fatalf("expected to_location_id rejection when handoff on, got %v", errs)
+	}
+	errsOff := validateStockEntryBody(stockEntryBody{
+		EntryType:      "issue",
+		FromLocationID: &from,
+		ToLocationID:   &to,
+		Lines:          []stockEntryLineIn{{ItemID: 10, Qty: 1}},
+	}, false)
+	if errsOff != nil && errsOff["to_location_id"] != "" {
+		t.Fatalf("expected issue+destination allowed when handoff off, got %v", errsOff)
 	}
 }
 

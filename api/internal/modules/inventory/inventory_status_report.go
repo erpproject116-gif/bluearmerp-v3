@@ -10,10 +10,24 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
+
+func redactInventoryStatusCommercialRefs(tu auth.TenantUser, commercialLocs []int64, row *inventoryStatusRow) {
+	if row == nil || !tu.StrictBranchIsolation || branchiso.CanViewAllBranchCommercial(tu) {
+		return
+	}
+	for _, id := range commercialLocs {
+		if id == row.LocationID {
+			return
+		}
+	}
+	row.LastSoldRefType = ""
+	row.LastSoldRefID = nil
+}
 
 // Inventory status values filter stock rows by computed condition.
 const (
@@ -99,6 +113,7 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 		join public.inv_items i on i.id = bal.item_id and i.tenant_id = bal.tenant_id and i.deleted_at is null
 		join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id and l.deleted_at is null
 		  and coalesce(l.is_rma, false) = false
+		  and coalesce(l.location_type, 'location') <> 'in_transit'
 		left join public.inv_units bu on bu.id = i.base_unit_id
 		left join public.inv_item_categories c on c.id = i.item_category_id
 		left join (
@@ -117,7 +132,9 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 		  select coalesce(sum(b.qty_on_hand - b.qty_reserved), 0) as company_available_qty
 		  from public.inv_item_location_balances b
 		  join public.inv_locations loc on loc.id = b.location_id and loc.tenant_id = b.tenant_id
-		    and coalesce(loc.is_rma, false) = false and loc.deleted_at is null
+		    and coalesce(loc.is_rma, false) = false
+		    and coalesce(loc.location_type, 'location') <> 'in_transit'
+		    and loc.deleted_at is null
 		  where b.tenant_id = bal.tenant_id and b.item_id = bal.item_id
 		) co_bal on true
 		left join lateral (
@@ -218,7 +235,9 @@ func inventoryMatrixItemCatalogSQL(tenantID int64, q, stockStatus string, catego
 		select sum(bal.qty_on_hand - bal.qty_reserved)::float8
 		from public.inv_item_location_balances bal
 		join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id
-		  and coalesce(l.is_rma, false) = false and l.deleted_at is null
+		  and coalesce(l.is_rma, false) = false
+		  and coalesce(l.location_type, 'location') <> 'in_transit'
+		  and l.deleted_at is null
 		where bal.tenant_id = i.tenant_id and bal.item_id = i.id` + locPred + `
 	), 0)`
 
@@ -235,7 +254,9 @@ func inventoryMatrixItemCatalogSQL(tenantID int64, q, stockStatus string, catego
 			select 1
 			from public.inv_item_location_balances bal
 			join public.inv_locations l on l.id = bal.location_id and l.tenant_id = bal.tenant_id
-			  and coalesce(l.is_rma, false) = false and l.deleted_at is null
+			  and coalesce(l.is_rma, false) = false
+			  and coalesce(l.location_type, 'location') <> 'in_transit'
+			  and l.deleted_at is null
 			where bal.tenant_id = i.tenant_id and bal.item_id = i.id
 			  and bal.qty_reserved > 0` + locPred + `
 		)`
@@ -305,7 +326,9 @@ func inventoryStatusMatrixExpandSQL(tenantID int64, itemIDs []int64) (string, []
 		  select coalesce(sum(b.qty_on_hand - b.qty_reserved), 0) as company_available_qty
 		  from public.inv_item_location_balances b
 		  join public.inv_locations loc on loc.id = b.location_id and loc.tenant_id = b.tenant_id
-		    and coalesce(loc.is_rma, false) = false and loc.deleted_at is null
+		    and coalesce(loc.is_rma, false) = false
+		    and coalesce(loc.location_type, 'location') <> 'in_transit'
+		    and loc.deleted_at is null
 		  where b.tenant_id = i.tenant_id and b.item_id = i.id
 		) co_bal on true
 		left join lateral (
@@ -343,6 +366,7 @@ func inventoryStatusMatrixExpandSQL(tenantID int64, itemIDs []int64) (string, []
 		  and i.id = any($2)
 		  and l.tenant_id = $1
 		  and coalesce(l.is_rma, false) = false
+		  and coalesce(l.location_type, 'location') <> 'in_transit'
 		  and l.deleted_at is null
 		  and coalesce(l.status, 'active') = 'active'
 		order by i.item_code asc, l.location_name asc
@@ -421,6 +445,10 @@ func listInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
 		base, args := inventoryStatusSQL(tu.TenantID, qFilter, stockStatus, categoryID, locationID, inStockOnly)
+		var commercialLocs []int64
+		if tu.StrictBranchIsolation && !branchiso.CanViewAllBranchCommercial(tu) {
+			commercialLocs, _ = branchiso.CommercialLocationIDs(r.Context(), pool, tu)
+		}
 
 		// Matrix view: page item masters (same catalog as /inventory/items), then expand
 		// every non-RMA branch with LEFT JOIN balances (zeros where never received).
@@ -478,6 +506,7 @@ func listInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 					response.Err(w, http.StatusInternalServerError, "Failed to read inventory status.", "ERR_INTERNAL")
 					return
 				}
+				redactInventoryStatusCommercialRefs(tu, commercialLocs, &row)
 				out = append(out, row)
 			}
 			if out == nil {
@@ -509,6 +538,7 @@ func listInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to read inventory status.", "ERR_INTERNAL")
 				return
 			}
+			redactInventoryStatusCommercialRefs(tu, commercialLocs, &row)
 			out = append(out, row)
 		}
 		if out == nil {
@@ -527,6 +557,10 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		base, args := inventoryStatusSQL(tu.TenantID, qFilter, stockStatus, categoryID, locationID, inStockOnly)
+		var commercialLocs []int64
+		if tu.StrictBranchIsolation && !branchiso.CanViewAllBranchCommercial(tu) {
+			commercialLocs, _ = branchiso.CommercialLocationIDs(r.Context(), pool, tu)
+		}
 		qry := fmt.Sprintf("select * from (%s) sub order by item_code asc limit %d", base, reports.ExportMaxRows)
 		rows, err := pool.Query(r.Context(), qry, args...)
 		if err != nil {
@@ -550,6 +584,7 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to export inventory status.", "ERR_INTERNAL")
 				return
 			}
+			redactInventoryStatusCommercialRefs(tu, commercialLocs, &row)
 			reorder := ""
 			if row.ReorderLevel != nil {
 				reorder = fmt.Sprintf("%.4f", *row.ReorderLevel)
