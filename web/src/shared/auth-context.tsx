@@ -38,6 +38,7 @@ export type MeData = {
     can_manage_all_support_tickets?: boolean;
     permissions?: Record<string, string> | null;
     can_access_platform_command?: boolean;
+    can_start_role_preview?: boolean;
     platform_user_id?: number;
     platform_role?: string;
     platform_only?: boolean;
@@ -86,7 +87,20 @@ export type MeData = {
     can_extend?: boolean;
     previous_active_tenant_id?: number | null;
   } | null;
+  role_preview?: {
+    active: boolean;
+    role_code: string;
+    real_role?: string;
+    home_location_id?: number;
+    expires_at?: string;
+    can_extend?: boolean;
+  } | null;
 };
+
+/** True while owner/superadmin is in a role-template preview (effective flags are stripped). */
+export function isRolePreviewActive(me: MeData | null | undefined): boolean {
+  return Boolean(me?.role_preview?.active);
+}
 
 /** Platform superadmins — same Command Center + unrestricted ERP as itsjohnranel.
  *  bluearmph@gmail.com is also a store owner of the signed-in business. */
@@ -100,9 +114,16 @@ function isProductOwnerEmail(email?: string): boolean {
   return PLATFORM_CONSOLE_EMAILS.has(email?.trim().toLowerCase() ?? "");
 }
 
+/** Email allowlist elevation — disabled during role preview (R5). */
+function elevatedProductOwner(me: MeData | null | undefined): boolean {
+  if (!me?.user || isRolePreviewActive(me)) return false;
+  return isProductOwnerEmail(me.user.email);
+}
+
 export function canAccessPlatformConsole(me: MeData | null | undefined): boolean {
   if (!me?.user) return false;
-  if (isProductOwnerEmail(me.user.email) || me.user.is_platform_superadmin) return true;
+  if (isRolePreviewActive(me)) return false;
+  if (elevatedProductOwner(me) || me.user.is_platform_superadmin) return true;
   if (me.user.can_access_platform_command) return true;
   if (me.user.platform_permissions && Object.keys(me.user.platform_permissions).length > 0) {
     return Boolean(
@@ -115,14 +136,15 @@ export function canAccessPlatformConsole(me: MeData | null | undefined): boolean
 
 export function hasPlatformPermission(me: MeData | null | undefined, code: string): boolean {
   if (!me?.user) return false;
-  if (me.user.is_platform_superadmin || isProductOwnerEmail(me.user.email)) return true;
+  if (isRolePreviewActive(me)) return false;
+  if (me.user.is_platform_superadmin || elevatedProductOwner(me)) return true;
   return Boolean(me.user.platform_permissions?.[code]);
 }
 
 export function canManageFormSettings(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  return Boolean(u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || isProductOwnerEmail(u.email));
+  return Boolean(u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || elevatedProductOwner(me));
 }
 
 export function canManageBranding(me: MeData | null | undefined): boolean {
@@ -130,14 +152,14 @@ export function canManageBranding(me: MeData | null | undefined): boolean {
   const u = me.user;
   return Boolean(
     u.can_manage_branding ??
-      (u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || isProductOwnerEmail(u.email)),
+      (u.can_manage_custom_fields || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || elevatedProductOwner(me)),
   );
 }
 
 export function canManageUsers(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  if (u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email)) return true;
+  if (u.is_platform_superadmin || u.is_tenant_owner || elevatedProductOwner(me)) return true;
   if (u.permissions && Object.keys(u.permissions).length > 0) {
     return hasPermission(me, "user_management.users", "write");
   }
@@ -147,7 +169,7 @@ export function canManageUsers(me: MeData | null | undefined): boolean {
 export function canViewActivityLogs(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  if (u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email)) return true;
+  if (u.is_platform_superadmin || u.is_tenant_owner || elevatedProductOwner(me)) return true;
   if (u.permissions && Object.keys(u.permissions).length > 0) {
     return hasPermission(me, "activity_logs.logs", "read");
   }
@@ -157,7 +179,7 @@ export function canViewActivityLogs(me: MeData | null | undefined): boolean {
 export function canViewChangeLogs(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  if (u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email)) return true;
+  if (u.is_platform_superadmin || u.is_tenant_owner || elevatedProductOwner(me)) return true;
   if (u.permissions && Object.keys(u.permissions).length > 0) {
     return (
       hasPermission(me, "activity_logs.changes", "read") || hasPermission(me, "activity_logs.logs", "read")
@@ -169,7 +191,7 @@ export function canViewChangeLogs(me: MeData | null | undefined): boolean {
 export function canViewCrm(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  return Boolean(u.can_view_crm || u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email));
+  return Boolean(u.can_view_crm || u.is_platform_superadmin || u.is_tenant_owner || elevatedProductOwner(me));
 }
 
 /** Same gate as the notifications inbox page (CrmRoute + ModuleAccessGate). */
@@ -185,21 +207,21 @@ export function canManageCrmRules(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
   return Boolean(
-    u.can_manage_crm_rules || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || isProductOwnerEmail(u.email),
+    u.can_manage_crm_rules || u.is_platform_superadmin || u.is_tenant_owner || u.is_store_admin || elevatedProductOwner(me),
   );
 }
 
 export function canViewAllCrm(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
-  return Boolean(u.can_view_all_crm || u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email));
+  return Boolean(u.can_view_all_crm || u.is_platform_superadmin || u.is_tenant_owner || elevatedProductOwner(me));
 }
 
 export function canManageSalesTeam(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;
   return Boolean(
-    u.can_manage_sales_team || u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email),
+    u.can_manage_sales_team || u.can_manage_users || u.is_platform_superadmin || u.is_tenant_owner || elevatedProductOwner(me),
   );
 }
 
@@ -209,7 +231,7 @@ export function canViewCrmAnalytics(me: MeData | null | undefined): boolean {
   if (u.permissions && Object.keys(u.permissions).length > 0) {
     return hasPermission(me, "crm.reports_customer_quotations", "read");
   }
-  return Boolean(u.can_view_crm_analytics || u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email));
+  return Boolean(u.can_view_crm_analytics || u.is_platform_superadmin || u.is_tenant_owner || elevatedProductOwner(me));
 }
 
 /** IT desk / superadmin — may view and manage every support ticket in the tenant. */
@@ -221,7 +243,7 @@ export function canManageAllSupportTickets(me: MeData | null | undefined): boole
       u.is_platform_superadmin ||
       u.is_tenant_owner ||
       u.is_store_admin ||
-      isProductOwnerEmail(u.email) ||
+      elevatedProductOwner(me) ||
       hasPermission(me, "support.tickets_assign", "write"),
   );
 }
@@ -231,7 +253,7 @@ export type AccessLevel = "deny" | "read" | "write";
 export function permissionLevel(me: MeData | null | undefined, code: string): AccessLevel {
   const u = me?.user;
   if (!u) return "deny";
-  if (u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email)) return "write";
+  if (u.is_platform_superadmin || u.is_tenant_owner || elevatedProductOwner(me)) return "write";
   const perms = u.permissions;
   if (perms && Object.keys(perms).length > 0) {
     if (perms[code]) return perms[code] as AccessLevel;

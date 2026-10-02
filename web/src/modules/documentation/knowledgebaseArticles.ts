@@ -158,6 +158,31 @@ export const knowledgebaseArticles: KbArticle[] = [
     relatedGuideIds: ["inventory"],
   },
   {
+    id: "role-preview-view-as-role",
+    title: "How do I view the app as a store admin (or another role)?",
+    scenario: "You are the owner or a platform superadmin and want to see menus and access limits as a role template would.",
+    intro:
+      "Use View as role… in the sidebar footer. This starts a read-only role template preview for about 60 minutes. It does not impersonate a specific user or copy their personal permission overrides.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Sign in as the business owner (or platform superadmin in that workspace).",
+          "In the sidebar footer, open View as role… and pick a role (for example store_admin). Optionally set a home branch.",
+          "Confirm menus and document access match that role. Creating or editing documents is blocked until you exit.",
+          "Use Exit preview on the amber banner (or +30 min to extend once).",
+        ],
+      },
+      {
+        type: "tip",
+        text: "End any support remoting session before starting role preview. Role preview and support sessions cannot run together.",
+      },
+    ],
+    primaryHref: "/app/user-management/roles",
+    primaryLabel: "Review roles",
+    relatedGuideIds: ["inventory"],
+  },
+  {
     id: "strict-branch-isolation",
     title: "What does Strict branch isolation change?",
     scenario: "Your business runs multiple branches and you need clear commercial boundaries without hiding stock inquiry.",

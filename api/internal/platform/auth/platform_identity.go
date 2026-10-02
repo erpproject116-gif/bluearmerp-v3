@@ -42,6 +42,9 @@ func (tu TenantUser) HasPlatformPermission(code string) bool {
 }
 
 func (tu TenantUser) CanAccessPlatformCommand() bool {
+	if tu.RolePreviewActive {
+		return false
+	}
 	if isBootstrapSuperadminEmail(tu.Email) || tu.IsPlatformSuperadmin {
 		return true
 	}

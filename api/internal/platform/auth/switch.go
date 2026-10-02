@@ -17,6 +17,7 @@ func RegisterAuthRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Post("/auth/switch-tenant", switchTenantHandler(pool))
 	r.Post("/auth/session-ended", sessionEndedHandler(pool))
 	r.Get("/auth/branches", branchesHandler(pool))
+	RegisterRolePreviewRoutes(r, pool)
 	RegisterPushRoutes(r, pool)
 }
 
@@ -51,6 +52,12 @@ func switchTenantHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if tu.RolePreviewActive {
+			response.Err(w, http.StatusForbidden,
+				"Cannot switch businesses during role preview. Exit preview first.",
+				"ERR_ROLE_PREVIEW_ACTIVE")
+			return
+		}
 		if tu.SupportSessionID > 0 && body.TenantID != tu.TenantID {
 			response.Err(w, http.StatusForbidden,
 				"Cannot switch businesses during a support session. End support first.",

@@ -38,11 +38,15 @@ type MePayload struct {
 	Entitlement        *entitlement.Snapshot `json:"entitlement,omitempty"`
 	Commercial         *day1commercial.Commercial `json:"commercial,omitempty"`
 	SupportSession     map[string]any        `json:"support_session,omitempty"`
+	RolePreview        map[string]any        `json:"role_preview,omitempty"`
 }
 
 func fullModuleAccess(tu TenantUser) bool {
 	// Platform operators and tenants with auto_enable_all_modules see every module as on.
 	// Tenant owners otherwise respect tenant_modules so Simple store / feature hide works for admins too.
+	if tu.RolePreviewActive {
+		return tu.AutoEnableAllModules
+	}
 	applyBootstrapOwnerFlags(&tu)
 	return tu.IsPlatformSuperadmin || tu.AutoEnableAllModules
 }
@@ -65,7 +69,9 @@ func MeHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 }
 
 func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.Config) (MePayload, error) {
-	applyBootstrapOwnerFlags(&tu)
+	if !tu.RolePreviewActive {
+		applyBootstrapOwnerFlags(&tu)
+	}
 	if tu.PlatformOnly || tu.TenantID <= 0 {
 		return buildPlatformOnlyMe(tu), nil
 	}
@@ -175,6 +181,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 			"can_manage_all_support_tickets": tu.CanManageAllSupportTickets(),
 			"permissions":                   tu.PermissionsMap(),
 			"can_access_platform_command":   tu.CanAccessPlatformCommand(),
+			"can_start_role_preview":        tu.CanStartRolePreview && !tu.RolePreviewActive,
 			"platform_user_id":              tu.PlatformUserID,
 			"platform_role":                 tu.PlatformRole,
 			"platform_only":                 tu.PlatformOnly,
@@ -195,6 +202,22 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 		}
 	}
 
+	var rolePreviewMap map[string]any
+	if tu.RolePreviewActive {
+		rolePreviewMap = map[string]any{
+			"active":     true,
+			"role_code":  tu.RolePreviewRoleCode,
+			"real_role":  tu.RealTenantRole,
+			"can_extend": true,
+		}
+		if tu.RolePreviewHomeLocationID > 0 {
+			rolePreviewMap["home_location_id"] = tu.RolePreviewHomeLocationID
+		}
+		if tu.RolePreviewExpiresAt != nil {
+			rolePreviewMap["expires_at"] = tu.RolePreviewExpiresAt.UTC().Format("2006-01-02T15:04:05Z07:00")
+		}
+	}
+
 	return MePayload{
 		User: user,
 		Tenant: map[string]any{
@@ -212,6 +235,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 		Entitlement:        ent,
 		Commercial:         commercial,
 		SupportSession:     supportMap,
+		RolePreview:        rolePreviewMap,
 	}, nil
 }
 

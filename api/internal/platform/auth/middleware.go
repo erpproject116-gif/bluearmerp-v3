@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
@@ -66,6 +67,16 @@ type TenantUser struct {
 	// Support remote workspace access (ghost membership).
 	SupportSessionID   int64
 	SupportAccessMode  string
+
+	// Role preview overlay ("View as …"). Effective flags are stripped; Real* keep lifecycle power.
+	RolePreviewActive         bool
+	RolePreviewRoleCode       string
+	RolePreviewHomeLocationID int64
+	RolePreviewExpiresAt      *time.Time
+	RealIsTenantOwner         bool
+	RealIsPlatformSuperadmin  bool
+	RealTenantRole            string
+	CanStartRolePreview       bool
 }
 
 type Claims struct {
@@ -176,8 +187,22 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 			}
 			applyBootstrapOwnerFlags(&user)
 
+			if err := applyRolePreviewOverlay(r.Context(), pool, &user); err != nil {
+				log.Printf("auth: role preview overlay: %v", err)
+				response.Err(w, http.StatusInternalServerError, "Failed to apply role preview.", "ERR_INTERNAL")
+				return
+			}
+
 			if !user.PlatformOnly {
 				user.ActiveBranchID = resolveActiveBranchID(r.Context(), pool, user, parseActiveBranchHeader(r))
+			}
+
+			// Role preview v1: default-deny mutating HTTP except allowlisted lifecycle paths.
+			if user.RolePreviewActive && !rolePreviewMutatingAllowed(r.Method, r.URL.Path) {
+				response.Err(w, http.StatusForbidden,
+					"Role preview is read-only. Exit preview to make changes.",
+					"ERR_ROLE_PREVIEW_READ_ONLY")
+				return
 			}
 
 			// Support session: expire / read-only / destructive rails on every request.

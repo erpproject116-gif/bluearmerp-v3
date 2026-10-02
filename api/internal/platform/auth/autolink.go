@@ -63,6 +63,10 @@ func applyBootstrapOwnerFlags(tu *TenantUser) {
 	if tu == nil || !isBootstrapSuperadminEmail(tu.Email) {
 		return
 	}
+	// Never re-elevate during role preview (R1 / R5).
+	if tu.RolePreviewActive {
+		return
+	}
 	tu.IsPlatformSuperadmin = true
 	tu.IsStoreAdmin = true
 	if tu.PlatformRole == "" {
@@ -75,6 +79,9 @@ func applyBootstrapOwnerFlags(tu *TenantUser) {
 }
 
 func (tu TenantUser) hasOwnerCapability() bool {
+	if tu.RolePreviewActive {
+		return false
+	}
 	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || isBootstrapSuperadminEmail(tu.Email)
 }
 

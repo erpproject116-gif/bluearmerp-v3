@@ -102,25 +102,28 @@ func loadEffectivePermissions(ctx context.Context, pool *pgxpool.Pool, tu *Tenan
 
 	// Effective access is Role, then per-user Overrides replace. Groups were retired
 	// in migration 308 (their grants were folded into overrides).
-	ovRows, err := pool.Query(ctx, `
-		select permission_code, access_level
-		from public.user_permission_overrides
-		where tenant_id = $1 and user_id = $2`,
-		tu.TenantID, tu.AppUserID)
-	if err != nil {
-		return err
-	}
-	for ovRows.Next() {
-		var code, lvl string
-		if err := ovRows.Scan(&code, &lvl); err != nil {
-			ovRows.Close()
+	// Role preview uses the stock role template only (R3) — skip overrides.
+	if !tu.RolePreviewActive {
+		ovRows, err := pool.Query(ctx, `
+			select permission_code, access_level
+			from public.user_permission_overrides
+			where tenant_id = $1 and user_id = $2`,
+			tu.TenantID, tu.AppUserID)
+		if err != nil {
 			return err
 		}
-		perms[code] = lvl
-	}
-	ovRows.Close()
-	if err := ovRows.Err(); err != nil {
-		return err
+		for ovRows.Next() {
+			var code, lvl string
+			if err := ovRows.Scan(&code, &lvl); err != nil {
+				ovRows.Close()
+				return err
+			}
+			perms[code] = lvl
+		}
+		ovRows.Close()
+		if err := ovRows.Err(); err != nil {
+			return err
+		}
 	}
 	if len(perms) > 0 {
 		tu.permissions = perms

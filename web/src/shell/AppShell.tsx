@@ -40,6 +40,8 @@ import { navFeatureLabelKey, navModuleLabelKey } from "../shared/branding/navLab
 import { UserAccountMenu } from "./UserAccountMenu";
 import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
 import { SupportSessionBanner } from "./SupportSessionBanner";
+import { RolePreviewBanner } from "./RolePreviewBanner";
+import { RolePreviewPicker } from "./RolePreviewPicker";
 import { SidebarNav } from "./SidebarNav";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { DemoTenantBanner } from "../shared/DemoTenantBanner";
@@ -376,6 +378,9 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
         <div class="mt-4 shrink-0 space-y-2 border-t border-stroke pt-3">
           <BusinessBranchSwitcher />
+          <div class="px-2 pb-1">
+            <RolePreviewPicker />
+          </div>
           <UserAccountMenu />
           <Show when={!shell.collapsed()}>
             <p
@@ -558,6 +563,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         </header>
         <main class="flex-1 p-4 sm:p-6">
           <SupportSessionBanner />
+          <RolePreviewBanner />
           <DemoTenantBanner />
           <EntitlementBanner />
           <DesktopPreferredHint />
