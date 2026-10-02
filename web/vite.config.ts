@@ -103,11 +103,11 @@ export default defineConfig(({ mode }) => {
               handler: "NetworkOnly",
             },
             {
-              // Same-origin /api only (Vite proxy / serverless). Never intercept
-              // cross-origin api.bluearmerp.com — SW fetch failures surface as
-              // CORS / workbox no-response and brick auth.refresh().
+              // Same-app /api only (Vite proxy / Vercel functions). Never intercept
+              // the API host (api.*) — SW fetch failures surface as CORS /
+              // workbox no-response and brick auth.refresh().
               urlPattern: ({ url }) =>
-                url.origin === self.location.origin && url.pathname.startsWith("/api"),
+                url.pathname.startsWith("/api") && !url.hostname.startsWith("api."),
               handler: "NetworkOnly",
               method: "GET",
             },
