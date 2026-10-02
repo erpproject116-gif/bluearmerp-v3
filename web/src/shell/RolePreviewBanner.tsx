@@ -50,6 +50,11 @@ export function RolePreviewBanner() {
         getGlobalToast()?.error(res.message ?? "Could not end role preview.");
         return;
       }
+      try {
+        sessionStorage.removeItem("bluearm_role_preview_active");
+      } catch {
+        /* ignore */
+      }
       await auth.refresh();
       getGlobalToast()?.success("Exited role preview.");
     } finally {

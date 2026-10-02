@@ -1,6 +1,6 @@
 import { type ParentComponent, Show, createSignal, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { supabase, apiNetworkErrorMessage } from "../shared/api";
+import { apiFetch, supabase, apiNetworkErrorMessage } from "../shared/api";
 import { useAuth } from "../shared/auth-context";
 import { needsSignInRedirect, SessionLoading, NavigateToSignIn } from "./AuthRedirect";
 import { signOutApp } from "./signOut";
@@ -9,6 +9,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
   const auth = useAuth();
   const navigate = useNavigate();
   const [signedInAs, setSignedInAs] = createSignal("");
+  const [endingPreview, setEndingPreview] = createSignal(false);
 
   onMount(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -24,6 +25,26 @@ export const ProtectedRoute: ParentComponent = (props) => {
     navigate("/signin", { replace: true });
   };
 
+  const exitRolePreviewAndRetry = async () => {
+    if (endingPreview()) return;
+    setEndingPreview(true);
+    try {
+      try {
+        await apiFetch("/api/v1/auth/role-preview/end", { method: "POST", body: "{}" }, { silent: true });
+      } catch {
+        /* ignore — SQL clear / soft-fail may already have cleared */
+      }
+      try {
+        sessionStorage.removeItem("bluearm_role_preview_active");
+      } catch {
+        /* ignore */
+      }
+      await auth.refresh();
+    } finally {
+      setEndingPreview(false);
+    }
+  };
+
   return (
     <Show when={auth.bootstrapping} fallback={
       <Show
@@ -37,13 +58,21 @@ export const ProtectedRoute: ParentComponent = (props) => {
                   <div class="max-w-lg rounded-xl border border-stroke bg-white p-6 shadow-sm">
                         <p class="text-sm font-medium text-text-primary">Cannot reach the API</p>
                         <p class="mt-2 text-sm text-text-secondary">{apiNetworkErrorMessage()}</p>
-                    <div class="mt-5">
+                    <div class="mt-5 flex flex-wrap gap-2">
                       <button
                         type="button"
                         class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
                         onClick={() => void auth.refresh()}
                       >
                         Retry
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+                        disabled={endingPreview()}
+                        onClick={() => void exitRolePreviewAndRetry()}
+                      >
+                        {endingPreview() ? "Exiting…" : "Exit role preview"}
                       </button>
                     </div>
                   </div>

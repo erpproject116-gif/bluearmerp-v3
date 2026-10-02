@@ -47,3 +47,5 @@ where lower(email) = lower('USER_EMAIL_HERE')
 Then hard-refresh the app. `/auth/me` should return 200.
 
 **After soft-fail deploy:** broken overlays auto-clear; Exit preview should work even if overlay did not activate. Prefer the Exit button / `POST /auth/role-preview/end` before SQL.
+
+**If overlay succeeds but the app still shows CORS / Cannot reach API:** hard-refresh (Ctrl+Shift+R) so the service worker updates — older builds intercepted cross-origin `api.bluearmerp.com` fetches and turned network blips into Workbox `no-response` + CORS noise. The error screen also offers **Exit role preview** which calls `POST /auth/role-preview/end` then retries `/auth/me`.

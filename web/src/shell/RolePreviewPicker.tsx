@@ -64,6 +64,11 @@ export function RolePreviewPicker() {
         getGlobalToast()?.error(res.message ?? "Could not start role preview.");
         return;
       }
+      try {
+        sessionStorage.setItem("bluearm_role_preview_active", "1");
+      } catch {
+        /* ignore */
+      }
       setOpen(false);
       await auth.refresh();
       getGlobalToast()?.success(`Viewing as ${role()}. Read-only.`);
