@@ -60,3 +60,74 @@ func TestLoadEffectivePermissionsSkipsOverridesConcept(t *testing.T) {
 		t.Fatal("preview member must not have owner capability")
 	}
 }
+
+func TestRestoreRolePreviewIdentityAfterSoftFail(t *testing.T) {
+	tu := TenantUser{
+		AppUserID:            2,
+		TenantID:             2,
+		Email:                "itsjohnranel@gmail.com",
+		IsTenantOwner:        true,
+		IsPlatformSuperadmin: true,
+		TenantRole:           "store_admin",
+		PlatformRole:         "superadmin",
+		PlatformPermissions:  map[string]bool{"platform.console": true},
+		HomeLocationID:       9,
+		CanStartRolePreview:  true,
+	}
+	tu.canManageUsersRole = true
+	tu.IsStoreAdmin = true
+	tu.permissions = map[string]string{"sales": "write"}
+
+	snap := snapshotRolePreviewIdentity(&tu)
+
+	// Simulate half-applied overlay strip.
+	tu.RealIsTenantOwner = true
+	tu.RealIsPlatformSuperadmin = true
+	tu.RealTenantRole = "store_admin"
+	tu.RolePreviewActive = true
+	tu.RolePreviewRoleCode = "receiving"
+	tu.IsTenantOwner = false
+	tu.IsPlatformSuperadmin = false
+	tu.TenantRole = "receiving"
+	tu.PlatformPermissions = nil
+	tu.PlatformRole = ""
+	tu.permissions = nil
+	tu.CanStartRolePreview = false
+
+	restoreRolePreviewIdentity(&tu, snap)
+
+	if tu.RolePreviewActive || tu.RolePreviewRoleCode != "" {
+		t.Fatal("preview flags must be cleared after restore")
+	}
+	if !tu.IsTenantOwner || !tu.IsPlatformSuperadmin {
+		t.Fatal("real owner/superadmin must be restored")
+	}
+	if tu.TenantRole != "store_admin" || tu.PlatformRole != "superadmin" {
+		t.Fatal("real roles must be restored")
+	}
+	if tu.PlatformPermissions["platform.console"] != true {
+		t.Fatal("platform permissions must be restored")
+	}
+	if tu.HomeLocationID != 9 || !tu.CanStartRolePreview {
+		t.Fatal("home location and can_start must be restored")
+	}
+	if tu.permissions["sales"] != "write" {
+		t.Fatal("effective permissions must be restored")
+	}
+}
+
+func TestCanStartRolePreviewRealDuringActivePreview(t *testing.T) {
+	tu := TenantUser{
+		RolePreviewActive:        true,
+		RealIsPlatformSuperadmin: true,
+		IsPlatformSuperadmin:     false,
+	}
+	if !canStartRolePreviewReal(tu) {
+		t.Fatal("real superadmin must be able to end/extend lifecycle during preview")
+	}
+	tu.RealIsPlatformSuperadmin = false
+	tu.RealIsTenantOwner = false
+	if canStartRolePreviewReal(tu) {
+		t.Fatal("stripped identity without Real* power must not start preview")
+	}
+}

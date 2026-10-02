@@ -43,8 +43,99 @@ func canStartRolePreviewReal(tu TenantUser) bool {
 	return tu.IsTenantOwner || tu.IsPlatformSuperadmin || isBootstrapSuperadminEmail(tu.Email)
 }
 
+// rolePreviewIdentitySnap captures pre-overlay identity so soft-fail can restore it.
+type rolePreviewIdentitySnap struct {
+	isTenantOwner        bool
+	isPlatformSuperadmin bool
+	tenantRole           string
+	platformRole         string
+	platformPermissions  map[string]bool
+	homeLocationID       int64
+	canFormSettings      bool
+	canManageUsers       bool
+	canViewActivityLogs  bool
+	canViewCrm           bool
+	canManageCrmRules    bool
+	canViewAllCrm        bool
+	canManageSalesTeam   bool
+	canViewCrmAnalytics  bool
+	applyUserScopes      bool
+	isStoreAdmin         bool
+	permissions          map[string]string
+	submitPerms          map[string]bool
+	canStartRolePreview  bool
+}
+
+func snapshotRolePreviewIdentity(tu *TenantUser) rolePreviewIdentitySnap {
+	return rolePreviewIdentitySnap{
+		isTenantOwner:        tu.IsTenantOwner,
+		isPlatformSuperadmin: tu.IsPlatformSuperadmin,
+		tenantRole:           tu.TenantRole,
+		platformRole:         tu.PlatformRole,
+		platformPermissions:  tu.PlatformPermissions,
+		homeLocationID:       tu.HomeLocationID,
+		canFormSettings:      tu.canManageFormSettingsRole,
+		canManageUsers:       tu.canManageUsersRole,
+		canViewActivityLogs:  tu.canViewActivityLogsRole,
+		canViewCrm:           tu.canViewCrmRole,
+		canManageCrmRules:    tu.canManageCrmRulesRole,
+		canViewAllCrm:        tu.canViewAllCrmRole,
+		canManageSalesTeam:   tu.canManageSalesTeamRole,
+		canViewCrmAnalytics:  tu.canViewCrmAnalyticsRole,
+		applyUserScopes:      tu.ApplyUserScopes,
+		isStoreAdmin:         tu.IsStoreAdmin,
+		permissions:          tu.permissions,
+		submitPerms:          tu.submitPerms,
+		canStartRolePreview:  tu.CanStartRolePreview,
+	}
+}
+
+func restoreRolePreviewIdentity(tu *TenantUser, snap rolePreviewIdentitySnap) {
+	tu.IsTenantOwner = snap.isTenantOwner
+	tu.IsPlatformSuperadmin = snap.isPlatformSuperadmin
+	tu.TenantRole = snap.tenantRole
+	tu.PlatformRole = snap.platformRole
+	tu.PlatformPermissions = snap.platformPermissions
+	tu.HomeLocationID = snap.homeLocationID
+	tu.canManageFormSettingsRole = snap.canFormSettings
+	tu.canManageUsersRole = snap.canManageUsers
+	tu.canViewActivityLogsRole = snap.canViewActivityLogs
+	tu.canViewCrmRole = snap.canViewCrm
+	tu.canManageCrmRulesRole = snap.canManageCrmRules
+	tu.canViewAllCrmRole = snap.canViewAllCrm
+	tu.canManageSalesTeamRole = snap.canManageSalesTeam
+	tu.canViewCrmAnalyticsRole = snap.canViewCrmAnalytics
+	tu.ApplyUserScopes = snap.applyUserScopes
+	tu.IsStoreAdmin = snap.isStoreAdmin
+	tu.permissions = snap.permissions
+	tu.submitPerms = snap.submitPerms
+	tu.CanStartRolePreview = snap.canStartRolePreview
+	tu.RolePreviewActive = false
+	tu.RolePreviewRoleCode = ""
+	tu.RolePreviewHomeLocationID = 0
+	tu.RolePreviewExpiresAt = nil
+	tu.RealIsTenantOwner = false
+	tu.RealIsPlatformSuperadmin = false
+	tu.RealTenantRole = ""
+}
+
+// abortRolePreviewSoftFail clears DB preview state, restores real identity, and never fails the request.
+func abortRolePreviewSoftFail(ctx context.Context, pool *pgxpool.Pool, tu *TenantUser, snap rolePreviewIdentitySnap, code string, cause error) {
+	log.Printf("auth: role preview overlay soft-fail user=%d tenant=%d role=%s: %v",
+		tu.AppUserID, tu.TenantID, code, cause)
+	if err := clearRolePreviewDB(ctx, pool, tu.AppUserID); err != nil {
+		log.Printf("auth: role preview soft-fail clear: user=%d: %v", tu.AppUserID, err)
+	}
+	if err := BumpUserRevision(ctx, pool, tu.AppUserID); err != nil {
+		log.Printf("auth: role preview soft-fail bump: user=%d: %v", tu.AppUserID, err)
+	}
+	restoreRolePreviewIdentity(tu, snap)
+}
+
 // applyRolePreviewOverlay applies DB preview columns onto tu (per-request).
 // Call after applyBootstrapOwnerFlags. Mutates tu in place.
+// Soft-fails on overlay errors: clears preview, restores real identity, returns nil
+// so middleware never bricks /auth/me or lifecycle routes.
 func applyRolePreviewOverlay(ctx context.Context, pool *pgxpool.Pool, tu *TenantUser) error {
 	if tu == nil || tu.AppUserID <= 0 || tu.PlatformOnly {
 		return nil
@@ -59,7 +150,9 @@ func applyRolePreviewOverlay(ctx context.Context, pool *pgxpool.Pool, tu *Tenant
 		from public.users where id = $1`, tu.AppUserID).
 		Scan(&roleCode, &homeID, &startedAt, &expiresAt)
 	if err != nil {
-		return err
+		// Do not brick the session if preview columns cannot be read.
+		log.Printf("auth: role preview overlay read soft-fail user=%d: %v", tu.AppUserID, err)
+		return nil
 	}
 
 	// Starter capability from real (pre-overlay) identity.
@@ -74,6 +167,8 @@ func applyRolePreviewOverlay(ctx context.Context, pool *pgxpool.Pool, tu *Tenant
 		_ = BumpUserRevision(ctx, pool, tu.AppUserID)
 		return nil
 	}
+
+	snap := snapshotRolePreviewIdentity(tu)
 
 	tu.RealIsTenantOwner = tu.IsTenantOwner
 	tu.RealIsPlatformSuperadmin = tu.IsPlatformSuperadmin
@@ -91,7 +186,8 @@ func applyRolePreviewOverlay(ctx context.Context, pool *pgxpool.Pool, tu *Tenant
 	tu.PlatformRole = ""
 
 	if err := reloadTenantRoleFlags(ctx, pool, tu); err != nil {
-		return err
+		abortRolePreviewSoftFail(ctx, pool, tu, snap, code, err)
+		return nil
 	}
 	if homeID != nil && *homeID > 0 {
 		tu.HomeLocationID = *homeID
@@ -101,7 +197,8 @@ func applyRolePreviewOverlay(ctx context.Context, pool *pgxpool.Pool, tu *Tenant
 	tu.permissions = nil
 	tu.submitPerms = nil
 	if err := loadEffectivePermissions(ctx, pool, tu); err != nil {
-		return err
+		abortRolePreviewSoftFail(ctx, pool, tu, snap, code, err)
+		return nil
 	}
 	return nil
 }
@@ -289,11 +386,9 @@ func endRolePreview(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
 			return
 		}
-		// Allow end if preview active OR real owner (lifecycle).
-		if !tu.RolePreviewActive && !canStartRolePreviewReal(tu) {
-			response.Err(w, http.StatusForbidden, "No active role preview.", "ERR_FORBIDDEN")
-			return
-		}
+		// Always allow clearing own preview columns (idempotent escape hatch).
+		// Soft-fail overlay may leave RolePreviewActive=false while DB still has columns;
+		// owners/superadmins may also end after soft-restore. Never require a successful overlay.
 		if err := clearRolePreviewDB(r.Context(), pool, tu.AppUserID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to end role preview.", "ERR_INTERNAL")
 			return

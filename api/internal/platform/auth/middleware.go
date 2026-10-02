@@ -187,10 +187,10 @@ func Middleware(pool *pgxpool.Pool, supabaseURL, jwtSecret string) func(http.Han
 			}
 			applyBootstrapOwnerFlags(&user)
 
+			// Soft-fail: applyRolePreviewOverlay clears broken preview and returns nil.
+			// Never 500 here — that bricks /auth/me and looks like a CORS outage in the browser.
 			if err := applyRolePreviewOverlay(r.Context(), pool, &user); err != nil {
-				log.Printf("auth: role preview overlay: %v", err)
-				response.Err(w, http.StatusInternalServerError, "Failed to apply role preview.", "ERR_INTERNAL")
-				return
+				log.Printf("auth: role preview overlay unexpected error user=%d: %v", user.AppUserID, err)
 			}
 
 			if !user.PlatformOnly {
