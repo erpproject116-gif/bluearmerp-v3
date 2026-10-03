@@ -40,7 +40,7 @@ export function apiNetworkErrorMessage(): string {
   if (!apiBase) {
     return "API URL is not configured. Set VITE_API_BASE_URL on Vercel to https://api.bluearmerp.com, then redeploy.";
   }
-  return `Could not reach the API at ${apiBase}. If the browser console shows CORS errors, set CORS_ORIGIN on the API host to your app origin (no trailing slash), redeploy the API, then hard-refresh.`;
+  return `Could not reach the API at ${apiBase}. A console CORS error with 502 usually means the API was briefly unavailable (not a wrong CORS_ORIGIN). Hard-refresh, use Exit role preview if you were viewing as a role, then retry. Only change CORS_ORIGIN if /auth/me still fails while https://api.bluearmerp.com/health returns OK.`;
 }
 
 export async function getAccessToken(): Promise<string | null> {
