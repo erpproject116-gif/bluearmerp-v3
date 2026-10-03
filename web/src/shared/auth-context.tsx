@@ -406,6 +406,7 @@ export const AuthProvider: ParentComponent = (props) => {
           clearRolePreviewAttempt();
         } else {
           clearRolePreviewFlag();
+          clearRolePreviewAttempt();
         }
         setState({ me: res.data, loading: false, bootstrapError: null, bootstrapMessage: null });
         return;
@@ -428,7 +429,11 @@ export const AuthProvider: ParentComponent = (props) => {
               res.code === "ERR_SESSION_IDLE"
             ? "unauthorized"
             : "network";
-      const suspected = isRolePreviewSuspected() || isRolePreviewFlagSet();
+      // After end+retry, attempt flags are cleared — still keep preview copy + Exit (D8).
+      const suspected =
+        isRolePreviewSuspected() ||
+        isRolePreviewFlagSet() ||
+        Boolean(options?._previewRecoveryTried);
       const bootstrapMessage =
         suspected
           ? rolePreviewBootstrapMessage(res.message)
@@ -455,24 +460,27 @@ export const AuthProvider: ParentComponent = (props) => {
         me: null,
         loading: false,
         bootstrapError: "network",
-        bootstrapMessage: isRolePreviewSuspected()
-          ? rolePreviewBootstrapMessage()
-          : apiNetworkErrorMessage(),
+        bootstrapMessage:
+          isRolePreviewSuspected() || Boolean(options?._previewRecoveryTried)
+            ? rolePreviewBootstrapMessage()
+            : apiNetworkErrorMessage(),
       });
     }
   };
 
-  /** Single-flight /auth/me — drops overlapping TOKEN_REFRESHED while bootstrap is in flight. */
+  /** Single-flight /auth/me — background waiters coalesce; foreground always re-fetches after wait (G6). */
   let refreshInflight: Promise<void> | null = null;
   const refreshCoalesced = async (options?: { background?: boolean }) => {
     if (refreshInflight) {
       await refreshInflight;
       if (options?.background) return;
+      // Foreground (picker Start, Exit, Retry): do not trust the prior flight — fetch again.
     }
-    refreshInflight = refresh(options).finally(() => {
-      refreshInflight = null;
+    const flight = refresh(options).finally(() => {
+      if (refreshInflight === flight) refreshInflight = null;
     });
-    await refreshInflight;
+    refreshInflight = flight;
+    await flight;
   };
 
   const setActiveTenant = async (tenantId: number) => {

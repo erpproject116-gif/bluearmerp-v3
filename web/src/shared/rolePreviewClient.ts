@@ -68,3 +68,8 @@ export function rolePreviewBootstrapMessage(detail?: string | null): string {
     " A CORS console message is often a side effect of a failed /auth/me — not always a CORS_ORIGIN misconfiguration."
   );
 }
+
+/** True when bootstrap copy is the preview-recovery message (D8 Exit even after attempt cleared). */
+export function isRolePreviewBootstrapMessage(msg?: string | null): boolean {
+  return Boolean(msg?.includes("Role preview could not finish loading your session."));
+}

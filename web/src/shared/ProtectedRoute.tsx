@@ -7,6 +7,7 @@ import { signOutApp } from "./signOut";
 import {
   clearRolePreviewAttempt,
   clearRolePreviewFlag,
+  isRolePreviewBootstrapMessage,
   isRolePreviewSuspected,
 } from "./rolePreviewClient";
 
@@ -48,7 +49,9 @@ export const ProtectedRoute: ParentComponent = (props) => {
   };
 
   const networkCopy = () => auth.bootstrapMessage || apiNetworkErrorMessage();
-  const showExitPreview = () => isRolePreviewSuspected();
+  // D8: Exit when Start suspected OR recovery left preview-scoped bootstrap copy.
+  const showExitPreview = () =>
+    isRolePreviewSuspected() || isRolePreviewBootstrapMessage(auth.bootstrapMessage);
 
   return (
     <Show when={auth.bootstrapping} fallback={
@@ -128,7 +131,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
                     >
                       Retry
                     </button>
-                    <Show when={isRolePreviewSuspected()}>
+                    <Show when={showExitPreview()}>
                       <button
                         type="button"
                         class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"

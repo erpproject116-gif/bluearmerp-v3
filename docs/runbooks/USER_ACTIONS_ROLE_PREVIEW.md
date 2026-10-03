@@ -17,7 +17,8 @@ Owners and platform superadmins can start a **read-only role template preview** 
    ```
 2. Deploy API (ECS) — Start preflight + migration-aware errors require API deploy.
 3. Deploy web (Vercel) — FE recovery / Exit / scoped bootstrap copy can ship alone (D9).
-4. Smoke: owner → View as `store_admin` → banner + menus change → create sale → clear read-only (no toast flood) → Exit preview.
+4. **SHA gate before QA:** `GET https://api.bluearmerp.com/health/schema` → `healthy: true`; Vercel production deployment SHA includes the FE recovery commits. Hard-refresh (Ctrl+Shift+R).
+5. Smoke: owner → View as `store_admin` → banner + menus change → create sale → clear read-only (no toast flood) → Exit preview.
 
 ## Notes
 
@@ -35,9 +36,10 @@ Use this order — do **not** jump to `CORS_ORIGIN` first.
 |------|--------|--------|
 | 1 | Did Start return `ERR_SETUP` / migration copy? | Apply `313_role_preview.sql`, redeploy API if needed. |
 | 2 | Did Start return conflict / role-load failure? | Stay owner; fix tenant role flags; retry. |
-| 3 | Start 200 but `/auth/me` fails? | UI should auto-end + clear attempt flag. Use **Exit role preview**, then hard-refresh (Ctrl+Shift+R). |
+| 3 | Start 200 but `/auth/me` fails? | UI should auto-end + clear attempt flag. Use **Exit role preview** (also shown when bootstrap copy mentions role preview), then hard-refresh (Ctrl+Shift+R). |
 | 4 | Console shows CORS / Workbox `no-response` on `/auth/me`? | Often a **side effect** of a failed authed call (SW / opaque error), not proof that `CORS_ORIGIN` is wrong. Clear preview first. |
-| 5 | Still failing with no preview columns set? | Then verify real CORS: API `CORS_ORIGIN` = app origin (no trailing slash), redeploy API, hard-refresh. |
+| 5 | Preview cleared but still broken? | DevTools → Application → Service Workers → **Unregister**, then Ctrl+Shift+R. Retry `/auth/me`. |
+| 6 | Still failing with no preview columns set? | Then verify real CORS: API `CORS_ORIGIN` = exact app origin (e.g. `https://app.bluearmerp.com`, no trailing slash); check `*.vercel.app` aliases separately; redeploy API; hard-refresh. |
 
 **Symptom (legacy):** After starting View-as-role, the app shows “Cannot reach the API” and the browser console reports CORS / Workbox `no-response` on `https://api.bluearmerp.com/api/v1/auth/me`.
 
