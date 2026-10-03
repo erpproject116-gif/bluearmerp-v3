@@ -52,6 +52,12 @@ export function peekPosOfflineQueue() {
   return readQueue();
 }
 
+/** True when any queued offline action targets this POS session. */
+export function hasOfflinePendingForSession(sessionId: number) {
+  if (!sessionId) return false;
+  return readQueue().some((a) => a.sessionId === sessionId);
+}
+
 export function clearPosOfflineQueue() {
   writeQueue([]);
 }

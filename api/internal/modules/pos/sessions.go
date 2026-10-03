@@ -88,6 +88,19 @@ type closeSessionBody struct {
 	Notes       *string `json:"notes"`
 }
 
+type switchLocationBody struct {
+	LocationID        int64   `json:"location_id"`
+	ClosingCash       float64 `json:"closing_cash"`
+	OpeningCash       float64 `json:"opening_cash"`
+	Notes             *string `json:"notes"`
+	HasOfflinePending bool    `json:"has_offline_pending"`
+}
+
+type switchLocationResult struct {
+	OldSession Session `json:"old_session"`
+	Session    Session `json:"session"`
+}
+
 type cartLineBody struct {
 	ItemID      int64   `json:"item_id"`
 	Qty         float64 `json:"qty"`
@@ -168,6 +181,7 @@ func registerSessionRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("pos.sessions", auth.AccessWrite)).Post("/sessions", openSession(pool))
 	r.Get("/sessions/{id}", getSession(pool))
 	r.With(auth.RequirePermission("pos.sessions", auth.AccessWrite)).Post("/sessions/{id}/close", closeSession(pool))
+	r.With(auth.RequirePermission("pos.sessions", auth.AccessWrite)).Post("/sessions/{id}/switch-location", switchSessionLocation(pool))
 	r.Get("/sessions/{id}/cart-lines", listCartLines(pool))
 	r.With(auth.RequirePermission("pos.checkout", auth.AccessWrite)).Post("/sessions/{id}/cart-lines", addCartLine(pool))
 	r.With(auth.RequirePermission("pos.checkout", auth.AccessWrite)).Patch("/sessions/{id}/cart-lines/{lineId}", patchCartLine(pool))
@@ -268,6 +282,11 @@ func openSession(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"location_id": "Location is required."})
 			return
 		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, body.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
+			return
+		}
 		var hasOpen bool
 		_ = pool.QueryRow(r.Context(), `
 			select exists(select 1 from public.pos_sessions where tenant_id = $1 and cashier_user_id = $2 and status = 'open')`,
@@ -277,14 +296,13 @@ func openSession(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		openedAt := time.Now()
-		var seq int
-		_ = pool.QueryRow(r.Context(), `
-			select coalesce(max(substring(session_no from '[0-9]+$')::int), 0) + 1
-			from public.pos_sessions where tenant_id = $1 and opened_at::date = $2::date`,
-			tu.TenantID, openedAt.Format("2006-01-02")).Scan(&seq)
-		sessionNo := fmt.Sprintf("POS-%s-%03d", openedAt.Format("20060102"), seq)
+		sessionNo, err := nextSessionNo(r.Context(), pool, tu.TenantID, openedAt)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to open session.", "ERR_INTERNAL")
+			return
+		}
 		var id int64
-		err := pool.QueryRow(r.Context(), `
+		err = pool.QueryRow(r.Context(), `
 			insert into public.pos_sessions (tenant_id, session_no, location_id, cashier_user_id, opening_cash, notes)
 			values ($1,$2,$3,$4,$5,$6) returning id`,
 			tu.TenantID, sessionNo, body.LocationID, tu.AppUserID, body.OpeningCash, body.Notes).Scan(&id)
@@ -354,6 +372,118 @@ func closeSession(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		row, _ := loadSession(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Session closed.")
+	}
+}
+
+// switchSessionLocation atomically closes the cashier's open session and opens a new
+// one at a different location (cash Z-boundary preserved; location_id never mutated).
+func switchSessionLocation(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := parseID(chi.URLParam(r, "id"))
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body switchLocationBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if errs := switchLocationInputErrors(body.LocationID, body.ClosingCash, body.OpeningCash, body.HasOfflinePending); len(errs) > 0 {
+			response.Validation(w, errs)
+			return
+		}
+		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, body.LocationID); err != nil {
+			code, msg, errCode := branchiso.HTTPStatus(err)
+			response.Err(w, code, msg, errCode)
+			return
+		}
+
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to switch location.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var curLoc, cashierID int64
+		var status string
+		err = tx.QueryRow(r.Context(), `
+			select location_id, coalesce(cashier_user_id, 0), status
+			from public.pos_sessions where id = $1 and tenant_id = $2 for update`,
+			id, tu.TenantID).Scan(&curLoc, &cashierID, &status)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Open session not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if status != "open" {
+			response.Validation(w, map[string]string{"session": "Session is not open."})
+			return
+		}
+		if cashierID != tu.AppUserID {
+			response.Validation(w, map[string]string{"session": "You can only switch location on your own open session."})
+			return
+		}
+		if body.LocationID == curLoc {
+			response.Validation(w, map[string]string{"location_id": "Choose a different location than the current shift."})
+			return
+		}
+		var cartCount int
+		_ = tx.QueryRow(r.Context(), `select count(*) from public.pos_cart_lines where session_id = $1`, id).Scan(&cartCount)
+		if cartCount > 0 {
+			response.Validation(w, map[string]string{"cart": "Cart must be empty before switching location."})
+			return
+		}
+
+		switchNote := fmt.Sprintf("location_switch→%d", body.LocationID)
+		if body.Notes != nil && strings.TrimSpace(*body.Notes) != "" {
+			switchNote = strings.TrimSpace(*body.Notes) + " | " + switchNote
+		}
+		tag, err := tx.Exec(r.Context(), `
+			update public.pos_sessions set status = 'closed', closing_cash = $3,
+			  notes = case when notes is null or notes = '' then $4 else notes || ' | ' || $4 end,
+			  closed_at = now(), updated_at = now()
+			where id = $1 and tenant_id = $2 and status = 'open'`,
+			id, tu.TenantID, body.ClosingCash, switchNote)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Open session not found.", "ERR_NOT_FOUND")
+			return
+		}
+
+		openedAt := time.Now()
+		sessionNo, err := nextSessionNoTx(r.Context(), tx, tu.TenantID, openedAt)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to switch location.", "ERR_INTERNAL")
+			return
+		}
+		var newID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.pos_sessions (tenant_id, session_no, location_id, cashier_user_id, opening_cash, notes)
+			values ($1,$2,$3,$4,$5,$6) returning id`,
+			tu.TenantID, sessionNo, body.LocationID, tu.AppUserID, body.OpeningCash,
+			fmt.Sprintf("location_switch←%d", id)).Scan(&newID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to open session at new location.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to switch location.", "ERR_INTERNAL")
+			return
+		}
+
+		oldRow, _ := loadSession(r.Context(), pool, tu.TenantID, id)
+		newRow, _ := loadSession(r.Context(), pool, tu.TenantID, newID)
+		auditBody := map[string]any{
+			"from_location_id": curLoc,
+			"to_location_id":   body.LocationID,
+			"old_session_id":   id,
+			"new_session_id":   newID,
+			"closing_cash":     body.ClosingCash,
+			"opening_cash":     body.OpeningCash,
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "pos.session.switch_location", "pos_session", &newID, nil, auditBody)
+		response.OK(w, switchLocationResult{OldSession: oldRow, Session: newRow}, "Location switched.")
 	}
 }
 
@@ -1143,6 +1273,55 @@ func sessionOpen(ctx context.Context, pool *pgxpool.Pool, tenantID, sessionID in
 	var ok bool
 	_ = pool.QueryRow(ctx, `select exists(select 1 from public.pos_sessions where id=$1 and tenant_id=$2 and status='open')`, sessionID, tenantID).Scan(&ok)
 	return ok
+}
+
+type sessionNoQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func nextSessionNo(ctx context.Context, pool *pgxpool.Pool, tenantID int64, openedAt time.Time) (string, error) {
+	return nextSessionNoQuery(ctx, pool, tenantID, openedAt)
+}
+
+func nextSessionNoTx(ctx context.Context, tx pgx.Tx, tenantID int64, openedAt time.Time) (string, error) {
+	return nextSessionNoQuery(ctx, tx, tenantID, openedAt)
+}
+
+func nextSessionNoQuery(ctx context.Context, q sessionNoQuerier, tenantID int64, openedAt time.Time) (string, error) {
+	var seq int
+	err := q.QueryRow(ctx, `
+		select coalesce(max(substring(session_no from '[0-9]+$')::int), 0) + 1
+		from public.pos_sessions where tenant_id = $1 and opened_at::date = $2::date`,
+		tenantID, openedAt.Format("2006-01-02")).Scan(&seq)
+	if err != nil {
+		return "", err
+	}
+	return formatSessionNo(openedAt, seq), nil
+}
+
+func formatSessionNo(openedAt time.Time, seq int) string {
+	return fmt.Sprintf("POS-%s-%03d", openedAt.Format("20060102"), seq)
+}
+
+// switchLocationInputErrors validates request fields before DB work (unit-testable).
+func switchLocationInputErrors(locationID int64, closingCash, openingCash float64, hasOfflinePending bool) map[string]string {
+	errs := map[string]string{}
+	if locationID <= 0 {
+		errs["location_id"] = "Location is required."
+	}
+	if closingCash < 0 {
+		errs["closing_cash"] = "Closing cash cannot be negative."
+	}
+	if openingCash < 0 {
+		errs["opening_cash"] = "Opening cash cannot be negative."
+	}
+	if hasOfflinePending {
+		errs["offline"] = "Sync or clear offline queued checkouts before switching location."
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs
 }
 
 func parseID(s string) (int64, error) {

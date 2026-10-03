@@ -37,6 +37,7 @@ import {
   patchPosCartLine,
   posTenderLabel,
   resumeHeldOrder,
+  switchPosSessionLocation,
   useInvalidatePosSession,
   usePosCatalogCategories,
   usePosCatalogItems,
@@ -54,6 +55,7 @@ import {
 import { PosLotPickSheet } from "./PosLotPickSheet";
 import {
   enqueuePosOffline,
+  hasOfflinePendingForSession,
   isLikelyOfflineError,
   peekPosOfflineQueue,
   removePosOfflineAction,
@@ -153,6 +155,12 @@ export default function PosPage() {
   const [checkingOut, setCheckingOut] = createSignal(false);
   const [closingCash, setClosingCash] = createSignal("");
   const [showClose, setShowClose] = createSignal(false);
+  const [showSwitchLoc, setShowSwitchLoc] = createSignal(false);
+  const [switchLocId, setSwitchLocId] = createSignal<number | null>(null);
+  const [switchLocLabel, setSwitchLocLabel] = createSignal("");
+  const [switchClosingCash, setSwitchClosingCash] = createSignal("");
+  const [switchOpeningCash, setSwitchOpeningCash] = createSignal("");
+  const [switchingLoc, setSwitchingLoc] = createSignal(false);
   const [shiftReport, setShiftReport] = createSignal<SessionReport | null>(null);
   const [modalItem, setModalItem] = createSignal<PosCatalogItem | null>(null);
   const [discount, setDiscount] = createSignal(0);
@@ -874,6 +882,91 @@ export default function PosPage() {
     invalidate();
   };
 
+  const openSwitchLocation = () => {
+    const s = session.data;
+    if (!s?.id) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.warning("Reconnect before switching location.");
+      return;
+    }
+    if (cartLines().length > 0) {
+      toast.warning("Clear or check out the cart before switching location.");
+      return;
+    }
+    if (hasOfflinePendingForSession(s.id)) {
+      toast.warning("Sync or clear offline queued checkouts before switching location.");
+      return;
+    }
+    setSwitchLocId(null);
+    setSwitchLocLabel("");
+    setSwitchClosingCash("");
+    setSwitchOpeningCash("");
+    setShowSwitchLoc(true);
+  };
+
+  const confirmSwitchLocation = async () => {
+    const s = session.data;
+    if (!s?.id) return;
+    const newLoc = switchLocId();
+    if (!newLoc) {
+      toast.warning("Pick the location you are moving to.");
+      return;
+    }
+    if (newLoc === s.location_id) {
+      toast.warning("Choose a different location than the current shift.");
+      return;
+    }
+    const closeRaw = switchClosingCash().trim();
+    if (!closeRaw) {
+      toast.warning("Enter the cash you counted before switching.");
+      return;
+    }
+    const closing = parseDecimalInput(closeRaw);
+    if (closing === null) {
+      toast.warning("Finish the closing amount — include cents if needed.");
+      return;
+    }
+    const openRaw = switchOpeningCash().trim();
+    const opening = openRaw === "" ? closing : parseDecimalInput(openRaw);
+    if (opening === null) {
+      toast.warning("Finish the opening amount — include cents if needed.");
+      return;
+    }
+    if (hasOfflinePendingForSession(s.id)) {
+      toast.warning("Sync or clear offline queued checkouts before switching location.");
+      return;
+    }
+    setSwitchingLoc(true);
+    try {
+      const res = await switchPosSessionLocation(s.id, {
+        location_id: newLoc,
+        closing_cash: closing,
+        opening_cash: opening,
+        has_offline_pending: false,
+      });
+      if (!res.success) {
+        const errs = res.errors ?? {};
+        toast.warning(
+          errs.cart ||
+            errs.offline ||
+            errs.location_id ||
+            errs.session ||
+            res.message ||
+            "Could not switch location.",
+        );
+        return;
+      }
+      const fromName = res.data?.old_session.location_name || s.location_name;
+      const toName = res.data?.session.location_name || switchLocLabel();
+      toast.success(`Shift moved ${fromName} → ${toName}.`);
+      setShowSwitchLoc(false);
+      invalidate();
+      focusSearch();
+    } finally {
+      setSwitchingLoc(false);
+    }
+  };
+
   const openReceiptSlip = (row: PosLastCheckout, reprint = false) => {
     const company = auth.me?.tenant.company_name;
     setSlipIsReprint(reprint);
@@ -992,6 +1085,7 @@ export default function PosPage() {
                     void voidLastSale();
                   },
                 },
+                { id: "switch-loc", label: posLabel("switch_location"), onClick: () => openSwitchLocation() },
                 { id: "close", label: posLabel("close_shift"), onClick: () => void openClose() },
                 {
                   id: "commission",
@@ -1048,6 +1142,13 @@ export default function PosPage() {
             </A>
           </Show>
           <Show when={!POS_CASHIER_SHELL_V2 && session.data}>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+              onClick={openSwitchLocation}
+            >
+              {posLabel("switch_location")}
+            </button>
             <button
               type="button"
               class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
@@ -1672,6 +1773,76 @@ export default function PosPage() {
               </button>
               <button type="button" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" onClick={closeShift}>
                 Close session
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={showSwitchLoc() && session.data}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => !switchingLoc() && setShowSwitchLoc(false)}>
+          <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 class="mb-1 text-lg font-semibold">{posLabel("switch_location")}</h3>
+            <p class="mb-4 text-sm text-slate-500">{posLabel("switch_location_hint")}</p>
+            <p class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Current: <span class="font-medium">{session.data!.location_name}</span> · {session.data!.session_no}
+            </p>
+            <div class="mb-4 space-y-4">
+              <LookupCombo
+                label={posLabel("location")}
+                value={switchLocLabel}
+                selectedId={switchLocId}
+                onInput={setSwitchLocLabel}
+                onSelect={(o) => {
+                  setSwitchLocId(o.id);
+                  setSwitchLocLabel(o.label);
+                }}
+                onClear={() => {
+                  setSwitchLocId(null);
+                  setSwitchLocLabel("");
+                }}
+                fetchOptions={fetchLocations}
+                placeholder="Select new location…"
+              />
+              <div>
+                <label class="mb-1 block text-sm font-medium text-slate-600">{posLabel("closing_cash")}</label>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
+                  value={switchClosingCash()}
+                  onInput={(e) => bindDecimalInput(e.currentTarget, setSwitchClosingCash)}
+                />
+              </div>
+              <div>
+                <label class="mb-1 block text-sm font-medium text-slate-600">{posLabel("opening_cash")}</label>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none"
+                  value={switchOpeningCash()}
+                  placeholder="Same as closing if blank"
+                  onInput={(e) => bindDecimalInput(e.currentTarget, setSwitchOpeningCash)}
+                />
+              </div>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+                disabled={switchingLoc()}
+                onClick={() => setShowSwitchLoc(false)}
+              >
+                {posLabel("cancel")}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
+                disabled={switchingLoc()}
+                onClick={() => void confirmSwitchLocation()}
+              >
+                {switchingLoc() ? "Switching…" : posLabel("switch_location")}
               </button>
             </div>
           </div>

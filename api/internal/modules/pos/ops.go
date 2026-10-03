@@ -197,6 +197,20 @@ func resumeHeldOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"held": "Held order is empty."})
 			return
 		}
+		// Held payloads omit lot/serial; resuming tracked items would sell without FEFO/serial pick.
+		for _, ln := range lines {
+			var trackLot, trackSerial bool
+			_ = pool.QueryRow(r.Context(), `
+				select coalesce(track_lot, false), coalesce(track_serial, false)
+				from public.inv_items where id = $1 and tenant_id = $2 and deleted_at is null`,
+				ln.ItemID, tu.TenantID).Scan(&trackLot, &trackSerial)
+			if trackLot || trackSerial {
+				response.Validation(w, map[string]string{
+					"held": "This saved bill has lot- or serial-tracked items. Re-ring them on the current shift so stock picks the right location.",
+				})
+				return
+			}
+		}
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to resume order.", "ERR_INTERNAL")

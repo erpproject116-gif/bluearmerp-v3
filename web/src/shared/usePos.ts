@@ -335,7 +335,10 @@ export function usePosCurrentSession() {
 
 export function useInvalidatePosSession() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ["pos-current-session"] });
+  return () => {
+    void qc.invalidateQueries({ queryKey: ["pos-current-session"] });
+    void qc.invalidateQueries({ queryKey: ["pos-catalog-items"] });
+  };
 }
 
 export async function openPosSession(body: { location_id: number; opening_cash: number }) {
@@ -344,6 +347,27 @@ export async function openPosSession(body: { location_id: number; opening_cash: 
 
 export async function closePosSession(id: number, body: { closing_cash: number }) {
   return apiFetch<PosSession>(`/api/v1/pos/sessions/${id}/close`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export type PosSwitchLocationResult = {
+  old_session: PosSession;
+  session: PosSession;
+};
+
+export async function switchPosSessionLocation(
+  id: number,
+  body: {
+    location_id: number;
+    closing_cash: number;
+    opening_cash: number;
+    notes?: string;
+    has_offline_pending?: boolean;
+  },
+) {
+  return apiFetch<PosSwitchLocationResult>(`/api/v1/pos/sessions/${id}/switch-location`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export type PosLotPickCandidate = {
