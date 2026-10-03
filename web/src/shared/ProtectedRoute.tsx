@@ -1,15 +1,10 @@
 import { type ParentComponent, Show, createSignal, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { apiFetch, supabase, apiNetworkErrorMessage } from "../shared/api";
+import { supabase, apiNetworkErrorMessage } from "../shared/api";
 import { useAuth } from "../shared/auth-context";
 import { needsSignInRedirect, SessionLoading, NavigateToSignIn } from "./AuthRedirect";
 import { signOutApp } from "./signOut";
-import {
-  clearRolePreviewAttempt,
-  clearRolePreviewFlag,
-  isRolePreviewBootstrapMessage,
-  isRolePreviewSuspected,
-} from "./rolePreviewClient";
+import { endRolePreviewSession } from "./endRolePreviewSession";
 
 export const ProtectedRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -35,13 +30,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
     if (endingPreview()) return;
     setEndingPreview(true);
     try {
-      try {
-        await apiFetch("/api/v1/auth/role-preview/end", { method: "POST", body: "{}" }, { silent: true });
-      } catch {
-        /* ignore — SQL clear / soft-fail may already have cleared */
-      }
-      clearRolePreviewFlag();
-      clearRolePreviewAttempt();
+      await endRolePreviewSession();
       await auth.refresh();
     } finally {
       setEndingPreview(false);
@@ -49,9 +38,6 @@ export const ProtectedRoute: ParentComponent = (props) => {
   };
 
   const networkCopy = () => auth.bootstrapMessage || apiNetworkErrorMessage();
-  // D8: Exit when Start suspected OR recovery left preview-scoped bootstrap copy.
-  const showExitPreview = () =>
-    isRolePreviewSuspected() || isRolePreviewBootstrapMessage(auth.bootstrapMessage);
 
   return (
     <Show when={auth.bootstrapping} fallback={
@@ -66,6 +52,10 @@ export const ProtectedRoute: ParentComponent = (props) => {
                   <div class="max-w-lg rounded-xl border border-stroke bg-white p-6 shadow-sm">
                     <p class="text-sm font-medium text-text-primary">Cannot reach the API</p>
                     <p class="mt-2 text-sm text-text-secondary">{networkCopy()}</p>
+                    <p class="mt-2 text-xs text-text-secondary">
+                      If you were using View as role, use Exit role preview — a CORS message often means the API
+                      briefly failed (e.g. 502), not a misconfigured CORS_ORIGIN.
+                    </p>
                     <div class="mt-5 flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -74,16 +64,21 @@ export const ProtectedRoute: ParentComponent = (props) => {
                       >
                         Retry
                       </button>
-                      <Show when={showExitPreview()}>
-                        <button
-                          type="button"
-                          class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
-                          disabled={endingPreview()}
-                          onClick={() => void exitRolePreviewAndRetry()}
-                        >
-                          {endingPreview() ? "Exiting…" : "Exit role preview"}
-                        </button>
-                      </Show>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+                        disabled={endingPreview()}
+                        onClick={() => void exitRolePreviewAndRetry()}
+                      >
+                        {endingPreview() ? "Exiting…" : "Exit role preview"}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"
+                        onClick={() => void signOut()}
+                      >
+                        Sign out
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -131,16 +126,14 @@ export const ProtectedRoute: ParentComponent = (props) => {
                     >
                       Retry
                     </button>
-                    <Show when={showExitPreview()}>
-                      <button
-                        type="button"
-                        class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
-                        disabled={endingPreview()}
-                        onClick={() => void exitRolePreviewAndRetry()}
-                      >
-                        {endingPreview() ? "Exiting…" : "Exit role preview"}
-                      </button>
-                    </Show>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+                      disabled={endingPreview()}
+                      onClick={() => void exitRolePreviewAndRetry()}
+                    >
+                      {endingPreview() ? "Exiting…" : "Exit role preview"}
+                    </button>
                     <button
                       type="button"
                       class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"

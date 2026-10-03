@@ -3,6 +3,8 @@ import { useNavigate } from "@solidjs/router";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "../../shared/api";
 import { useAuth, type MeData } from "../../shared/auth-context";
 import { resolvePostLoginPath } from "../../shared/authReturnTo";
+import { endRolePreviewSession } from "../../shared/endRolePreviewSession";
+import { rolePreviewBootstrapMessage } from "../../shared/rolePreviewClient";
 
 async function fetchMeWithRetry(maxAttempts = 4): Promise<Awaited<ReturnType<typeof apiFetch<MeData>>>> {
   let lastErr: unknown;
@@ -91,11 +93,16 @@ export default function AuthCallbackPage() {
       }
 
       if (!me.success) {
-        navigate(
-          `/signin?error=${encodeURIComponent(me.message ?? "Account not provisioned yet.")}`,
-          { replace: true },
-        );
-        return;
+        // Sticky role preview / 5xx can look like a dead API after Google sign-in.
+        await endRolePreviewSession();
+        me = await fetchMeWithRetry(2);
+        if (!me.success) {
+          navigate(
+            `/signin?error=${encodeURIComponent(rolePreviewBootstrapMessage(me.message))}&recover_preview=1`,
+            { replace: true },
+          );
+          return;
+        }
       }
 
       void recordIntake(email, fullName);
@@ -104,8 +111,20 @@ export default function AuthCallbackPage() {
       const href = await resolvePostLoginPath(auth.me);
       navigate(href, { replace: true });
     } catch {
+      try {
+        await endRolePreviewSession();
+        const me = await fetchMeWithRetry(2);
+        if (me.success && me.data) {
+          await auth.refresh();
+          const href = await resolvePostLoginPath(auth.me);
+          navigate(href, { replace: true });
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
       navigate(
-        `/signin?error=${encodeURIComponent(apiNetworkErrorMessage())}`,
+        `/signin?error=${encodeURIComponent(rolePreviewBootstrapMessage(apiNetworkErrorMessage()))}&recover_preview=1`,
         { replace: true },
       );
     }
