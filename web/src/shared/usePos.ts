@@ -346,11 +346,54 @@ export async function closePosSession(id: number, body: { closing_cash: number }
   return apiFetch<PosSession>(`/api/v1/pos/sessions/${id}/close`, { method: "POST", body: JSON.stringify(body) });
 }
 
+export type PosLotPickCandidate = {
+  id: number;
+  lot_no: string;
+  qty_on_hand: number;
+  expiry_date?: string;
+};
+
+/** Returned in res.data when code is ERR_POS_LOT_PICK (HTTP 409). */
+export type PosLotPickPayload = {
+  needs_lot_pick: boolean;
+  item_id: number;
+  item_name: string;
+  qty: number;
+  unit_price: number;
+  modifier_ids?: number[];
+  notes?: string | null;
+  size_label?: string | null;
+  lots: PosLotPickCandidate[];
+};
+
 export async function addPosCartLine(
   sessionId: number,
-  body: { item_id: number; qty: number; unit_price: number; modifier_ids?: number[]; notes?: string | null; size_label?: string | null },
+  body: {
+    item_id: number;
+    qty: number;
+    unit_price: number;
+    modifier_ids?: number[];
+    notes?: string | null;
+    size_label?: string | null;
+    lot_batch_id?: number | null;
+  },
 ) {
-  return apiFetch<PosCartLine>(`/api/v1/pos/sessions/${sessionId}/cart-lines`, { method: "POST", body: JSON.stringify(body) });
+  return apiFetch<PosCartLine | PosLotPickPayload>(`/api/v1/pos/sessions/${sessionId}/cart-lines`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function isPosLotPickResponse(
+  res: { success: boolean; code?: string; data?: unknown },
+): res is { success: false; code: "ERR_POS_LOT_PICK"; data: PosLotPickPayload } {
+  return (
+    !res.success &&
+    res.code === "ERR_POS_LOT_PICK" &&
+    !!res.data &&
+    typeof res.data === "object" &&
+    (res.data as PosLotPickPayload).needs_lot_pick === true
+  );
 }
 
 export async function fetchItemModifiers(itemId: number): Promise<PosModifierGroup[]> {

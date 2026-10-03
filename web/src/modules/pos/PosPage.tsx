@@ -32,6 +32,7 @@ import {
   fetchSessionReport,
   holdCart,
   isCashTender,
+  isPosLotPickResponse,
   openPosSession,
   patchPosCartLine,
   posTenderLabel,
@@ -45,9 +46,12 @@ import {
   type HeldOrder,
   type PosCartLine,
   type PosCatalogItem,
+  type PosLotPickCandidate,
+  type PosLotPickPayload,
   type PosModifierGroup,
   type SessionReport,
 } from "../../shared/usePos";
+import { PosLotPickSheet } from "./PosLotPickSheet";
 import {
   enqueuePosOffline,
   isLikelyOfflineError,
@@ -206,6 +210,7 @@ export default function PosPage() {
   const [showShiftReport, setShowShiftReport] = createSignal(false);
   const [shiftReportTab, setShiftReportTab] = createSignal<"z" | "daily">("z");
   const [stockFilter, setStockFilter] = createSignal<"all" | "in_stock" | "low" | "top">("all");
+  const [lotPickDraft, setLotPickDraft] = createSignal<PosLotPickPayload | null>(null);
   let searchInputEl: HTMLInputElement | undefined;
 
   const focusSearch = () => {
@@ -360,55 +365,102 @@ export default function PosPage() {
     toast.success("POS session opened.");
   };
 
-  const addItem = async (item: PosCatalogItem) => {
-    const s = session.data;
-    if (!s?.id) return;
-    if (POS_CASHIER_SHELL_V2 && item.stock_status === "sold_out") {
-      toast.warning("Sold out at this location — cannot add.");
-      return;
+  const finishAddToCart = (line: PosCartLine | undefined, opts?: { trackSerial?: boolean }) => {
+    if (line?.lot_no) {
+      toast.info(`Lot ${line.lot_no} · FEFO`);
+    } else if (line?.lot_batch_id) {
+      toast.info(`Lot #${line.lot_batch_id} · FEFO`);
     }
-    if (item.has_modifiers) {
-      setModalItem(item);
-      return;
-    }
-    setAdding(true);
-    const res = await addPosCartLine(s.id, { item_id: item.id, qty: 1, unit_price: item.price });
-    setAdding(false);
-    if (!res.success) {
-      toast.warning(formatPosApiError(res) || "Could not add item.");
-      return;
-    }
-    if (POS_CASHIER_SHELL_V2 && item.track_serial) {
+    if (POS_CASHIER_SHELL_V2 && opts?.trackSerial) {
       toast.info("Serial item — scan the serial barcode (or attach serial on the line) before paying.");
     }
     if (POS_CASHIER_SHELL_V2) setCartSheetOpen(true);
     invalidate();
   };
 
-  const addFromModal = async (payload: { qty: number; modifier_ids: number[]; notes?: string; size_label?: string }) => {
+  const submitCartLine = async (body: {
+    item_id: number;
+    qty: number;
+    unit_price: number;
+    modifier_ids?: number[];
+    notes?: string | null;
+    size_label?: string | null;
+    lot_batch_id?: number | null;
+  }, opts?: { trackSerial?: boolean; trackLot?: boolean }) => {
     const s = session.data;
-    const item = modalItem();
-    if (!s?.id || !item) return;
+    if (!s?.id) return false;
     setAdding(true);
-    const res = await addPosCartLine(s.id, {
-      item_id: item.id,
-      qty: payload.qty,
-      unit_price: item.price,
-      modifier_ids: payload.modifier_ids,
-      notes: payload.notes || null,
-      size_label: payload.size_label || null,
-    });
+    const res = await addPosCartLine(s.id, body);
     setAdding(false);
+    if (isPosLotPickResponse(res)) {
+      setLotPickDraft(res.data);
+      return false;
+    }
     if (!res.success) {
       toast.warning(formatPosApiError(res) || "Could not add item.");
+      return false;
+    }
+    finishAddToCart(res.data as PosCartLine | undefined, opts);
+    return true;
+  };
+
+  const addItem = async (item: PosCatalogItem) => {
+    const s = session.data;
+    if (!s?.id) return;
+    if (POS_CASHIER_SHELL_V2 && item.stock_status === "sold_out") {
+      toast.warning(
+        item.track_lot
+          ? "No sellable lots at this register — transfer stock or pick another location."
+          : "Sold out at this location — cannot add.",
+      );
       return;
     }
-    setModalItem(null);
-    if (POS_CASHIER_SHELL_V2 && item.track_serial) {
-      toast.info("Serial item — scan the serial barcode before paying.");
+    if (item.has_modifiers) {
+      setModalItem(item);
+      return;
     }
-    if (POS_CASHIER_SHELL_V2) setCartSheetOpen(true);
-    invalidate();
+    await submitCartLine(
+      { item_id: item.id, qty: 1, unit_price: item.price },
+      { trackSerial: item.track_serial, trackLot: item.track_lot },
+    );
+  };
+
+  const addFromModal = async (payload: { qty: number; modifier_ids: number[]; notes?: string; size_label?: string }) => {
+    const item = modalItem();
+    if (!item) return;
+    const ok = await submitCartLine(
+      {
+        item_id: item.id,
+        qty: payload.qty,
+        unit_price: item.price,
+        modifier_ids: payload.modifier_ids,
+        notes: payload.notes || null,
+        size_label: payload.size_label || null,
+      },
+      { trackSerial: item.track_serial, trackLot: item.track_lot },
+    );
+    if (ok) setModalItem(null);
+  };
+
+  const confirmLotPick = async (lot: PosLotPickCandidate) => {
+    const draft = lotPickDraft();
+    if (!draft) return;
+    const ok = await submitCartLine(
+      {
+        item_id: draft.item_id,
+        qty: draft.qty,
+        unit_price: draft.unit_price,
+        modifier_ids: draft.modifier_ids,
+        notes: draft.notes ?? null,
+        size_label: draft.size_label ?? null,
+        lot_batch_id: lot.id,
+      },
+      { trackLot: true },
+    );
+    if (ok) {
+      setLotPickDraft(null);
+      setModalItem(null);
+    }
   };
 
   const changeQty = async (ln: PosCartLine, delta: number) => {
@@ -756,7 +808,11 @@ export default function PosPage() {
     }
     // serial
     if (resolved.item.stock_status === "sold_out") {
-      toast.warning("Sold out at this location — cannot add.");
+      toast.warning(
+        resolved.item.track_lot
+          ? "No sellable lots at this register — transfer stock or pick another location."
+          : "Sold out at this location — cannot add.",
+      );
       setSearch("");
       focusSearch();
       return;
@@ -767,7 +823,9 @@ export default function PosPage() {
       unit_price: resolved.item.price,
       modifier_ids: [],
     });
-    if (addRes.success && addRes.data?.id) {
+    if (isPosLotPickResponse(addRes)) {
+      setLotPickDraft(addRes.data);
+    } else if (addRes.success && addRes.data && "id" in addRes.data) {
       await patchPosCartLine(s.id, addRes.data.id, { serial_unit_ids: [resolved.serial_unit_id] });
       toast.success(`Serial ${resolved.serial_no} attached.`);
     } else if (!addRes.success) {
@@ -1335,6 +1393,17 @@ export default function PosPage() {
 
       <Show when={modalItem()}>
         {(item) => <ProductModal item={item()} adding={adding()} onCancel={() => setModalItem(null)} onAdd={addFromModal} />}
+      </Show>
+
+      <Show when={lotPickDraft()}>
+        {(draft) => (
+          <PosLotPickSheet
+            draft={draft()}
+            busy={adding()}
+            onCancel={() => setLotPickDraft(null)}
+            onPick={(lot) => void confirmLotPick(lot)}
+          />
+        )}
       </Show>
 
       <Show when={showPayment()}>

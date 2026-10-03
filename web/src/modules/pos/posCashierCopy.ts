@@ -9,6 +9,7 @@ const CODE_HINTS: Record<string, string> = {
   ERR_RATE_LIMITED: "Too many requests — wait a moment and try again.",
   ERR_NOT_FOUND: "That record was not found.",
   ERR_VALIDATION: "Check the highlighted fields and try again.",
+  ERR_POS_LOT_PICK: "Pick a lot for this item.",
   ERR_INTERNAL: "Something went wrong on the server. Try again or ask a manager.",
 };
 

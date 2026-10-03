@@ -150,7 +150,7 @@ func listCatalogItems(pool *pgxpool.Pool) http.HandlerFunc {
 			enrichCatalogStock(r.Context(), pool, tu.TenantID, locationID, out)
 		} else {
 			for i := range out {
-				out[i].StockStatus = deriveStockStatus(out[i].TrackInventory || out[i].TrackSerial, nil, out[i].ReorderLevel)
+				out[i].StockStatus = deriveStockStatus(catalogTracked(out[i]), nil, out[i].ReorderLevel)
 			}
 		}
 		stockFilter := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("stock")))
@@ -264,15 +264,49 @@ func enrichCatalogStock(ctx context.Context, pool *pgxpool.Pool, tenantID, locat
 		}
 	}
 
+	// Sellable lot qty at register (non-expired). For track_lot items this overrides balance
+	// so expired-only stock does not look available when FEFO cannot assign.
+	lotQtyByItem := map[int64]float64{}
+	lotRows, err := pool.Query(ctx, `
+		select item_id, coalesce(sum(qty_on_hand), 0)::float8
+		from public.inv_lot_batches
+		where tenant_id = $1 and location_id = $2 and item_id = any($3)
+		  and qty_on_hand > 0
+		  and (expiry_date is null or expiry_date >= current_date)
+		group by item_id`,
+		tenantID, locationID, ids)
+	if err == nil {
+		defer lotRows.Close()
+		for lotRows.Next() {
+			var iid int64
+			var lotQty float64
+			if err := lotRows.Scan(&iid, &lotQty); err != nil {
+				continue
+			}
+			lotQtyByItem[iid] = lotQty
+		}
+	}
+	for i := range items {
+		if !items[i].TrackLot {
+			continue
+		}
+		q := roundMoney(lotQtyByItem[items[i].ID]) // 0 when no sellable lots
+		items[i].QtyAvailable = &q
+	}
+
 	top := loadTopSellerIDs(ctx, pool, tenantID, locationID, topSellerCap)
 	for i := range items {
 		items[i].IsTopSeller = top[items[i].ID]
 		items[i].StockStatus = deriveStockStatus(
-			items[i].TrackInventory || items[i].TrackSerial,
+			catalogTracked(items[i]),
 			items[i].QtyAvailable,
 			items[i].ReorderLevel,
 		)
 	}
+}
+
+func catalogTracked(it CatalogItem) bool {
+	return it.TrackInventory || it.TrackSerial || it.TrackLot
 }
 
 func loadTopSellerIDs(ctx context.Context, pool *pgxpool.Pool, tenantID, locationID int64, capN int) map[int64]bool {

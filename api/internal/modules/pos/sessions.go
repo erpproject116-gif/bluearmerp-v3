@@ -95,6 +95,27 @@ type cartLineBody struct {
 	ModifierIDs []int64 `json:"modifier_ids"`
 	Notes       *string `json:"notes"`
 	SizeLabel   *string `json:"size_label"`
+	LotBatchID  *int64  `json:"lot_batch_id"`
+}
+
+// lotPickPayload is returned when FEFO cannot auto-assign but the cashier can choose a lot.
+type lotPickPayload struct {
+	NeedsLotPick bool              `json:"needs_lot_pick"`
+	ItemID       int64             `json:"item_id"`
+	ItemName     string            `json:"item_name"`
+	Qty          float64           `json:"qty"`
+	UnitPrice    float64           `json:"unit_price"`
+	ModifierIDs  []int64           `json:"modifier_ids,omitempty"`
+	Notes        *string           `json:"notes,omitempty"`
+	SizeLabel    *string           `json:"size_label,omitempty"`
+	Lots         []lotPickCandidate `json:"lots"`
+}
+
+type lotPickCandidate struct {
+	ID        int64   `json:"id"`
+	LotNo     string  `json:"lot_no"`
+	QtyOnHand float64 `json:"qty_on_hand"`
+	Expiry    string  `json:"expiry_date,omitempty"`
 }
 
 type cartLinePatch struct {
@@ -371,12 +392,17 @@ func addCartLine(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var itemCode, itemName string
+		var trackLot, trackSerial bool
 		if err := pool.QueryRow(r.Context(), `
-			select item_code, item_name from public.inv_items where id = $1 and tenant_id = $2 and deleted_at is null`,
-			body.ItemID, tu.TenantID).Scan(&itemCode, &itemName); err != nil {
+			select item_code, item_name, coalesce(track_lot, false), coalesce(track_serial, false)
+			from public.inv_items where id = $1 and tenant_id = $2 and deleted_at is null`,
+			body.ItemID, tu.TenantID).Scan(&itemCode, &itemName, &trackLot, &trackSerial); err != nil {
 			response.Validation(w, map[string]string{"item_id": "Item not found."})
 			return
 		}
+		var locationID int64
+		_ = pool.QueryRow(r.Context(), `select location_id from public.pos_sessions where id = $1 and tenant_id = $2`, sessionID, tu.TenantID).Scan(&locationID)
+
 		// Resolve any selected modifiers server-side (never trust client prices).
 		var mods []CartLineModifier
 		var modsDelta float64
@@ -405,15 +431,64 @@ func addCartLine(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		effUnit := roundMoney(body.UnitPrice + modsDelta)
 		lineTotal := roundMoney(body.Qty * effUnit)
+
+		lotID, lotNo, needsPicker, lotErr := resolveCartLineLot(
+			r.Context(), pool, tu.TenantID, body.ItemID, locationID, body.Qty, body.LotBatchID, true,
+		)
+		if lotErr != "" {
+			response.Validation(w, map[string]string{"lot_batch_id": lotErr})
+			return
+		}
+		if needsPicker {
+			cands, _ := listFEFOLots(r.Context(), pool, tu.TenantID, body.ItemID, locationID, body.Qty, 4)
+			payload := lotPickPayload{
+				NeedsLotPick: true,
+				ItemID:       body.ItemID,
+				ItemName:     itemName,
+				Qty:          body.Qty,
+				UnitPrice:    body.UnitPrice,
+				ModifierIDs:  body.ModifierIDs,
+				Notes:        body.Notes,
+				SizeLabel:    body.SizeLabel,
+			}
+			for _, c := range cands {
+				pc := lotPickCandidate{ID: c.ID, LotNo: c.LotNo, QtyOnHand: c.QtyOnHand}
+				if c.ExpiryDate != nil {
+					pc.Expiry = c.ExpiryDate.Format("2006-01-02")
+				}
+				payload.Lots = append(payload.Lots, pc)
+			}
+			if payload.Lots == nil {
+				payload.Lots = []lotPickCandidate{}
+			}
+			response.JSON(w, http.StatusConflict, response.Envelope{
+				Success: false,
+				Message: "Pick a lot for this item.",
+				Code:    "ERR_POS_LOT_PICK",
+				Errors:  map[string]string{"lot_batch_id": "Pick a lot for this item."},
+				Data:    payload,
+			})
+			return
+		}
+
 		var lineNo int
 		_ = pool.QueryRow(r.Context(), `select coalesce(max(line_no), 0) + 1 from public.pos_cart_lines where session_id = $1`, sessionID).Scan(&lineNo)
 		var lineID int64
 		if err := pool.QueryRow(r.Context(), `
-			insert into public.pos_cart_lines (session_id, line_no, item_id, item_code, item_name, qty, unit_price, line_total, notes, size_label)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
-			sessionID, lineNo, body.ItemID, itemCode, itemName, body.Qty, effUnit, lineTotal, body.Notes, body.SizeLabel).Scan(&lineID); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to add line.", "ERR_INTERNAL")
-			return
+			insert into public.pos_cart_lines (session_id, line_no, item_id, item_code, item_name, qty, unit_price, line_total, notes, size_label, lot_batch_id)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
+			sessionID, lineNo, body.ItemID, itemCode, itemName, body.Qty, effUnit, lineTotal, body.Notes, body.SizeLabel, lotID).Scan(&lineID); err != nil {
+			// Fallback if lot_batch_id column missing on older DBs.
+			if err2 := pool.QueryRow(r.Context(), `
+				insert into public.pos_cart_lines (session_id, line_no, item_id, item_code, item_name, qty, unit_price, line_total, notes, size_label)
+				values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
+				sessionID, lineNo, body.ItemID, itemCode, itemName, body.Qty, effUnit, lineTotal, body.Notes, body.SizeLabel).Scan(&lineID); err2 != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to add line.", "ERR_INTERNAL")
+				return
+			}
+			if lotID != nil {
+				_, _ = pool.Exec(r.Context(), `update public.pos_cart_lines set lot_batch_id = $2 where id = $1`, lineID, *lotID)
+			}
 		}
 		for i := range mods {
 			var mid int64
@@ -426,7 +501,12 @@ func addCartLine(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			mods[i].ID = mid
 		}
-		response.OK(w, CartLine{ID: lineID, LineNo: lineNo, ItemID: body.ItemID, ItemCode: itemCode, ItemName: itemName, Qty: body.Qty, UnitPrice: effUnit, LineTotal: lineTotal, Notes: body.Notes, SizeLabel: body.SizeLabel, Modifiers: mods}, "Added.")
+		out := CartLine{
+			ID: lineID, LineNo: lineNo, ItemID: body.ItemID, ItemCode: itemCode, ItemName: itemName,
+			Qty: body.Qty, UnitPrice: effUnit, LineTotal: lineTotal, Notes: body.Notes, SizeLabel: body.SizeLabel,
+			LotBatchID: lotID, LotNo: lotNo, TrackLot: trackLot, TrackSerial: trackSerial, Modifiers: mods,
+		}
+		response.OK(w, out, "Added.")
 	}
 }
 
