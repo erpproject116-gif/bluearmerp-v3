@@ -273,6 +273,18 @@ export default function ItemsPage() {
     void apiFetch<ItemCategory[]>("/api/v1/inventory/item-categories").then((res) => {
       setCategories(res.data ?? []);
     });
+    // Deep-link from POS More → Print barcodes
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("barcode") === "1") {
+        setBarcodeOpen(true);
+        sp.delete("barcode");
+        const next = `${window.location.pathname}${sp.toString() ? `?${sp}` : ""}${window.location.hash}`;
+        window.history.replaceState({}, "", next);
+      }
+    } catch {
+      /* ignore */
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F3") {
         e.preventDefault();

@@ -128,7 +128,7 @@ export const knowledgebaseGroups: KbGroup[] = [
     id: "pos",
     title: "Point of Sale",
     description: "Retail checkout, serial scanning, and shift management.",
-    articleIds: ["pos-checkout-guide", "pos-manage-settings", "pos-cannot-open-shift"],
+    articleIds: ["pos-checkout-guide", "pos-first-day-register", "pos-manage-settings", "pos-cannot-open-shift"],
   },
   {
     id: "finance",

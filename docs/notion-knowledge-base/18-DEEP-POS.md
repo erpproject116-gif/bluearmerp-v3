@@ -94,15 +94,30 @@ Products (price, VIP, POS visibility) · Categories · Default location · Tax i
 
 ---
 
-## 7. UNKNOWN / caveats
+## 7. Cashier shell v2 (flagged)
+
+**Flag:** `pos_cashier_shell_v2` — see runbook `docs/runbooks/POS_CASHIER_SHELL_V2.md`.
+
+| Decision | Choice |
+|----------|--------|
+| D14 PWA | Keep ERP `start_url`; POS uses in-app install coach (not `/app/pos` as install home) |
+| D15 Shift diary | Phase 3b session activity + end-of-shift Z + transaction annex |
+| Void-last | Reversal via `POST …/void-last`; restores `pos_checkout` stock; exclusive POS ORs reversed; multi-invoice OR blocks |
+| Receipt | Checkout `receipt_format` snapshot + slip UI; OR title only when OR# present |
+| Cash drawer | in/out affect expected cash; `coin_exchange` audited & excluded; no revenue JE on drawer or close |
+
+---
+
+## 8. UNKNOWN / caveats
 
 - Offline queue internals — roadmap  
 - Whether POS checkout always syncs CRM warranty assets like Sales create — **verify** (possible gap)  
 - Exhaustive Manage field settings list — extend catalog later  
+- Void-last API shipped (`POST /pos/sessions/{id}/void-last`) — see runbook 
 
 ---
 
-## 8. Compare to retail ops
+## 9. Compare to retail ops
 
 | Your question | Bluearm |
 |---------------|---------|
@@ -111,3 +126,7 @@ Products (price, VIP, POS visibility) · Categories · Default location · Tax i
 | Does stock drop at checkout? | Yes (qty-tracked) |
 | Serial phones at counter? | Scan before checkout |
 | Can we sell without foundation? | No |
+
+- Phase 3b: session activity + Z-report + daily rollup APIs/UI behind `pos_cashier_shell_v2` (ops only; no revenue JE).
+
+- Cashier shell v2 Phases 0�7 landed behind flag (runbook `POS_CASHIER_SHELL_V2.md`); apply migrations 314�315 on deploy.

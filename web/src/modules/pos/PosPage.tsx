@@ -39,6 +39,7 @@ import {
   usePosCatalogItems,
   usePosCurrentSession,
   usePosSettings,
+  voidLastPosCheckout,
   type HeldOrder,
   type PosCartLine,
   type PosCatalogItem,
@@ -52,6 +53,23 @@ import {
   removePosOfflineAction,
 } from "../../shared/posOfflineQueue";
 import { WorkflowGuideHeaderControl } from "../../shared/WorkflowGuideHeader";
+import { formatPosCashierError } from "./posCashierCopy";
+import { PosActivityFeed } from "./PosActivityFeed";
+import { PosCashDrawerModal } from "./PosCashDrawerModal";
+import { PosInstallCoach } from "./PosInstallCoach";
+import { PosMoreMenu } from "./PosMoreMenu";
+import { PosReceiptSlip } from "./PosReceiptSlip";
+import { PosShiftReportPanel } from "./PosShiftReportPanel";
+import { SaleCompletePanel } from "./SaleCompletePanel";
+import { resolvePosScan } from "./posScan";
+import {
+  POS_CASHIER_SHELL_V2,
+  fallbackReceiptFromCheckout,
+  listRecentCheckouts,
+  pushRecentCheckout,
+  type PosLastCheckout,
+} from "./posShellV2";
+import type { PosReceiptFormat } from "../../shared/usePos";
 
 async function fetchLocations(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "25" });
@@ -76,10 +94,12 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   pickup: "Pickup",
 };
 
-function formatPosApiError(res: { message?: string; errors?: Record<string, string> }): string {
-  const fieldMsgs = res.errors ? Object.values(res.errors).filter(Boolean) : [];
-  if (fieldMsgs.length > 0) return fieldMsgs.join(" ");
-  return (res.message ?? "").trim();
+function formatPosApiError(res: {
+  message?: string;
+  code?: string;
+  errors?: Record<string, string>;
+}): string {
+  return formatPosCashierError(res);
 }
 
 export default function PosPage() {
@@ -164,6 +184,23 @@ export default function PosPage() {
   });
 
   const [showPayment, setShowPayment] = createSignal(false);
+  const [showSaleComplete, setShowSaleComplete] = createSignal(false);
+  const [lastCheckout, setLastCheckout] = createSignal<PosLastCheckout | null>(null);
+  const [voidingLast, setVoidingLast] = createSignal(false);
+  const [slipReceipt, setSlipReceipt] = createSignal<PosReceiptFormat | null>(null);
+  const [slipIsReprint, setSlipIsReprint] = createSignal(false);
+  const [showRecentSlips, setShowRecentSlips] = createSignal(false);
+  const [showCashDrawer, setShowCashDrawer] = createSignal(false);
+  const [showActivity, setShowActivity] = createSignal(false);
+  const [showShiftReport, setShowShiftReport] = createSignal(false);
+  const [shiftReportTab, setShiftReportTab] = createSignal<"z" | "daily">("z");
+  const [stockFilter, setStockFilter] = createSignal<"all" | "in_stock" | "low" | "top">("all");
+  let searchInputEl: HTMLInputElement | undefined;
+
+  const focusSearch = () => {
+    queueMicrotask(() => searchInputEl?.focus());
+  };
+  const [cartSheetOpen, setCartSheetOpen] = createSignal(false);
   const [showBills, setShowBills] = createSignal(false);
   const [heldOrders, setHeldOrders] = createSignal<HeldOrder[]>([]);
   const [showCustomer, setShowCustomer] = createSignal(false);
@@ -171,6 +208,13 @@ export default function PosPage() {
   const [showCommission, setShowCommission] = createSignal(false);
   const [offlinePending, setOfflinePending] = createSignal(peekPosOfflineQueue().length);
   const [syncingOffline, setSyncingOffline] = createSignal(false);
+  const [deviceOnline, setDeviceOnline] = createSignal(
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+
+  const isRestaurantProfile = createMemo(
+    () => (settings.data?.hospitality_profile ?? "retail") === "restaurant",
+  );
 
   const refreshOfflinePending = () => setOfflinePending(peekPosOfflineQueue().length);
 
@@ -182,22 +226,22 @@ export default function PosPage() {
     let synced = 0;
     try {
       for (const action of queue) {
+        if (action.kind === "add_line") {
+          // Phase 6: do not expand add_line offline until designed — surface and drop.
+          removePosOfflineAction(action.id);
+          toast.warning("A queued cart line was removed (offline add-line is not supported yet). Re-add the item.");
+          continue;
+        }
         if (action.kind === "checkout") {
           const res = await checkoutPos(action.sessionId, action.body as Parameters<typeof checkoutPos>[1]);
           if (!res.success) {
             if (isLikelyOfflineError(null, res)) break;
             removePosOfflineAction(action.id);
-            toast.warning(res.message ?? "Queued checkout failed and was dropped.");
-            continue;
-          }
-          removePosOfflineAction(action.id);
-          synced += 1;
-        } else if (action.kind === "add_line") {
-          const res = await addPosCartLine(action.sessionId, action.body as Parameters<typeof addPosCartLine>[1]);
-          if (!res.success) {
-            if (isLikelyOfflineError(null, res)) break;
-            removePosOfflineAction(action.id);
-            toast.warning(res.message ?? "Queued line failed and was dropped.");
+            toast.warning(
+              res.message
+                ? `Queued checkout failed and was removed: ${res.message}. Re-ring the sale if needed.`
+                : "Queued checkout failed and was removed from the queue. Re-ring the sale if needed.",
+            );
             continue;
           }
           removePosOfflineAction(action.id);
@@ -205,12 +249,12 @@ export default function PosPage() {
         }
       }
       if (synced > 0) {
-        toast.success(`Synced ${synced} offline POS action${synced === 1 ? "" : "s"}.`);
+        toast.success(`Synced ${synced} offline checkout${synced === 1 ? "" : "s"}.`);
         invalidate();
       }
     } catch (err) {
       if (!isLikelyOfflineError(err)) {
-        toast.warning("Offline sync interrupted.");
+        toast.warning("Offline sync interrupted — pending checkouts stay in the queue.");
       }
     } finally {
       setSyncingOffline(false);
@@ -222,14 +266,25 @@ export default function PosPage() {
     refreshOfflinePending();
     void flushOfflineQueue();
     const onOnline = () => {
+      setDeviceOnline(true);
       refreshOfflinePending();
       void flushOfflineQueue();
     };
+    const onOffline = () => setDeviceOnline(false);
     window.addEventListener("online", onOnline);
-    onCleanup(() => window.removeEventListener("online", onOnline));
+    window.addEventListener("offline", onOffline);
+    onCleanup(() => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    });
   });
 
-  const items = usePosCatalogItems(() => ({ categoryId: activeCategory(), q: search().trim() || undefined }));
+  const items = usePosCatalogItems(() => ({
+    categoryId: activeCategory(),
+    q: search().trim() || undefined,
+    locationId: session.data?.location_id ?? null,
+    stock: POS_CASHIER_SHELL_V2 ? stockFilter() : "all",
+  }));
 
   const sessionHasQueuedCheckout = createMemo(() => {
     offlinePending(); // re-read queue when pending count changes
@@ -297,6 +352,10 @@ export default function PosPage() {
   const addItem = async (item: PosCatalogItem) => {
     const s = session.data;
     if (!s?.id) return;
+    if (POS_CASHIER_SHELL_V2 && item.stock_status === "sold_out") {
+      toast.warning("Sold out at this location — cannot add.");
+      return;
+    }
     if (item.has_modifiers) {
       setModalItem(item);
       return;
@@ -305,9 +364,13 @@ export default function PosPage() {
     const res = await addPosCartLine(s.id, { item_id: item.id, qty: 1, unit_price: item.price });
     setAdding(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not add item.");
+      toast.warning(formatPosApiError(res) || "Could not add item.");
       return;
     }
+    if (POS_CASHIER_SHELL_V2 && item.track_serial) {
+      toast.info("Serial item — scan the serial barcode (or attach serial on the line) before paying.");
+    }
+    if (POS_CASHIER_SHELL_V2) setCartSheetOpen(true);
     invalidate();
   };
 
@@ -326,10 +389,14 @@ export default function PosPage() {
     });
     setAdding(false);
     if (!res.success) {
-      toast.warning(res.message ?? "Could not add item.");
+      toast.warning(formatPosApiError(res) || "Could not add item.");
       return;
     }
     setModalItem(null);
+    if (POS_CASHIER_SHELL_V2 && item.track_serial) {
+      toast.info("Serial item — scan the serial barcode before paying.");
+    }
+    if (POS_CASHIER_SHELL_V2) setCartSheetOpen(true);
     invalidate();
   };
 
@@ -480,10 +547,20 @@ export default function PosPage() {
         tenders.length === 1
           ? posTenderLabel(tenders[0].tender_type)
           : tenders.map((t) => posTenderLabel(t.tender_type)).join(" + ");
-      toast.success(
-        `Sale ${res.data?.sales_no} — ${money(total)} · ${label}${change > 0 ? ` · Change ${money(change)}` : ""}`,
-      );
+      const result: PosLastCheckout = {
+        sales_id: res.data!.sales_id,
+        sales_no: res.data!.sales_no,
+        grand_total: res.data?.grand_total ?? total,
+        change,
+        journal_entry_id: res.data?.journal_entry_id ?? null,
+        official_receipt_id: res.data?.official_receipt_id ?? null,
+        tender_label: label,
+        at: new Date().toISOString(),
+        receipt_format: res.data?.receipt_format ?? null,
+      };
+      pushRecentCheckout(s.id, result);
       setShowPayment(false);
+      setCartSheetOpen(false);
       setDiscount(0);
       setPrivilegeType("none");
       setPrivilegeIdNo("");
@@ -496,6 +573,14 @@ export default function PosPage() {
       setCustomerLabel("");
       await orderExtrasDraft.clearOnSave();
       invalidate();
+      if (POS_CASHIER_SHELL_V2) {
+        setLastCheckout(result);
+        setShowSaleComplete(true);
+      } else {
+        toast.success(
+          `Sale ${result.sales_no} — ${money(total)} · ${label}${change > 0 ? ` · Change ${money(change)}` : ""}`,
+        );
+      }
     } catch (err) {
       setCheckingOut(false);
       if (isLikelyOfflineError(err)) {
@@ -515,14 +600,19 @@ export default function PosPage() {
       toast.warning("Cart is empty.");
       return;
     }
-    const label = window.prompt("Label for this bill (e.g. Table 5, John):", "");
+    const label = window.prompt(
+      POS_CASHIER_SHELL_V2
+        ? "Name this saved bill (e.g. Table 5, John):"
+        : "Label for this bill (e.g. Table 5, John):",
+      "",
+    );
     if (label === null) return;
     const res = await holdCart(s.id, { label, order_type: orderType() });
     if (!res.success) {
       toast.warning(res.message ?? "Could not save bill.");
       return;
     }
-    toast.success("Bill saved.");
+    toast.success(POS_CASHIER_SHELL_V2 ? "Bill saved — open Saved bills to resume." : "Bill saved.");
     invalidate();
   };
 
@@ -614,49 +704,59 @@ export default function PosPage() {
   };
 
   const handleSearchKey = async (e: KeyboardEvent) => {
-    if (e.key !== "Enter" || !settings.data?.enable_barcode) return;
-    const list = items.data ?? [];
+    if (e.key !== "Enter") return;
+    const scanEnabled = POS_CASHIER_SHELL_V2 || !!settings.data?.enable_barcode;
+    if (!scanEnabled) return;
     const code = search().trim();
     if (!code) return;
-    const exact = list.find((i) => i.item_code.toLowerCase() === code.toLowerCase()) ?? (list.length === 1 ? list[0] : null);
-    if (exact) {
-      await addItem(exact);
-      setSearch("");
-      return;
-    }
+    e.preventDefault();
     const s = session.data;
     if (!s?.id) return;
-    const serialRes = await apiFetch<{
-      serial_unit_id: number;
-      item_id: number;
-      item_code: string;
-      serial_no: string;
-    }>(
-      "/api/v1/inventory/serial-units/resolve-scan",
-      {
-        method: "POST",
-        body: JSON.stringify({ serial_no: code, context: "pos", location_id: s.location_id }),
-      },
-      { silent: true },
-    );
-    if (!serialRes.success || !serialRes.data) return;
-    const unit = serialRes.data;
-    const catalogItem = list.find((i) => i.id === unit.item_id);
-    if (!catalogItem) {
-      toast.warning(`Serial ${unit.serial_no} is not in this POS catalog.`);
+
+    const resolved = await resolvePosScan({
+      code,
+      catalog: items.data ?? [],
+      locationId: s.location_id,
+    });
+
+    if (resolved.kind === "ambiguous") {
+      toast.info(`${resolved.count} matches — tap the product on the grid.`);
+      return;
+    }
+    if (resolved.kind === "miss") {
+      toast.warning("No item or serial matched that scan.");
+      setSearch("");
+      focusSearch();
+      return;
+    }
+    if (resolved.kind === "item") {
+      await addItem(resolved.item);
+      setSearch("");
+      focusSearch();
+      return;
+    }
+    // serial
+    if (resolved.item.stock_status === "sold_out") {
+      toast.warning("Sold out at this location — cannot add.");
+      setSearch("");
+      focusSearch();
       return;
     }
     const addRes = await addPosCartLine(s.id, {
-      item_id: catalogItem.id,
+      item_id: resolved.item.id,
       qty: 1,
-      unit_price: catalogItem.price,
+      unit_price: resolved.item.price,
       modifier_ids: [],
     });
     if (addRes.success && addRes.data?.id) {
-      await patchPosCartLine(s.id, addRes.data.id, { serial_unit_ids: [unit.serial_unit_id] });
+      await patchPosCartLine(s.id, addRes.data.id, { serial_unit_ids: [resolved.serial_unit_id] });
+      toast.success(`Serial ${resolved.serial_no} attached.`);
+    } else if (!addRes.success) {
+      toast.warning(formatPosApiError(addRes) || "Could not add scanned serial.");
     }
     invalidate();
     setSearch("");
+    focusSearch();
   };
 
   const openClose = async () => {
@@ -697,9 +797,39 @@ export default function PosPage() {
     invalidate();
   };
 
+  const openReceiptSlip = (row: PosLastCheckout, reprint = false) => {
+    const company = auth.me?.tenant.company_name;
+    setSlipIsReprint(reprint);
+    setSlipReceipt(fallbackReceiptFromCheckout(row, company));
+  };
+
+  const openRecentSlips = () => {
+    if (!session.data?.id) return;
+    setShowRecentSlips(true);
+  };
+
+  const voidLastSale = async () => {
+    const s = session.data;
+    if (!s?.id) return;
+    setVoidingLast(true);
+    try {
+      const res = await voidLastPosCheckout(s.id);
+      if (!res.success) {
+        toast.warning(formatPosApiError(res) || res.message || "Could not void sale.");
+        return;
+      }
+      toast.success(`Voided ${res.data?.sales_no ?? "sale"} — stock restored.`);
+      setShowSaleComplete(false);
+      setLastCheckout(null);
+      invalidate();
+    } finally {
+      setVoidingLast(false);
+    }
+  };
+
   return (
     <div
-      class="flex h-screen flex-col text-slate-900"
+      class={`flex flex-col text-slate-900 ${POS_CASHIER_SHELL_V2 ? "h-dvh max-h-dvh" : "h-screen"}`}
       style={{
         "background-color": theme().surface,
         "--pos-primary": theme().primary,
@@ -707,30 +837,105 @@ export default function PosPage() {
         "--pos-header-bg": theme().header_bg,
         "--pos-header-text": theme().header_text,
         "--pos-btn-text": theme().button_text,
+        ...(POS_CASHIER_SHELL_V2
+          ? {
+              "padding-top": "env(safe-area-inset-top)",
+              "padding-bottom": "env(safe-area-inset-bottom)",
+            }
+          : {}),
       }}
     >
       <header
-        class="flex items-center justify-between border-b border-slate-200 px-5 py-3"
+        class={`flex items-center justify-between border-b border-slate-200 ${POS_CASHIER_SHELL_V2 ? "px-3 py-2 sm:px-5 sm:py-3" : "px-5 py-3"}`}
         style={{ "background-color": "var(--pos-header-bg)", color: "var(--pos-header-text)" }}
       >
-        <div class="flex items-center gap-3">
+        <div class="flex min-w-0 items-center gap-3">
           <span
-            class="flex h-8 w-8 items-center justify-center rounded-lg text-white"
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white"
             style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
           >
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </span>
-          <div>
-            <h1 class="text-base font-semibold leading-tight">{auth.me?.tenant.company_name ?? "Point of Sale"}</h1>
+          <div class="min-w-0">
+            <h1 class="truncate text-base font-semibold leading-tight">{auth.me?.tenant.company_name ?? "Point of Sale"}</h1>
             <Show when={session.data}>
-              {(s) => <p class="text-xs opacity-70">{s().session_no} · {s().location_name}</p>}
+              {(s) => <p class="truncate text-xs opacity-70">{s().session_no} · {s().location_name}</p>}
             </Show>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <Show when={session.data}>
+        <div class="flex shrink-0 items-center gap-2">
+          <Show when={POS_CASHIER_SHELL_V2 && session.data}>
+            <PosMoreMenu
+              items={[
+                {
+                  id: "discount",
+                  label:
+                    isRestaurantProfile() && guests().length > 0
+                      ? `${posLabel("guests")} (${guests().length})`
+                      : posLabel("discount"),
+                  onClick: applyDiscount,
+                },
+                {
+                  id: "drawer",
+                  label: "Cash drawer",
+                  onClick: () => setShowCashDrawer(true),
+                },
+                {
+                  id: "activity",
+                  label: "Shift activity",
+                  onClick: () => setShowActivity(true),
+                },
+                {
+                  id: "z-report",
+                  label: "End-of-shift report",
+                  onClick: () => {
+                    setShiftReportTab("z");
+                    setShowShiftReport(true);
+                  },
+                },
+                {
+                  id: "inventory",
+                  label: "Open Inventory",
+                  onClick: () => {
+                    window.location.href = "/app/inventory/items";
+                  },
+                },
+                {
+                  id: "barcodes",
+                  label: "Print barcodes",
+                  onClick: () => {
+                    window.location.href = "/app/inventory/items?barcode=1";
+                  },
+                },
+                {
+                  id: "reprint",
+                  label: "Reprint slip",
+                  onClick: openRecentSlips,
+                },
+                {
+                  id: "void",
+                  label: "Void last sale",
+                  onClick: () => {
+                    if (!window.confirm("Void the last sale on this shift? Stock will be restored.")) return;
+                    void voidLastSale();
+                  },
+                },
+                { id: "close", label: posLabel("close_shift"), onClick: () => void openClose() },
+                {
+                  id: "commission",
+                  label: (() => {
+                    const n = commissions().filter((c) => c.tic_name.trim() && Number(c.rate_value) > 0).length;
+                    return n > 0 ? `${posLabel("commission")} (${n})` : posLabel("commission");
+                  })(),
+                  onClick: openCommission,
+                },
+                { id: "help", label: "Help", onClick: () => { window.location.href = "/app/documentation/kb/pos-checkout-guide"; } },
+              ]}
+            />
+          </Show>
+          <Show when={!POS_CASHIER_SHELL_V2 && session.data}>
             <button
               type="button"
               class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
@@ -749,11 +954,13 @@ export default function PosPage() {
               })()}
             </button>
           </Show>
-          <WorkflowGuideHeaderControl
-            compact
-            class="relative inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
-          />
-          <Show when={hasPermission(auth.me, "pos.manage", "read")}>
+          <Show when={!POS_CASHIER_SHELL_V2}>
+            <WorkflowGuideHeaderControl
+              compact
+              class="relative inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+            />
+          </Show>
+          <Show when={!POS_CASHIER_SHELL_V2 && hasPermission(auth.me, "pos.manage", "read")}>
             <A
               href="/app/pos/manage"
               class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
@@ -761,14 +968,16 @@ export default function PosPage() {
               {posLabel("manage")}
             </A>
           </Show>
-          <A
-            href="/app/documentation/kb/pos-checkout-guide"
-            class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
-            title="POS user guide and knowledge base"
-          >
-            Help
-          </A>
-          <Show when={session.data}>
+          <Show when={!POS_CASHIER_SHELL_V2}>
+            <A
+              href="/app/documentation/kb/pos-checkout-guide"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+              title="POS user guide and knowledge base"
+            >
+              Help
+            </A>
+          </Show>
+          <Show when={!POS_CASHIER_SHELL_V2 && session.data}>
             <button
               type="button"
               class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
@@ -782,11 +991,20 @@ export default function PosPage() {
           </A>
         </div>
       </header>
+      <Show when={POS_CASHIER_SHELL_V2}>
+        <PosInstallCoach />
+      </Show>
+      <Show when={!deviceOnline()}>
+        <div class="border-b border-red-200 bg-red-50 px-5 py-2 text-sm text-red-950">
+          Device is offline. You can queue one checkout per shift; cart edits need a connection. Stock and payments are not
+          confirmed until sync.
+        </div>
+      </Show>
       <Show when={offlinePending() > 0}>
         <div class="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-5 py-2 text-sm text-amber-950">
           <span>
-            {offlinePending()} offline action{offlinePending() === 1 ? "" : "s"} pending
-            {typeof navigator !== "undefined" && !navigator.onLine ? " (device offline)" : ""}.
+            {offlinePending()} checkout{offlinePending() === 1 ? "" : "s"} waiting to sync
+            {!deviceOnline() ? " (still offline)" : ""}. Failed syncs are removed with a warning — re-ring if needed.
           </span>
           <button
             type="button"
@@ -866,25 +1084,28 @@ export default function PosPage() {
           </div>
         }
       >
-        <div class="flex flex-1 overflow-hidden">
+        <div class={`relative flex flex-1 overflow-hidden ${POS_CASHIER_SHELL_V2 ? "pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>
           <CategoryRail
             categories={categories.data ?? []}
             activeId={activeCategory()}
             onSelect={setActiveCategory}
           />
 
-          <section class="flex flex-1 flex-col overflow-hidden">
-            <div class="border-b border-slate-200 bg-white px-5 py-3">
+          <section class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <div class="border-b border-slate-200 bg-white px-3 py-3 sm:px-5">
               <div class="relative">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
                 </svg>
                 <input
+                  ref={(el) => {
+                    searchInputEl = el;
+                  }}
                   type="search"
-                  class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm focus:border-emerald-500 focus:bg-white focus:outline-none"
+                  class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-emerald-500 focus:bg-white focus:outline-none"
                   placeholder={
-                    settings.data?.enable_barcode
-                      ? "Search or scan barcode…"
+                    POS_CASHIER_SHELL_V2 || settings.data?.enable_barcode
+                      ? "Ready to scan — item code or serial, then Enter"
                       : posLabel("search_placeholder")
                   }
                   value={search()}
@@ -892,8 +1113,33 @@ export default function PosPage() {
                   onKeyDown={handleSearchKey}
                 />
               </div>
+              <Show when={POS_CASHIER_SHELL_V2}>
+                <p class="mt-1.5 text-[11px] text-slate-400">
+                  Scan to sell only. Stock-in and barcode printing stay in Inventory / Purchases.
+                </p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ["all", "All"],
+                      ["in_stock", "In stock"],
+                      ["low", "Low"],
+                      ["top", "Top"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      type="button"
+                      class={`rounded-lg px-2.5 py-1 text-xs font-medium ${
+                        stockFilter() === id ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                      onClick={() => setStockFilter(id)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Show>
             </div>
-            <div class="flex-1 overflow-auto p-5">
+            <div class="flex-1 overflow-auto p-3 sm:p-5">
               <Show
                 when={(items.data ?? []).length > 0}
                 fallback={
@@ -902,31 +1148,51 @@ export default function PosPage() {
                   </div>
                 }
               >
-                <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
                   <For each={items.data ?? []}>
-                    {(item) => (
-                      <button
-                        type="button"
-                        class="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-emerald-400 hover:shadow-md disabled:opacity-60"
-                        disabled={adding()}
-                        onClick={() => addItem(item)}
-                      >
-                        <div class="flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-100">
-                          <AuthImage
-                            src={item.image_url}
-                            alt={item.item_name}
-                            class="h-full w-full object-cover"
-                            fallback={() => (
-                              <span class="text-2xl font-semibold text-slate-300">{initials(item.item_name)}</span>
+                    {(item) => {
+                      const soldOut = () => item.stock_status === "sold_out";
+                      const badge = () => {
+                        if (item.stock_status === "sold_out") return { text: "Sold out", cls: "bg-slate-800 text-white" };
+                        if (item.stock_status === "low") return { text: "Low", cls: "bg-amber-500 text-white" };
+                        if (item.is_top_seller) return { text: "Top", cls: "bg-emerald-600 text-white" };
+                        return null;
+                      };
+                      return (
+                        <button
+                          type="button"
+                          class="group relative flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-emerald-400 hover:shadow-md disabled:opacity-60"
+                          classList={{ "opacity-50 grayscale": soldOut() }}
+                          disabled={adding() || soldOut()}
+                          onClick={() => addItem(item)}
+                        >
+                          <Show when={badge()}>
+                            {(b) => (
+                              <span class={`absolute left-2 top-2 z-10 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${b().cls}`}>
+                                {b().text}
+                              </span>
                             )}
-                          />
-                        </div>
-                        <div class="flex flex-1 flex-col gap-0.5 p-3">
-                          <span class="line-clamp-2 text-sm font-medium leading-snug">{item.item_name}</span>
-                          <span class="mt-auto text-sm font-semibold text-emerald-600">{money(item.price)}</span>
-                        </div>
-                      </button>
-                    )}
+                          </Show>
+                          <div class="flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-100">
+                            <AuthImage
+                              src={item.image_url}
+                              alt={item.item_name}
+                              class="h-full w-full object-cover"
+                              fallback={() => (
+                                <span class="text-2xl font-semibold text-slate-300">{initials(item.item_name)}</span>
+                              )}
+                            />
+                          </div>
+                          <div class="flex flex-1 flex-col gap-0.5 p-3">
+                            <span class="line-clamp-2 text-sm font-medium leading-snug">{item.item_name}</span>
+                            <Show when={item.qty_available != null && item.stock_status !== "untracked"}>
+                              <span class="text-[11px] text-slate-400 tabular-nums">Qty {item.qty_available}</span>
+                            </Show>
+                            <span class="mt-auto text-sm font-semibold text-emerald-600">{money(item.price)}</span>
+                          </div>
+                        </button>
+                      );
+                    }}
                   </For>
                 </div>
               </Show>
@@ -934,6 +1200,7 @@ export default function PosPage() {
           </section>
 
           <OrderPanel
+            class={POS_CASHIER_SHELL_V2 ? "hidden lg:flex" : undefined}
             orderType={orderType()}
             orderTypes={orderTypes()}
             onOrderType={setOrderType}
@@ -954,10 +1221,103 @@ export default function PosPage() {
             onClear={clearOrder}
             onCheckout={openPaymentWithCommissions}
             checkingOut={checkingOut()}
-            guests={guests()}
+            guests={isRestaurantProfile() ? guests() : []}
             onAssignGuest={setLineGuest}
             labels={settings.data?.ui_labels}
           />
+
+          <Show when={POS_CASHIER_SHELL_V2}>
+            {/* Mobile sticky Pay bar (< lg). Tablet landscape (≥ lg) uses side cart. */}
+            <div
+              class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white px-3 pt-2 lg:hidden"
+              style={{ "padding-bottom": "max(0.75rem, env(safe-area-inset-bottom))" }}
+            >
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="flex min-h-12 min-w-0 flex-1 items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left"
+                  onClick={() => setCartSheetOpen(true)}
+                >
+                  <span class="text-sm font-medium text-slate-700">
+                    Cart · {cartLines().length} item{cartLines().length === 1 ? "" : "s"}
+                  </span>
+                  <span class="text-base font-semibold tabular-nums text-slate-900">{money(taxPreview().total)}</span>
+                </button>
+                <button
+                  type="button"
+                  class="min-h-12 shrink-0 rounded-xl px-5 text-base font-semibold disabled:opacity-50"
+                  style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
+                  disabled={checkingOut() || cartLines().length === 0}
+                  onClick={openPaymentWithCommissions}
+                >
+                  {posLabel("pay")}
+                </button>
+              </div>
+            </div>
+
+            <Show when={cartSheetOpen()}>
+              <div class="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true">
+                <button
+                  type="button"
+                  class="absolute inset-0 bg-slate-900/40"
+                  aria-label="Close cart"
+                  onClick={() => setCartSheetOpen(false)}
+                />
+                <div
+                  class="absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-2xl bg-white shadow-xl"
+                  style={{ "padding-bottom": "env(safe-area-inset-bottom)" }}
+                >
+                  <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <h2 class="text-base font-semibold">Cart</h2>
+                    <button
+                      type="button"
+                      class="rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-50"
+                      onClick={() => setCartSheetOpen(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <OrderPanel
+                      class="h-full !w-full !max-w-none !border-l-0"
+                      orderType={orderType()}
+                      orderTypes={orderTypes()}
+                      onOrderType={setOrderType}
+                      lines={cartLines()}
+                      locationId={session.data?.location_id ?? null}
+                      catalogByItemId={catalogByItemId()}
+                      subtotal={taxPreview().subtotal}
+                      tax={taxPreview().tax}
+                      discount={taxPreview().discount}
+                      total={taxPreview().total}
+                      customerLabel={customerLabel()}
+                      onCustomer={() => {
+                        setCartSheetOpen(false);
+                        setShowCustomer(true);
+                      }}
+                      onSaveBill={saveBill}
+                      onBills={() => {
+                        setCartSheetOpen(false);
+                        void openBills();
+                      }}
+                      onQty={changeQty}
+                      onRemove={removeLine}
+                      onLot={pickLot}
+                      onClear={clearOrder}
+                      onCheckout={() => {
+                        setCartSheetOpen(false);
+                        openPaymentWithCommissions();
+                      }}
+                      checkingOut={checkingOut()}
+                      guests={isRestaurantProfile() ? guests() : []}
+                      onAssignGuest={setLineGuest}
+                      labels={settings.data?.ui_labels}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Show>
+          </Show>
         </div>
       </Show>
 
@@ -968,20 +1328,93 @@ export default function PosPage() {
       <Show when={showPayment()}>
         <PaymentModal
           total={taxPreview().total}
-          tipEnabled={settings.data?.tip_enabled !== false}
+          tipEnabled={isRestaurantProfile() && settings.data?.tip_enabled !== false}
           tip={tipAmount()}
           onTipChange={setTipAmount}
           tableLabel={tableLabel()}
           onTableLabelChange={setTableLabel}
-          showTable={orderType() === "dine_in"}
+          showTable={isRestaurantProfile() && orderType() === "dine_in"}
           tenders={settings.data?.allowed_tenders ?? ["cash"]}
           checkingOut={checkingOut()}
           commissions={commissions()}
           onCommissionsChange={setCommissions}
           labels={settings.data?.ui_labels}
+          shellV2={POS_CASHIER_SHELL_V2}
           onCancel={() => setShowPayment(false)}
           onConfirm={checkout}
         />
+      </Show>
+
+      <Show when={POS_CASHIER_SHELL_V2 && showSaleComplete() && lastCheckout()}>
+        {(result) => (
+          <SaleCompletePanel
+            result={result()}
+            voiding={voidingLast()}
+            onVoid={voidLastSale}
+            onPrint={() => openReceiptSlip(result(), false)}
+            onNext={() => {
+              setShowSaleComplete(false);
+              setLastCheckout(null);
+            }}
+          />
+        )}
+      </Show>
+
+      <Show when={POS_CASHIER_SHELL_V2 && slipReceipt()}>
+        {(rf) => (
+          <PosReceiptSlip
+            receipt={rf()}
+            reprint={slipIsReprint()}
+            onClose={() => setSlipReceipt(null)}
+          />
+        )}
+      </Show>
+
+      <Show when={POS_CASHIER_SHELL_V2 && showRecentSlips() && session.data}>
+        <div class="fixed inset-0 z-[65] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4" onClick={() => setShowRecentSlips(false)}>
+          <div
+            class="max-h-[80dvh] w-full max-w-sm overflow-auto rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl"
+            style={{ "padding-bottom": "max(1rem, env(safe-area-inset-bottom))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 class="mb-1 text-lg font-semibold">Reprint slip</h3>
+            <p class="mb-4 text-sm text-slate-500">From this shift’s recent checkouts (stored on this device).</p>
+            <Show
+              when={listRecentCheckouts(session.data!.id).length > 0}
+              fallback={<p class="py-6 text-center text-sm text-slate-400">No recent slips yet.</p>}
+            >
+              <ul class="space-y-2">
+                <For each={listRecentCheckouts(session.data!.id)}>
+                  {(row) => (
+                    <li>
+                      <button
+                        type="button"
+                        class="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-3 text-left hover:bg-slate-50"
+                        onClick={() => {
+                          setShowRecentSlips(false);
+                          openReceiptSlip(row, true);
+                        }}
+                      >
+                        <span>
+                          <span class="block font-mono text-xs text-slate-500">{row.sales_no}</span>
+                          <span class="text-sm font-medium">{row.tender_label}</span>
+                        </span>
+                        <span class="tabular-nums text-sm font-semibold">{money(row.grand_total)}</span>
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
+            <button
+              type="button"
+              class="mt-4 min-h-11 w-full rounded-lg border border-slate-300 py-2 text-sm font-medium"
+              onClick={() => setShowRecentSlips(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
       </Show>
 
       <Show when={showCustomer()}>
@@ -1006,6 +1439,7 @@ export default function PosPage() {
           currentIdNo={privilegeIdNo()}
           currentName={privilegeName()}
           currentGuests={guests()}
+          allowGuests={!POS_CASHIER_SHELL_V2 || isRestaurantProfile()}
           max={subtotalLines()}
           seniorPct={settings.data?.privilege_senior_pct ?? 20}
           pwdPct={settings.data?.privilege_pwd_pct ?? 20}
@@ -1029,7 +1463,10 @@ export default function PosPage() {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowClose(false)}>
           <div class="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 class="mb-1 text-lg font-semibold">Close shift</h3>
-            <p class="mb-4 text-sm text-slate-500">Shift summary (X/Z report). Count the drawer and enter the closing cash.</p>
+            <p class="mb-4 text-sm text-slate-500">
+              Count the drawer and enter closing cash.
+              {POS_CASHIER_SHELL_V2 ? " Closing does not post a revenue journal entry." : " Shift summary (X/Z report)."}
+            </p>
 
             <div class="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
               <Show when={shiftReport()} fallback={<p class="text-slate-400">Loading summary…</p>}>
@@ -1057,7 +1494,7 @@ export default function PosPage() {
                       </For>
                     </Show>
 
-                    <Show when={rep().cash_in > 0 || rep().cash_out > 0}>
+                    <Show when={rep().cash_in > 0 || rep().cash_out > 0 || (rep().coin_exchange ?? 0) > 0}>
                       <div class="my-2 border-t border-slate-200" />
                       <Show when={rep().cash_in > 0}>
                         <div class="flex justify-between py-0.5">
@@ -1071,6 +1508,12 @@ export default function PosPage() {
                           <span class="tabular-nums">-{money(rep().cash_out)}</span>
                         </div>
                       </Show>
+                      <Show when={(rep().coin_exchange ?? 0) > 0}>
+                        <div class="flex justify-between py-0.5">
+                          <span class="text-slate-500">Coin exchange (excluded)</span>
+                          <span class="tabular-nums text-slate-400">{money(rep().coin_exchange ?? 0)}</span>
+                        </div>
+                      </Show>
                     </Show>
 
                     <div class="my-2 border-t border-slate-200" />
@@ -1078,6 +1521,11 @@ export default function PosPage() {
                       <span>Expected cash in drawer</span>
                       <span class="tabular-nums">{money(rep().expected_cash)}</span>
                     </div>
+                    <Show when={POS_CASHIER_SHELL_V2}>
+                      <p class="mt-1 text-[11px] text-slate-400">
+                        Opening + cash sales + cash in − cash out. Coin exchange is not included.
+                      </p>
+                    </Show>
                   </>
                 )}
               </Show>
@@ -1112,7 +1560,9 @@ export default function PosPage() {
                         "bg-amber-50 text-amber-700": absVar() >= 0.005,
                       }}
                     >
-                      <span>{variance() < -0.005 ? "Short" : variance() > 0.005 ? "Over" : "Balanced"}</span>
+                      <span>
+                        {variance() < -0.005 ? "Short (variance)" : variance() > 0.005 ? "Over (variance)" : "Balanced"}
+                      </span>
                       <span class="tabular-nums">{absVar() < 0.005 ? money(0) : money(absVar())}</span>
                     </div>
                     <p class="mb-4 text-xs leading-relaxed text-slate-500">
@@ -1145,6 +1595,30 @@ export default function PosPage() {
             </div>
           </div>
         </div>
+      </Show>
+
+      <Show when={POS_CASHIER_SHELL_V2 && showCashDrawer() && session.data}>
+        <PosCashDrawerModal
+          sessionId={session.data!.id}
+          formatError={formatPosApiError}
+          onClose={() => setShowCashDrawer(false)}
+          onRecorded={() => {
+            if (showClose()) void fetchSessionReport(session.data!.id).then(setShiftReport);
+          }}
+        />
+      </Show>
+
+      <Show when={POS_CASHIER_SHELL_V2 && showActivity() && session.data}>
+        <PosActivityFeed sessionId={session.data!.id} onClose={() => setShowActivity(false)} />
+      </Show>
+
+      <Show when={POS_CASHIER_SHELL_V2 && showShiftReport() && session.data}>
+        <PosShiftReportPanel
+          sessionId={session.data!.id}
+          locationId={session.data!.location_id}
+          initialTab={shiftReportTab()}
+          onClose={() => setShowShiftReport(false)}
+        />
       </Show>
     </div>
   );
@@ -1201,6 +1675,7 @@ function PaymentModal(props: {
   commissions: PosCommissionDraft[];
   onCommissionsChange: (rows: PosCommissionDraft[]) => void;
   labels?: Record<string, string>;
+  shellV2?: boolean;
   onCancel: () => void;
   onConfirm: (tenders: { tender_type: string; amount: number }[]) => void;
 }) {
@@ -1267,10 +1742,23 @@ function PaymentModal(props: {
   };
 
   return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
-      <div class="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div
+      class={`fixed inset-0 z-50 flex bg-slate-900/40 ${props.shellV2 ? "items-end justify-center p-0 sm:items-center sm:p-4" : "items-center justify-center p-4"}`}
+      onClick={props.onCancel}
+    >
+      <div
+        class={`w-full overflow-auto bg-white shadow-xl ${
+          props.shellV2
+            ? "max-h-[92dvh] rounded-t-2xl p-5 sm:max-h-[90vh] sm:max-w-md sm:rounded-2xl sm:p-6"
+            : "max-h-[90vh] max-w-sm rounded-2xl p-6"
+        }`}
+        style={props.shellV2 ? { "padding-bottom": "max(1.25rem, env(safe-area-inset-bottom))" } : undefined}
+        onClick={(e) => e.stopPropagation()}
+      >
         <h3 class="mb-1 text-lg font-semibold">{L("payment")}</h3>
-        <p class="mb-4 text-sm text-slate-500">Amount due <span class="font-semibold text-slate-900">{money(props.total)}</span></p>
+        <p class={`mb-4 text-slate-500 ${props.shellV2 ? "text-base" : "text-sm"}`}>
+          Amount due <span class="font-semibold text-slate-900">{money(props.total)}</span>
+        </p>
         <Show when={props.showTable}>
           <label class="mb-1 block text-xs font-medium text-slate-500">{L("table")}</label>
           <input
@@ -1395,13 +1883,17 @@ function PaymentModal(props: {
           </Show>
         </div>
 
-        <div class="mt-4 flex gap-2">
-          <button type="button" class="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50" onClick={props.onCancel}>
+        <div class={`mt-4 flex gap-2 ${props.shellV2 ? "flex-col-reverse sm:flex-row" : ""}`}>
+          <button
+            type="button"
+            class={`flex-1 rounded-lg border border-slate-300 font-medium hover:bg-slate-50 ${props.shellV2 ? "min-h-12 py-3 text-base" : "py-2.5 text-sm"}`}
+            onClick={props.onCancel}
+          >
             {L("cancel")}
           </button>
           <button
             type="button"
-            class="flex-1 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50"
+            class={`flex-1 rounded-lg font-semibold disabled:opacity-50 ${props.shellV2 ? "min-h-12 py-3 text-base" : "py-2.5 text-sm"}`}
             style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
             disabled={props.checkingOut || !canConfirm()}
             onClick={confirm}
@@ -1526,6 +2018,7 @@ function DiscountModal(props: {
   currentIdNo: string;
   currentName: string;
   currentGuests: PosGuestDraft[];
+  allowGuests?: boolean;
   max: number;
   seniorPct: number;
   pwdPct: number;
@@ -1540,7 +2033,9 @@ function DiscountModal(props: {
     guests: PosGuestDraft[];
   }) => void;
 }) {
-  const [mode, setMode] = createSignal<"ticket" | "guests">(props.currentGuests.length > 0 ? "guests" : "ticket");
+  const [mode, setMode] = createSignal<"ticket" | "guests">(
+    props.allowGuests !== false && props.currentGuests.length > 0 ? "guests" : "ticket",
+  );
   const [type, setType] = createSignal<PosPrivilegeKind>(
     props.currentType === "none" && props.currentAmount > 0 ? "manual" : props.currentType,
   );
@@ -1595,7 +2090,8 @@ function DiscountModal(props: {
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={props.onCancel}>
       <div class="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 class="mb-1 text-lg font-semibold">Discount / Guests</h3>
+        <h3 class="mb-1 text-lg font-semibold">{props.allowGuests === false ? "Discount" : "Discount / Guests"}</h3>
+        <Show when={props.allowGuests !== false}>
         <div class="mb-3 flex gap-2">
           <button
             type="button"
@@ -1612,6 +2108,7 @@ function DiscountModal(props: {
             Per guest (F&B)
           </button>
         </div>
+        </Show>
 
         <Show when={mode() === "ticket"}>
           <p class="mb-3 text-xs text-slate-500">One privilege for the entire cart. Prefer Per guest when only some covers qualify.</p>
@@ -2049,6 +2546,7 @@ function ProductModal(props: {
 }
 
 function OrderPanel(props: {
+  class?: string;
   orderType: string;
   orderTypes: string[];
   onOrderType: (t: string) => void;
@@ -2076,7 +2574,7 @@ function OrderPanel(props: {
   const L = (key: string, fallback?: string) => resolvePosLabel(props.labels, key, fallback);
   const actionBtn = "flex flex-col items-center gap-1 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50";
   return (
-    <aside class="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
+    <aside class={`flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white ${props.class ?? ""}`}>
       <div class="border-b border-slate-100 p-4">
         <div class="mb-3 grid grid-cols-3 gap-2">
           <button type="button" class={actionBtn} onClick={props.onCustomer}>

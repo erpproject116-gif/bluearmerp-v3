@@ -500,6 +500,80 @@ func reverseSaleStock(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) e
 	return nil
 }
 
+// reversePosCheckoutStock restores qty for POS checkout movements
+// (ref_type=pos_checkout, ref_id=sales_id). Sales void does not call this —
+// POS void-last must.
+func reversePosCheckoutStock(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
+	rows, err := tx.Query(ctx, `
+		select sm.item_id, sm.location_id, sm.qty_delta::float8
+		from public.inv_stock_movements sm
+		where sm.tenant_id = $1
+		  and sm.ref_type = 'pos_checkout'
+		  and sm.ref_id = $2
+		  and sm.movement_type = 'sales'`, tenantID, salesID)
+	if err != nil {
+		return err
+	}
+	type movRow struct {
+		itemID, locationID int64
+		qtyDelta           float64
+	}
+	var movs []movRow
+	for rows.Next() {
+		var m movRow
+		if err := rows.Scan(&m.itemID, &m.locationID, &m.qtyDelta); err != nil {
+			rows.Close()
+			return err
+		}
+		movs = append(movs, m)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, m := range movs {
+		restoreQty := -m.qtyDelta
+		if restoreQty <= 0 {
+			continue
+		}
+		if _, err = tx.Exec(ctx, `
+			insert into public.inv_item_location_balances (tenant_id, item_id, location_id, qty_on_hand)
+			values ($1, $2, $3, $4)
+			on conflict (tenant_id, item_id, location_id)
+			do update set qty_on_hand = inv_item_location_balances.qty_on_hand + excluded.qty_on_hand, updated_at = now()`,
+			tenantID, m.itemID, m.locationID, restoreQty); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `
+			insert into public.inv_stock_movements (
+			  tenant_id, item_id, location_id, qty_delta, movement_type, ref_type, ref_id
+			) values ($1, $2, $3, $4, 'sales_reversal', 'pos_checkout', $5)`,
+			tenantID, m.itemID, m.locationID, restoreQty, salesID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ReverseCompletedSaleInventory restores stock/lots/serials for a completed sale,
+// including POS checkout movements (ref_type=pos_checkout).
+func ReverseCompletedSaleInventory(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
+	if err := reversePosCheckoutStock(ctx, tx, tenantID, salesID); err != nil {
+		return fmt.Errorf("pos checkout stock: %w", err)
+	}
+	if err := reverseSaleStock(ctx, tx, tenantID, salesID); err != nil {
+		return fmt.Errorf("sale line stock: %w", err)
+	}
+	if err := reverseSaleLot(ctx, tx, tenantID, salesID); err != nil {
+		return fmt.Errorf("lots: %w", err)
+	}
+	if err := reverseSaleSerials(ctx, tx, tenantID, salesID); err != nil {
+		return fmt.Errorf("serials: %w", err)
+	}
+	return nil
+}
+
 // reverseSaleSerials moves sold serials back to in_stock for this sales invoice.
 func reverseSaleSerials(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
 	rows, err := tx.Query(ctx, `

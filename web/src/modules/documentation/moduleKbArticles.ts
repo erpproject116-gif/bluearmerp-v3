@@ -902,7 +902,60 @@ export const moduleKbArticles: KbArticle[] = [
     ],
     primaryHref: "/app/pos",
     primaryLabel: "Open POS terminal",
-    relatedGuideIds: ["pos-manage-settings", "serial-barcode-scanning", "sales-cash-in-after-save"],
+    relatedGuideIds: ["pos-manage-settings", "serial-barcode-scanning", "sales-cash-in-after-save", "pos-first-day-register"],
+  },
+  {
+    id: "pos-first-day-register",
+    title: "First day on the register (cashier shell v2)",
+    scenario: "You are a new cashier using the premium POS terminal flag and need a short checklist.",
+    intro:
+      "Enable the cashier shell with localStorage pos_cashier_shell_v2=1 (or the staging flag). The register is sell-first: open shift → scan/add → pay → next customer. Stock-in and barcode printing stay in Inventory.",
+    blocks: [
+      {
+        type: "heading",
+        text: "Before you sell",
+      },
+      {
+        type: "steps",
+        items: [
+          "Open /app/pos and open a shift on the correct location.",
+          "Optional: install Bluearm from the in-POS coach, then open /app/pos again (app home stays Production).",
+          "Confirm the search box says Ready to scan when barcodes are enabled.",
+        ],
+      },
+      {
+        type: "heading",
+        text: "During the shift",
+      },
+      {
+        type: "steps",
+        items: [
+          "Add products from the grid or scan item codes / serials (Enter).",
+          "Sold-out tiles stay dimmed; Low / Top badges are hints only.",
+          "After pay: Sale recorded screen → Print slip if needed → Next customer. Void last sale only with care (restores stock).",
+          "More → Cash drawer for cash in/out or coin exchange (exchange does not change expected cash).",
+          "More → Shift activity or End-of-shift report for the diary / Z summary (ops only — no extra revenue JE on close).",
+        ],
+      },
+      {
+        type: "heading",
+        text: "Close",
+      },
+      {
+        type: "steps",
+        items: [
+          "Count the drawer, enter closing cash, review variance, then close session.",
+          "Saved bills resume from Saved bills — they are holds, not completed sales.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Offline: one queued checkout may wait to sync. Failed syncs warn you to re-ring — they are not silent.",
+      },
+    ],
+    primaryHref: "/app/pos",
+    primaryLabel: "Open POS terminal",
+    relatedGuideIds: ["pos-checkout-guide", "pos-manage-settings"],
   },
   {
     id: "pos-manage-settings",

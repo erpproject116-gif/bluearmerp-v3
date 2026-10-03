@@ -125,13 +125,14 @@ type tenderBody struct {
 }
 
 type checkoutResult struct {
-	SalesID           int64    `json:"sales_id"`
-	SalesNo           string   `json:"sales_no"`
-	GrandTotal        float64  `json:"grand_total"`
-	Change            float64  `json:"change"`
-	Tenders           []Tender `json:"tenders"`
-	JournalEntryID    *int64   `json:"journal_entry_id,omitempty"`
-	OfficialReceiptID *int64   `json:"official_receipt_id,omitempty"`
+	SalesID           int64          `json:"sales_id"`
+	SalesNo           string         `json:"sales_no"`
+	GrandTotal        float64        `json:"grand_total"`
+	Change            float64        `json:"change"`
+	Tenders           []Tender       `json:"tenders"`
+	JournalEntryID    *int64         `json:"journal_entry_id,omitempty"`
+	OfficialReceiptID *int64         `json:"official_receipt_id,omitempty"`
+	ReceiptFormat     *ReceiptFormat `json:"receipt_format,omitempty"`
 }
 
 type cartLineQuerier interface {
@@ -149,6 +150,7 @@ func registerSessionRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("pos.checkout", auth.AccessWrite)).Patch("/sessions/{id}/cart-lines/{lineId}", patchCartLine(pool))
 	r.With(auth.RequirePermission("pos.checkout", auth.AccessWrite)).Delete("/sessions/{id}/cart-lines/{lineId}", deleteCartLine(pool))
 	r.With(auth.RequirePermission("pos.checkout", auth.AccessWrite)).Post("/sessions/{id}/checkout", checkoutSession(pool))
+	registerVoidLastRoute(r, pool)
 }
 
 func listSessions(pool *pgxpool.Pool) http.HandlerFunc {
@@ -881,6 +883,30 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to update session.", "ERR_INTERNAL")
 			return
 		}
+
+		company, locName, cashierName, sessionNo := loadReceiptMeta(r.Context(), tx, tu.TenantID, sessionID, locationID)
+		orNo := loadOfficialReceiptNo(r.Context(), tx, tu.TenantID, acct.OfficialReceiptID)
+		receipt := buildReceiptFormat(receiptBuildInput{
+			CompanyName:  company,
+			LocationName: locName,
+			CashierName:  cashierName,
+			SessionNo:    sessionNo,
+			SalesNo:      salesNo,
+			ORID:         acct.OfficialReceiptID,
+			ORNo:         orNo,
+			At:           orderDate,
+			OrderType:    strings.TrimSpace(body.OrderType),
+			TableLabel:   strings.TrimSpace(body.TableLabel),
+			Lines:        lines,
+			Subtotal:     subtotal,
+			Discount:     discountTotal,
+			Tax:          taxTotal,
+			Tip:          tipAmount,
+			GrandTotal:   amountDue,
+			Change:       change,
+			Tenders:      body.Tenders,
+		})
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save checkout.", "ERR_INTERNAL")
 			return
@@ -889,6 +915,7 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		response.OK(w, checkoutResult{
 			SalesID: salesID, SalesNo: salesNo, GrandTotal: amountDue, Change: change, Tenders: outTenders,
 			JournalEntryID: acct.JournalEntryID, OfficialReceiptID: acct.OfficialReceiptID,
+			ReceiptFormat: &receipt,
 		}, "Checkout complete.")
 	}
 }

@@ -49,6 +49,7 @@ type Item struct {
 	Status                 string             `json:"status"`
 	ItemCategoryID         *int64             `json:"item_category_id,omitempty"`
 	ItemCategoryName       string             `json:"item_category_name,omitempty"`
+	PosVisible             bool               `json:"pos_visible"`
 	CustomValues           map[string]any     `json:"custom_values,omitempty"`
 }
 
@@ -132,7 +133,7 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 			i.warranty_duration_months, i.reorder_level::float8, i.track_serial, i.track_lot, i.serial_policy, i.lot_policy, i.track_inventory_qty,
 			coalesce(i.catch_weight, false), i.default_shelf_life_days, coalesce(i.lot_allocation_method, 'manual'), coalesce(i.price_basis, 'unit'),
 			i.status, i.item_category_id,
-			coalesce(cat.name, ''), count(*) over()
+			coalesce(cat.name, ''), coalesce(i.pos_visible, true), count(*) over()
 			from public.inv_items i
 			left join public.inv_item_categories cat on cat.id = i.item_category_id and cat.tenant_id = i.tenant_id
 			left join public.inv_units bu on bu.id = i.base_unit_id
@@ -158,7 +159,7 @@ func listItems(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.WarrantyDurationMonths, &row.ReorderLevel, &row.TrackSerial, &row.TrackLot, &row.SerialPolicy, &row.LotPolicy, &row.TrackInventoryQty,
 				&row.CatchWeight, &row.DefaultShelfLifeDays, &row.LotAllocationMethod, &row.PriceBasis,
 				&row.Status, &row.ItemCategoryID,
-				&row.ItemCategoryName, &total); err != nil {
+				&row.ItemCategoryName, &row.PosVisible, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read.", "ERR_INTERNAL")
 				return
 			}

@@ -34,6 +34,10 @@
 
 There is **no** third status (e.g. suspended). Help “open shift / close shift” maps exactly to these two values.
 
+### Cashier shell v2 (flagged)
+
+Terminal IA / mobile sheet / Sale Complete behind `pos_cashier_shell_v2`. Phase 0 decisions + void spike: `docs/runbooks/POS_CASHIER_SHELL_V2.md`. Deep dive §7: `18-DEEP-POS.md`.
+
 ### UNKNOWN (remaining)
 
 Offline queue internals (roadmap / tip text).
@@ -76,3 +80,5 @@ Finance workspace also links Payroll and Remittances.
 ### Evidence
 
 Help `hr` / KB; `hr/leave.go`, `discipline.go`, `absenteeism.go`; migration `193`. No `docs/modules/hr/README.md` (G-30 mitigated by pack).
+
+Phases 3b�7 (activity/Z, catalog badges, scan boundary, offline honesty, PWA coach, KB first-day): see `docs/runbooks/POS_CASHIER_SHELL_V2.md`.

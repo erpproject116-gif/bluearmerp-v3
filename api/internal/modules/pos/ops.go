@@ -45,15 +45,33 @@ type cashMovementBody struct {
 	Reason       string  `json:"reason"`
 }
 
+type CashMovement struct {
+	ID           int64   `json:"id"`
+	MovementType string  `json:"movement_type"`
+	Amount       float64 `json:"amount"`
+	Reason       string  `json:"reason,omitempty"`
+	CreatedAt    string  `json:"created_at"`
+	ActorName    string  `json:"actor_name,omitempty"`
+}
+
 type SessionReport struct {
-	SessionNo    string             `json:"session_no"`
-	Status       string             `json:"status"`
-	OpeningCash  float64            `json:"opening_cash"`
-	SalesTotal   float64            `json:"sales_total"`
-	TendersByType map[string]float64 `json:"tenders_by_type"`
-	CashIn       float64            `json:"cash_in"`
-	CashOut      float64            `json:"cash_out"`
-	ExpectedCash float64            `json:"expected_cash"`
+	SessionNo       string             `json:"session_no"`
+	Status          string             `json:"status"`
+	OpeningCash     float64            `json:"opening_cash"`
+	SalesTotal      float64            `json:"sales_total"`
+	TendersByType   map[string]float64 `json:"tenders_by_type"`
+	CashIn          float64            `json:"cash_in"`
+	CashOut         float64            `json:"cash_out"`
+	CoinExchange    float64            `json:"coin_exchange"`
+	ExpectedCash    float64            `json:"expected_cash"`
+	ClosingCash     *float64           `json:"closing_cash,omitempty"`
+	Variance        *float64           `json:"variance,omitempty"`
+}
+
+// computeExpectedCash is opening + cash tenders + cash-in − cash-out.
+// Coin exchange is intentionally excluded (bill↔coin swap, no drawer net change).
+func computeExpectedCash(opening, cashTenders, cashIn, cashOut float64) float64 {
+	return roundMoney(opening + cashTenders + cashIn - cashOut)
 }
 
 func registerOpsRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -62,7 +80,9 @@ func registerOpsRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("pos.checkout", auth.AccessWrite)).Post("/held-orders/{id}/resume", resumeHeldOrder(pool))
 	r.With(auth.RequirePermission("pos.checkout", auth.AccessWrite)).Delete("/held-orders/{id}", deleteHeldOrder(pool))
 	r.With(auth.RequirePermission("pos.checkout", auth.AccessWrite)).Post("/sessions/{id}/cash-movements", addCashMovement(pool))
+	r.Get("/sessions/{id}/cash-movements", listCashMovements(pool))
 	r.Get("/sessions/{id}/report", sessionReport(pool))
+	registerShiftDiaryRoutes(r, pool)
 	r.With(auth.RequirePermission("pos.manage", auth.AccessRead)).Get("/logs", listPosLogs(pool))
 }
 
@@ -250,24 +270,70 @@ func addCashMovement(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		mt := strings.ToLower(strings.TrimSpace(body.MovementType))
-		if mt != "in" && mt != "out" {
-			response.Validation(w, map[string]string{"movement_type": "Type must be 'in' or 'out'."})
+		if mt != "in" && mt != "out" && mt != "coin_exchange" {
+			response.Validation(w, map[string]string{"movement_type": "Type must be 'in', 'out', or 'coin_exchange'."})
 			return
 		}
 		if body.Amount <= 0 {
 			response.Validation(w, map[string]string{"amount": "Amount must be greater than zero."})
 			return
 		}
+		reason := strings.TrimSpace(body.Reason)
+		if mt == "coin_exchange" && reason == "" {
+			response.Validation(w, map[string]string{"reason": "Reason is required for coin exchange."})
+			return
+		}
 		var id int64
 		if err := pool.QueryRow(r.Context(), `
 			insert into public.pos_cash_movements (session_id, movement_type, amount, reason, created_by_user_id)
 			values ($1,$2,$3,$4,$5) returning id`,
-			sessionID, mt, body.Amount, strings.TrimSpace(body.Reason), tu.AppUserID).Scan(&id); err != nil {
+			sessionID, mt, body.Amount, reason, tu.AppUserID).Scan(&id); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to record cash movement.", "ERR_INTERNAL")
 			return
 		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "pos.cash_movement", "pos_cash_movement", &id, nil, body)
-		response.OK(w, map[string]any{"id": id}, "Recorded.")
+		action := "pos.cash_movement"
+		if mt == "coin_exchange" {
+			action = "pos.coin_exchange"
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, action, "pos_cash_movement", &id, nil, body)
+		response.OK(w, map[string]any{"id": id, "movement_type": mt}, "Recorded.")
+	}
+}
+
+func listCashMovements(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		sessionID, err := parseID(chi.URLParam(r, "id"))
+		if err != nil || !sessionBelongsToTenant(r.Context(), pool, tu.TenantID, sessionID) {
+			response.Err(w, http.StatusNotFound, "Session not found.", "ERR_NOT_FOUND")
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select m.id, m.movement_type, m.amount::float8, coalesce(m.reason, ''), m.created_at::text,
+			  coalesce(u.full_name, '')
+			from public.pos_cash_movements m
+			left join public.users u on u.id = m.created_by_user_id
+			where m.session_id = $1
+			order by m.created_at desc
+			limit 100`, sessionID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load cash movements.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		var out []CashMovement
+		for rows.Next() {
+			var m CashMovement
+			if err := rows.Scan(&m.ID, &m.MovementType, &m.Amount, &m.Reason, &m.CreatedAt, &m.ActorName); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read cash movements.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, m)
+		}
+		if out == nil {
+			out = []CashMovement{}
+		}
+		response.OK(w, out, "OK")
 	}
 }
 
@@ -280,10 +346,19 @@ func sessionReport(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		rep := SessionReport{TendersByType: map[string]float64{}}
-		_ = pool.QueryRow(r.Context(), `select session_no, status, opening_cash::float8, sales_total::float8 from public.pos_sessions where id=$1 and tenant_id=$2`, sessionID, tu.TenantID).
-			Scan(&rep.SessionNo, &rep.Status, &rep.OpeningCash, &rep.SalesTotal)
+		var closing *float64
+		_ = pool.QueryRow(r.Context(), `
+			select session_no, status, opening_cash::float8, sales_total::float8, closing_cash::float8
+			from public.pos_sessions where id=$1 and tenant_id=$2`, sessionID, tu.TenantID).
+			Scan(&rep.SessionNo, &rep.Status, &rep.OpeningCash, &rep.SalesTotal, &closing)
+		rep.ClosingCash = closing
 
-		trows, err := pool.Query(r.Context(), `select tender_type, sum(amount)::float8 from public.pos_tenders where session_id=$1 group by tender_type`, sessionID)
+		trows, err := pool.Query(r.Context(), `
+			select t.tender_type, sum(t.amount)::float8
+			from public.pos_tenders t
+			join public.sa_sales s on s.id = t.sales_id and s.deleted_at is null
+			where t.session_id=$1
+			group by t.tender_type`, sessionID)
 		if err == nil {
 			for trows.Next() {
 				var t string
@@ -295,22 +370,32 @@ func sessionReport(pool *pgxpool.Pool) http.HandlerFunc {
 			trows.Close()
 		}
 
-		crows, err := pool.Query(r.Context(), `select movement_type, sum(amount)::float8 from public.pos_cash_movements where session_id=$1 group by movement_type`, sessionID)
+		crows, err := pool.Query(r.Context(), `
+			select movement_type, sum(amount)::float8
+			from public.pos_cash_movements where session_id=$1
+			group by movement_type`, sessionID)
 		if err == nil {
 			for crows.Next() {
 				var mt string
 				var amt float64
 				if err := crows.Scan(&mt, &amt); err == nil {
-					if mt == "in" {
+					switch mt {
+					case "in":
 						rep.CashIn = roundMoney(amt)
-					} else {
+					case "out":
 						rep.CashOut = roundMoney(amt)
+					case "coin_exchange":
+						rep.CoinExchange = roundMoney(amt)
 					}
 				}
 			}
 			crows.Close()
 		}
-		rep.ExpectedCash = roundMoney(rep.OpeningCash + rep.TendersByType["cash"] + rep.CashIn - rep.CashOut)
+		rep.ExpectedCash = computeExpectedCash(rep.OpeningCash, rep.TendersByType["cash"], rep.CashIn, rep.CashOut)
+		if closing != nil {
+			v := roundMoney(*closing - rep.ExpectedCash)
+			rep.Variance = &v
+		}
 		response.OK(w, rep, "OK")
 	}
 }

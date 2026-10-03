@@ -6,7 +6,7 @@ import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { useToast } from "../../shared/toast";
 import { useAuth, hasPermission } from "../../shared/auth-context";
 import { sanitizeIntegerInput, bindDecimalInput, formatMoney } from "../../shared/money";
-import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
+import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, setPosItemVisible, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
 import { uiLabel } from "../../shared/branding/uiLabel";
 import {
   POS_LABEL_FIELDS,
@@ -29,6 +29,7 @@ type ItemRow = {
   track_inventory_qty: boolean;
   status: string;
   item_category_id?: number | null;
+  pos_visible?: boolean;
 };
 
 type CategoryRow = {
@@ -219,12 +220,29 @@ function ProductsTab() {
               <th class="px-4 py-2.5">Product</th>
               <th class="px-4 py-2.5">Category</th>
               <th class="px-4 py-2.5 text-right">Price</th>
+              <th class="px-4 py-2.5 text-center">On POS</th>
               <th class="px-4 py-2.5" />
             </tr>
           </thead>
           <tbody>
             <For each={items() ?? []}>
-              {(row) => <ProductRow row={row} categories={categories() ?? []} onSave={saveItem} onPickImage={onPickImage} />}
+              {(row) => (
+                <ProductRow
+                  row={row}
+                  categories={categories() ?? []}
+                  onSave={saveItem}
+                  onPickImage={onPickImage}
+                  onVisibilityChange={async (id, on) => {
+                    const res = await setPosItemVisible(id, on);
+                    if (!res.success) {
+                      toast.warning(res.message ?? "Could not update POS visibility.");
+                      return false;
+                    }
+                    refetch();
+                    return true;
+                  }}
+                />
+              )}
             </For>
           </tbody>
         </table>
@@ -243,6 +261,7 @@ function ProductRow(props: {
   categories: CategoryRow[];
   onSave: (row: ItemRow, patch: Partial<ItemRow>) => void;
   onPickImage: (row: ItemRow, e: Event) => void;
+  onVisibilityChange: (id: number, on: boolean) => Promise<boolean>;
 }) {
   const [price, setPrice] = createSignal(String(props.row.sales_price));
   const [categoryId, setCategoryId] = createSignal<number | null>(props.row.item_category_id ?? null);
@@ -285,6 +304,19 @@ function ProductRow(props: {
           class="w-24 rounded-lg border border-stroke px-2 py-1.5 text-right text-sm focus:border-brand-500 focus:outline-none"
           value={price()}
           onInput={(e) => bindDecimalInput(e.currentTarget, setPrice)}
+        />
+      </td>
+      <td class="px-4 py-2 text-center">
+        <input
+          type="checkbox"
+          class="h-4 w-4 rounded border-slate-300"
+          checked={props.row.pos_visible !== false}
+          title="Show on POS terminal"
+          onChange={async (e) => {
+            const on = e.currentTarget.checked;
+            const ok = await props.onVisibilityChange(props.row.id, on);
+            if (!ok) e.currentTarget.checked = !on;
+          }}
         />
       </td>
       <td class="px-4 py-2">

@@ -102,6 +102,44 @@ export type CheckoutResult = {
   change: number;
   journal_entry_id?: number;
   official_receipt_id?: number;
+  receipt_format?: PosReceiptFormat;
+};
+
+export type PosReceiptLine = {
+  item_name: string;
+  item_code?: string;
+  qty: number;
+  unit_price: number;
+  line_total: number;
+};
+
+export type PosReceiptTender = {
+  tender_type: string;
+  amount: number;
+};
+
+/** Frozen checkout slip snapshot — render only; not an HTML builder. */
+export type PosReceiptFormat = {
+  doc_title: string;
+  company_name: string;
+  location_name?: string;
+  cashier_name?: string;
+  session_no?: string;
+  sales_no: string;
+  official_receipt_no?: string | null;
+  official_receipt_id?: number | null;
+  at: string;
+  order_type?: string;
+  table_label?: string;
+  lines: PosReceiptLine[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  tip: number;
+  grand_total: number;
+  change: number;
+  tenders: PosReceiptTender[];
+  footer_note: string;
 };
 
 export type HeldOrder = {
@@ -121,7 +159,19 @@ export type SessionReport = {
   tenders_by_type: Record<string, number>;
   cash_in: number;
   cash_out: number;
+  coin_exchange?: number;
   expected_cash: number;
+  closing_cash?: number | null;
+  variance?: number | null;
+};
+
+export type CashMovement = {
+  id: number;
+  movement_type: string;
+  amount: number;
+  reason?: string;
+  created_at: string;
+  actor_name?: string;
 };
 
 export type PosLog = {
@@ -153,6 +203,12 @@ export type PosCatalogItem = {
   track_serial?: boolean;
   track_lot?: boolean;
   has_modifiers: boolean;
+  pos_visible?: boolean;
+  qty_available?: number | null;
+  reorder_level?: number | null;
+  /** ok | low | sold_out | untracked */
+  stock_status?: string;
+  is_top_seller?: boolean;
 };
 
 export type PosSettings = {
@@ -197,15 +253,22 @@ export function usePosCatalogCategories() {
   }));
 }
 
-export function usePosCatalogItems(params: () => { categoryId?: number | null; q?: string }) {
+export function usePosCatalogItems(params: () => {
+  categoryId?: number | null;
+  q?: string;
+  locationId?: number | null;
+  stock?: string | null;
+}) {
   return createQuery(() => {
     const p = params();
     const qs = new URLSearchParams();
     if (p.categoryId) qs.set("category_id", String(p.categoryId));
     if (p.q) qs.set("q", p.q);
+    if (p.locationId) qs.set("location_id", String(p.locationId));
+    if (p.stock && p.stock !== "all") qs.set("stock", p.stock);
     const suffix = qs.toString() ? `?${qs}` : "";
     return {
-      queryKey: ["pos-catalog-items", p.categoryId ?? null, p.q ?? ""],
+      queryKey: ["pos-catalog-items", p.categoryId ?? null, p.q ?? "", p.locationId ?? null, p.stock ?? "all"],
       queryFn: async () => {
         const res = await apiFetch<PosCatalogItem[]>(`/api/v1/pos/catalog/items${suffix}`);
         if (!res.success) throw new Error(res.message ?? "Failed to load items");
@@ -213,6 +276,13 @@ export function usePosCatalogItems(params: () => { categoryId?: number | null; q
       },
       staleTime: 15_000,
     };
+  });
+}
+
+export async function setPosItemVisible(itemId: number, posVisible: boolean) {
+  return apiFetch<{ id: number; pos_visible: boolean }>(`/api/v1/pos/catalog/items/${itemId}/visibility`, {
+    method: "PATCH",
+    body: JSON.stringify({ pos_visible: posVisible }),
   });
 }
 
@@ -319,6 +389,23 @@ export async function checkoutPos(
   return apiFetch<CheckoutResult>(`/api/v1/pos/sessions/${sessionId}/checkout`, { method: "POST", body: JSON.stringify(body) });
 }
 
+export type VoidLastResult = {
+  sales_id: number;
+  sales_no: string;
+  grand_total: number;
+  journal_action: string;
+  or_voided: number;
+  reversal_journal_entry_id?: number;
+};
+
+/** Reverse the last completed checkout on an open session (no hard-delete). */
+export async function voidLastPosCheckout(sessionId: number, reason?: string) {
+  return apiFetch<VoidLastResult>(`/api/v1/pos/sessions/${sessionId}/void-last`, {
+    method: "POST",
+    body: JSON.stringify({ reason: reason?.trim() || "Void last sale at register" }),
+  });
+}
+
 export async function holdCart(sessionId: number, body: { label: string; order_type: string }) {
   return apiFetch(`/api/v1/pos/sessions/${sessionId}/hold`, { method: "POST", body: JSON.stringify(body) });
 }
@@ -336,8 +423,96 @@ export async function deleteHeldOrder(id: number) {
   return apiFetch(`/api/v1/pos/held-orders/${id}`, { method: "DELETE" });
 }
 
-export async function addCashMovement(sessionId: number, body: { movement_type: string; amount: number; reason: string }) {
+export async function addCashMovement(
+  sessionId: number,
+  body: { movement_type: string; amount: number; reason: string },
+) {
   return apiFetch(`/api/v1/pos/sessions/${sessionId}/cash-movements`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function fetchCashMovements(sessionId: number): Promise<CashMovement[]> {
+  const res = await apiFetch<CashMovement[]>(`/api/v1/pos/sessions/${sessionId}/cash-movements`);
+  return res.data ?? [];
+}
+
+export type SessionActivityEvent = {
+  kind: string;
+  at: string;
+  sales_no?: string;
+  sales_id?: number;
+  amount?: number;
+  label?: string;
+  tender?: string;
+  voided?: boolean;
+};
+
+export type ShiftTxn = {
+  sales_id: number;
+  sales_no: string;
+  at: string;
+  grand_total: number;
+  voided: boolean;
+  tenders: Record<string, number>;
+};
+
+export type ZReport = SessionReport & {
+  location_name?: string;
+  cashier_name?: string;
+  opened_at?: string;
+  closed_at?: string | null;
+  txn_count: number;
+  void_count: number;
+  transactions: ShiftTxn[];
+  cash_movements: CashMovement[];
+  generated_at: string;
+};
+
+export type DailySessionRow = {
+  session_id: number;
+  session_no: string;
+  location_name: string;
+  cashier_name: string;
+  status: string;
+  sales_total: number;
+  opening_cash: number;
+  closing_cash?: number | null;
+  expected_cash: number;
+  variance?: number | null;
+  txn_count: number;
+};
+
+export type DailyRollup = {
+  date: string;
+  location_id?: number | null;
+  location_name?: string;
+  session_count: number;
+  sales_total: number;
+  txn_count: number;
+  void_count: number;
+  cash_tenders: number;
+  tenders_by_type: Record<string, number>;
+  cash_in: number;
+  cash_out: number;
+  coin_exchange: number;
+  sessions: DailySessionRow[];
+  generated_at: string;
+};
+
+export async function fetchSessionActivity(sessionId: number, limit = 40): Promise<SessionActivityEvent[]> {
+  const res = await apiFetch<SessionActivityEvent[]>(`/api/v1/pos/sessions/${sessionId}/activity?limit=${limit}`);
+  return res.data ?? [];
+}
+
+export async function fetchZReport(sessionId: number): Promise<ZReport | null> {
+  const res = await apiFetch<ZReport>(`/api/v1/pos/sessions/${sessionId}/z-report`);
+  return res.data ?? null;
+}
+
+export async function fetchDailyRollup(date: string, locationId?: number | null): Promise<DailyRollup | null> {
+  const qs = new URLSearchParams({ date });
+  if (locationId) qs.set("location_id", String(locationId));
+  const res = await apiFetch<DailyRollup>(`/api/v1/pos/reports/daily?${qs}`);
+  return res.data ?? null;
 }
 
 export async function fetchSessionReport(sessionId: number): Promise<SessionReport | null> {
