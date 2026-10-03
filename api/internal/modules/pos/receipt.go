@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branding"
 )
 
 // ReceiptFormat is the frozen counter slip snapshot returned at checkout.
@@ -13,6 +16,9 @@ import (
 type ReceiptFormat struct {
 	DocTitle          string          `json:"doc_title"`
 	CompanyName       string          `json:"company_name"`
+	Address           string          `json:"address,omitempty"`
+	Phone             string          `json:"phone,omitempty"`
+	Email             string          `json:"email,omitempty"`
 	LocationName      string          `json:"location_name,omitempty"`
 	CashierName       string          `json:"cashier_name,omitempty"`
 	SessionNo         string          `json:"session_no,omitempty"`
@@ -31,6 +37,7 @@ type ReceiptFormat struct {
 	Change            float64         `json:"change"`
 	Tenders           []ReceiptTender `json:"tenders"`
 	FooterNote        string          `json:"footer_note"`
+	BrandFooter       string          `json:"brand_footer,omitempty"`
 }
 
 type ReceiptLine struct {
@@ -48,6 +55,10 @@ type ReceiptTender struct {
 
 type receiptBuildInput struct {
 	CompanyName  string
+	Address      string
+	Phone        string
+	Email        string
+	BrandFooter  string
 	LocationName string
 	CashierName  string
 	SessionNo    string
@@ -103,6 +114,9 @@ func buildReceiptFormat(in receiptBuildInput) ReceiptFormat {
 	return ReceiptFormat{
 		DocTitle:          docTitle,
 		CompanyName:       in.CompanyName,
+		Address:           strings.TrimSpace(in.Address),
+		Phone:             strings.TrimSpace(in.Phone),
+		Email:             strings.TrimSpace(in.Email),
 		LocationName:      in.LocationName,
 		CashierName:       in.CashierName,
 		SessionNo:         in.SessionNo,
@@ -121,6 +135,7 @@ func buildReceiptFormat(in receiptBuildInput) ReceiptFormat {
 		Change:            roundMoney(in.Change),
 		Tenders:           tenders,
 		FooterNote:        footer,
+		BrandFooter:       strings.TrimSpace(in.BrandFooter),
 	}
 }
 
@@ -133,6 +148,19 @@ func loadReceiptMeta(ctx context.Context, tx pgx.Tx, tenantID, sessionID, locati
 		left join public.users u on u.id = s.cashier_user_id
 		where s.id = $1 and s.tenant_id = $2`, sessionID, tenantID).Scan(&sessionNo, &cashier)
 	return
+}
+
+// applyBrandingIdentity prefers Settings → Branding receipt fields over bare tenants.company_name.
+func applyBrandingIdentity(ctx context.Context, pool *pgxpool.Pool, tenantID int64, company string) (name, address, phone, email, brandFooter string) {
+	name = strings.TrimSpace(company)
+	id, err := branding.LoadPrintIdentity(ctx, pool, tenantID)
+	if err != nil {
+		return name, "", "", "", ""
+	}
+	if cn := strings.TrimSpace(id.CompanyName); cn != "" && !strings.EqualFold(cn, "Company") {
+		name = cn
+	}
+	return name, strings.TrimSpace(id.Address), strings.TrimSpace(id.Phone), strings.TrimSpace(id.Email), strings.TrimSpace(id.FooterText)
 }
 
 func loadOfficialReceiptNo(ctx context.Context, tx pgx.Tx, tenantID int64, orID *int64) *string {

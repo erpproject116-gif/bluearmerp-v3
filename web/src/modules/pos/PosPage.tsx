@@ -10,6 +10,8 @@ import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { useAuth, hasPermission } from "../../shared/auth-context";
+import { useBranding } from "../../shared/branding/BrandingProvider";
+import { BrandingLogoImage } from "../../shared/branding/BrandingLogoImage";
 import {
   emptyGuest,
   previewGuestTicket,
@@ -104,6 +106,7 @@ function formatPosApiError(res: {
 
 export default function PosPage() {
   const auth = useAuth();
+  const branding = useBranding();
   const toast = useToast();
   const invalidate = useInvalidatePosSession();
   const session = usePosCurrentSession();
@@ -112,7 +115,15 @@ export default function PosPage() {
 
   const posLabel = (key: string, fallback?: string) =>
     resolvePosLabel(settings.data?.ui_labels, key, fallback);
-  const theme = createMemo(() => resolvePosTheme(settings.data?.theme));
+  const theme = createMemo(() =>
+    resolvePosTheme(settings.data?.theme, branding.settings().colors),
+  );
+  const storeName = createMemo(
+    () =>
+      branding.settings().receipt.company_name?.trim() ||
+      auth.me?.tenant.company_name ||
+      "Point of Sale",
+  );
 
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
@@ -850,16 +861,9 @@ export default function PosPage() {
         style={{ "background-color": "var(--pos-header-bg)", color: "var(--pos-header-text)" }}
       >
         <div class="flex min-w-0 items-center gap-3">
-          <span
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white"
-            style={{ "background-color": "var(--pos-primary)", color: "var(--pos-btn-text)" }}
-          >
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </span>
+          <BrandingLogoImage class="h-8 w-8 shrink-0 rounded-lg object-contain" alt="" />
           <div class="min-w-0">
-            <h1 class="truncate text-base font-semibold leading-tight">{auth.me?.tenant.company_name ?? "Point of Sale"}</h1>
+            <h1 class="truncate text-base font-semibold leading-tight">{storeName()}</h1>
             <Show when={session.data}>
               {(s) => <p class="truncate text-xs opacity-70">{s().session_no} · {s().location_name}</p>}
             </Show>

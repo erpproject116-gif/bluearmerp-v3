@@ -122,6 +122,9 @@ export type PosReceiptTender = {
 export type PosReceiptFormat = {
   doc_title: string;
   company_name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
   location_name?: string;
   cashier_name?: string;
   session_no?: string;
@@ -140,6 +143,8 @@ export type PosReceiptFormat = {
   change: number;
   tenders: PosReceiptTender[];
   footer_note: string;
+  /** Settings → Branding receipt footer (snapshotted at checkout). */
+  brand_footer?: string;
 };
 
 export type HeldOrder = {

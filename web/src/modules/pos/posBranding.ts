@@ -83,13 +83,33 @@ export function resolvePosLabel(labels: Record<string, string> | undefined | nul
   return fallback ?? POS_UI_LABEL_DEFAULTS[key] ?? key;
 }
 
-export function resolvePosTheme(theme: PosTheme | undefined | null): Required<PosTheme> {
+/** Brand colors from Settings → Branding (optional fallback when POS theme fields empty). */
+export type PosBrandColorFallback = {
+  primary?: string;
+  accent?: string;
+  surface?: string;
+  heading?: string;
+  background?: string;
+};
+
+/**
+ * Prefer pos_settings.theme; else map global branding colors; else POS defaults.
+ * Header stays light-neutral when brand background is a page color (not a header chrome).
+ */
+export function resolvePosTheme(
+  theme: PosTheme | undefined | null,
+  brand?: PosBrandColorFallback | null,
+): Required<PosTheme> {
+  const pick = (pos?: string, brandVal?: string, def?: string) =>
+    pos?.trim() || brandVal?.trim() || def || "";
+
   return {
-    primary: theme?.primary?.trim() || POS_THEME_DEFAULTS.primary,
-    accent: theme?.accent?.trim() || POS_THEME_DEFAULTS.accent,
+    primary: pick(theme?.primary, brand?.primary, POS_THEME_DEFAULTS.primary),
+    accent: pick(theme?.accent, brand?.accent, POS_THEME_DEFAULTS.accent),
+    // Do not use page background as header chrome — keeps register header readable.
     header_bg: theme?.header_bg?.trim() || POS_THEME_DEFAULTS.header_bg,
-    header_text: theme?.header_text?.trim() || POS_THEME_DEFAULTS.header_text,
-    surface: theme?.surface?.trim() || POS_THEME_DEFAULTS.surface,
+    header_text: pick(theme?.header_text, brand?.heading, POS_THEME_DEFAULTS.header_text),
+    surface: pick(theme?.surface, brand?.background || brand?.surface, POS_THEME_DEFAULTS.surface),
     button_text: theme?.button_text?.trim() || POS_THEME_DEFAULTS.button_text,
   };
 }

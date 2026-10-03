@@ -8,6 +8,7 @@ import { useAuth, hasPermission } from "../../shared/auth-context";
 import { sanitizeIntegerInput, bindDecimalInput, formatMoney } from "../../shared/money";
 import { usePosSettings, savePosSettings, fetchPosLogs, posTenderLabel, POS_TENDER_TYPES, setPosItemVisible, type PosSettings, type PosModifierGroup } from "../../shared/usePos";
 import { uiLabel } from "../../shared/branding/uiLabel";
+import { useBranding } from "../../shared/branding/BrandingProvider";
 import {
   POS_LABEL_FIELDS,
   POS_THEME_DEFAULTS,
@@ -1010,7 +1011,11 @@ function SettingsTab() {
         <div class="rounded-xl border border-stroke bg-white p-5">
           <h3 class="mb-1 text-sm font-semibold text-text-primary">Branding &amp; colors</h3>
           <p class="mb-4 text-xs text-text-secondary">
-            Color palette for the POS shell (header, primary actions, background). Company name still comes from tenant branding.
+            Store identity (logo, company name, receipt contact) lives in{" "}
+            <A href="/app/settings/branding" class="font-medium text-brand-700 hover:underline">
+              Settings → Branding
+            </A>
+            . Colors below only override register chrome; empty fields fall back to global brand colors, then POS defaults.
           </p>
           <PosThemeEditor
             theme={current().theme ?? {}}
@@ -1041,7 +1046,8 @@ function PosThemeEditor(props: {
   payLabel: string;
   onChange: (theme: Record<string, string>) => void;
 }) {
-  const resolved = () => resolvePosTheme(props.theme);
+  const branding = useBranding();
+  const resolved = () => resolvePosTheme(props.theme, branding.settings().colors);
   const fields: { key: keyof typeof POS_THEME_DEFAULTS; label: string }[] = [
     { key: "primary", label: "Primary (buttons)" },
     { key: "accent", label: "Accent" },

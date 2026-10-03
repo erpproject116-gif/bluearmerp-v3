@@ -885,9 +885,14 @@ func checkoutSession(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		company, locName, cashierName, sessionNo := loadReceiptMeta(r.Context(), tx, tu.TenantID, sessionID, locationID)
+		company, address, phone, email, brandFooter := applyBrandingIdentity(r.Context(), pool, tu.TenantID, company)
 		orNo := loadOfficialReceiptNo(r.Context(), tx, tu.TenantID, acct.OfficialReceiptID)
 		receipt := buildReceiptFormat(receiptBuildInput{
 			CompanyName:  company,
+			Address:      address,
+			Phone:        phone,
+			Email:        email,
+			BrandFooter:  brandFooter,
 			LocationName: locName,
 			CashierName:  cashierName,
 			SessionNo:    sessionNo,

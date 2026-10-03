@@ -68,6 +68,7 @@ No separate “diary” product. No revenue JE on shift close, cash in/out, or c
 - Title is **Sales slip** unless Finance OR# is present ? **Official Receipt**.
 - `PosReceiptSlip` screen preview + browser print; reprint from session recent checkouts.
 - Screen fallback builds a totals-only slip if snapshot missing.
+- **Identity:** logo + company name + receipt contact from **Settings ? Branding** (`LoadPrintIdentity` / `useBranding`). POS `theme` only overrides register chrome; empty theme fields fall back to global brand colors, then POS defaults.
 
 ## Phase 3 � Cash drawer + close variance
 

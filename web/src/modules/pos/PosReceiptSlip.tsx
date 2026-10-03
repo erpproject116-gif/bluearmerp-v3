@@ -1,5 +1,6 @@
 import { For, Show } from "solid-js";
 import { formatPeso } from "../../shared/money";
+import { BrandingLogoImage } from "../../shared/branding/BrandingLogoImage";
 import { posTenderLabel, type PosReceiptFormat } from "../../shared/usePos";
 
 function money(n: number): string {
@@ -19,6 +20,7 @@ function formatWhen(iso: string): string {
 /**
  * Counter slip from receipt_format snapshot.
  * Screen preview + browser print — not an HTML receipt builder.
+ * Logo uses live branding (same asset as Settings → Branding); identity text prefers snapshot.
  */
 export function PosReceiptSlip(props: {
   receipt: PosReceiptFormat;
@@ -58,8 +60,19 @@ export function PosReceiptSlip(props: {
           style={{ "font-family": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}
         >
           <header class="mb-3 text-center">
+            <div class="mb-2 flex justify-center">
+              <BrandingLogoImage class="max-h-12 max-w-[10rem] object-contain" alt="" />
+            </div>
             <h1 class="text-base font-bold uppercase tracking-wide">{props.receipt.doc_title}</h1>
             <p class="mt-1 text-sm font-semibold">{props.receipt.company_name}</p>
+            <Show when={props.receipt.address}>
+              <p class="text-xs text-slate-600">{props.receipt.address}</p>
+            </Show>
+            <Show when={props.receipt.phone || props.receipt.email}>
+              <p class="text-xs text-slate-600">
+                {[props.receipt.phone, props.receipt.email].filter(Boolean).join(" · ")}
+              </p>
+            </Show>
             <Show when={props.receipt.location_name}>
               <p class="text-xs text-slate-600">{props.receipt.location_name}</p>
             </Show>
@@ -165,6 +178,9 @@ export function PosReceiptSlip(props: {
           </div>
 
           <p class="text-center text-[10px] leading-snug text-slate-500">{props.receipt.footer_note}</p>
+          <Show when={props.receipt.brand_footer}>
+            <p class="mt-2 text-center text-[10px] leading-snug text-slate-500">{props.receipt.brand_footer}</p>
+          </Show>
         </article>
       </div>
       <style>{`
