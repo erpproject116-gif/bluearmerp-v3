@@ -473,6 +473,14 @@ export default function PosPage() {
       toast.warning("A checkout is already queued offline for this shift. Wait for sync or reconnect.");
       return;
     }
+    const missingLot = cartLines().find((ln) => {
+      const needsLot = Boolean(ln.track_lot || catalogByItemId().get(ln.item_id)?.track_lot);
+      return needsLot && !(ln.lot_batch_id && ln.lot_batch_id > 0);
+    });
+    if (missingLot) {
+      toast.warning(`Pick a lot / batch for “${missingLot.item_name}” on the cart before paying.`);
+      return;
+    }
     setShowPayment(true);
   };
 
@@ -2653,9 +2661,17 @@ function OrderPanel(props: {
                         </For>
                       </select>
                     </Show>
-                    <Show when={props.catalogByItemId.get(ln.item_id)?.track_lot}>
-                      <div class="mt-1">
-                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Lot</span>
+                    <Show when={ln.track_lot || props.catalogByItemId.get(ln.item_id)?.track_lot}>
+                      <div
+                        class={`mt-1 rounded-md p-1 ${
+                          !(ln.lot_batch_id && ln.lot_batch_id > 0)
+                            ? "bg-amber-50 ring-1 ring-amber-300"
+                            : ""
+                        }`}
+                      >
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">
+                          Lot{!(ln.lot_batch_id && ln.lot_batch_id > 0) ? " (required)" : ""}
+                        </span>
                         <LotLineCell
                           itemId={ln.item_id}
                           locationId={props.locationId}

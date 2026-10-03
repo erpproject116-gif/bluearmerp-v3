@@ -56,6 +56,8 @@ type CartLine struct {
 	SerialUnitIDs []int64            `json:"serial_unit_ids,omitempty"`
 	LotBatchID    *int64             `json:"lot_batch_id,omitempty"`
 	LotNo         string             `json:"lot_no,omitempty"`
+	TrackLot      bool               `json:"track_lot,omitempty"`
+	TrackSerial   bool               `json:"track_serial,omitempty"`
 	Modifiers     []CartLineModifier `json:"modifiers,omitempty"`
 }
 
@@ -964,16 +966,20 @@ func loadCartLinesTx(ctx context.Context, tx pgx.Tx, sessionID int64) ([]CartLin
 func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64) ([]CartLine, error) {
 	rows, err := q.Query(ctx, `
 		select cl.id, cl.line_no, cl.item_id, cl.item_code, cl.item_name, cl.qty::float8, cl.unit_price::float8, cl.line_total::float8,
-		  cl.notes, cl.size_label, coalesce(cl.guest_no, 1), coalesce(cl.serial_unit_ids, '{}'), cl.lot_batch_id, coalesce(lb.lot_no, '')
+		  cl.notes, cl.size_label, coalesce(cl.guest_no, 1), coalesce(cl.serial_unit_ids, '{}'), cl.lot_batch_id, coalesce(lb.lot_no, ''),
+		  coalesce(i.track_lot, false), coalesce(i.track_serial, false)
 		from public.pos_cart_lines cl
+		left join public.inv_items i on i.id = cl.item_id
 		left join public.inv_lot_batches lb on lb.id = cl.lot_batch_id
 		where cl.session_id=$1 order by cl.line_no`, sessionID)
 	if err != nil {
 		// Pre-migration 177: guest_no column missing.
 		rows, err = q.Query(ctx, `
 			select cl.id, cl.line_no, cl.item_id, cl.item_code, cl.item_name, cl.qty::float8, cl.unit_price::float8, cl.line_total::float8,
-			  cl.notes, cl.size_label, coalesce(cl.serial_unit_ids, '{}'), cl.lot_batch_id, coalesce(lb.lot_no, '')
+			  cl.notes, cl.size_label, coalesce(cl.serial_unit_ids, '{}'), cl.lot_batch_id, coalesce(lb.lot_no, ''),
+			  coalesce(i.track_lot, false), coalesce(i.track_serial, false)
 			from public.pos_cart_lines cl
+			left join public.inv_items i on i.id = cl.item_id
 			left join public.inv_lot_batches lb on lb.id = cl.lot_batch_id
 			where cl.session_id=$1 order by cl.line_no`, sessionID)
 		if err != nil {
@@ -985,7 +991,7 @@ func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64)
 		var lineIDs []int64
 		for rows.Next() {
 			var ln CartLine
-			if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.SerialUnitIDs, &ln.LotBatchID, &ln.LotNo); err != nil {
+			if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.SerialUnitIDs, &ln.LotBatchID, &ln.LotNo, &ln.TrackLot, &ln.TrackSerial); err != nil {
 				return nil, err
 			}
 			ln.GuestNo = 1
@@ -1004,7 +1010,7 @@ func loadCartLinesQuery(ctx context.Context, q cartLineQuerier, sessionID int64)
 	var lineIDs []int64
 	for rows.Next() {
 		var ln CartLine
-		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.GuestNo, &ln.SerialUnitIDs, &ln.LotBatchID, &ln.LotNo); err != nil {
+		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName, &ln.Qty, &ln.UnitPrice, &ln.LineTotal, &ln.Notes, &ln.SizeLabel, &ln.GuestNo, &ln.SerialUnitIDs, &ln.LotBatchID, &ln.LotNo, &ln.TrackLot, &ln.TrackSerial); err != nil {
 			return nil, err
 		}
 		if ln.GuestNo <= 0 {

@@ -69,6 +69,9 @@ export type PosCartLine = {
   serial_unit_ids?: number[];
   lot_batch_id?: number | null;
   lot_no?: string;
+  /** From inv_items — reliable even when catalog category filter omits the item. */
+  track_lot?: boolean;
+  track_serial?: boolean;
   modifiers?: PosCartLineModifier[];
 };
 

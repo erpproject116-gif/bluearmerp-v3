@@ -17,9 +17,7 @@ export function formatPosCashierError(res: {
   code?: string;
   errors?: Record<string, string>;
 }): string {
-  const code = (res.code || "").trim();
-  if (code && CODE_HINTS[code]) return CODE_HINTS[code];
-
+  // Prefer field messages — ERR_VALIDATION alone hides the real checkout reason (lot, stock, etc.).
   const fieldMsgs = res.errors ? Object.values(res.errors).filter(Boolean) : [];
   if (fieldMsgs.length) {
     const joined = fieldMsgs.join(" ");
@@ -31,13 +29,31 @@ export function formatPosCashierError(res: {
       return "This item needs a serial number. Scan or pick the serial before paying.";
     }
     if (lower.includes("lot")) {
-      return "This item needs a lot / batch. Pick a lot before paying.";
+      return "This item needs a lot / batch. Pick a lot on the cart line before paying.";
     }
     if (lower.includes("cart")) {
       return joined;
     }
+    if (lower.includes("tender")) {
+      return "Payment amount is short of the total due (including tip).";
+    }
+    if (lower.includes("account") || lower.includes("accounting") || lower.includes("journal")) {
+      return "Accounting setup blocked this sale. Ask a manager to check POS accounting accounts.";
+    }
+    if (lower.includes("partner") || lower.includes("customer") || lower.includes("walk-in")) {
+      return "No walk-in customer is set up. Ask a manager to add a customer partner.";
+    }
+    if (lower.includes("tax type") || lower.includes("currency")) {
+      return "Tax or currency setup is incomplete. Ask a manager.";
+    }
+    if (lower.includes("fiscal") || lower.includes("period")) {
+      return "This date is outside an open fiscal period. Ask a manager.";
+    }
     return joined;
   }
+
+  const code = (res.code || "").trim();
+  if (code && CODE_HINTS[code]) return CODE_HINTS[code];
 
   const msg = (res.message || "").trim();
   if (!msg) return "Could not complete that action. Try again.";
