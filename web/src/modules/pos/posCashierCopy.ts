@@ -27,7 +27,7 @@ export function formatPosCashierError(res: {
       return "Not enough stock at this counter. Choose another item or ask a manager.";
     }
     if (lower.includes("serial")) {
-      return "This item needs a serial number. Scan or pick the serial before paying.";
+      return "This item needs a serial number. Tap Pick serial on the cart line, or scan the serial barcode.";
     }
     if (lower.includes("lot")) {
       return "This item needs a lot / batch. Pick a lot on the cart line before paying.";

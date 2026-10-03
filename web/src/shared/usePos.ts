@@ -321,6 +321,25 @@ export async function patchPosCartLine(
   });
 }
 
+export type PosAvailableSerial = {
+  id: number;
+  serial_no: string;
+  status: string;
+  location_id?: number | null;
+  location_name?: string;
+};
+
+/** Sellable serials at a register location (free_only = in_stock, not reserved). */
+export async function fetchAvailableSerials(itemId: number, locationId: number | null | undefined) {
+  const qs = new URLSearchParams({
+    item_id: String(itemId),
+    free_only: "true",
+    limit: "50",
+  });
+  if (locationId != null && locationId > 0) qs.set("location_id", String(locationId));
+  return apiFetch<PosAvailableSerial[]>(`/api/v1/inventory/serial-units/available?${qs}`);
+}
+
 export function usePosCurrentSession() {
   return createQuery(() => ({
     queryKey: ["pos-current-session"],

@@ -45,6 +45,7 @@ import {
   usePosSettings,
   voidLastPosCheckout,
   type HeldOrder,
+  type PosAvailableSerial,
   type PosCartLine,
   type PosCatalogItem,
   type PosLotPickCandidate,
@@ -53,6 +54,7 @@ import {
   type SessionReport,
 } from "../../shared/usePos";
 import { PosLotPickSheet } from "./PosLotPickSheet";
+import { PosSerialPickSheet } from "./PosSerialPickSheet";
 import {
   enqueuePosOffline,
   hasOfflinePendingForSession,
@@ -219,6 +221,10 @@ export default function PosPage() {
   const [shiftReportTab, setShiftReportTab] = createSignal<"z" | "daily">("z");
   const [stockFilter, setStockFilter] = createSignal<"all" | "in_stock" | "low" | "top">("all");
   const [lotPickDraft, setLotPickDraft] = createSignal<PosLotPickPayload | null>(null);
+  const [serialPickLine, setSerialPickLine] = createSignal<PosCartLine | null>(null);
+  const [serialPicking, setSerialPicking] = createSignal(false);
+  /** Display labels for attached serial unit ids (API cart lines only return ids). */
+  const [serialNoByUnitId, setSerialNoByUnitId] = createSignal<Record<number, string>>({});
   let searchInputEl: HTMLInputElement | undefined;
 
   const focusSearch = () => {
@@ -373,17 +379,22 @@ export default function PosPage() {
     toast.success("POS session opened.");
   };
 
+  const lineNeedsSerial = (ln: PosCartLine) =>
+    Boolean(ln.track_serial || catalogByItemId().get(ln.item_id)?.track_serial);
+
+  const lineHasSerial = (ln: PosCartLine) => (ln.serial_unit_ids?.length ?? 0) > 0;
+
   const finishAddToCart = (line: PosCartLine | undefined, opts?: { trackSerial?: boolean }) => {
     if (line?.lot_no) {
       toast.info(`Lot ${line.lot_no} · FEFO`);
     } else if (line?.lot_batch_id) {
       toast.info(`Lot #${line.lot_batch_id} · FEFO`);
     }
-    if (POS_CASHIER_SHELL_V2 && opts?.trackSerial) {
-      toast.info("Serial item — scan the serial barcode (or attach serial on the line) before paying.");
-    }
     if (POS_CASHIER_SHELL_V2) setCartSheetOpen(true);
     invalidate();
+    if (opts?.trackSerial && line && !lineHasSerial(line)) {
+      setSerialPickLine(line);
+    }
   };
 
   const submitCartLine = async (body: {
@@ -436,10 +447,14 @@ export default function PosPage() {
   const addFromModal = async (payload: { qty: number; modifier_ids: number[]; notes?: string; size_label?: string }) => {
     const item = modalItem();
     if (!item) return;
+    const qty = item.track_serial ? 1 : payload.qty;
+    if (item.track_serial && payload.qty !== 1) {
+      toast.info("Serial items sell as qty 1 — pick one serial per line.");
+    }
     const ok = await submitCartLine(
       {
         item_id: item.id,
-        qty: payload.qty,
+        qty,
         unit_price: item.price,
         modifier_ids: payload.modifier_ids,
         notes: payload.notes || null,
@@ -474,14 +489,22 @@ export default function PosPage() {
   const changeQty = async (ln: PosCartLine, delta: number) => {
     const s = session.data;
     if (!s?.id) return;
+    if (lineNeedsSerial(ln) && delta > 0) {
+      toast.warning("Serial items stay at qty 1. Add another line (and serial) for a second unit.");
+      return;
+    }
     const next = ln.qty + delta;
     if (next <= 0) {
       await removeLine(ln);
       return;
     }
+    if (lineNeedsSerial(ln) && next > 1) {
+      toast.warning("Serial items stay at qty 1.");
+      return;
+    }
     const res = await patchPosCartLine(s.id, ln.id, { qty: next });
     if (!res.success) {
-      toast.warning(res.message ?? "Could not update quantity.");
+      toast.warning(formatPosApiError(res) || "Could not update quantity.");
       return;
     }
     invalidate();
@@ -507,6 +530,30 @@ export default function PosPage() {
       return;
     }
     invalidate();
+  };
+
+  const openSerialPick = (ln: PosCartLine) => {
+    setSerialPickLine(ln);
+  };
+
+  const confirmSerialPick = async (unit: PosAvailableSerial) => {
+    const ln = serialPickLine();
+    const s = session.data;
+    if (!ln || !s?.id) return;
+    setSerialPicking(true);
+    try {
+      const res = await patchPosCartLine(s.id, ln.id, { serial_unit_ids: [unit.id], qty: 1 });
+      if (!res.success) {
+        toast.warning(formatPosApiError(res) || "Could not attach serial.");
+        return;
+      }
+      setSerialNoByUnitId((prev) => ({ ...prev, [unit.id]: unit.serial_no }));
+      toast.success(`Serial ${unit.serial_no} attached.`);
+      setSerialPickLine(null);
+      invalidate();
+    } finally {
+      setSerialPicking(false);
+    }
   };
 
   const catalogByItemId = createMemo(() => {
@@ -539,6 +586,12 @@ export default function PosPage() {
     });
     if (missingLot) {
       toast.warning(`Pick a lot / batch for “${missingLot.item_name}” on the cart before paying.`);
+      return;
+    }
+    const missingSerial = cartLines().find((ln) => lineNeedsSerial(ln) && !lineHasSerial(ln));
+    if (missingSerial) {
+      toast.warning(`Pick or scan a serial for “${missingSerial.item_name}” before paying.`);
+      setSerialPickLine(missingSerial);
       return;
     }
     setShowPayment(true);
@@ -834,7 +887,9 @@ export default function PosPage() {
     if (isPosLotPickResponse(addRes)) {
       setLotPickDraft(addRes.data);
     } else if (addRes.success && addRes.data && "id" in addRes.data) {
-      await patchPosCartLine(s.id, addRes.data.id, { serial_unit_ids: [resolved.serial_unit_id] });
+      await patchPosCartLine(s.id, addRes.data.id, { serial_unit_ids: [resolved.serial_unit_id], qty: 1 });
+      setSerialNoByUnitId((prev) => ({ ...prev, [resolved.serial_unit_id]: resolved.serial_no }));
+      setSerialPickLine(null);
       toast.success(`Serial ${resolved.serial_no} attached.`);
     } else if (!addRes.success) {
       toast.warning(formatPosApiError(addRes) || "Could not add scanned serial.");
@@ -1389,6 +1444,8 @@ export default function PosPage() {
             onQty={changeQty}
             onRemove={removeLine}
             onLot={pickLot}
+            onSerialPick={openSerialPick}
+            serialNoByUnitId={serialNoByUnitId()}
             onClear={clearOrder}
             onCheckout={openPaymentWithCommissions}
             checkingOut={checkingOut()}
@@ -1474,6 +1531,8 @@ export default function PosPage() {
                       onQty={changeQty}
                       onRemove={removeLine}
                       onLot={pickLot}
+                      onSerialPick={openSerialPick}
+                      serialNoByUnitId={serialNoByUnitId()}
                       onClear={clearOrder}
                       onCheckout={() => {
                         setCartSheetOpen(false);
@@ -1503,6 +1562,22 @@ export default function PosPage() {
             busy={adding()}
             onCancel={() => setLotPickDraft(null)}
             onPick={(lot) => void confirmLotPick(lot)}
+          />
+        )}
+      </Show>
+
+      <Show when={serialPickLine()}>
+        {(ln) => (
+          <PosSerialPickSheet
+            itemId={ln().item_id}
+            itemName={ln().item_name}
+            locationId={session.data?.location_id ?? null}
+            busy={serialPicking()}
+            onCancel={() => {
+              setSerialPickLine(null);
+              focusSearch();
+            }}
+            onPick={(unit) => void confirmSerialPick(unit)}
           />
         )}
       </Show>
@@ -2816,6 +2891,8 @@ function OrderPanel(props: {
   onQty: (ln: PosCartLine, delta: number) => void;
   onRemove: (ln: PosCartLine) => void;
   onLot: (ln: PosCartLine, lotBatchId: number | null, lotNo: string) => void;
+  onSerialPick: (ln: PosCartLine) => void;
+  serialNoByUnitId: Record<number, string>;
   onClear: () => void;
   onCheckout: () => void;
   checkingOut: boolean;
@@ -2825,6 +2902,13 @@ function OrderPanel(props: {
 }) {
   const L = (key: string, fallback?: string) => resolvePosLabel(props.labels, key, fallback);
   const actionBtn = "flex flex-col items-center gap-1 rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50";
+  const needsSerial = (ln: PosCartLine) =>
+    Boolean(ln.track_serial || props.catalogByItemId.get(ln.item_id)?.track_serial);
+  const serialLabel = (ln: PosCartLine) => {
+    const ids = ln.serial_unit_ids ?? [];
+    if (ids.length === 0) return "";
+    return ids.map((id) => props.serialNoByUnitId[id] || `Unit #${id}`).join(", ");
+  };
   return (
     <aside class={`flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white ${props.class ?? ""}`}>
       <div class="border-b border-slate-100 p-4">
@@ -2921,6 +3005,26 @@ function OrderPanel(props: {
                         />
                       </div>
                     </Show>
+                    <Show when={needsSerial(ln)}>
+                      <div
+                        class={`mt-1 rounded-md p-1 ${
+                          !(ln.serial_unit_ids && ln.serial_unit_ids.length > 0)
+                            ? "bg-amber-50 ring-1 ring-amber-300"
+                            : ""
+                        }`}
+                      >
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">
+                          Serial{!(ln.serial_unit_ids && ln.serial_unit_ids.length > 0) ? " (required)" : ""}
+                        </span>
+                        <button
+                          type="button"
+                          class="mt-0.5 w-full truncate rounded-md border border-slate-200 bg-white px-2 py-1 text-left text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => props.onSerialPick(ln)}
+                        >
+                          {serialLabel(ln) || "Pick serial…"}
+                        </button>
+                      </div>
+                    </Show>
                     <p class="text-xs text-slate-500">{money(ln.unit_price)}</p>
                   </div>
                   <div class="flex items-center gap-1.5">
@@ -2928,7 +3032,13 @@ function OrderPanel(props: {
                       −
                     </button>
                     <span class="w-6 text-center text-sm tabular-nums">{ln.qty}</span>
-                    <button type="button" class="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50" onClick={() => props.onQty(ln, 1)}>
+                    <button
+                      type="button"
+                      class="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                      disabled={needsSerial(ln)}
+                      title={needsSerial(ln) ? "Serial items stay at qty 1" : undefined}
+                      onClick={() => props.onQty(ln, 1)}
+                    >
                       +
                     </button>
                   </div>
