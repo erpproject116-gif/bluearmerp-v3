@@ -79,11 +79,14 @@ export function RolePreviewPicker() {
       const body: Record<string, unknown> = { role_code: role() };
       const hid = Number(homeId());
       if (Number.isFinite(hid) && hid > 0) body.home_location_id = hid;
-      const res = await apiFetch("/api/v1/auth/role-preview", {
-        method: "POST",
-        body: JSON.stringify(body),
-        silent: true,
-      });
+      const res = await apiFetch(
+        "/api/v1/auth/role-preview",
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+        { silent: true },
+      );
       if (!res.success) {
         clearRolePreviewAttempt();
         const field = res.errors ? Object.values(res.errors).filter(Boolean).join(" ") : "";
