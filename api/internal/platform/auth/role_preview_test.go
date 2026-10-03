@@ -131,3 +131,43 @@ func TestCanStartRolePreviewRealDuringActivePreview(t *testing.T) {
 		t.Fatal("stripped identity without Real* power must not start preview")
 	}
 }
+
+func TestIsMissingRolePreviewSchema(t *testing.T) {
+	cases := []struct {
+		msg  string
+		want bool
+	}{
+		{"ERROR: column \"role_preview_role_code\" does not exist (SQLSTATE 42703)", true},
+		{"undefined_column: role_preview_expires_at", true},
+		{"connection refused", false},
+		{"column \"tenant_role\" does not exist", false},
+	}
+	for _, tc := range cases {
+		err := errString(tc.msg)
+		if got := isMissingRolePreviewSchema(err); got != tc.want {
+			t.Fatalf("%q: got %v want %v", tc.msg, got, tc.want)
+		}
+	}
+	if isMissingRolePreviewSchema(nil) {
+		t.Fatal("nil must be false")
+	}
+}
+
+type errString string
+
+func (e errString) Error() string { return string(e) }
+
+func TestRolePreviewAllowlistStaysTiny(t *testing.T) {
+	// D6: do not widen business mutate paths.
+	denied := []string{
+		"/api/v1/sales",
+		"/api/v1/pos/sessions/1/pay",
+		"/api/v1/inventory/items",
+		"/api/v1/user-management/users",
+	}
+	for _, p := range denied {
+		if rolePreviewMutatingAllowed(http.MethodPost, p) {
+			t.Fatalf("POST %s must stay denied under role preview", p)
+		}
+	}
+}

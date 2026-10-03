@@ -251,6 +251,39 @@ func clearRolePreviewDB(ctx context.Context, pool *pgxpool.Pool, appUserID int64
 	return err
 }
 
+// isMissingRolePreviewSchema reports undefined-column errors for role_preview_* (migration 313).
+func isMissingRolePreviewSchema(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "role_preview_") {
+		return false
+	}
+	return strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "undefined_column") ||
+		strings.Contains(msg, "42703")
+}
+
+const rolePreviewMigrationMsg = "Role preview is not available. Apply migration 313_role_preview.sql on the API database, then retry."
+
+// preflightRolePreviewLoad verifies preview columns exist and the target role flags can load
+// before writing preview columns (avoids sticky DB state that soft-fails on next /me).
+func preflightRolePreviewLoad(ctx context.Context, pool *pgxpool.Pool, tu *TenantUser, roleCode string) error {
+	var probe *string
+	err := pool.QueryRow(ctx, `
+		select role_preview_role_code from public.users where id = $1`, tu.AppUserID).Scan(&probe)
+	if isMissingRolePreviewSchema(err) {
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	probeTu := *tu
+	probeTu.TenantRole = roleCode
+	return reloadTenantRoleFlags(ctx, pool, &probeTu)
+}
+
 type rolePreviewStartBody struct {
 	RoleCode       string `json:"role_code"`
 	HomeLocationID *int64 `json:"home_location_id"`
@@ -319,6 +352,18 @@ func startRolePreview(pool *pgxpool.Pool) http.HandlerFunc {
 			homeID = body.HomeLocationID
 		}
 
+		if err := preflightRolePreviewLoad(r.Context(), pool, &tu, code); err != nil {
+			if isMissingRolePreviewSchema(err) {
+				response.Err(w, http.StatusServiceUnavailable, rolePreviewMigrationMsg, "ERR_SETUP")
+				return
+			}
+			log.Printf("auth.role_preview.preflight_fail tenant=%d user=%d role=%s: %v", tu.TenantID, tu.AppUserID, code, err)
+			response.Err(w, http.StatusConflict,
+				"Cannot start role preview for this role — template flags could not be loaded. You remain signed in as owner.",
+				"ERR_CONFLICT")
+			return
+		}
+
 		ttl := rolePreviewDefaultTTL
 		if body.TTLMinutes != nil && *body.TTLMinutes > 0 {
 			ttl = time.Duration(*body.TTLMinutes) * time.Minute
@@ -337,6 +382,10 @@ func startRolePreview(pool *pgxpool.Pool) http.HandlerFunc {
 			  updated_at = now()
 			where id = $1`, tu.AppUserID, code, homeID, expires)
 		if err != nil {
+			if isMissingRolePreviewSchema(err) {
+				response.Err(w, http.StatusServiceUnavailable, rolePreviewMigrationMsg, "ERR_SETUP")
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to start role preview.", "ERR_INTERNAL")
 			return
 		}
@@ -390,6 +439,10 @@ func endRolePreview(pool *pgxpool.Pool) http.HandlerFunc {
 		// Soft-fail overlay may leave RolePreviewActive=false while DB still has columns;
 		// owners/superadmins may also end after soft-restore. Never require a successful overlay.
 		if err := clearRolePreviewDB(r.Context(), pool, tu.AppUserID); err != nil {
+			if isMissingRolePreviewSchema(err) {
+				response.Err(w, http.StatusServiceUnavailable, rolePreviewMigrationMsg, "ERR_SETUP")
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to end role preview.", "ERR_INTERNAL")
 			return
 		}

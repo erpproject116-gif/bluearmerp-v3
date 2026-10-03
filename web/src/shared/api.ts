@@ -3,6 +3,7 @@ import { invalidateAfterMutation } from "./queryInvalidation";
 import { getGlobalToast } from "./toast";
 import { getActiveTenantId, getActiveBranchIdCurrent } from "./activeContext";
 import { shouldHandleServerSessionIdle } from "./sessionIdleDecision";
+import { isRolePreviewFlagSet } from "./rolePreviewClient";
 
 const url = import.meta.env.VITE_SUPABASE_URL ?? "";
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
@@ -195,6 +196,10 @@ export async function apiFetch<T>(
   }
   if (body.code === "ERR_SUPPORT_FORBIDDEN" && !options?.silent) {
     getGlobalToast()?.error(body.message || "Blocked during support session.");
+  }
+  // Preview banner already explains read-only — avoid toast storms on every mutate.
+  if (body.code === "ERR_ROLE_PREVIEW_READ_ONLY" && !options?.silent && !isRolePreviewFlagSet()) {
+    getGlobalToast()?.error(body.message || "Role preview is read-only. Exit preview to make changes.");
   }
   if (body.success && shouldAutoSuccessToast(path, init.method, options)) {
     getGlobalToast()?.success(

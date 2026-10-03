@@ -1,6 +1,14 @@
 import { createContext, onCleanup, onMount, useContext, type ParentComponent } from "solid-js";
 import { createStore } from "solid-js/store";
 import { apiFetch, apiNetworkErrorMessage, supabase } from "./api";
+import {
+  clearRolePreviewAttempt,
+  clearRolePreviewFlag,
+  isRolePreviewFlagSet,
+  isRolePreviewSuspected,
+  rolePreviewBootstrapMessage,
+  setRolePreviewFlag,
+} from "./rolePreviewClient";
 import { getActiveTenantId, setActiveTenantId } from "./activeContext";
 
 export type TenantMembership = {
@@ -358,30 +366,15 @@ export const AuthProvider: ParentComponent = (props) => {
     bootstrapMessage: null as string | null,
   });
 
-  const ROLE_PREVIEW_FLAG = "bluearm_role_preview_active";
-
-  const clearRolePreviewFlag = () => {
-    try {
-      sessionStorage.removeItem(ROLE_PREVIEW_FLAG);
-    } catch {
-      /* ignore */
-    }
-  };
-
   const tryEndRolePreviewRecovery = async () => {
-    let flagged = false;
-    try {
-      flagged = sessionStorage.getItem(ROLE_PREVIEW_FLAG) === "1";
-    } catch {
-      flagged = false;
-    }
-    if (!flagged) return false;
+    if (!isRolePreviewSuspected()) return false;
     try {
       await apiFetch("/api/v1/auth/role-preview/end", { method: "POST", body: "{}" }, { silent: true });
     } catch {
       /* still attempt /me after clear attempt */
     }
     clearRolePreviewFlag();
+    clearRolePreviewAttempt();
     return true;
   };
 
@@ -409,11 +402,8 @@ export const AuthProvider: ParentComponent = (props) => {
           setActiveTenantId(resolved);
         }
         if (res.data.role_preview?.active) {
-          try {
-            sessionStorage.setItem(ROLE_PREVIEW_FLAG, "1");
-          } catch {
-            /* ignore */
-          }
+          setRolePreviewFlag();
+          clearRolePreviewAttempt();
         } else {
           clearRolePreviewFlag();
         }
@@ -423,8 +413,8 @@ export const AuthProvider: ParentComponent = (props) => {
       if (background && state.me) {
         return;
       }
-      // Server 5xx is not a CORS outage — don't show the CORS_ORIGIN hint.
-      if (res.status >= 500 && !options?._previewRecoveryTried) {
+      // Server 5xx / network after preview — recover without blaming CORS_ORIGIN first.
+      if ((res.status >= 500 || res.status === 0) && !options?._previewRecoveryTried) {
         if (await tryEndRolePreviewRecovery()) {
           await refresh({ ...options, _previewRecoveryTried: true });
           return;
@@ -438,11 +428,14 @@ export const AuthProvider: ParentComponent = (props) => {
               res.code === "ERR_SESSION_IDLE"
             ? "unauthorized"
             : "network";
+      const suspected = isRolePreviewSuspected() || isRolePreviewFlagSet();
       const bootstrapMessage =
-        res.status >= 500
-          ? res.message ||
-            "The API returned an error loading your session. Retry or use Exit role preview if you were viewing as another role."
-          : (res.message ?? null);
+        suspected
+          ? rolePreviewBootstrapMessage(res.message)
+          : res.status >= 500
+            ? res.message ||
+              "The API returned an error loading your session. Retry or use Exit role preview if you were viewing as another role."
+            : (res.message ?? null);
       setState({
         me: null,
         loading: false,
@@ -462,7 +455,9 @@ export const AuthProvider: ParentComponent = (props) => {
         me: null,
         loading: false,
         bootstrapError: "network",
-        bootstrapMessage: apiNetworkErrorMessage(),
+        bootstrapMessage: isRolePreviewSuspected()
+          ? rolePreviewBootstrapMessage()
+          : apiNetworkErrorMessage(),
       });
     }
   };

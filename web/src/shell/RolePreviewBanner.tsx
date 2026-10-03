@@ -2,6 +2,7 @@ import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { useAuth } from "../shared/auth-context";
 import { apiFetch } from "../shared/api";
 import { getGlobalToast } from "../shared/toast";
+import { clearRolePreviewAttempt, clearRolePreviewFlag } from "../shared/rolePreviewClient";
 
 type RolePreview = {
   active: boolean;
@@ -50,11 +51,8 @@ export function RolePreviewBanner() {
         getGlobalToast()?.error(res.message ?? "Could not end role preview.");
         return;
       }
-      try {
-        sessionStorage.removeItem("bluearm_role_preview_active");
-      } catch {
-        /* ignore */
-      }
+      clearRolePreviewFlag();
+      clearRolePreviewAttempt();
       await auth.refresh();
       getGlobalToast()?.success("Exited role preview.");
     } finally {

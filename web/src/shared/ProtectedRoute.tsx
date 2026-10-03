@@ -4,6 +4,11 @@ import { apiFetch, supabase, apiNetworkErrorMessage } from "../shared/api";
 import { useAuth } from "../shared/auth-context";
 import { needsSignInRedirect, SessionLoading, NavigateToSignIn } from "./AuthRedirect";
 import { signOutApp } from "./signOut";
+import {
+  clearRolePreviewAttempt,
+  clearRolePreviewFlag,
+  isRolePreviewSuspected,
+} from "./rolePreviewClient";
 
 export const ProtectedRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -34,16 +39,16 @@ export const ProtectedRoute: ParentComponent = (props) => {
       } catch {
         /* ignore — SQL clear / soft-fail may already have cleared */
       }
-      try {
-        sessionStorage.removeItem("bluearm_role_preview_active");
-      } catch {
-        /* ignore */
-      }
+      clearRolePreviewFlag();
+      clearRolePreviewAttempt();
       await auth.refresh();
     } finally {
       setEndingPreview(false);
     }
   };
+
+  const networkCopy = () => auth.bootstrapMessage || apiNetworkErrorMessage();
+  const showExitPreview = () => isRolePreviewSuspected();
 
   return (
     <Show when={auth.bootstrapping} fallback={
@@ -56,8 +61,8 @@ export const ProtectedRoute: ParentComponent = (props) => {
               fallback={
                 <div class="flex min-h-screen items-center justify-center bg-body p-6">
                   <div class="max-w-lg rounded-xl border border-stroke bg-white p-6 shadow-sm">
-                        <p class="text-sm font-medium text-text-primary">Cannot reach the API</p>
-                        <p class="mt-2 text-sm text-text-secondary">{apiNetworkErrorMessage()}</p>
+                    <p class="text-sm font-medium text-text-primary">Cannot reach the API</p>
+                    <p class="mt-2 text-sm text-text-secondary">{networkCopy()}</p>
                     <div class="mt-5 flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -66,14 +71,16 @@ export const ProtectedRoute: ParentComponent = (props) => {
                       >
                         Retry
                       </button>
-                      <button
-                        type="button"
-                        class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
-                        disabled={endingPreview()}
-                        onClick={() => void exitRolePreviewAndRetry()}
-                      >
-                        {endingPreview() ? "Exiting…" : "Exit role preview"}
-                      </button>
+                      <Show when={showExitPreview()}>
+                        <button
+                          type="button"
+                          class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+                          disabled={endingPreview()}
+                          onClick={() => void exitRolePreviewAndRetry()}
+                        >
+                          {endingPreview() ? "Exiting…" : "Exit role preview"}
+                        </button>
+                      </Show>
                     </div>
                   </div>
                 </div>
@@ -113,7 +120,7 @@ export const ProtectedRoute: ParentComponent = (props) => {
                       Signed in as: {signedInAs()}
                     </p>
                   )}
-                  <div class="mt-5 flex gap-2">
+                  <div class="mt-5 flex flex-wrap gap-2">
                     <button
                       type="button"
                       class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
@@ -121,6 +128,16 @@ export const ProtectedRoute: ParentComponent = (props) => {
                     >
                       Retry
                     </button>
+                    <Show when={isRolePreviewSuspected()}>
+                      <button
+                        type="button"
+                        class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
+                        disabled={endingPreview()}
+                        onClick={() => void exitRolePreviewAndRetry()}
+                      >
+                        {endingPreview() ? "Exiting…" : "Exit role preview"}
+                      </button>
+                    </Show>
                     <button
                       type="button"
                       class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50"

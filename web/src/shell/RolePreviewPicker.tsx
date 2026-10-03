@@ -1,8 +1,14 @@
 import { For, Show, createSignal } from "solid-js";
 import { useQuery } from "@tanstack/solid-query";
-import { useAuth } from "../shared/auth-context";
+import { useAuth, isRolePreviewActive } from "../shared/auth-context";
 import { apiFetch } from "../shared/api";
 import { getGlobalToast } from "../shared/toast";
+import {
+  clearRolePreviewAttempt,
+  clearRolePreviewFlag,
+  markRolePreviewAttempt,
+  setRolePreviewFlag,
+} from "../shared/rolePreviewClient";
 
 type RoleOpt = { role_code: string; role_name?: string; is_active?: boolean };
 type LocOpt = { id: number; location_name: string; is_rma?: boolean; location_type?: string; status?: string };
@@ -23,7 +29,7 @@ export function RolePreviewPicker() {
     enabled: open() && canStart(),
     queryFn: async () => {
       const res = await apiFetch<RoleOpt[]>("/api/v1/user-management/roles");
-      if (!res.ok) return [] as RoleOpt[];
+      if (!res.success) return [] as RoleOpt[];
       return (res.data ?? []).filter(
         (r) =>
           r.is_active !== false &&
@@ -39,7 +45,7 @@ export function RolePreviewPicker() {
     queryFn: async () => {
       const qs = new URLSearchParams({ page: "1", pageSize: "200", status: "active" });
       const res = await apiFetch<LocOpt[]>(`/api/v1/inventory/locations?${qs}`);
-      if (!res.ok) return [] as LocOpt[];
+      if (!res.success) return [] as LocOpt[];
       return (res.data ?? []).filter(
         (l) =>
           !l.is_rma &&
@@ -49,9 +55,26 @@ export function RolePreviewPicker() {
     },
   }));
 
+  const abortStart = async (message: string) => {
+    try {
+      await apiFetch("/api/v1/auth/role-preview/end", { method: "POST", body: "{}" }, { silent: true });
+    } catch {
+      /* ignore */
+    }
+    clearRolePreviewFlag();
+    clearRolePreviewAttempt();
+    try {
+      await auth.refresh();
+    } catch {
+      /* ignore */
+    }
+    getGlobalToast()?.error(message);
+  };
+
   const start = async () => {
     if (busy() || !role()) return;
     setBusy(true);
+    markRolePreviewAttempt();
     try {
       const body: Record<string, unknown> = { role_code: role() };
       const hid = Number(homeId());
@@ -59,19 +82,35 @@ export function RolePreviewPicker() {
       const res = await apiFetch("/api/v1/auth/role-preview", {
         method: "POST",
         body: JSON.stringify(body),
+        silent: true,
       });
-      if (!res.ok) {
-        getGlobalToast()?.error(res.message ?? "Could not start role preview.");
+      if (!res.success) {
+        clearRolePreviewAttempt();
+        const field = res.errors ? Object.values(res.errors).filter(Boolean).join(" ") : "";
+        getGlobalToast()?.error(field || res.message || "Could not start role preview.");
         return;
       }
-      try {
-        sessionStorage.setItem("bluearm_role_preview_active", "1");
-      } catch {
-        /* ignore */
-      }
       setOpen(false);
-      await auth.refresh();
-      getGlobalToast()?.success(`Viewing as ${role()}. Read-only.`);
+      try {
+        await auth.refresh();
+      } catch {
+        await abortStart(
+          "Role preview started on the server but the session could not reload. Preview was cleared — try again or hard-refresh.",
+        );
+        return;
+      }
+      if (!isRolePreviewActive(auth.me)) {
+        await abortStart(
+          res.message?.includes("migration") || res.code === "ERR_SETUP"
+            ? res.message || "Role preview could not apply. Check that migration 313 is applied."
+            : `Could not activate preview as “${role()}” (role may lack permissions or was cleared). You are still signed in as owner.`,
+        );
+        return;
+      }
+      setRolePreviewFlag();
+      clearRolePreviewAttempt();
+      const homeLabel = homeId() ? " Home branch is applied for this preview." : "";
+      getGlobalToast()?.success(`Viewing as ${role()}. Read-only.${homeLabel}`);
     } finally {
       setBusy(false);
     }
@@ -122,7 +161,7 @@ export function RolePreviewPicker() {
                 disabled={busy()}
                 onClick={() => void start()}
               >
-                Start
+                {busy() ? "Starting…" : "Start"}
               </button>
               <button
                 type="button"
