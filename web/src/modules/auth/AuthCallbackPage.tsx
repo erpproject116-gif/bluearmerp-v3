@@ -1,6 +1,6 @@
-import { Show, createSignal, onMount } from "solid-js";
+import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { apiFetch, supabase } from "../../shared/api";
+import { apiAbsoluteUrl, apiFetch, supabase } from "../../shared/api";
 import { useAuth, type MeData } from "../../shared/auth-context";
 import { resolvePostLoginPath } from "../../shared/authReturnTo";
 import { endRolePreviewSession } from "../../shared/endRolePreviewSession";
@@ -44,6 +44,15 @@ async function recordIntake(email: string, fullName: string) {
 
 type Phase = "working" | "recover";
 
+async function apiIsHealthy(): Promise<boolean> {
+  try {
+    const res = await fetch(apiAbsoluteUrl("/health"), { cache: "no-store" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
   const auth = useAuth();
@@ -51,6 +60,13 @@ export default function AuthCallbackPage() {
   const [status, setStatus] = createSignal("Completing sign-in…");
   const [error, setError] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
+  const [apiHealthy, setApiHealthy] = createSignal<boolean | null>(null);
+
+  const refreshApiHealth = async () => {
+    const healthy = await apiIsHealthy();
+    setApiHealthy(healthy);
+    return healthy;
+  };
 
   const finishWithMe = async () => {
     await auth.refresh();
@@ -98,6 +114,14 @@ export default function AuthCallbackPage() {
     window.history.replaceState({}, document.title, "/auth/callback");
     const { email, fullName } = profileFromSession(session);
 
+    if (!(await refreshApiHealth())) {
+      setError(
+        "The API is currently unavailable (health check failed). Exit is paused because it cannot clear server-side role preview while the API is down. This is an upstream outage/502, not evidence of a CORS_ORIGIN error.",
+      );
+      setPhase("recover");
+      return;
+    }
+
     setStatus("Loading your workspace…");
     let me = await fetchMeOnce();
 
@@ -116,7 +140,14 @@ export default function AuthCallbackPage() {
 
     if (!me.success) {
       setStatus("Clearing role preview (if any)…");
-      await endRolePreviewSession();
+      const serverCleared = await endRolePreviewSession();
+      if (!serverCleared) {
+        setError(
+          "The API health check passed, but it did not confirm that role preview was cleared. Retry when the API is stable; use the runbook SQL kill path if this persists.",
+        );
+        setPhase("recover");
+        return;
+      }
       me = await fetchMeOnce();
     }
 
@@ -152,7 +183,21 @@ export default function AuthCallbackPage() {
     setStatus("Exiting role preview…");
     setError(null);
     try {
-      await endRolePreviewSession();
+      if (!(await refreshApiHealth())) {
+        setError(
+          "The API is still unavailable. Exit cannot clear server-side role preview until health returns 200.",
+        );
+        setPhase("recover");
+        return;
+      }
+      const serverCleared = await endRolePreviewSession();
+      if (!serverCleared) {
+        setError(
+          "The API did not confirm that role preview was cleared. Retry, or use the SQL kill path from the role-preview runbook.",
+        );
+        setPhase("recover");
+        return;
+      }
       setStatus("Retrying session…");
       const me = await fetchMeOnce();
       if (me.success) {
@@ -176,6 +221,9 @@ export default function AuthCallbackPage() {
   };
 
   onMount(() => {
+    void refreshApiHealth();
+    const healthPoll = window.setInterval(() => void refreshApiHealth(), 3000);
+    onCleanup(() => window.clearInterval(healthPoll));
     void loadSessionAfterOAuth().catch((e) => {
       setError(
         rolePreviewBootstrapMessage(e instanceof Error ? e.message : "Sign-in callback failed."),
@@ -199,22 +247,32 @@ export default function AuthCallbackPage() {
           <p class="text-sm font-medium text-text-primary">Sign-in could not finish</p>
           <p class="mt-2 text-sm text-text-secondary">{error()}</p>
           <p class="mt-2 text-xs text-text-secondary">
-            You are on /auth/callback. Use Exit role preview if View as role was active — then Retry. A console CORS
-            line with 502 usually means the API was briefly unreachable, not a wrong CORS_ORIGIN.
+            <Show
+              when={apiHealthy() === true}
+              fallback="API health is unavailable. Waiting for health 200 before enabling Exit."
+            >
+              API health is OK. You can safely Exit role preview and retry.
+            </Show>{" "}
+            A console CORS line with 502 means the upstream API was unavailable; only investigate CORS_ORIGIN when
+            health is 200 and OPTIONS still lacks the origin header.
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
             <button
               type="button"
               class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              disabled={busy()}
+              disabled={busy() || apiHealthy() !== true}
               onClick={() => void exitPreviewAndRetry()}
             >
-              {busy() ? "Working…" : "Exit role preview & retry"}
+              {busy()
+                ? "Working…"
+                : apiHealthy() === true
+                  ? "Exit role preview & retry"
+                  : "Waiting for API health…"}
             </button>
             <button
               type="button"
               class="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary hover:bg-slate-50 disabled:opacity-50"
-              disabled={busy()}
+              disabled={busy() || apiHealthy() !== true}
               onClick={() => void loadSessionAfterOAuth()}
             >
               Retry

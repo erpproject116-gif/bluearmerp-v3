@@ -30,7 +30,8 @@ export const ProtectedRoute: ParentComponent = (props) => {
     if (endingPreview()) return;
     setEndingPreview(true);
     try {
-      await endRolePreviewSession();
+      const serverCleared = await endRolePreviewSession();
+      if (!serverCleared) return;
       await auth.refresh();
     } finally {
       setEndingPreview(false);

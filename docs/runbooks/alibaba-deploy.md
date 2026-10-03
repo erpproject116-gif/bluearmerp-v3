@@ -10,6 +10,19 @@ Pushes to `main` that touch `api/**` trigger [`.github/workflows/api-ecs-deploy.
 2. Alibaba ECS **RunCommand** on `i-t4n5tdhzaktd0x6tc34w` runs [`deploy/alibaba/deploy-api-on-ecs.sh`](../../deploy/alibaba/deploy-api-on-ecs.sh) (git pull + Docker rebuild)
 3. Public `GET /health/schema` must return `healthy: true`
 
+### Overlap-tested cutover (no stop-first deploy)
+
+The deploy script keeps `bluearm-api` serving on `127.0.0.1:8080` while it starts
+`bluearm-api-candidate` on `127.0.0.1:18081` and waits for candidate `/health` 200.
+
+- When `/etc/caddy/Caddyfile` contains `127.0.0.1:8080`, the script validates and reloads Caddy onto the healthy candidate, replaces the production container, verifies production `/health`, then reloads Caddy back to `:8080`.
+- If the final container fails, the prior image is restored; while Caddy cutover is active, traffic remains on the healthy candidate until rollback is healthy.
+- On hosts without file-managed Caddy, the healthy candidate is still tested before a rapid port-8080 swap. That fallback minimizes but cannot mathematically eliminate the short bind/start gap.
+- Override `CANDIDATE_PORT` or `CADDY_CONFIG` only when the host layout differs.
+
+Do not replace this with stop → build → start: that produces public 502 responses whose
+missing CORS headers are then misleadingly reported by browsers as CORS failures.
+
 ### GitHub repository secrets (required)
 
 | Secret | Purpose |

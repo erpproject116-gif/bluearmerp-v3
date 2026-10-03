@@ -36,14 +36,18 @@ Use this order — do **not** jump to `CORS_ORIGIN` first.
 |------|--------|--------|
 | 1 | Did Start return `ERR_SETUP` / migration copy? | Apply `313_role_preview.sql`, redeploy API if needed. |
 | 2 | Did Start return conflict / role-load failure? | Stay owner; fix tenant role flags; retry. |
-| 3 | Start 200 but `/auth/me` fails? | UI should auto-end + clear attempt flag. Use **Exit role preview** (also shown when bootstrap copy mentions role preview), then hard-refresh (Ctrl+Shift+R). |
-| 4 | Console shows CORS / Workbox `no-response` on `/auth/me`? | Often a **side effect** of a failed authed call (SW / opaque error), not proof that `CORS_ORIGIN` is wrong. Clear preview first. |
-| 5 | Preview cleared but still broken? | DevTools → Application → Service Workers → **Unregister**, then Ctrl+Shift+R. Retry `/auth/me`. |
-| 6 | Still failing with no preview columns set? | Then verify real CORS: API `CORS_ORIGIN` = exact app origin (e.g. `https://app.bluearmerp.com`, no trailing slash); check `*.vercel.app` aliases separately; redeploy API; hard-refresh. |
+| 3 | Console shows CORS **and 502** on `/auth/me`? | Open `/health`. This is an upstream outage until health is 200; Exit cannot clear DB state while the API is down. Callback polls health and disables Exit meanwhile. |
+| 4 | Health returns 200? | Use **Exit role preview & retry**. The client must receive a successful end response before claiming preview was cleared. |
+| 5 | End still cannot clear while health is 200? | Use the SQL kill path below, then hard-refresh. |
+| 6 | Preview cleared but still broken? | DevTools → Application → Service Workers → **Unregister**, then Ctrl+Shift+R. Retry `/auth/me`. |
+| 7 | Healthy API, cleared preview, OPTIONS still lacks ACAO? | Only now verify real CORS: `CORS_ORIGIN` = exact app origin (e.g. `https://app.bluearmerp.com`, no trailing slash); check `*.vercel.app` aliases separately. |
 
 **Symptom (legacy):** After starting View-as-role, the app shows “Cannot reach the API” and the browser console reports CORS / Workbox `no-response` on `https://api.bluearmerp.com/api/v1/auth/me`.
 
-**Cause (usually):** Not a broken `CORS_ORIGIN`. A failed role-preview overlay used to hard-fail middleware with 500 before CORS-friendly handling completed; every authed call (including Exit preview) failed, so the session looked like a total API outage.
+**Cause (usually):** Not a broken `CORS_ORIGIN`. A 502 is produced before the Go API/CORS
+middleware, so it has no ACAO header and the browser reports both 502 and CORS. The ECS
+deploy now health-tests an overlapping candidate and uses Caddy cutover when available.
+Separately, a failed preview overlay soft-clears and restores the real identity.
 
 **Immediate SQL (prod):**
 
@@ -70,4 +74,7 @@ Then hard-refresh the app. `/auth/me` should return 200.
 
 **After soft-fail + FE recovery deploy:** broken overlays auto-clear; Start failures leave you as owner; Exit preview should work even if overlay did not activate. Prefer the Exit button / `POST /auth/role-preview/end` before SQL.
 
-**If overlay succeeds but the app still shows CORS / Cannot reach API:** hard-refresh (Ctrl+Shift+R) so the service worker updates — older builds intercepted cross-origin `api.bluearmerp.com` fetches and turned network blips into Workbox `no-response` + CORS noise. The error screen also offers **Exit role preview** when a preview attempt is suspected.
+**If overlay succeeds but the app still shows CORS / Cannot reach API:** check `/health`
+first. The callback waits for health 200 before enabling Exit, because Exit uses the same API.
+After a confirmed server-side clear, hard-refresh (Ctrl+Shift+R); older service workers can
+turn network blips into Workbox `no-response` noise.

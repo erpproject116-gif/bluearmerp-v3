@@ -47,7 +47,11 @@ export default function SignInPage() {
     setEndingPreview(true);
     setError(null);
     try {
-      await endRolePreviewSession();
+      const serverCleared = await endRolePreviewSession();
+      if (!serverCleared) {
+        setError("The API did not confirm that role preview was cleared. Wait for API health, then try again.");
+        return;
+      }
       await auth.refresh();
       if (auth.me) {
         const href = await resolvePostLoginPath(auth.me);

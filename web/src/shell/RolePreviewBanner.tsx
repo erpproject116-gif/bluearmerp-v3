@@ -46,7 +46,11 @@ export function RolePreviewBanner() {
     if (busy()) return;
     setBusy(true);
     try {
-      await endRolePreviewSession();
+      const serverCleared = await endRolePreviewSession();
+      if (!serverCleared) {
+        getGlobalToast()?.error("The API did not confirm that role preview was cleared.");
+        return;
+      }
       await auth.refresh();
       getGlobalToast()?.success("Exited role preview.");
     } catch {
