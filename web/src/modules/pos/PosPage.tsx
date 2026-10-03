@@ -276,10 +276,34 @@ export default function PosPage() {
           }
           removePosOfflineAction(action.id);
           synced += 1;
+          const sid = session.data?.id;
+          if (sid && res.data) {
+            const label =
+              Array.isArray((action.body as { tenders?: { tender_type: string }[] }).tenders) &&
+              (action.body as { tenders: { tender_type: string }[] }).tenders.length === 1
+                ? posTenderLabel((action.body as { tenders: { tender_type: string }[] }).tenders[0].tender_type)
+                : "Payment";
+            const row: PosLastCheckout = {
+              sales_id: res.data.sales_id,
+              sales_no: res.data.sales_no,
+              grand_total: res.data.grand_total ?? 0,
+              change: res.data.change ?? 0,
+              journal_entry_id: res.data.journal_entry_id ?? null,
+              official_receipt_id: res.data.official_receipt_id ?? null,
+              tender_label: label,
+              at: new Date().toISOString(),
+              receipt_format: res.data.receipt_format ?? null,
+            };
+            pushRecentCheckout(sid, row);
+            setLastCheckout(row);
+            setShowSaleComplete(true);
+          }
         }
       }
       if (synced > 0) {
-        toast.success(`Synced ${synced} offline checkout${synced === 1 ? "" : "s"}.`);
+        if (!showSaleComplete()) {
+          toast.success(`Synced ${synced} offline checkout${synced === 1 ? "" : "s"}.`);
+        }
         invalidate();
       }
     } catch (err) {
@@ -705,14 +729,9 @@ export default function PosPage() {
       setCustomerLabel("");
       await orderExtrasDraft.clearOnSave();
       invalidate();
-      if (POS_CASHIER_SHELL_V2) {
-        setLastCheckout(result);
-        setShowSaleComplete(true);
-      } else {
-        toast.success(
-          `Sale ${result.sales_no} — ${money(total)} · ${label}${change > 0 ? ` · Change ${money(change)}` : ""}`,
-        );
-      }
+      // Always end on sale-complete + print (normal till) — not gated on shell v2.
+      setLastCheckout(result);
+      setShowSaleComplete(true);
     } catch (err) {
       setCheckingOut(false);
       if (isLikelyOfflineError(err)) {
@@ -1200,6 +1219,13 @@ export default function PosPage() {
             <button
               type="button"
               class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+              onClick={openRecentSlips}
+            >
+              Reprint slip
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
               onClick={openSwitchLocation}
             >
               {posLabel("switch_location")}
@@ -1602,7 +1628,7 @@ export default function PosPage() {
         />
       </Show>
 
-      <Show when={POS_CASHIER_SHELL_V2 && showSaleComplete() && lastCheckout()}>
+      <Show when={showSaleComplete() && lastCheckout()}>
         {(result) => (
           <SaleCompletePanel
             result={result()}
@@ -1612,12 +1638,13 @@ export default function PosPage() {
             onNext={() => {
               setShowSaleComplete(false);
               setLastCheckout(null);
+              focusSearch();
             }}
           />
         )}
       </Show>
 
-      <Show when={POS_CASHIER_SHELL_V2 && slipReceipt()}>
+      <Show when={slipReceipt()}>
         {(rf) => (
           <PosReceiptSlip
             receipt={rf()}
@@ -1627,7 +1654,7 @@ export default function PosPage() {
         )}
       </Show>
 
-      <Show when={POS_CASHIER_SHELL_V2 && showRecentSlips() && session.data}>
+      <Show when={showRecentSlips() && session.data}>
         <div class="fixed inset-0 z-[65] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4" onClick={() => setShowRecentSlips(false)}>
           <div
             class="max-h-[80dvh] w-full max-w-sm overflow-auto rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl"

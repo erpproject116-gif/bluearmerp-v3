@@ -25,6 +25,7 @@ function readPosCashierShellV2(): boolean {
     /* ignore */
   }
   // Default OFF until staging pilots pass (master plan Phase 7).
+  // Note: sale-complete + Print slip after checkout is ALWAYS on (not gated here).
   return false;
 }
 

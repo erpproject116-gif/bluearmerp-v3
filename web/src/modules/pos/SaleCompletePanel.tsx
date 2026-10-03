@@ -50,6 +50,16 @@ export function SaleCompletePanel(props: {
           </Show>
         </p>
         <p class="font-mono text-xs text-slate-400">{props.result.sales_no}</p>
+        <Show when={props.result.sales_id > 0}>
+          <a
+            href={`/app/sales/sales/${props.result.sales_id}/invoice/print`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-xs font-medium text-emerald-700 underline-offset-2 hover:underline"
+          >
+            View sales invoice (back office)
+          </a>
+        </Show>
       </div>
       <div class="flex flex-col gap-2 border-t border-slate-200 p-4">
         <Show when={confirmVoid()}>

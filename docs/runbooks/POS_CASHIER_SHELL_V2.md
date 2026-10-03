@@ -60,13 +60,13 @@ No separate “diary” product. No revenue JE on shift close, cash in/out, or c
 - `SaleCompletePanel` — honest “Sale recorded” / paid / OR pending + void confirm
 - `PosMoreMenu` ≤4; hide Manage on terminal
 - Responsive: `lg+` split; `<lg` bottom cart sheet + sticky Pay; safe-area / `dvh`
-- Payment modal stays; success path uses Sale Complete when flag on
+- Payment modal stays; **sale-complete + Print slip after every successful checkout is always on** (not gated by shell v2). Shell v2 still gates chrome (More menu, mobile cart sheet, etc.).
 - **P1b:** void-last API + UI
-## Phase 2 � Receipt slip (flagged)
+## Phase 2 � Receipt slip
 
 - Checkout returns structured `receipt_format` (not an HTML builder).
 - Title is **Sales slip** unless Finance OR# is present ? **Official Receipt**.
-- `PosReceiptSlip` screen preview + browser print; reprint from session recent checkouts.
+- `PosReceiptSlip` screen preview + browser print; reprint from session recent checkouts (header **Reprint slip** when shell v2 off; More menu when on).
 - Screen fallback builds a totals-only slip if snapshot missing.
 - **Identity:** logo + company name + receipt contact from **Settings ? Branding** (`LoadPrintIdentity` / `useBranding`). POS `theme` only overrides register chrome; empty theme fields fall back to global brand colors, then POS defaults.
 - **Lots / stock:** Catalog badges use non-expired lot qty at the open session location for `track_lot` items. Add-to-cart auto-assigns FEFO when possible; otherwise one-step lot sheet (`ERR_POS_LOT_PICK`). HQ lots do not sell at another location until transferred.
