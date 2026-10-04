@@ -41,7 +41,6 @@ import { UserAccountMenu } from "./UserAccountMenu";
 import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
 import { SupportSessionBanner } from "./SupportSessionBanner";
 import { RolePreviewBanner } from "./RolePreviewBanner";
-import { RolePreviewPicker } from "./RolePreviewPicker";
 import { SidebarNav } from "./SidebarNav";
 import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { DemoTenantBanner } from "../shared/DemoTenantBanner";
@@ -378,9 +377,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
         <div class="mt-4 shrink-0 space-y-2 border-t border-stroke pt-3">
           <BusinessBranchSwitcher />
-          <div class="px-2 pb-1">
-            <RolePreviewPicker />
-          </div>
+          {/* View as role temporarily hidden — recovery banner still mounts if preview is active. */}
           <UserAccountMenu />
           <Show when={!shell.collapsed()}>
             <p

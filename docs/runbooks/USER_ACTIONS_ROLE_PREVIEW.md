@@ -2,7 +2,7 @@
 
 ## What shipped
 
-Owners and platform superadmins can start a **read-only role template preview** from the sidebar (“View as role…”). Server overlay strips owner/platform power, reloads the chosen role’s permissions (no personal overrides), and blocks mutating HTTP except end/extend.
+Owners and platform superadmins can start a **read-only role template preview** (sidebar “View as role…” is **temporarily hidden** in the app shell; API start/end and the recovery banner remain). Server overlay strips owner/platform power, reloads the chosen role’s permissions (no personal overrides), and blocks mutating HTTP except end/extend.
 
 ## Deploy checklist
 
