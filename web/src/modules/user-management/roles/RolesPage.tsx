@@ -277,24 +277,23 @@ export default function RolesPage() {
         <Field label="Description">
           <input class={inputClass} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} />
         </Field>
-        <Field label="Apply user data scopes">
+        <Field label="Limit to assigned branches/customers">
           <label class="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={applyUserScopes()}
               onChange={(e) => setApplyUserScopes(e.currentTarget.checked)}
             />
-            This role uses Data scopes (limit which customers/locations the user can see)
+            This job only sees branches/customers assigned on People → Access
           </label>
           <p class="mt-1 text-xs text-text-secondary">
-            Leave off for company admins who should see all branches. Turn on for branch-only staff, then assign
-            customers/locations under{" "}
-            <span class="font-medium">User Management → Data scopes</span>.
+            Leave off for company-wide jobs. Turn on for branch staff, then assign branches under{" "}
+            <span class="font-medium">People → Access</span> (or Branches &amp; customers for customers too).
           </p>
           <Show when={applyUserScopes()}>
             <p class="mt-1 text-xs text-amber-700">
-              Fail-closed: a user with this role sees <strong>no records</strong> until you assign them
-              customers/locations under Data scopes.
+              Fail-closed: a user with this job sees <strong>no records</strong> until you assign them
+              branches/customers.
             </p>
           </Show>
         </Field>

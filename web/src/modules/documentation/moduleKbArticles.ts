@@ -1149,24 +1149,24 @@ export const moduleKbArticles: KbArticle[] = [
   },
   {
     id: "user-management-admin",
-    title: "Users, roles, groups, and data scopes (RBAC)",
+    title: "People, jobs, and branches (RBAC)",
     scenario: "You administer who can do what in the workspace.",
     intro:
-      "Bluearm uses RBAC plus optional data scopes—not full ABAC. Users get a role (job template), optional groups (team add-ons), rare per-user overrides, and optional customer/location scopes.",
+      "Bluearm uses RBAC plus optional data scopes—not full ABAC. Prefer People → Access (job + branches + home). Jobs are permission templates; Branches & customers is the advanced scope screen. User groups are retired for now (Teams may return later).",
     blocks: [
       {
         type: "steps",
         items: [
           "Module & Features — turn on what the company bought.",
-          "Roles — default access for a job (Accountant, Warehouse). Prefer roles first.",
-          "Groups — optional shared add-ons on top of a role (e.g. Manila sales). Does not replace the role.",
-          "Users — invite people, assign role (+ groups), soft-delete/restore, open Overrides only for exceptions.",
-          "Data scopes — if the role has Apply user data scopes, limit which customers/locations they see.",
+          "Jobs — default access for a role (Accountant, Warehouse). Prefer jobs first.",
+          "People — invite, then Access to set job + allowed branches + home in one place.",
+          "Branches & customers — advanced customer/location scopes (Access preserves customer scopes when saving branches).",
+          "Overrides — rare per-user exceptions on top of the job.",
         ],
       },
       {
         type: "tip",
-        text: "Invite sends email when SMTP is configured; otherwise the invite stays pending and you ask them to sign in with Google at /signin. Use Resend on a pending invite to re-queue mail. Soft-delete stops access but keeps role, groups, overrides, and scopes for Restore. Use Remove & reset for re-invite (More menu) to clear scopes/overrides/groups, unlink Google, and invite again.",
+        text: "Invite sends email when SMTP is configured; otherwise the invite stays pending and you ask them to sign in with Google at /signin. Soft-delete stops access but keeps role, overrides, and scopes for Restore. Use Remove & reset for re-invite to clear scopes/overrides, unlink Google, and invite again. Branch limits apply when the job has “Limit to assigned branches/customers” enabled.",
       },
     ],
     primaryHref: "/app/user-management/users",

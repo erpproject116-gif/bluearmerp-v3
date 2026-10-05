@@ -9,6 +9,8 @@ export type TenantUserRow = {
   status: string;
   auth_linked: boolean;
   is_owner: boolean;
+  home_location_id?: number;
+  home_location_name?: string;
   invite_id?: number;
   invited_at?: string;
   invited_by_user_id?: number;

@@ -632,24 +632,28 @@ export const appModules: AppModule[] = [
     basePath: "/app/user-management",
     features: [
       {
-        label: "Users",
+        label: "People",
         href: "/app/user-management/users",
         settingsHref: "/app/user-management/users",
+        headerPriority: "primary",
       },
       {
-        label: "Roles",
+        label: "Jobs",
         href: "/app/user-management/roles",
         settingsHref: "/app/user-management/roles",
+        headerPriority: "primary",
       },
       {
-        label: "Data scopes",
+        label: "Branches & customers",
         href: "/app/user-management/user-permissions",
         settingsHref: "/app/user-management/user-permissions",
+        headerPriority: "primary",
       },
       {
         label: "Module & Features",
         href: "/app/user-management/tenant-modules",
         settingsHref: "/app/user-management/tenant-modules",
+        headerPriority: "primary",
       },
       {
         label: "Process Policies",
@@ -661,21 +665,25 @@ export const appModules: AppModule[] = [
         label: "Mapping Center",
         href: "/app/user-management/mapping-center",
         settingsHref: "/app/user-management/mapping-center",
+        headerPriority: "overflow",
       },
       {
         label: "Migration Center",
         href: "/app/user-management/migration-center",
         settingsHref: "/app/user-management/migration-center",
+        headerPriority: "overflow",
       },
       {
         label: "Demo Data",
         href: "/app/user-management/demo-data",
         settingsHref: "/app/user-management/demo-data",
+        headerPriority: "overflow",
       },
       {
         label: "Help feedback",
         href: "/app/user-management/help-feedback",
         settingsHref: "/app/user-management/help-feedback",
+        headerPriority: "overflow",
       },
       {
         label: "Billing & subscription",

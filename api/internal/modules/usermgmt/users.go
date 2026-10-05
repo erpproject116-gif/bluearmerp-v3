@@ -23,16 +23,18 @@ import (
 )
 
 type UserRow struct {
-	ID           int64      `json:"id"`
-	Email        string     `json:"email"`
-	FullName     string     `json:"full_name"`
-	TenantRole   string     `json:"tenant_role"`
-	Status       string     `json:"status"`
-	AuthLinked   bool       `json:"auth_linked"`
-	IsOwner      bool       `json:"is_owner"`
-	InviteID     *int64     `json:"invite_id,omitempty"`
-	InvitedAt    *time.Time `json:"invited_at,omitempty"`
-	InvitedBy    *int64     `json:"invited_by_user_id,omitempty"`
+	ID               int64      `json:"id"`
+	Email            string     `json:"email"`
+	FullName         string     `json:"full_name"`
+	TenantRole       string     `json:"tenant_role"`
+	Status           string     `json:"status"`
+	AuthLinked       bool       `json:"auth_linked"`
+	IsOwner          bool       `json:"is_owner"`
+	HomeLocationID   *int64     `json:"home_location_id,omitempty"`
+	HomeLocationName string     `json:"home_location_name,omitempty"`
+	InviteID         *int64     `json:"invite_id,omitempty"`
+	InvitedAt        *time.Time `json:"invited_at,omitempty"`
+	InvitedBy        *int64     `json:"invited_by_user_id,omitempty"`
 }
 
 type inviteBody struct {
@@ -45,6 +47,8 @@ type userPatchBody struct {
 	TenantRole *string `json:"tenant_role"`
 	Status     *string `json:"status"`
 	FullName   *string `json:"full_name"`
+	// HomeLocationID: omit = no change; <=0 = clear; >0 = set (must be tenant location).
+	HomeLocationID *int64 `json:"home_location_id"`
 }
 
 func registerUserRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -118,12 +122,15 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 			  u.status,
 			  u.auth_user_id is not null,
 			  t.owner_user_id = u.id,
+			  u.home_location_id,
+			  coalesce(hl.location_name, ''),
 			  ui.id,
 			  ui.invited_at,
 			  ui.invited_by_user_id,
 			  count(*) over() as total_count
 			from public.users u
 			join public.tenants t on t.id = u.tenant_id
+			left join public.inv_locations hl on hl.id = u.home_location_id and hl.tenant_id = u.tenant_id
 			left join lateral (
 			  select i.id, i.invited_at, i.invited_by_user_id
 			  from public.user_invites i
@@ -147,13 +154,18 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 		var total int64
 		for rows.Next() {
 			var row UserRow
+			var homeID *int64
+			var homeName string
 			if err := rows.Scan(
 				&row.ID, &row.Email, &row.FullName, &row.TenantRole, &row.Status,
-				&row.AuthLinked, &row.IsOwner, &row.InviteID, &row.InvitedAt, &row.InvitedBy, &total,
+				&row.AuthLinked, &row.IsOwner, &homeID, &homeName,
+				&row.InviteID, &row.InvitedAt, &row.InvitedBy, &total,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to list users.", "ERR_INTERNAL")
 				return
 			}
+			row.HomeLocationID = homeID
+			row.HomeLocationName = homeName
 			out = append(out, row)
 		}
 		response.OKList(w, out, p.Page, p.PageSize, total)
@@ -454,6 +466,40 @@ func patchUser(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		fullName := body.FullName
 
+		if body.HomeLocationID != nil && *body.HomeLocationID > 0 {
+			homeID := *body.HomeLocationID
+			var locOK bool
+			err = pool.QueryRow(r.Context(), `
+				select exists (
+				  select 1 from public.inv_locations
+				  where id = $1 and tenant_id = $2 and status = 'active' and deleted_at is null
+				)`, homeID, tu.TenantID).Scan(&locOK)
+			if err != nil || !locOK {
+				response.Validation(w, map[string]string{"home_location_id": "Invalid home location."})
+				return
+			}
+			var scopeCount int
+			_ = pool.QueryRow(r.Context(), `
+				select count(*) from public.user_data_scopes
+				where tenant_id = $1 and user_id = $2
+				  and scope_type in ('location', 'warehouse')`, tu.TenantID, id).Scan(&scopeCount)
+			if scopeCount > 0 {
+				var inScope bool
+				_ = pool.QueryRow(r.Context(), `
+					select exists (
+					  select 1 from public.user_data_scopes
+					  where tenant_id = $1 and user_id = $2
+					    and scope_type in ('location', 'warehouse') and record_id = $3
+					)`, tu.TenantID, id, homeID).Scan(&inScope)
+				if !inScope {
+					response.Validation(w, map[string]string{
+						"home_location_id": "Home branch must be one of the user's allowed branches.",
+					})
+					return
+				}
+			}
+		}
+
 		q := `update public.users set tenant_role = $1, status = $2, auth_revision = auth_revision + 1, updated_at = now()`
 		args := []any{role, status}
 		n := 3
@@ -467,14 +513,25 @@ func patchUser(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, fn)
 			n++
 		}
-		q += fmt.Sprintf(" where id = $%d and tenant_id = $%d returning id, email, full_name, tenant_role, status, auth_user_id is not null", n, n+1)
+		if body.HomeLocationID != nil {
+			if *body.HomeLocationID <= 0 {
+				q += ", home_location_id = null"
+			} else {
+				q += fmt.Sprintf(", home_location_id = $%d", n)
+				args = append(args, *body.HomeLocationID)
+				n++
+			}
+		}
+		q += fmt.Sprintf(" where id = $%d and tenant_id = $%d returning id, email, full_name, tenant_role, status, auth_user_id is not null, home_location_id", n, n+1)
 		args = append(args, id, tu.TenantID)
 
 		var row UserRow
 		var isOwner bool
+		var homeID *int64
 		err = pool.QueryRow(r.Context(), q, args...).Scan(
-			&row.ID, &row.Email, &row.FullName, &row.TenantRole, &row.Status, &row.AuthLinked,
+			&row.ID, &row.Email, &row.FullName, &row.TenantRole, &row.Status, &row.AuthLinked, &homeID,
 		)
+		row.HomeLocationID = homeID
 		if err == pgx.ErrNoRows {
 			response.Err(w, http.StatusNotFound, "User not found.", "ERR_NOT_FOUND")
 			return

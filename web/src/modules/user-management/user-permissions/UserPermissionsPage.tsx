@@ -139,12 +139,12 @@ export default function UserPermissionsPage() {
   return (
     <div class="space-y-4">
       <div class="space-y-1">
-        <h2 class="text-lg font-semibold text-text-primary">Data scopes</h2>
+        <h2 class="text-lg font-semibold text-text-primary">Branches &amp; customers</h2>
         <p class="text-sm text-text-secondary">
-          Limit which customers and locations this user can see when their role has{" "}
-          <strong>Apply user data scopes</strong>. Not for roles or delete — manage accounts on{" "}
+          Advanced limits for customers and locations when the job has{" "}
+          <strong>Limit to assigned branches/customers</strong>. Everyday job + branch setup:{" "}
           <A href="/app/user-management/users" class="text-brand-600 hover:underline">
-            Users
+            People → Access
           </A>
           .
         </p>

@@ -986,10 +986,9 @@ export const documentationSections: DocSection[] = [
       {
         type: "steps",
         items: [
-          "User Management → Users: invite staff, assign role/groups, soft-delete/restore, rare Overrides.",
-          "User Management → Roles: job templates (permission matrix). Prefer roles before Groups.",
-          "User Management → Groups: optional team add-ons on top of a role.",
-          "User Management → Data scopes: limit customers/locations when a role applies scopes (not for delete).",
+          "User Management → People: invite staff; Access sets job + branches + home; soft-delete/restore; rare Overrides.",
+          "User Management → Jobs: permission templates. Prefer jobs before one-off overrides.",
+          "User Management → Branches & customers: advanced customer/location scopes (groups are retired for now).",
           "User Management → Process Policies: require quotations, SO, PR approval, GR before supplier invoice, and legacy vs split SO release.",
           "User Management → Demo Data: populate or purge sample documents on DEMO000 / BLUEARM tenants.",
           "Activity Logs: see who changed important records across the tenant.",

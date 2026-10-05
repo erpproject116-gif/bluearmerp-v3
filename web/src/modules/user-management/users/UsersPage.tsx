@@ -15,13 +15,17 @@ import {
   type TenantUserRow,
 } from "../../../shared/useUserManagement";
 import {
+  fetchUserDataScopes,
+  saveUserDataScopes,
   saveUserPermissionOverrides,
   useInvalidatePermissions,
   usePermissionRegistry,
   useUserPermissions,
+  type UserDataScope,
 } from "../../../shared/usePermissions";
 
 type RowMenuPos = { top: number; left: number };
+type LocOpt = { id: number; label: string };
 
 export default function UsersPage() {
   const auth = useAuth();
@@ -53,18 +57,28 @@ export default function UsersPage() {
   };
   const [inviteOpen, setInviteOpen] = createSignal(false);
   const [editOpen, setEditOpen] = createSignal(false);
+  const [accessOpen, setAccessOpen] = createSignal(false);
   const [permOpen, setPermOpen] = createSignal(false);
   const [previewOpen, setPreviewOpen] = createSignal(false);
   const [permUserId, setPermUserId] = createSignal<number | null>(null);
   const [previewUserId, setPreviewUserId] = createSignal<number | null>(null);
   const [permValues, setPermValues] = createSignal<Record<string, MatrixValue>>({});
   const [editing, setEditing] = createSignal<TenantUserRow | null>(null);
+  const [accessUser, setAccessUser] = createSignal<TenantUserRow | null>(null);
   const [inviteEmail, setInviteEmail] = createSignal("");
   const [inviteName, setInviteName] = createSignal("");
   const [inviteRole, setInviteRole] = createSignal("member");
+  const [inviteBranchIds, setInviteBranchIds] = createSignal<number[]>([]);
+  const [inviteHomeId, setInviteHomeId] = createSignal<number | null>(null);
   const [editRole, setEditRole] = createSignal("member");
   const [editStatus, setEditStatus] = createSignal("active");
   const [editName, setEditName] = createSignal("");
+  const [accessRole, setAccessRole] = createSignal("member");
+  const [accessBranchIds, setAccessBranchIds] = createSignal<number[]>([]);
+  const [accessHomeId, setAccessHomeId] = createSignal<number | null>(null);
+  const [accessCustomerScopes, setAccessCustomerScopes] = createSignal<UserDataScope[]>([]);
+  const [accessLoading, setAccessLoading] = createSignal(false);
+  const [locations, setLocations] = createSignal<LocOpt[]>([]);
   const [saving, setSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateUserManagement();
@@ -107,10 +121,29 @@ export default function UsersPage() {
     status: statusFilter() || undefined,
   }));
 
+  const loadLocations = async () => {
+    if (locations().length > 0) return;
+    const res = await apiFetch<Array<{ id: number; location_name: string }>>(
+      "/api/v1/inventory/locations?pageSize=500",
+    );
+    setLocations((res.data ?? []).map((l) => ({ id: l.id, label: l.location_name })));
+  };
+
+  const roleAppliesScopes = (roleCode: string) =>
+    Boolean((roles.data ?? []).find((r) => r.role_code === roleCode)?.apply_user_scopes);
+
+  const toggleBranchId = (ids: number[], id: number, checked: boolean) => {
+    if (checked) return ids.includes(id) ? ids : [...ids, id];
+    return ids.filter((x) => x !== id);
+  };
+
   const openInvite = () => {
     setInviteEmail("");
     setInviteName("");
     setInviteRole("member");
+    setInviteBranchIds([]);
+    setInviteHomeId(null);
+    void loadLocations();
     setInviteOpen(true);
   };
 
@@ -120,6 +153,117 @@ export default function UsersPage() {
     setEditRole(row.tenant_role);
     setEditStatus(row.status);
     setEditOpen(true);
+  };
+
+  const openAccess = async (row: TenantUserRow) => {
+    if (row.is_owner) {
+      toast.warning("Company owner has full access; use Active branch in the sidebar to filter your own view.");
+      return;
+    }
+    if (row.status === "disabled") {
+      toast.warning("Restore this user before editing access.");
+      return;
+    }
+    setAccessUser(row);
+    setAccessRole(row.tenant_role);
+    setAccessHomeId(row.home_location_id ?? null);
+    setAccessBranchIds([]);
+    setAccessCustomerScopes([]);
+    setAccessOpen(true);
+    setAccessLoading(true);
+    await loadLocations();
+    const res = await fetchUserDataScopes(row.id);
+    setAccessLoading(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to load branches.");
+      return;
+    }
+    const scopes = res.data ?? [];
+    setAccessCustomerScopes(scopes.filter((s) => s.scope_type === "customer"));
+    const locIds = [
+      ...new Set(
+        scopes
+          .filter((s) => s.scope_type === "location" || s.scope_type === "warehouse")
+          .map((s) => s.record_id),
+      ),
+    ];
+    setAccessBranchIds(locIds);
+    if (row.home_location_id && locIds.length > 0 && !locIds.includes(row.home_location_id)) {
+      setAccessHomeId(null);
+    }
+  };
+
+  const saveAccess = async () => {
+    const row = accessUser();
+    if (!row) return;
+    const branches = accessBranchIds();
+    let home = accessHomeId();
+    if (home != null && branches.length > 0 && !branches.includes(home)) {
+      toast.warning("Home branch must be one of the allowed branches.");
+      return;
+    }
+    if (branches.length > 0 && !roleAppliesScopes(accessRole())) {
+      const roleRow = (roles.data ?? []).find((r) => r.role_code === accessRole());
+      const ok = confirm(
+        `Job “${roleRow?.role_name ?? accessRole()}” is not branch-limited yet.\n\n` +
+          `Without “Limit to assigned branches/customers” on the job, branch selections are stored but the user still sees company-wide data.\n\n` +
+          `Enable branch limits on this job now?`,
+      );
+      if (ok && roleRow) {
+        const patch = await apiFetch(
+          `/api/v1/user-management/roles/${roleRow.id}`,
+          { method: "PATCH", body: JSON.stringify({ apply_user_scopes: true }) },
+          { silent: true },
+        );
+        if (!patch.success) {
+          toast.warning(patch.message ?? "Could not enable branch limits on the job.");
+          return;
+        }
+        invalidate.all();
+      }
+    }
+    if (branches.length === 0 && roleAppliesScopes(accessRole())) {
+      if (
+        !confirm(
+          "No branches selected and this job is branch-limited. The user will see no branch records until you assign branches. Continue?",
+        )
+      ) {
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const merged: UserDataScope[] = [
+        ...accessCustomerScopes(),
+        ...branches.map((id) => ({ scope_type: "location", record_id: id })),
+      ];
+      const scopeRes = await saveUserDataScopes(row.id, merged);
+      if (!scopeRes.success) {
+        toast.warning(scopeRes.message ?? "Failed to save branches.");
+        return;
+      }
+      const patchRes = await apiFetch(
+        `/api/v1/user-management/users/${row.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            tenant_role: accessRole(),
+            home_location_id: home && home > 0 ? home : 0,
+          }),
+        },
+        { silent: true },
+      );
+      if (!patchRes.success) {
+        toast.warning(patchRes.message ?? "Failed to save role/home.");
+        return;
+      }
+      toast.success("Access saved.");
+      setAccessOpen(false);
+      invalidate.all();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openOverrides = (row: TenantUserRow) => {
@@ -180,6 +324,32 @@ export default function UsersPage() {
       toast.warning("Email and full name are required.");
       return;
     }
+    const branches = inviteBranchIds();
+    const home = inviteHomeId();
+    if (home != null && branches.length > 0 && !branches.includes(home)) {
+      toast.warning("Home branch must be one of the allowed branches.");
+      return;
+    }
+
+    if (branches.length > 0 && !roleAppliesScopes(inviteRole())) {
+      const roleRow = (roles.data ?? []).find((r) => r.role_code === inviteRole());
+      const ok = confirm(
+        `Job “${roleRow?.role_name ?? inviteRole()}” is not branch-limited yet.\n\n` +
+          `Enable branch limits on this job so assigned branches take effect?`,
+      );
+      if (ok && roleRow) {
+        const patch = await apiFetch(
+          `/api/v1/user-management/roles/${roleRow.id}`,
+          { method: "PATCH", body: JSON.stringify({ apply_user_scopes: true }) },
+          { silent: true },
+        );
+        if (!patch.success) {
+          toast.warning(patch.message ?? "Could not enable branch limits on the job.");
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       const res = await apiFetch<TenantUserRow>(
@@ -194,9 +364,34 @@ export default function UsersPage() {
         },
         { silent: true },
       );
-      if (!res.success) {
+      if (!res.success || !res.data?.id) {
         toast.warning(res.message ?? "Could not invite user.");
         return;
+      }
+      const userId = res.data.id;
+      if (branches.length > 0) {
+        const scopeRes = await saveUserDataScopes(
+          userId,
+          branches.map((id) => ({ scope_type: "location", record_id: id })),
+        );
+        if (!scopeRes.success) {
+          toast.warning(scopeRes.message ?? "Invite created but branches failed to save. Use Access to fix.");
+        }
+      }
+      if (home != null || branches.length > 0) {
+        const patchRes = await apiFetch(
+          `/api/v1/user-management/users/${userId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              home_location_id: home && home > 0 ? home : 0,
+            }),
+          },
+          { silent: true },
+        );
+        if (!patchRes.success) {
+          toast.warning(patchRes.message ?? "Invite created but home branch failed to save. Use Access to fix.");
+        }
       }
       toast.success(
         res.message ??
@@ -424,16 +619,14 @@ export default function UsersPage() {
   return (
     <div class="space-y-3">
       <p class="text-sm text-text-secondary">
-        Invite people, assign a role, soft-delete/restore. The company owner cannot be deleted
-        until a platform superadmin or the current owner uses <strong>Make company owner</strong> on another active
-        user. The list defaults to{" "}
-        <strong>Active + pending</strong> so outstanding invites stay visible until the person signs in with Google
-        and joins — then their status becomes <strong>Active</strong>. Open <strong>Overrides</strong> only for
-        exceptions. Limit customers/locations on{" "}
+        Invite people and set their <strong>Access</strong> (job + branches + home) in one place. The company owner
+        cannot be deleted until ownership is transferred via <strong>Make company owner</strong>. Defaults to{" "}
+        <strong>Active + pending</strong> so invites stay visible until Google sign-in. Use{" "}
+        <strong>Overrides</strong> for rare exceptions;{" "}
         <A href="/app/user-management/user-permissions" class="text-brand-600 hover:underline">
-          Data scopes
-        </A>
-        .
+          Branches &amp; customers
+        </A>{" "}
+        for advanced customer limits. User groups stay retired for now.
       </p>
       <Show when={(list.data?.rows ?? []).some((r) => r.status === "invited")}>
         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950">
@@ -450,12 +643,19 @@ export default function UsersPage() {
           { key: "full_name", header: "Full name", sortable: true },
           {
             key: "tenant_role",
-            header: "Role",
+            header: "Job",
             render: (row) => (
               <span>
                 {row.tenant_role}
                 {row.is_owner ? " (Owner)" : ""}
               </span>
+            ),
+          },
+          {
+            key: "home_location_name",
+            header: "Home branch",
+            render: (row) => (
+              <span class="text-sm text-text-secondary">{row.home_location_name || (row.is_owner ? "All" : "—")}</span>
             ),
           },
           {
@@ -511,6 +711,15 @@ export default function UsersPage() {
                 >
                   Edit
                 </button>
+                <Show when={!row.is_owner && row.status !== "disabled"}>
+                  <button
+                    type="button"
+                    class="text-sm text-brand-600 hover:underline"
+                    onClick={() => void openAccess(row)}
+                  >
+                    Access
+                  </button>
+                </Show>
                 <Show when={hasMoreItems(row)}>
                   <button
                     type="button"
@@ -568,22 +777,36 @@ export default function UsersPage() {
             class="fixed z-[80] min-w-[13rem] rounded-lg border border-stroke bg-white py-1 shadow-lg"
             style={{ top: `${menuPos()!.top}px`, left: `${menuPos()!.left}px` }}
           >
-            <Show when={menuRow()!.status === "active" && !menuRow()!.is_owner}>
+            <Show when={(menuRow()!.status === "active" || menuRow()!.status === "invited") && !menuRow()!.is_owner}>
               <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
                 Access
               </p>
               <button
                 type="button"
                 role="menuitem"
-                class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                class="block w-full px-3 py-1.5 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
                 onClick={() => {
                   const row = menuRow()!;
                   closeRowMenu();
-                  openOverrides(row);
+                  void openAccess(row);
                 }}
               >
-                Overrides
+                Job &amp; branches
               </button>
+              <Show when={menuRow()!.status === "active"}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="block w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-slate-50"
+                  onClick={() => {
+                    const row = menuRow()!;
+                    closeRowMenu();
+                    openOverrides(row);
+                  }}
+                >
+                  Overrides
+                </button>
+              </Show>
               <button
                 type="button"
                 role="menuitem"
@@ -605,9 +828,9 @@ export default function UsersPage() {
                   openDataScopes(row);
                 }}
               >
-                Data scopes
+                Branches &amp; customers
               </button>
-              <Show when={canTransferOwnership()}>
+              <Show when={canTransferOwnership() && menuRow()!.status === "active"}>
                 <button
                   type="button"
                   role="menuitem"
@@ -758,22 +981,154 @@ export default function UsersPage() {
         <Field label="Full name *">
           <input class={inputClass} value={inviteName()} onInput={(e) => setInviteName(e.currentTarget.value)} />
         </Field>
-        <Field label="Role *">
+        <Field label="Job *">
           <select class={inputClass} value={inviteRole()} onChange={(e) => setInviteRole(e.currentTarget.value)}>
             <For each={roles.data ?? []}>
               {(role) => (
                 <option value={role.role_code} disabled={!role.is_active}>
                   {role.role_name}
+                  {role.apply_user_scopes ? " (branch-limited)" : ""}
                 </option>
               )}
             </For>
           </select>
         </Field>
+        <Field label="Allowed branches">
+          <div class="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-stroke p-2">
+            <For each={locations()} fallback={<p class="text-xs text-text-secondary">No locations found.</p>}>
+              {(loc) => (
+                <label class="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={inviteBranchIds().includes(loc.id)}
+                    onChange={(e) => {
+                      const next = toggleBranchId(inviteBranchIds(), loc.id, e.currentTarget.checked);
+                      setInviteBranchIds(next);
+                      const home = inviteHomeId();
+                      if (home != null && !next.includes(home)) setInviteHomeId(null);
+                    }}
+                  />
+                  {loc.label}
+                </label>
+              )}
+            </For>
+          </div>
+        </Field>
+        <Field label="Home branch">
+          <select
+            class={inputClass}
+            value={inviteHomeId() ?? ""}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setInviteHomeId(v ? Number(v) : null);
+            }}
+          >
+            <option value="">None</option>
+            <For each={locations().filter((l) => inviteBranchIds().length === 0 || inviteBranchIds().includes(l.id))}>
+              {(loc) => <option value={loc.id}>{loc.label}</option>}
+            </For>
+          </select>
+        </Field>
+        <Show when={inviteBranchIds().length > 0 && !roleAppliesScopes(inviteRole())}>
+          <p class="text-xs text-amber-700">
+            This job is not branch-limited yet. On save you can enable limits so branches take effect.
+          </p>
+        </Show>
         <p class="text-xs text-text-secondary">
           We email an invite when Resend (`RESEND_API_KEY`) or SMTP is configured on the API. They join by signing in
           with Google using this exact email — no separate Accept step. If email is not configured, the invite stays
           pending and you can share /signin.
         </p>
+      </EntityModal>
+
+      <EntityModal
+        open={accessOpen()}
+        title={`Access — ${accessUser()?.full_name || accessUser()?.email || "User"}`}
+        onClose={() => setAccessOpen(false)}
+        onSave={() => void saveAccess()}
+        saving={saving() || accessLoading()}
+        saveLabel="Save access"
+      >
+        <Show when={!accessLoading()} fallback={<p class="text-sm text-text-secondary">Loading…</p>}>
+          <Field label="Job *">
+            <select class={inputClass} value={accessRole()} onChange={(e) => setAccessRole(e.currentTarget.value)}>
+              <For each={roles.data ?? []}>
+                {(role) => (
+                  <option value={role.role_code} disabled={!role.is_active}>
+                    {role.role_name}
+                    {role.apply_user_scopes ? " (branch-limited)" : ""}
+                  </option>
+                )}
+              </For>
+            </select>
+          </Field>
+          <Field label="Allowed branches">
+            <div class="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-stroke p-2">
+              <For each={locations()} fallback={<p class="text-xs text-text-secondary">No locations found.</p>}>
+                {(loc) => (
+                  <label class="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={accessBranchIds().includes(loc.id)}
+                      onChange={(e) => {
+                        const next = toggleBranchId(accessBranchIds(), loc.id, e.currentTarget.checked);
+                        setAccessBranchIds(next);
+                        const home = accessHomeId();
+                        if (home != null && !next.includes(home)) setAccessHomeId(null);
+                      }}
+                    />
+                    {loc.label}
+                  </label>
+                )}
+              </For>
+            </div>
+            <Show when={accessCustomerScopes().length > 0}>
+              <p class="mt-1 text-xs text-text-secondary">
+                {accessCustomerScopes().length} customer scope(s) kept when you save (edit under Branches &amp;
+                customers).
+              </p>
+            </Show>
+          </Field>
+          <Field label="Home branch">
+            <select
+              class={inputClass}
+              value={accessHomeId() ?? ""}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setAccessHomeId(v ? Number(v) : null);
+              }}
+            >
+              <option value="">None</option>
+              <For
+                each={locations().filter(
+                  (l) => accessBranchIds().length === 0 || accessBranchIds().includes(l.id),
+                )}
+              >
+                {(loc) => <option value={loc.id}>{loc.label}</option>}
+              </For>
+            </select>
+          </Field>
+          <Show when={accessBranchIds().length > 0 && !roleAppliesScopes(accessRole())}>
+            <p class="text-xs text-amber-700">
+              This job is not branch-limited. Saving will offer to enable limits so branches take effect.
+            </p>
+          </Show>
+          <Show when={accessBranchIds().length === 0 && roleAppliesScopes(accessRole())}>
+            <p class="text-xs text-amber-700">
+              Branch-limited job with no branches — user will see no branch records until you assign some.
+            </p>
+          </Show>
+          <p class="text-xs text-text-secondary">
+            Advanced:{" "}
+            <A href="/app/user-management/user-permissions" class="text-brand-600 hover:underline">
+              Branches &amp; customers
+            </A>
+            {" · "}
+            <A href="/app/user-management/roles" class="text-brand-600 hover:underline">
+              Jobs
+            </A>
+          </p>
+        </Show>
       </EntityModal>
 
       <EntityModal

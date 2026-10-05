@@ -234,6 +234,10 @@ func patchRole(pool *pgxpool.Pool) http.HandlerFunc {
 			if body.Description != nil {
 				description = stringsTrim(*body.Description)
 			}
+			// Allow toggling branch/customer scope enforcement on system jobs (Access UX).
+			if body.ApplyUserScopes != nil {
+				applyScopes = *body.ApplyUserScopes
+			}
 		} else {
 			if body.RoleName != nil {
 				roleName = stringsTrim(*body.RoleName)
