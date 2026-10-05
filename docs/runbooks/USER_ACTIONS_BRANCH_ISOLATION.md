@@ -2,6 +2,41 @@
 
 Agent implementation lands with flags **default OFF**. Complete these steps to go live.
 
+## Active-branch view scope (owners / platform)
+
+Independent of `strict_branch_isolation` (works when the flag is **off**):
+
+| Mode | Who | Behavior |
+|------|-----|----------|
+| **All branches** (default for owners with no stored preference) | Owner / platform / support | No `X-Branch-ID` → company-wide lists |
+| **Active branch selected** | Owner / platform / support | `X-Branch-ID` → list/export/picker SQL `location_id = branch` |
+| Precedence | Everyone | `?location_id=` **wins over** Active branch |
+| GET-by-id | Owners | Still company-wide in v1 (list hide ≠ detail block) |
+| GL / TB / P&L / BS / cash flow | Everyone | **Company-wide books**; FE shows honesty banner when a branch is selected |
+| POS open session | Cashiers | Uses **session.location_id**, not sidebar Active branch (warn if they differ) |
+
+Hard fence for **non-owners** still requires `strict_branch_isolation` + home/scopes (sections below).
+
+### Coverage matrix (v1)
+
+| Area | List / export | Get-by-id | Notes |
+|------|---------------|-----------|--------|
+| Sales, SO, Quotation, PR, PO, GR, DR | Via `ApplyUserScopesSQL` | Owner open OK | Wired |
+| SI, OR, PV, AR/AP aging | Via datascope | Owner open OK | Wired |
+| Serial units, available serials, lot batches | Via datascope | N/A | Operating defaults |
+| Stock balance report | Via datascope | N/A | Narrows when Active branch set; All branches = multi-location |
+| Inv book / inventory-status (planning) | Not auto-narrowed for owners | N/A | Use explicit location or All branches |
+| Stock transfers / in-transit | Handoff v2 rules | — | Do not break |
+| Journal / TB / P&L / BS / cash flow | Company-wide | — | Banner only; no fake branch books |
+| POS catalog / cart | Session location | — | Sidebar branch ignored in-session |
+
+### Residual gaps
+
+- Journal entries lack `location_id` — true branch books need a later epic.
+- Some CRM / manufacturing / shipping pickers may omit datascope — audit if leaks appear.
+- Owner deep-link to HQ doc while viewing Branch 1 still opens (by design v1).
+- Null `location_id` legacy docs disappear under Active branch filter; visible again under All branches.
+
 ## 1. Apply migration
 
 Ensure `312_branch_isolation_transfer_v2.sql` is applied (ECS migration runner or Supabase SQL).
@@ -48,11 +83,14 @@ where tenant_id = <PILOT_TENANT_ID>;
 
 ## 5. Sign-off checklist
 
-- Store admin on Branch A cannot open Branch B sales by URL.
-- Inv. Balance by Location still shows other-branch qty.
-- Foreign movement rows redact commercial `ref_type` / `ref_id`.
+- Owner: All branches → company-wide sales; switch to Branch 1 → HQ rows gone; All restores.
+- Owner: P&L/TB/BS show company-wide honesty banner when a branch is selected.
+- Store admin on Branch A cannot open Branch B sales by URL (isolation ON).
+- Stock balance: with Active branch set, defaults to that location; All branches = multi-location.
+- Foreign movement rows redact commercial `ref_type` / `ref_id` (isolation).
 - Transfer: Submit → Approve → Ship → Receive (Post blocked).
 - Bell toast for owner/store_admin on submit/approve/ship/receive.
+- POS: open session keeps session location if sidebar branch differs (warn shown).
 
 ## 6. Broader rollout
 

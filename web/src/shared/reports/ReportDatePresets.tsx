@@ -157,22 +157,21 @@ export function ReportDatePresets(props: {
   onChange: (preset: ReportDatePresetId, range: ReportDateRange | null) => void;
 }) {
   return (
-    <div class="flex flex-wrap gap-1.5">
-      <For each={REPORT_DATE_PRESETS.filter((p) => p.id !== "year_to_date")}>
-        {(preset) => (
-          <button
-            type="button"
-            class="rounded-lg border px-3 py-1.5 text-sm transition-colors"
-            classList={{
-              "border-brand-400 bg-brand-50 text-brand-700": props.value === preset.id,
-              "border-stroke text-text-secondary hover:bg-slate-50": props.value !== preset.id,
-            }}
-            onClick={() => props.onChange(preset.id, resolveReportDatePreset(preset.id))}
-          >
-            {preset.label}
-          </button>
-        )}
-      </For>
-    </div>
+    <label class="text-sm">
+      <span class="mb-1 block text-text-secondary">Period</span>
+      <select
+        class="rounded-lg border border-stroke bg-white px-3 py-2 text-sm text-text-primary"
+        value={props.value}
+        aria-label="Date period"
+        onChange={(e) => {
+          const id = e.currentTarget.value as ReportDatePresetId;
+          props.onChange(id, resolveReportDatePreset(id));
+        }}
+      >
+        <For each={REPORT_DATE_PRESETS.filter((p) => p.id !== "year_to_date")}>
+          {(preset) => <option value={preset.id}>{preset.label}</option>}
+        </For>
+      </select>
+    </label>
   );
 }

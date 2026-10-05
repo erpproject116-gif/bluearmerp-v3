@@ -60,6 +60,7 @@ export default function GeneralLedgerReportPage() {
     <FinanceLayout>
       <ReportPageLayout
         title="General Ledger"
+        companyWideBooksNote
         description="Posted journal entry lines — Search (F8)."
         dateFrom={() => filters().date_from ?? ""}
         dateTo={() => filters().date_to ?? ""}

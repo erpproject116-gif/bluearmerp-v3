@@ -58,6 +58,7 @@ export default function ProfitAndLossReportPage() {
       <ReportPageLayout
         title="Profit & Loss"
         description="Income and expense accounts for the period — Search (F8)."
+        companyWideBooksNote
         dateFrom={() => filters().date_from ?? ""}
         dateTo={() => filters().date_to ?? ""}
         onDateFromChange={(v) => setFilters((f) => ({ ...f, date_from: v }))}

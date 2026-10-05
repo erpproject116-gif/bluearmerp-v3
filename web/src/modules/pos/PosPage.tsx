@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, Index, Show, onCleanup, on
 import { A } from "@solidjs/router";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { apiFetch } from "../../shared/api";
+import { getActiveBranchCurrent } from "../../shared/activeContext";
 import { formatPeso, sanitizeIntegerInput, parseDecimalInput, bindDecimalInput, roundMoney } from "../../shared/money";
 import { AuthImage } from "../../shared/AuthImage";
 import { LotLineCell } from "../../shared/LotLineCell";
@@ -1098,7 +1099,21 @@ export default function PosPage() {
           <div class="min-w-0">
             <h1 class="truncate text-base font-semibold leading-tight">{storeName()}</h1>
             <Show when={session.data}>
-              {(s) => <p class="truncate text-xs opacity-70">{s().session_no} · {s().location_name}</p>}
+              {(s) => (
+                <>
+                  <p class="truncate text-xs opacity-70">{s().session_no} · {s().location_name}</p>
+                  <Show
+                    when={(() => {
+                      const b = getActiveBranchCurrent();
+                      return b != null && b.id > 0 && b.id !== s().location_id;
+                    })()}
+                  >
+                    <p class="truncate text-[0.65rem] text-amber-200">
+                      Sidebar branch differs — POS uses this session location
+                    </p>
+                  </Show>
+                </>
+              )}
             </Show>
           </div>
         </div>

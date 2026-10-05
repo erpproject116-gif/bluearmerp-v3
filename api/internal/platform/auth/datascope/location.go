@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 )
 
 // ResolveLocationFilter returns the location id to apply when user data scopes are already on.
@@ -32,12 +33,17 @@ func RoleAppliesUserScopes(_ context.Context, _ *pgxpool.Pool, tu auth.TenantUse
 	return tu.ApplyUserScopes, nil
 }
 
-// ResolveReportLocationFilter applies explicit ?location_id= for everyone.
-// Active branch is applied only when the role enforces user data scopes — owners and
-// company-wide roles see all branches unless they pass an explicit location filter.
+// ResolveReportLocationFilter applies location narrowing for reports.
+// Precedence: explicit ?location_id= > ActiveBranch for view-all users (owner/platform/support)
+// > ActiveBranch when apply_user_scopes > none. Independent of strict_branch_isolation.
 func ResolveReportLocationFilter(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, explicit *int64) (*int64, error) {
 	if explicit != nil && *explicit > 0 {
 		return explicit, nil
+	}
+	// Owner/platform/support voluntary view-scope (same as ApplyActiveBranchViewSQL).
+	if branchiso.CanViewAllBranchCommercial(tu) && tu.ActiveBranchID > 0 {
+		id := tu.ActiveBranchID
+		return &id, nil
 	}
 	apply, err := RoleAppliesUserScopes(ctx, pool, tu)
 	if err != nil {

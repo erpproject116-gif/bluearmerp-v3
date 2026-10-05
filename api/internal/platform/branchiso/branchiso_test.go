@@ -48,3 +48,37 @@ func TestResolveOperatingBranch(t *testing.T) {
 		t.Fatalf("owner keeps active, got %d", got)
 	}
 }
+
+func TestApplyActiveBranchViewSQL(t *testing.T) {
+	// Rule 1: owner + ActiveBranch, isolation OFF → narrow
+	owner := auth.TenantUser{IsTenantOwner: true, ActiveBranchID: 42, StrictBranchIsolation: false}
+	var args []any
+	frag, next := ApplyActiveBranchViewSQL(owner, "so.location_id", 1, &args)
+	if frag != " and so.location_id = $1" || next != 2 || len(args) != 1 || args[0] != int64(42) {
+		t.Fatalf("owner active view: frag=%q next=%d args=%v", frag, next, args)
+	}
+
+	// Rule 2: ActiveBranch unset → no filter
+	owner.ActiveBranchID = 0
+	args = nil
+	frag, next = ApplyActiveBranchViewSQL(owner, "so.location_id", 1, &args)
+	if frag != "" || next != 1 || len(args) != 0 {
+		t.Fatalf("all branches: frag=%q next=%d args=%v", frag, next, args)
+	}
+
+	// Platform with branch
+	plat := auth.TenantUser{IsPlatformSuperadmin: true, ActiveBranchID: 7}
+	args = nil
+	frag, next = ApplyActiveBranchViewSQL(plat, "po.location_id", 3, &args)
+	if frag != " and po.location_id = $3" || next != 4 || args[0] != int64(7) {
+		t.Fatalf("platform: frag=%q next=%d args=%v", frag, next, args)
+	}
+
+	// Rule 4: store_admin is not view-all — no voluntary view-scope here
+	sa := auth.TenantUser{TenantRole: "store_admin", ActiveBranchID: 42, StrictBranchIsolation: false}
+	args = nil
+	frag, next = ApplyActiveBranchViewSQL(sa, "so.location_id", 1, &args)
+	if frag != "" || next != 1 {
+		t.Fatalf("store_admin must not get view-all narrow: frag=%q", frag)
+	}
+}

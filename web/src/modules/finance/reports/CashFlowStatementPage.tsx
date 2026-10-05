@@ -62,6 +62,7 @@ export default function CashFlowStatementPage() {
     <FinanceLayout>
       <ReportPageLayout
         title="Statement of Cash Flows"
+        companyWideBooksNote
         description="Cash movements classified into operating, investing, and financing — Search (F8)."
         dateFrom={() => filters().date_from ?? ""}
         dateTo={() => filters().date_to ?? ""}

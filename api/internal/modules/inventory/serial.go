@@ -15,6 +15,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -142,11 +143,20 @@ func listSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *id)
 			argN++
 		}
+		var locExplicit *int64
 		if id, ok := optionalInt64Query(r, "location_id"); ok {
-			where += fmt.Sprintf(" and su.location_id = $%d", argN)
-			args = append(args, *id)
-			argN++
+			locExplicit = id
 		}
+		dsScope, next, dsErr := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			LocationColumn:     "su.location_id",
+			ExplicitLocationID: locExplicit,
+		}, argN, &args)
+		if dsErr != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
+		argN = next
 		if sn := strings.TrimSpace(r.URL.Query().Get("serial_no")); sn != "" {
 			where += fmt.Sprintf(" and su.serial_no ilike $%d", argN)
 			args = append(args, "%"+sn+"%")
@@ -260,11 +270,16 @@ func listAvailableSerialUnits(pool *pgxpool.Pool) http.HandlerFunc {
 		} else {
 			where += " and su.status in ('in_stock', 'reserved')"
 		}
-		if locationID != nil {
-			where += fmt.Sprintf(" and su.location_id = $%d", argN)
-			args = append(args, *locationID)
-			argN++
+		dsScope, next, dsErr := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			LocationColumn:     "su.location_id",
+			ExplicitLocationID: locationID,
+		}, argN, &args)
+		if dsErr != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
 		}
+		where += dsScope
+		argN = next
 		if freeOnly {
 			where += fmt.Sprintf(`
 			  and not exists (
@@ -548,11 +563,20 @@ func listLotBatches(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *id)
 			argN++
 		}
+		var locExplicit *int64
 		if id, ok := optionalInt64Query(r, "location_id"); ok {
-			where += fmt.Sprintf(" and lb.location_id = $%d", argN)
-			args = append(args, *id)
-			argN++
+			locExplicit = id
 		}
+		dsScope, next, dsErr := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			LocationColumn:     "lb.location_id",
+			ExplicitLocationID: locExplicit,
+		}, argN, &args)
+		if dsErr != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
+		where += dsScope
+		argN = next
 		if strings.TrimSpace(r.URL.Query().Get("available_only")) == "true" {
 			where += " and lb.qty_on_hand > 0.0001"
 		}

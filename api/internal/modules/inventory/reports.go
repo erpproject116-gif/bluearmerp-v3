@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
@@ -90,6 +92,24 @@ func stockBalanceSQL(tenantID int64) string {
 		  and coalesce(l.location_type, 'location') <> 'in_transit'`
 }
 
+func stockBalanceScopedSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, r *http.Request) (string, []any, error) {
+	base := stockBalanceSQL(tu.TenantID)
+	args := []any{tu.TenantID}
+	argN := 2
+	var locExplicit *int64
+	if id, ok := optionalInt64Query(r, "location_id"); ok {
+		locExplicit = id
+	}
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		LocationColumn:     "bal.location_id",
+		ExplicitLocationID: locExplicit,
+	}, argN, &args)
+	if err != nil {
+		return "", nil, err
+	}
+	return base + frag, args, nil
+}
+
 func listStockBalance(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{
 		"item_code": "item_code", "qty_on_hand": "qty_on_hand", "available_qty": "available_qty",
@@ -98,15 +118,22 @@ func listStockBalance(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
-		base := stockBalanceSQL(tu.TenantID)
+		base, args, err := stockBalanceScopedSQL(r.Context(), pool, tu, r)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
-		if err := pool.QueryRow(r.Context(), countQ, tu.TenantID).Scan(&total); err != nil {
+		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to count report.", "ERR_INTERNAL")
 			return
 		}
-		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $2 offset $3", base, p.Sort, reports.OrderSQL(p.Order))
-		rows, err := pool.Query(r.Context(), q, tu.TenantID, p.PageSize, offset)
+		limIdx := len(args) + 1
+		offIdx := len(args) + 2
+		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $%d offset $%d", base, p.Sort, reports.OrderSQL(p.Order), limIdx, offIdx)
+		queryArgs := append(append([]any{}, args...), p.PageSize, offset)
+		rows, err := pool.Query(r.Context(), q, queryArgs...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load report.", "ERR_INTERNAL")
 			return
@@ -132,8 +159,13 @@ func listStockBalance(pool *pgxpool.Pool) http.HandlerFunc {
 func exportStockBalance(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		q := fmt.Sprintf("select * from (%s) sub order by item_code asc limit %d", stockBalanceSQL(tu.TenantID), reports.ExportMaxRows)
-		rows, err := pool.Query(r.Context(), q, tu.TenantID)
+		base, args, err := stockBalanceScopedSQL(r.Context(), pool, tu, r)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
+		q := fmt.Sprintf("select * from (%s) sub order by item_code asc limit %d", base, reports.ExportMaxRows)
+		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to export.", "ERR_INTERNAL")
 			return

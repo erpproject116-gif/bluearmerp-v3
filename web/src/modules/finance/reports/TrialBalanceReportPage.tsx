@@ -49,6 +49,7 @@ export default function TrialBalanceReportPage() {
     <FinanceLayout>
       <ReportPageLayout
         title="Trial Balance"
+        companyWideBooksNote
         description="Posted journal balances by account — Search (F8)."
         dateFrom={() => filters().date_from ?? ""}
         dateTo={() => filters().date_to ?? ""}

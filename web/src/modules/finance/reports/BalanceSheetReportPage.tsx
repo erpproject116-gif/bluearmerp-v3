@@ -49,6 +49,7 @@ export default function BalanceSheetReportPage() {
     <FinanceLayout>
       <ReportPageLayout
         title="Balance Sheet"
+        companyWideBooksNote
         description="Asset, liability, and equity balances — Search (F8)."
         dateFrom={() => filters().date_from ?? ""}
         dateTo={() => filters().date_to ?? ""}

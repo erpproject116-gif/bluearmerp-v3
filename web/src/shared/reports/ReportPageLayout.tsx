@@ -1,4 +1,5 @@
 import { type Accessor, createSignal, type JSX, Show } from "solid-js";
+import { getActiveBranchIdCurrent } from "../activeContext";
 import { useAuth } from "../auth-context";
 import { PrintBrandingFooter } from "../branding/PrintBrandingFooter";
 import { PrintBrandingHeader } from "../branding/PrintBrandingHeader";
@@ -41,6 +42,11 @@ export type ReportPageLayoutProps = {
   exportFilename?: string;
   /** When false, filter panel starts collapsed. Default true (open). */
   filtersOpenByDefault?: boolean;
+  /**
+   * GL-style reports that stay company-wide even when Active branch is set.
+   * Shows an honesty banner so branch view is not mistaken for branch books.
+   */
+  companyWideBooksNote?: boolean;
 };
 
 export function ReportPageLayout(props: ReportPageLayoutProps) {
@@ -83,11 +89,16 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
           </>
         }
       >
+        <Show when={props.companyWideBooksNote && getActiveBranchIdCurrent()}>
+          <p class="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            This report is company-wide. Active branch filters sales and inventory documents, not the general ledger.
+          </p>
+        </Show>
         <Show when={showDates() || props.filterExtra}>
           <p class="text-xs font-semibold uppercase tracking-wide text-text-secondary">Filters</p>
         </Show>
         <Show when={showDates()}>
-          <div class="mt-2 space-y-3">
+          <div class="mt-2 flex flex-wrap items-end gap-3">
             <ReportDatePresets
               value={datePreset()}
               onChange={(preset, range) => {
@@ -102,34 +113,32 @@ export function ReportPageLayout(props: ReportPageLayoutProps) {
                 }
               }}
             />
-            <div class="flex flex-wrap items-end gap-3">
-              <label class="text-sm">
-                <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
-                <input
-                  type="date"
-                  required
-                  class="rounded-lg border border-stroke px-3 py-2"
-                  value={props.dateFrom!() || ""}
-                  onInput={(e) => {
-                    setCustomOverride(true);
-                    props.onDateFromChange!(e.currentTarget.value);
-                  }}
-                />
-              </label>
-              <label class="text-sm">
-                <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_to")}</span>
-                <input
-                  type="date"
-                  required
-                  class="rounded-lg border border-stroke px-3 py-2"
-                  value={props.dateTo!() || ""}
-                  onInput={(e) => {
-                    setCustomOverride(true);
-                    props.onDateToChange!(e.currentTarget.value);
-                  }}
-                />
-              </label>
-            </div>
+            <label class="text-sm">
+              <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_from")}</span>
+              <input
+                type="date"
+                required
+                class="rounded-lg border border-stroke px-3 py-2"
+                value={props.dateFrom!() || ""}
+                onInput={(e) => {
+                  setCustomOverride(true);
+                  props.onDateFromChange!(e.currentTarget.value);
+                }}
+              />
+            </label>
+            <label class="text-sm">
+              <span class="mb-1 block text-text-secondary">{uiLabel("reports.date_to")}</span>
+              <input
+                type="date"
+                required
+                class="rounded-lg border border-stroke px-3 py-2"
+                value={props.dateTo!() || ""}
+                onInput={(e) => {
+                  setCustomOverride(true);
+                  props.onDateToChange!(e.currentTarget.value);
+                }}
+              />
+            </label>
           </div>
         </Show>
         <Show when={props.filterExtra}>{props.filterExtra}</Show>

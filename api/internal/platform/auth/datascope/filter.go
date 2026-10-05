@@ -33,10 +33,9 @@ func applyExplicitLocationSQL(f ListFilter, argIdx int, args *[]any) (string, in
 }
 
 // ApplyUserScopesSQL appends AND fragments when the user's role enforces data scopes.
-// Owners, platform superadmins, and roles without apply_user_scopes still honor
-// ExplicitLocationID so voluntary UI filters work company-wide.
-// When tenant_process_policies.strict_branch_isolation is on, non-owners also get
-// commercial location filtering (home/assigned) even if apply_user_scopes is off.
+// Precedence: ExplicitLocationID (?location_id=) > ActiveBranch view-scope for
+// owner/platform/support > apply_user_scopes rows > strict_branch_isolation fence.
+// Owner ActiveBranch narrowing does NOT require strict_branch_isolation.
 func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, f ListFilter, argIdx int, args *[]any) (string, int, error) {
 	var frag strings.Builder
 
@@ -50,10 +49,22 @@ func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 		return nil
 	}
 
+	// explicit set → skip ActiveBranch (precedence).
+	hasExplicit := f.ExplicitLocationID != nil && *f.ExplicitLocationID > 0
+	appendActiveView := func() {
+		if hasExplicit {
+			return
+		}
+		viewFrag, next := branchiso.ApplyActiveBranchViewSQL(tu, f.LocationColumn, argIdx, args)
+		frag.WriteString(viewFrag)
+		argIdx = next
+	}
+
 	if tu.IsPlatformSuperadmin || tu.IsTenantOwner {
 		ex, next := applyExplicitLocationSQL(f, argIdx, args)
 		argIdx = next
 		frag.WriteString(ex)
+		appendActiveView()
 		if err := appendIso(); err != nil {
 			return "", argIdx, err
 		}
@@ -65,6 +76,7 @@ func ApplyUserScopesSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantU
 		ex, next := applyExplicitLocationSQL(f, argIdx, args)
 		argIdx = next
 		frag.WriteString(ex)
+		appendActiveView() // support sessions (view-all) without apply_user_scopes
 		if err := appendIso(); err != nil {
 			return "", argIdx, err
 		}

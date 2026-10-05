@@ -167,9 +167,24 @@ func AssertCommercialLocationAccess(ctx context.Context, pool *pgxpool.Pool, tu 
 	return nil
 }
 
-// ApplyCommercialLocationSQL appends location filters when isolation is on.
-// unrestricted (owner): only ActiveBranch voluntary narrow is NOT applied (owner sees all unless explicit).
-// restricted: location IN allowed AND operating branch equality when resolved > 0.
+// ApplyActiveBranchViewSQL narrows list/export SQL for users who can view all
+// branches (owner / platform / support) when they selected an Active branch.
+// Independent of strict_branch_isolation. Empty when ActiveBranch unset/0.
+// Callers must apply ExplicitLocationID first and skip this when explicit is set
+// (precedence: explicit > active branch).
+func ApplyActiveBranchViewSQL(tu auth.TenantUser, locationColumn string, argIdx int, args *[]any) (string, int) {
+	if locationColumn == "" || !CanViewAllBranchCommercial(tu) || tu.ActiveBranchID <= 0 {
+		return "", argIdx
+	}
+	frag := fmt.Sprintf(" and %s = $%d", locationColumn, argIdx)
+	*args = append(*args, tu.ActiveBranchID)
+	return frag, argIdx + 1
+}
+
+// ApplyCommercialLocationSQL appends location filters when isolation is on for
+// non–view-all users (hard fence: home/assigned locations).
+// View-all users (owner/platform/support): no isolation fence here — use
+// ApplyActiveBranchViewSQL for voluntary ActiveBranch narrowing instead.
 func ApplyCommercialLocationSQL(
 	ctx context.Context,
 	pool *pgxpool.Pool,
