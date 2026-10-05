@@ -624,7 +624,7 @@ export default function UsersPage() {
         <strong>Active + pending</strong> so invites stay visible until Google sign-in. Use{" "}
         <strong>Overrides</strong> for rare exceptions;{" "}
         <A href="/app/user-management/user-permissions" class="text-brand-600 hover:underline">
-          Branches &amp; customers
+          Data scopes
         </A>{" "}
         for advanced customer limits. User groups stay retired for now.
       </p>
@@ -828,7 +828,7 @@ export default function UsersPage() {
                   openDataScopes(row);
                 }}
               >
-                Branches &amp; customers
+                Data scopes
               </button>
               <Show when={canTransferOwnership() && menuRow()!.status === "active"}>
                 <button
@@ -1084,8 +1084,7 @@ export default function UsersPage() {
             </div>
             <Show when={accessCustomerScopes().length > 0}>
               <p class="mt-1 text-xs text-text-secondary">
-                {accessCustomerScopes().length} customer scope(s) kept when you save (edit under Branches &amp;
-                customers).
+                {accessCustomerScopes().length} customer scope(s) kept when you save (edit under Data scopes).
               </p>
             </Show>
           </Field>
@@ -1121,7 +1120,7 @@ export default function UsersPage() {
           <p class="text-xs text-text-secondary">
             Advanced:{" "}
             <A href="/app/user-management/user-permissions" class="text-brand-600 hover:underline">
-              Branches &amp; customers
+              Data scopes
             </A>
             {" · "}
             <A href="/app/user-management/roles" class="text-brand-600 hover:underline">

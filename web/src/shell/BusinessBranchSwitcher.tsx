@@ -11,6 +11,16 @@ type Branch = { id: number; location_code: string; location_name: string; locati
 /** Sentinel select value for company-wide view (omit X-Branch-ID). */
 const ALL_BRANCHES = "all";
 
+const COLLAPSED_KEY = "bluearm.branchSwitcher.collapsed";
+
+function readCollapsedPref(): boolean {
+  try {
+    return window.localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Sidebar-footer control: pick active business first, then branch (when the business
  * has multiple locations). Business switch reloads tenant-scoped data; branch switch
@@ -54,6 +64,7 @@ export function BusinessBranchSwitcher() {
   const [selectedBranchId, setSelectedBranchId] = createSignal<number | null>(null);
   const [switchingBusiness, setSwitchingBusiness] = createSignal(false);
   const [hydrated, setHydrated] = createSignal(false);
+  const [collapsed, setCollapsed] = createSignal(readCollapsedPref());
 
   createEffect(() => {
     const list = branches();
@@ -123,55 +134,100 @@ export function BusinessBranchSwitcher() {
     return id != null ? String(id) : "";
   };
 
-  const viewingLabel = () => {
+  const branchLabel = () => {
     const id = selectedBranchId();
     if (id == null && canAllBranches()) return "All branches";
     const b = branches().find((x) => x.id === id);
-    return b?.location_name ?? "—";
+    return b?.location_name ?? "Branch";
   };
+
+  const toggleCollapsed = () => {
+    setCollapsed((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const showBranchPicker = () => (branches()?.length ?? 0) > 1;
 
   return (
     <Show when={!shell.collapsed() && auth.me}>
-      <div class="rounded-lg border border-stroke erp-panel px-3 py-2 space-y-2">
-        <div>
-          <label class="mb-1 block text-[0.65rem] font-semibold uppercase tracking-wide text-text-secondary">
-            Active business
-          </label>
-          <Show
-            when={hasMultipleBusinesses() && !auth.me?.support_session}
-            fallback={<p class="truncate text-sm font-medium text-text-primary">{currentBusinessName()}</p>}
+      <div class="rounded-lg border border-stroke erp-panel px-3 py-2">
+        <button
+          type="button"
+          class="flex w-full items-start gap-2 text-left"
+          aria-expanded={!collapsed()}
+          onClick={toggleCollapsed}
+        >
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-medium text-text-primary">{currentBusinessName()}</p>
+            <Show when={showBranchPicker()}>
+              <p class="mt-0.5 truncate text-[0.65rem] font-semibold uppercase tracking-wide text-text-secondary">
+                {branchLabel()}
+              </p>
+            </Show>
+          </div>
+          <svg
+            class="mt-1 h-3.5 w-3.5 shrink-0 text-text-secondary transition-transform"
+            classList={{ "rotate-180": !collapsed() }}
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
           >
-            <select
-              class="w-full bg-transparent text-sm font-medium text-text-primary focus:outline-none disabled:opacity-60"
-              value={tenantId() || ""}
-              disabled={switchingBusiness()}
-              onChange={(e) => void onBusinessChange(e.currentTarget.value)}
-            >
-              <For each={memberships()}>
-                {(m) => <option value={m.tenant_id}>{m.company_name}</option>}
-              </For>
-            </select>
-          </Show>
-        </div>
+            <path
+              fill-rule="evenodd"
+              d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
 
-        <Show when={(branches()?.length ?? 0) > 1}>
-          <div>
-            <label class="mb-1 block text-[0.65rem] font-semibold uppercase tracking-wide text-text-secondary">
-              Active branch
-            </label>
-            <select
-              class="w-full bg-transparent text-sm font-medium text-text-primary focus:outline-none"
-              value={hydrated() ? selectValue() : ""}
-              onChange={(e) => onBranchChange(e.currentTarget.value)}
-            >
-              <Show when={canAllBranches()}>
-                <option value={ALL_BRANCHES}>All branches</option>
+        <Show when={!collapsed()}>
+          <div class="mt-2 space-y-2 border-t border-stroke pt-2">
+            <div>
+              <label class="mb-1 block text-[0.65rem] font-semibold uppercase tracking-wide text-text-secondary">
+                Active business
+              </label>
+              <Show
+                when={hasMultipleBusinesses() && !auth.me?.support_session}
+                fallback={<p class="truncate text-sm font-medium text-text-primary">{currentBusinessName()}</p>}
+              >
+                <select
+                  class="w-full bg-transparent text-sm font-medium text-text-primary focus:outline-none disabled:opacity-60"
+                  value={tenantId() || ""}
+                  disabled={switchingBusiness()}
+                  onChange={(e) => void onBusinessChange(e.currentTarget.value)}
+                >
+                  <For each={memberships()}>
+                    {(m) => <option value={m.tenant_id}>{m.company_name}</option>}
+                  </For>
+                </select>
               </Show>
-              <For each={branches()}>{(b) => <option value={b.id}>{b.location_name}</option>}</For>
-            </select>
-            <p class="mt-1 truncate text-[0.65rem] text-text-secondary" title={viewingLabel()}>
-              Viewing: {viewingLabel()}
-            </p>
+            </div>
+
+            <Show when={showBranchPicker()}>
+              <div>
+                <label class="mb-1 block truncate text-[0.65rem] font-semibold uppercase tracking-wide text-text-secondary">
+                  {branchLabel()}
+                </label>
+                <select
+                  class="w-full bg-transparent text-sm font-medium text-text-primary focus:outline-none"
+                  value={hydrated() ? selectValue() : ""}
+                  aria-label={`Active branch: ${branchLabel()}`}
+                  onChange={(e) => onBranchChange(e.currentTarget.value)}
+                >
+                  <Show when={canAllBranches()}>
+                    <option value={ALL_BRANCHES}>All branches</option>
+                  </Show>
+                  <For each={branches()}>{(b) => <option value={b.id}>{b.location_name}</option>}</For>
+                </select>
+              </div>
+            </Show>
           </div>
         </Show>
       </div>

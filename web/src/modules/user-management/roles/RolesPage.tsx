@@ -288,7 +288,7 @@ export default function RolesPage() {
           </label>
           <p class="mt-1 text-xs text-text-secondary">
             Leave off for company-wide jobs. Turn on for branch staff, then assign branches under{" "}
-            <span class="font-medium">People → Access</span> (or Branches &amp; customers for customers too).
+            <span class="font-medium">People → Access</span> (or Data scopes for customers too).
           </p>
           <Show when={applyUserScopes()}>
             <p class="mt-1 text-xs text-amber-700">

@@ -2,8 +2,8 @@
 export const POS_UI_LABEL_DEFAULTS: Record<string, string> = {
   manage: "Manage",
   close_shift: "Close shift",
-  switch_location: "Switch location",
-  switch_location_hint: "Close this till at the current branch and open a new shift at another location. Cart must be empty.",
+  switch_location: "Switch Branch",
+  switch_location_hint: "Close this till at the current branch and open a new shift at another branch. Cart must be empty.",
   closing_cash: "Closing cash",
   exit_pos: "Exit POS",
   discount: "Discount",
@@ -53,8 +53,8 @@ export const POS_THEME_DEFAULTS: Required<PosTheme> = {
 export const POS_LABEL_FIELDS: { key: string; label: string; hint?: string }[] = [
   { key: "manage", label: "Manage button" },
   { key: "close_shift", label: "Close shift button" },
-  { key: "switch_location", label: "Switch location button" },
-  { key: "switch_location_hint", label: "Switch location hint" },
+  { key: "switch_location", label: "Switch Branch button" },
+  { key: "switch_location_hint", label: "Switch Branch hint" },
   { key: "closing_cash", label: "Closing cash field" },
   { key: "exit_pos", label: "Exit POS button" },
   { key: "discount", label: "Discount button" },

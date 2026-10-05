@@ -644,7 +644,7 @@ export const appModules: AppModule[] = [
         headerPriority: "primary",
       },
       {
-        label: "Branches & customers",
+        label: "Data scopes",
         href: "/app/user-management/user-permissions",
         settingsHref: "/app/user-management/user-permissions",
         headerPriority: "primary",
