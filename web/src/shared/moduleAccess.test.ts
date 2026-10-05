@@ -45,6 +45,20 @@ describe("isTenantModuleEnabled", () => {
     const m = me({ enabled_module_codes: ["inventory"] });
     expect(isTenantModuleEnabled(m, "production")).toBe(false);
   });
+
+  it("treats empty enabled_module_codes as all-off when modules registry is present", () => {
+    const m = me({
+      enabled_module_codes: [],
+      modules: [{ module_code: "sales", module_name: "Sales", is_enabled: false }],
+    });
+    expect(isTenantModuleEnabled(m, "sales")).toBe(false);
+    expect(isTenantModuleEnabled(m, "inventory")).toBe(false);
+  });
+
+  it("falls back to permissions when modules registry is absent and codes empty", () => {
+    const m = me({ enabled_module_codes: [], modules: undefined });
+    expect(isTenantModuleEnabled(m, "documentation")).toBe(true);
+  });
 });
 
 describe("isTenantFeatureEnabled", () => {

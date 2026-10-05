@@ -18,8 +18,11 @@ export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: s
   }
   if (moduleId === "production") return isTenantModuleEnabled(me, "manufacturing");
   if (moduleId === "manufacturing") {
-    const codes = me?.enabled_module_codes;
     // Nav follows tenant module toggle; pages still gate on manufacturing.* permissions.
+    if (hasTenantModuleRegistry(me)) {
+      return (me?.enabled_module_codes ?? []).includes("manufacturing");
+    }
+    const codes = me?.enabled_module_codes;
     if (codes?.length) return codes.includes("manufacturing");
     return hasModuleAccess(me, "manufacturing");
   }
@@ -30,9 +33,19 @@ export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: s
   if (moduleId === "activity_logs" || moduleId === "user_management") return true;
 
   const codes = me?.enabled_module_codes;
+  // When /me shipped the modules registry, enabled_module_codes is authoritative
+  // (including empty = nothing enabled). Do not fall back to permission-only nav.
+  if (hasTenantModuleRegistry(me)) {
+    if (!(codes ?? []).includes(moduleId)) return false;
+    return hasModuleAccess(me, moduleId);
+  }
   if (!codes?.length) return hasModuleAccess(me, moduleId);
   if (!codes.includes(moduleId)) return false;
   return hasModuleAccess(me, moduleId);
+}
+
+function hasTenantModuleRegistry(me: MeData | null | undefined): boolean {
+  return Array.isArray(me?.modules);
 }
 
 /** Sub-branch features (migration 057). Falls back to parent module when feature row absent. */

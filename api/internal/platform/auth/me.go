@@ -42,13 +42,14 @@ type MePayload struct {
 }
 
 func fullModuleAccess(tu TenantUser) bool {
-	// Platform operators and tenants with auto_enable_all_modules see every module as on.
-	// Tenant owners otherwise respect tenant_modules so Simple store / feature hide works for admins too.
-	if tu.RolePreviewActive {
-		return tu.AutoEnableAllModules
+	// Only auto_enable_all_modules forces every module on in /me.
+	// Platform superadmins and owners working inside a real tenant must still
+	// respect tenant_modules — otherwise Modules & Features toggles never hide
+	// sidebar items for the people who manage them.
+	if !tu.RolePreviewActive {
+		applyBootstrapOwnerFlags(&tu)
 	}
-	applyBootstrapOwnerFlags(&tu)
-	return tu.IsPlatformSuperadmin || tu.AutoEnableAllModules
+	return tu.AutoEnableAllModules
 }
 
 func MeHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
