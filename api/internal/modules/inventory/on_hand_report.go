@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -68,7 +70,7 @@ func parseOnHandFilters(r *http.Request) (asOf time.Time, minQty, maxQty *float6
 	return asOf, minQty, maxQty, belowSafety, itemID, locationID, safetyDocType, nil
 }
 
-func onHandSQL(tenantID int64, asOf time.Time, minQty, maxQty *float64, belowSafety bool, itemID, locationID *int64, safetyDocType string) (string, []any) {
+func onHandSQL(tenantID int64, asOf time.Time, minQty, maxQty *float64, belowSafety bool, itemID *int64, safetyDocType, dsFrag string, dsArgs []any) (string, []any) {
 	asOfEnd := asOf.Format("2006-01-02") + " 23:59:59.999+00"
 	today := time.Now().Format("2006-01-02")
 	useLive := asOf.Format("2006-01-02") == today
@@ -119,21 +121,19 @@ func onHandSQL(tenantID int64, asOf time.Time, minQty, maxQty *float64, belowSaf
 		args = append(args, *itemID)
 		argN++
 	}
-	if locationID != nil {
-		where += fmt.Sprintf(" and l.id = $%d", argN)
-		args = append(args, *locationID)
-		argN++
-	}
+	where += dsFrag
+	args = append(args, dsArgs...)
 	q := fmt.Sprintf("select * from (%s where 1=1%s) sub where (qty_on_hand <> 0 or qty_reserved <> 0)", base, where)
+	next := len(args) + 1
 	if minQty != nil {
-		q += fmt.Sprintf(" and qty_on_hand >= $%d", argN)
+		q += fmt.Sprintf(" and qty_on_hand >= $%d", next)
 		args = append(args, *minQty)
-		argN++
+		next++
 	}
 	if maxQty != nil {
-		q += fmt.Sprintf(" and qty_on_hand <= $%d", argN)
+		q += fmt.Sprintf(" and qty_on_hand <= $%d", next)
 		args = append(args, *maxQty)
-		argN++
+		next++
 	}
 	if belowSafety {
 		q += " and below_safety = true"
@@ -141,18 +141,43 @@ func onHandSQL(tenantID int64, asOf time.Time, minQty, maxQty *float64, belowSaf
 	return q, args
 }
 
+func onHandScopedSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, r *http.Request, asOf time.Time, minQty, maxQty *float64, belowSafety bool, itemID *int64, safetyDocType string) (string, []any, error) {
+	argN := 3
+	if itemID != nil {
+		argN = 4
+	}
+	var locExplicit *int64
+	if id, err := parseOptionalLocationID(r); err == nil {
+		locExplicit = id
+	}
+	dsArgs := []any{}
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		LocationColumn:     "l.id",
+		ExplicitLocationID: locExplicit,
+	}, argN, &dsArgs)
+	if err != nil {
+		return "", nil, err
+	}
+	q, args := onHandSQL(tu.TenantID, asOf, minQty, maxQty, belowSafety, itemID, safetyDocType, frag, dsArgs)
+	return q, args, nil
+}
+
 func listOnHandReport(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{"item_code": "item_code", "qty_on_hand": "qty_on_hand"}
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		asOf, minQty, maxQty, belowSafety, itemID, locationID, safetyDocType, errs := parseOnHandFilters(r)
+		asOf, minQty, maxQty, belowSafety, itemID, _, safetyDocType, errs := parseOnHandFilters(r)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
 		}
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
-		base, args := onHandSQL(tu.TenantID, asOf, minQty, maxQty, belowSafety, itemID, locationID, safetyDocType)
+		base, args, err := onHandScopedSQL(r.Context(), pool, tu, r, asOf, minQty, maxQty, belowSafety, itemID, safetyDocType)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
@@ -189,12 +214,16 @@ func listOnHandReport(pool *pgxpool.Pool) http.HandlerFunc {
 func exportOnHandReport(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		asOf, minQty, maxQty, belowSafety, itemID, locationID, safetyDocType, errs := parseOnHandFilters(r)
+		asOf, minQty, maxQty, belowSafety, itemID, _, safetyDocType, errs := parseOnHandFilters(r)
 		if errs != nil {
 			response.Validation(w, errs)
 			return
 		}
-		base, args := onHandSQL(tu.TenantID, asOf, minQty, maxQty, belowSafety, itemID, locationID, safetyDocType)
+		base, args, err := onHandScopedSQL(r.Context(), pool, tu, r, asOf, minQty, maxQty, belowSafety, itemID, safetyDocType)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		q := fmt.Sprintf("select * from (%s) sub order by item_code asc limit %d", base, reports.ExportMaxRows)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {

@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
@@ -198,6 +200,40 @@ func inventoryStatusSQL(tenantID int64, q, stockStatus string, categoryID, locat
 		outer += " and available_qty > 0"
 	}
 	return outer, args
+}
+
+func inventoryStatusScopedSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, q, stockStatus string, categoryID, locationID *int64, inStockOnly bool) (string, []any, error) {
+	// Build without embedding location; ApplyUserScopesSQL owns Active branch + scopes + explicit.
+	base, args := inventoryStatusSQL(tu.TenantID, q, stockStatus, categoryID, nil, inStockOnly)
+	argN := len(args) + 1
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		LocationColumn:     "location_id",
+		ExplicitLocationID: locationID,
+	}, argN, &args)
+	if err != nil {
+		return "", nil, err
+	}
+	return base + frag, args, nil
+}
+
+func appendLocationDatascope(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, sql string, args []any, locationColumn string, locationID *int64) (string, []any, error) {
+	argN := len(args) + 1
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		LocationColumn:     locationColumn,
+		ExplicitLocationID: locationID,
+	}, argN, &args)
+	if err != nil {
+		return "", nil, err
+	}
+	if frag == "" {
+		return sql, args, nil
+	}
+	// Insert before trailing ORDER BY when present.
+	lower := strings.ToLower(sql)
+	if idx := strings.LastIndex(lower, "order by"); idx >= 0 {
+		return sql[:idx] + frag + " " + sql[idx:], args, nil
+	}
+	return sql + frag, args, nil
 }
 
 // inventoryMatrixItemCatalogSQL pages the same masters as /inventory/items (active by default).
@@ -444,7 +480,11 @@ func listInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
-		base, args := inventoryStatusSQL(tu.TenantID, qFilter, stockStatus, categoryID, locationID, inStockOnly)
+		base, args, err := inventoryStatusScopedSQL(r.Context(), pool, tu, qFilter, stockStatus, categoryID, locationID, inStockOnly)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		var commercialLocs []int64
 		if tu.StrictBranchIsolation && !branchiso.CanViewAllBranchCommercial(tu) {
 			commercialLocs, _ = branchiso.CommercialLocationIDs(r.Context(), pool, tu)
@@ -493,6 +533,11 @@ func listInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 
 			expandQ, expandArgs := inventoryStatusMatrixExpandSQL(tu.TenantID, itemIDs)
+			expandQ, expandArgs, err = appendLocationDatascope(r.Context(), pool, tu, expandQ, expandArgs, "l.id", locationID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+				return
+			}
 			rows, err := pool.Query(r.Context(), expandQ, expandArgs...)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load inventory status.", "ERR_INTERNAL")
@@ -556,7 +601,11 @@ func exportInventoryStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, errs)
 			return
 		}
-		base, args := inventoryStatusSQL(tu.TenantID, qFilter, stockStatus, categoryID, locationID, inStockOnly)
+		base, args, err := inventoryStatusScopedSQL(r.Context(), pool, tu, qFilter, stockStatus, categoryID, locationID, inStockOnly)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		var commercialLocs []int64
 		if tu.StrictBranchIsolation && !branchiso.CanViewAllBranchCommercial(tu) {
 			commercialLocs, _ = branchiso.CommercialLocationIDs(r.Context(), pool, tu)

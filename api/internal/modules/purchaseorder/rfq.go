@@ -15,6 +15,8 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/branchiso"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -26,6 +28,8 @@ type RFQ struct {
 	RfqNo             string         `json:"rfq_no"`
 	RfqDate           string         `json:"rfq_date"`
 	Status            string         `json:"status"`
+	LocationID        *int64         `json:"location_id,omitempty"`
+	LocationName      string         `json:"location_name,omitempty"`
 	PurchaseRequestID *int64         `json:"purchase_request_id,omitempty"`
 	Notes             *string        `json:"notes,omitempty"`
 	LineCount         int            `json:"line_count,omitempty"`
@@ -59,13 +63,25 @@ func registerRFQRoutes(r chi.Router, pool *pgxpool.Pool) {
 func listRFQs(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		rows, err := pool.Query(r.Context(), `
-			select r.id, r.rfq_no, r.rfq_date::text, r.status, r.purchase_request_id, r.notes,
+		args := []any{tu.TenantID}
+		argN := 2
+		dsScope, _, err := datascope.ApplyUserScopesSQL(r.Context(), pool, tu, datascope.ListFilter{
+			LocationColumn: "r.location_id",
+		}, argN, &args)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
+		q := fmt.Sprintf(`
+			select r.id, r.rfq_no, r.rfq_date::text, r.status, r.location_id, coalesce(l.location_name, ''),
+			  r.purchase_request_id, r.notes,
 			  (select count(*)::int from public.rfq_request_lines ln where ln.rfq_id = r.id)
 			from public.rfq_requests r
-			where r.tenant_id = $1
+			left join public.inv_locations l on l.id = r.location_id and l.tenant_id = r.tenant_id
+			where r.tenant_id = $1%s
 			order by r.rfq_date desc, r.id desc
-			limit 50`, tu.TenantID)
+			limit 50`, dsScope)
+		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list RFQs.", "ERR_INTERNAL")
 			return
@@ -74,7 +90,8 @@ func listRFQs(pool *pgxpool.Pool) http.HandlerFunc {
 		var out []RFQ
 		for rows.Next() {
 			var x RFQ
-			if err := rows.Scan(&x.ID, &x.RfqNo, &x.RfqDate, &x.Status, &x.PurchaseRequestID, &x.Notes, &x.LineCount); err != nil {
+			if err := rows.Scan(&x.ID, &x.RfqNo, &x.RfqDate, &x.Status, &x.LocationID, &x.LocationName,
+				&x.PurchaseRequestID, &x.Notes, &x.LineCount); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read RFQ.", "ERR_INTERNAL")
 				return
 			}
@@ -104,9 +121,13 @@ func loadRFQ(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (RFQ, 
 	var hdr RFQ
 	var d time.Time
 	err := pool.QueryRow(ctx, `
-		select id, rfq_no, rfq_date, status, purchase_request_id, notes
-		from public.rfq_requests where id = $1 and tenant_id = $2`, id, tenantID).Scan(
-		&hdr.ID, &hdr.RfqNo, &d, &hdr.Status, &hdr.PurchaseRequestID, &hdr.Notes)
+		select r.id, r.rfq_no, r.rfq_date, r.status, r.location_id, coalesce(l.location_name, ''),
+		  r.purchase_request_id, r.notes
+		from public.rfq_requests r
+		left join public.inv_locations l on l.id = r.location_id and l.tenant_id = r.tenant_id
+		where r.id = $1 and r.tenant_id = $2`, id, tenantID).Scan(
+		&hdr.ID, &hdr.RfqNo, &d, &hdr.Status, &hdr.LocationID, &hdr.LocationName,
+		&hdr.PurchaseRequestID, &hdr.Notes)
 	if err != nil {
 		return RFQ{}, err
 	}
@@ -141,6 +162,7 @@ func createRFQ(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, _ := auth.FromContext(r.Context())
 		var body struct {
 			PurchaseRequestID *int64         `json:"purchase_request_id"`
+			LocationID        *int64         `json:"location_id"`
 			Notes             *string        `json:"notes"`
 			CustomValues      map[string]any `json:"custom_values"`
 			Lines             []struct {
@@ -162,6 +184,16 @@ func createRFQ(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		locID, locErr := resolveRFQLocationID(r.Context(), pool, tu, body.LocationID, body.PurchaseRequestID)
+		if locErr != nil {
+			if locErr == branchiso.ErrForbiddenLocation || locErr == branchiso.ErrIsolationClosed {
+				response.Err(w, http.StatusForbidden, "Branch not allowed for this user.", "ERR_FORBIDDEN")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to resolve branch.", "ERR_INTERNAL")
+			return
+		}
+
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create RFQ.", "ERR_INTERNAL")
@@ -178,9 +210,9 @@ func createRFQ(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var rfqID int64
 		err = tx.QueryRow(r.Context(), `
-			insert into public.rfq_requests (tenant_id, rfq_date, date_seq, rfq_no, purchase_request_id, notes, created_by_user_id)
-			values ($1, $2::date, $3, $4, $5, $6, $7) returning id`,
-			tu.TenantID, rfqDate.Format("2006-01-02"), seq, rfqNo, body.PurchaseRequestID, body.Notes, tu.AppUserID).Scan(&rfqID)
+			insert into public.rfq_requests (tenant_id, rfq_date, date_seq, rfq_no, purchase_request_id, location_id, notes, created_by_user_id)
+			values ($1, $2::date, $3, $4, $5, $6, $7, $8) returning id`,
+			tu.TenantID, rfqDate.Format("2006-01-02"), seq, rfqNo, body.PurchaseRequestID, locID, body.Notes, tu.AppUserID).Scan(&rfqID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to insert RFQ.", "ERR_INTERNAL")
 			return
@@ -250,13 +282,22 @@ func createRFQFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		var exists bool
-		if err := pool.QueryRow(r.Context(), `
-			select exists(
-			  select 1 from public.pr_purchase_requests
-			  where id = $1 and tenant_id = $2 and deleted_at is null
-			)`, prID, tu.TenantID).Scan(&exists); err != nil || !exists {
+		var prLocationID *int64
+		err = pool.QueryRow(r.Context(), `
+			select location_id from public.pr_purchase_requests
+			where id = $1 and tenant_id = $2 and deleted_at is null`, prID, tu.TenantID).Scan(&prLocationID)
+		if err != nil {
 			response.Err(w, http.StatusNotFound, "Purchase request not found.", "ERR_NOT_FOUND")
+			return
+		}
+
+		locID, locErr := resolveRFQLocationID(r.Context(), pool, tu, prLocationID, &prID)
+		if locErr != nil {
+			if locErr == branchiso.ErrForbiddenLocation || locErr == branchiso.ErrIsolationClosed {
+				response.Err(w, http.StatusForbidden, "Branch not allowed for this user.", "ERR_FORBIDDEN")
+				return
+			}
+			response.Err(w, http.StatusInternalServerError, "Failed to resolve branch.", "ERR_INTERNAL")
 			return
 		}
 
@@ -313,10 +354,10 @@ func createRFQFromPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var rfqID int64
 		err = tx.QueryRow(r.Context(), `
-			insert into public.rfq_requests (tenant_id, rfq_date, date_seq, rfq_no, purchase_request_id, notes, created_by_user_id)
-			values ($1, $2::date, $3, $4, $5, $6, $7)
+			insert into public.rfq_requests (tenant_id, rfq_date, date_seq, rfq_no, purchase_request_id, location_id, notes, created_by_user_id)
+			values ($1, $2::date, $3, $4, $5, $6, $7, $8)
 			returning id`,
-			tu.TenantID, rfqDate.Format("2006-01-02"), seq, rfqNo, prID, body.Notes, tu.AppUserID).Scan(&rfqID)
+			tu.TenantID, rfqDate.Format("2006-01-02"), seq, rfqNo, prID, locID, body.Notes, tu.AppUserID).Scan(&rfqID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create RFQ.", "ERR_INTERNAL")
 			return
@@ -404,4 +445,43 @@ func patchRFQStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		hdr, _ := loadRFQ(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, hdr, "RFQ status updated.")
 	}
+}
+
+// resolveRFQLocationID picks location for a new RFQ: explicit body > PR location >
+// Active branch > home. Asserts commercial access when isolation is on.
+func resolveRFQLocationID(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, explicit *int64, prID *int64) (*int64, error) {
+	if explicit != nil && *explicit > 0 {
+		if err := branchiso.AssertCommercialLocationAccess(ctx, pool, tu, *explicit); err != nil {
+			return nil, err
+		}
+		id := *explicit
+		return &id, nil
+	}
+	if prID != nil && *prID > 0 {
+		var prLoc *int64
+		err := pool.QueryRow(ctx, `
+			select location_id from public.pr_purchase_requests
+			where id = $1 and tenant_id = $2 and deleted_at is null`, *prID, tu.TenantID).Scan(&prLoc)
+		if err == nil && prLoc != nil && *prLoc > 0 {
+			if err := branchiso.AssertCommercialLocationAccess(ctx, pool, tu, *prLoc); err != nil {
+				return nil, err
+			}
+			return prLoc, nil
+		}
+	}
+	if tu.ActiveBranchID > 0 {
+		if err := branchiso.AssertCommercialLocationAccess(ctx, pool, tu, tu.ActiveBranchID); err != nil {
+			return nil, err
+		}
+		id := tu.ActiveBranchID
+		return &id, nil
+	}
+	if tu.HomeLocationID > 0 {
+		if err := branchiso.AssertCommercialLocationAccess(ctx, pool, tu, tu.HomeLocationID); err != nil {
+			return nil, err
+		}
+		id := tu.HomeLocationID
+		return &id, nil
+	}
+	return nil, nil
 }

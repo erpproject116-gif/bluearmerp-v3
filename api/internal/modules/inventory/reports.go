@@ -190,7 +190,7 @@ func exportStockBalance(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-func stockLedgerWhere(tenantID int64, dateFrom, dateTo *time.Time, itemID, locationID *int64, q string) (string, []any) {
+func stockLedgerWhere(tenantID int64, dateFrom, dateTo *time.Time, itemID *int64, q string) (string, []any) {
 	where := "sm.tenant_id = $1"
 	args := []any{tenantID}
 	n := 2
@@ -204,11 +204,6 @@ func stockLedgerWhere(tenantID int64, dateFrom, dateTo *time.Time, itemID, locat
 		args = append(args, *itemID)
 		n++
 	}
-	if locationID != nil {
-		where += fmt.Sprintf(" and sm.location_id = $%d", n)
-		args = append(args, *locationID)
-		n++
-	}
 	if strings.TrimSpace(q) != "" {
 		where += fmt.Sprintf(" and (i.item_code ilike $%d or i.item_name ilike $%d)", n, n)
 		args = append(args, "%"+strings.TrimSpace(q)+"%")
@@ -216,8 +211,42 @@ func stockLedgerWhere(tenantID int64, dateFrom, dateTo *time.Time, itemID, locat
 	return where, args
 }
 
+func stockLedgerScopedSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, r *http.Request, dateFrom, dateTo *time.Time, itemID *int64, q string) (string, []any, error) {
+	where, args := stockLedgerWhere(tu.TenantID, dateFrom, dateTo, itemID, q)
+	argN := len(args) + 1
+	var locExplicit *int64
+	if id, err := parseOptionalLocationID(r); err == nil {
+		locExplicit = id
+	}
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		LocationColumn:     "sm.location_id",
+		ExplicitLocationID: locExplicit,
+	}, argN, &args)
+	if err != nil {
+		return "", nil, err
+	}
+	where += frag
+	qry := fmt.Sprintf(`
+		select sm.id, sm.created_at::text, i.item_code, i.item_name, sm.location_id, l.location_name,
+		  sm.qty_delta::float8,
+		  sum(sm.qty_delta) over (partition by sm.item_id, sm.location_id order by sm.created_at, sm.id)::float8,
+		  sm.movement_type, sm.ref_type, sm.ref_id,
+		  coalesce(sm.reason, '')
+		from public.inv_stock_movements sm
+		join public.inv_items i on i.id = sm.item_id
+		join public.inv_locations l on l.id = sm.location_id
+		where %s`, where)
+	return qry, args, nil
+}
+
 func stockLedgerSQL(tenantID int64, dateFrom, dateTo *time.Time, itemID, locationID *int64, q string) (string, []any) {
-	where, args := stockLedgerWhere(tenantID, dateFrom, dateTo, itemID, locationID, q)
+	// Kept for tests/callers that pass an explicit location without datascope context.
+	where, args := stockLedgerWhere(tenantID, dateFrom, dateTo, itemID, q)
+	if locationID != nil {
+		n := len(args) + 1
+		where += fmt.Sprintf(" and sm.location_id = $%d", n)
+		args = append(args, *locationID)
+	}
 	qry := fmt.Sprintf(`
 		select sm.id, sm.created_at::text, i.item_code, i.item_name, sm.location_id, l.location_name,
 		  sm.qty_delta::float8,
@@ -242,14 +271,17 @@ func listStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		itemID, _ := parseOptionalItemID(r)
-		locationID, _ := parseOptionalLocationID(r)
 		qFilter := strings.TrimSpace(r.URL.Query().Get("q"))
 		p := httputil.ParseListParams(r, "created_at", allowed)
 		if p.Order == "" {
 			p.Order = "desc"
 		}
 		offset := httputil.Offset(p)
-		base, args := stockLedgerSQL(tu.TenantID, dateFrom, dateTo, itemID, locationID, qFilter)
+		base, args, err := stockLedgerScopedSQL(r.Context(), pool, tu, r, dateFrom, dateTo, itemID, qFilter)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
@@ -306,9 +338,12 @@ func exportStockLedger(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		itemID, _ := parseOptionalItemID(r)
-		locationID, _ := parseOptionalLocationID(r)
 		qFilter := strings.TrimSpace(r.URL.Query().Get("q"))
-		base, args := stockLedgerSQL(tu.TenantID, dateFrom, dateTo, itemID, locationID, qFilter)
+		base, args, err := stockLedgerScopedSQL(r.Context(), pool, tu, r, dateFrom, dateTo, itemID, qFilter)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		q := fmt.Sprintf("select * from (%s) sub order by created_at desc limit %d", base, reports.ExportMaxRows)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
@@ -388,6 +423,24 @@ func stockAgeingSQL() string {
 		group by i.id, i.item_code, i.item_name, l.id, l.location_name, bal.qty_on_hand, bal.updated_at, bal.created_at`
 }
 
+func stockAgeingScopedSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, r *http.Request) (string, []any, error) {
+	base := stockAgeingSQL()
+	args := []any{tu.TenantID}
+	argN := 2
+	var locExplicit *int64
+	if id, err := parseOptionalLocationID(r); err == nil {
+		locExplicit = id
+	}
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		LocationColumn:     "bal.location_id",
+		ExplicitLocationID: locExplicit,
+	}, argN, &args)
+	if err != nil {
+		return "", nil, err
+	}
+	return base + frag, args, nil
+}
+
 func listStockAgeing(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{
 		"item_code": "item_code", "qty_on_hand": "qty_on_hand", "age_days": "age_days",
@@ -399,15 +452,22 @@ func listStockAgeing(pool *pgxpool.Pool) http.HandlerFunc {
 			p.Order = "desc"
 		}
 		offset := httputil.Offset(p)
-		base := stockAgeingSQL()
+		base, args, err := stockAgeingScopedSQL(r.Context(), pool, tu, r)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
-		if err := pool.QueryRow(r.Context(), countQ, tu.TenantID).Scan(&total); err != nil {
+		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to count report.", "ERR_INTERNAL")
 			return
 		}
-		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $2 offset $3", base, p.Sort, reports.OrderSQL(p.Order))
-		rows, err := pool.Query(r.Context(), q, tu.TenantID, p.PageSize, offset)
+		limIdx := len(args) + 1
+		offIdx := len(args) + 2
+		q := fmt.Sprintf("select * from (%s) sub order by %s %s limit $%d offset $%d", base, p.Sort, reports.OrderSQL(p.Order), limIdx, offIdx)
+		queryArgs := append(append([]any{}, args...), p.PageSize, offset)
+		rows, err := pool.Query(r.Context(), q, queryArgs...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load report.", "ERR_INTERNAL")
 			return
@@ -435,8 +495,13 @@ func listStockAgeing(pool *pgxpool.Pool) http.HandlerFunc {
 func exportStockAgeing(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
-		q := fmt.Sprintf("select * from (%s) sub order by age_days desc, item_code asc limit %d", stockAgeingSQL(), reports.ExportMaxRows)
-		rows, err := pool.Query(r.Context(), q, tu.TenantID)
+		base, args, err := stockAgeingScopedSQL(r.Context(), pool, tu, r)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
+		q := fmt.Sprintf("select * from (%s) sub order by age_days desc, item_code asc limit %d", base, reports.ExportMaxRows)
+		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to export.", "ERR_INTERNAL")
 			return

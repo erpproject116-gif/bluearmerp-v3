@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/reports"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -30,7 +32,7 @@ type invBookRow struct {
 	VipPrice      float64 `json:"vip_price"`
 }
 
-func invBookSQL(tenantID int64, dateFrom, dateTo time.Time, itemID, locationID *int64, q string) (string, []any) {
+func invBookSQL(tenantID int64, dateFrom, dateTo time.Time, itemID *int64, q, dsFrag string, dsArgs []any) (string, []any) {
 	args := []any{tenantID, dateFrom.Format("2006-01-02"), dateTo.Format("2006-01-02")}
 	extra := ""
 	n := 4
@@ -39,15 +41,13 @@ func invBookSQL(tenantID int64, dateFrom, dateTo time.Time, itemID, locationID *
 		args = append(args, *itemID)
 		n++
 	}
-	if locationID != nil {
-		extra += fmt.Sprintf(" and l.id = $%d", n)
-		args = append(args, *locationID)
-		n++
-	}
 	if strings.TrimSpace(q) != "" {
 		extra += fmt.Sprintf(" and (i.item_code ilike $%d or i.item_name ilike $%d or coalesce(i.spec_name,'') ilike $%d)", n, n, n)
 		args = append(args, "%"+strings.TrimSpace(q)+"%")
+		n++
 	}
+	extra += dsFrag
+	args = append(args, dsArgs...)
 	qry := `
 		with bounds as (
 		  select $2::date as d_from, $3::date as d_to
@@ -78,6 +78,30 @@ func invBookSQL(tenantID int64, dateFrom, dateTo time.Time, itemID, locationID *
 	return qry, args
 }
 
+func invBookScopedSQL(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, r *http.Request, dateFrom, dateTo time.Time, itemID *int64, q string) (string, []any, error) {
+	argN := 4
+	if itemID != nil {
+		argN++
+	}
+	if strings.TrimSpace(q) != "" {
+		argN++
+	}
+	var locExplicit *int64
+	if id, err := parseOptionalLocationID(r); err == nil {
+		locExplicit = id
+	}
+	dsArgs := []any{}
+	frag, _, err := datascope.ApplyUserScopesSQL(ctx, pool, tu, datascope.ListFilter{
+		LocationColumn:     "l.id",
+		ExplicitLocationID: locExplicit,
+	}, argN, &dsArgs)
+	if err != nil {
+		return "", nil, err
+	}
+	base, args := invBookSQL(tu.TenantID, dateFrom, dateTo, itemID, q, frag, dsArgs)
+	return base, args, nil
+}
+
 func listInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{"item_code": "item_code", "closing_qty": "closing_qty"}
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -96,9 +120,12 @@ func listInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "item_code", allowed)
 		offset := httputil.Offset(p)
 		itemID, _ := parseOptionalItemID(r)
-		locationID, _ := parseOptionalLocationID(r)
 		qFilter := strings.TrimSpace(r.URL.Query().Get("q"))
-		base, args := invBookSQL(tu.TenantID, *dateFrom, *dateTo, itemID, locationID, qFilter)
+		base, args, err := invBookScopedSQL(r.Context(), pool, tu, r, *dateFrom, *dateTo, itemID, qFilter)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		countQ := fmt.Sprintf("select count(*) from (%s) sub", base)
 		var total int64
 		if err := pool.QueryRow(r.Context(), countQ, args...).Scan(&total); err != nil {
@@ -145,9 +172,12 @@ func exportInvBookReport(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		itemID, _ := parseOptionalItemID(r)
-		locationID, _ := parseOptionalLocationID(r)
 		qFilter := strings.TrimSpace(r.URL.Query().Get("q"))
-		base, args := invBookSQL(tu.TenantID, *dateFrom, *dateTo, itemID, locationID, qFilter)
+		base, args, err := invBookScopedSQL(r.Context(), pool, tu, r, *dateFrom, *dateTo, itemID, qFilter)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to apply location scope.", "ERR_INTERNAL")
+			return
+		}
 		q := fmt.Sprintf("select * from (%s) sub order by item_code asc limit %d", base, reports.ExportMaxRows)
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {

@@ -24,18 +24,18 @@ Hard fence for **non-owners** still requires `strict_branch_isolation` + home/sc
 | Sales, SO, Quotation, PR, PO, GR, DR | Via `ApplyUserScopesSQL` | Owner open OK | Wired |
 | SI, OR, PV, AR/AP aging | Via datascope | Owner open OK | Wired |
 | Serial units, available serials, lot batches | Via datascope | N/A | Operating defaults |
-| Stock balance report | Via datascope | N/A | Narrows when Active branch set; All branches = multi-location |
-| Inv book / inventory-status (planning) | Not auto-narrowed for owners | N/A | Use explicit location or All branches |
+| Stock balance / ledger / ageing / on-hand / inv-book / inventory-status | Via datascope | N/A | Narrows when Active branch set (or `?location_id=`); All branches = multi-location for view-all |
 | Stock transfers / in-transit | Handoff v2 rules | — | Do not break |
 | Journal / TB / P&L / BS / cash flow | Company-wide | — | Banner only; no fake branch books |
 | POS catalog / cart | Session location | — | Sidebar branch ignored in-session |
+| RFQ | Via datascope (`location_id`) | N/A | Migration `316_rfq_location_id.sql`; inherit from PR / Active branch / home |
 
 ### Residual gaps
 
 - Journal entries lack `location_id` — true branch books need a later epic.
 - Some CRM / manufacturing / shipping pickers may omit datascope — audit if leaks appear.
 - Owner deep-link to HQ doc while viewing Branch 1 still opens (by design v1).
-- Null `location_id` legacy docs disappear under Active branch filter; visible again under All branches.
+- Null `location_id` legacy docs (incl. old RFQs) disappear under Active branch filter; visible again under All branches.
 
 ## 1. Apply migration
 
