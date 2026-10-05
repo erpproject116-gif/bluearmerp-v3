@@ -206,6 +206,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "stocks",
     topId: "inv1",
     expandGroupId: "stocks_management",
+    moduleId: "inventory",
     defaultExpanded: false,
     children: [
       {
@@ -215,6 +216,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         iconId: "inventory",
         topId: "inv1",
         expandGroupId: "stocks_management",
+        moduleId: "inventory",
       },
       {
         id: "customers_vendors",
@@ -223,6 +225,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         iconId: "crm",
         topId: "inv1",
         expandGroupId: "stocks_management",
+        moduleId: "inventory",
       },
       {
         id: "locations",
@@ -231,6 +234,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         iconId: "sub_warehouse",
         topId: "inv1",
         expandGroupId: "stocks_management",
+        moduleId: "inventory",
       },
       {
         id: "serials",
@@ -239,6 +243,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         iconId: "sub_serial_lot",
         topId: "inv1",
         expandGroupId: "stocks_management",
+        moduleId: "inventory",
       },
       {
         id: "lots",
@@ -247,6 +252,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         iconId: "sub_serial_lot",
         topId: "inv1",
         expandGroupId: "stocks_management",
+        moduleId: "inventory",
       },
       {
         id: "after_sales",
@@ -255,6 +261,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         iconId: "after_sales",
         topId: "inv1",
         expandGroupId: "stocks_management",
+        moduleId: "after_sales",
       },
     ],
   },
@@ -350,6 +357,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "sales_process",
     topId: "inv1",
     expandGroupId: "sales_process",
+    moduleId: "selling",
     defaultExpanded: false,
     children: [
       {
@@ -598,6 +606,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "purchase_process",
     topId: "inv1",
     expandGroupId: "procurement_process",
+    moduleId: "buying",
     defaultExpanded: false,
     children: [
       {
@@ -905,6 +914,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     iconId: "finance",
     topId: "acct1",
     expandGroupId: "accounting_dept",
+    moduleId: "finance",
     defaultExpanded: false,
     children: [
       {
@@ -923,6 +933,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
         iconId: "sub_general_ledger",
         topId: "acct1",
         expandGroupId: "accounting_dept",
+        moduleId: "finance",
       },
       {
         id: "cash",

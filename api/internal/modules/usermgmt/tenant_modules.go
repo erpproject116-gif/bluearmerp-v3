@@ -305,6 +305,16 @@ func patchTenantModules(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		// Custom toggles must win over auto_enable_all_modules (otherwise /me still
+		// reports every module as enabled and the sidebar never hides).
+		if _, err := tx.Exec(r.Context(), `
+			update public.tenants
+			set auto_enable_all_modules = false, updated_at = now()
+			where id = $1 and auto_enable_all_modules = true`, tu.TenantID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to clear auto-enable.", "ERR_INTERNAL")
+			return
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return

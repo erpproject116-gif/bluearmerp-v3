@@ -36,6 +36,16 @@ function areaEnabled(area: HomeSidebarArea, me: MeData | null | undefined): bool
   return isTenantModuleEnabled(me, area.moduleId);
 }
 
+/** Visible if the node itself is enabled, or any descendant is (for unlabeled parent groups). */
+function areaVisible(area: HomeSidebarArea, me: MeData | null | undefined): boolean {
+  if (area.kind === "separator") return true;
+  const kids = (area.children ?? []).filter((c) => areaVisible(c, me));
+  if (kids.length > 0) return true;
+  // Group with children all gated off → hide the empty parent.
+  if ((area.children ?? []).length > 0) return false;
+  return areaEnabled(area, me);
+}
+
 function NavAreaLink(props: {
   area: HomeSidebarArea;
   /** Prefer a function so query-string changes recompute highlight. */
@@ -239,11 +249,12 @@ export function SidebarNav() {
   );
 
   const childrenOf = (area: HomeSidebarArea) =>
-    (area.children ?? []).filter((c) => areaEnabled(c, auth.me));
+    (area.children ?? []).filter((c) => areaVisible(c, auth.me));
 
   /** Floor standalone: hide More Apps noise unless owner/admin (drawer still has core modules). */
   const sidebarAreas = () =>
     HOME_SIDEBAR_AREAS.filter((area) => {
+      if (!areaVisible(area, auth.me)) return false;
       if (area.id !== "more") return true;
       if (!shell.viewport.isStandalone()) return true;
       return canManageWorkspaceSetup(auth.me);
@@ -747,7 +758,7 @@ export function SidebarNav() {
           <Show
             when={area.kind === "separator"}
             fallback={
-              <Show when={areaEnabled(area, auth.me)}>
+              <Show when={areaVisible(area, auth.me)}>
                 <HomeAreaBlock
                   area={area}
                   active={homeActive}
