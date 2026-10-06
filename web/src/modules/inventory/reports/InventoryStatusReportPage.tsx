@@ -303,6 +303,7 @@ export default function InventoryStatusReportPage() {
       item_id: item.item_id,
       item_code: item.item_code,
       item_name: item.item_name,
+      live_on_hand: item.total_on_hand,
     });
   };
 
@@ -561,7 +562,16 @@ export default function InventoryStatusReportPage() {
                                   <Show when={cell?.track_serial && (cell?.serial_unit_count ?? 0) > 0}>
                                     <button
                                       type="button"
-                                      class="rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium text-slate-700"
+                                      class={`rounded px-1 py-0.5 text-[10px] font-medium ${
+                                        Math.abs((cell?.qty_on_hand ?? 0) - (cell?.serial_unit_count ?? 0)) > 0.0001
+                                          ? "bg-amber-100 text-amber-900 ring-1 ring-amber-300"
+                                          : "bg-slate-100 text-slate-700"
+                                      }`}
+                                      title={
+                                        Math.abs((cell?.qty_on_hand ?? 0) - (cell?.serial_unit_count ?? 0)) > 0.0001
+                                          ? `On-hand qty (${fmtQty(cell!.qty_on_hand)}) ≠ in-stock serials (${cell!.serial_unit_count}). Open Serial Reconciliation to fix.`
+                                          : `${cell!.serial_unit_count} in-stock serial(s) at this branch`
+                                      }
                                       onClick={() => openSerials(item, linkId, b.name)}
                                     >
                                       {cell!.serial_unit_count} sn

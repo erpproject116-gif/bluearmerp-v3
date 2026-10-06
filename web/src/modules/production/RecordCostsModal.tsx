@@ -102,11 +102,23 @@ export function RecordCostsModal(props: Props) {
   });
 
   const canSave = () =>
-    Boolean(payload()) && !saving() && needsConversion() && Boolean(debitId()) && Boolean(conversionId());
+    Boolean(payload()) &&
+    !saving() &&
+    needsConversion() &&
+    Boolean(debitId()) &&
+    Boolean(conversionId()) &&
+    debitId() !== conversionId();
 
   const handleSave = async () => {
     const id = props.workOrderId;
-    if (!id || !canSave()) return;
+    if (!id || !canSave()) {
+      if (debitId() != null && conversionId() != null && debitId() === conversionId()) {
+        setFieldErrors({
+          credit_conversion_account_id: "Choose a different account from production expense. Same account posts zero.",
+        });
+      }
+      return;
+    }
     setSaving(true);
     setFieldErrors({});
     let res;
@@ -158,7 +170,8 @@ export function RecordCostsModal(props: Props) {
 
             <p class="text-sm text-text-secondary">
               Record labor, overhead, and other cost as an expense. Material cost stays on the job and is not booked
-              again. Stock and the job stay as they are.
+              again. Stock and the job stay as they are. Debit and credit must be different accounts — the same account
+              on both sides posts zero.
             </p>
 
             <Show when={!needsConversion()}>

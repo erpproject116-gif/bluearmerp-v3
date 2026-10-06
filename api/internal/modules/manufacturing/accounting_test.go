@@ -77,6 +77,18 @@ func TestBuildCostPostingLinesUsesSelectedAccounts(t *testing.T) {
 	}
 }
 
+func TestSameCostPostingAccounts(t *testing.T) {
+	if !sameCostPostingAccounts(5010, 5010) {
+		t.Fatal("identical ids should be rejected")
+	}
+	if sameCostPostingAccounts(5010, 5105) {
+		t.Fatal("different ids should be allowed")
+	}
+	if sameCostPostingAccounts(0, 0) || sameCostPostingAccounts(10, 0) {
+		t.Fatal("unset accounts are not same-account pairs")
+	}
+}
+
 func TestManufacturingCompleteRejectsInvalidCosts(t *testing.T) {
 	if _, err := normalizeManufacturingCosts(10, -1, 0, 0); err == nil {
 		t.Fatal("negative labor cost should be rejected")

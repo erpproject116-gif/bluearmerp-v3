@@ -23,6 +23,8 @@ export type InvBookLedgerTarget = {
   item_name: string;
   location_id?: number;
   location_name?: string;
+  /** Live on-hand from Inv by location (all branches or filtered); compared to period Ending. */
+  live_on_hand?: number;
 };
 
 type Props = {
@@ -329,7 +331,9 @@ export function InvBookLedgerModal(props: Props) {
                         <td class="px-3 py-2 text-right tabular-nums">{fmtQtyOrZero(pageTotals().release)}</td>
                         <td class="px-3 py-2 text-right tabular-nums text-brand-700">
                           {fmtQtyOrZero(pageTotals().ending)}
-                          <div class="text-[10px] font-normal uppercase tracking-wide text-text-secondary">Ending</div>
+                          <div class="text-[10px] font-normal uppercase tracking-wide text-text-secondary">
+                            Ending (as of {period().date_to})
+                          </div>
                         </td>
                         <td class="px-3 py-2" colspan={2} />
                       </tr>
@@ -347,39 +351,57 @@ export function InvBookLedgerModal(props: Props) {
               </ReportLoadingOverlay>
             </div>
 
-            <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-stroke px-5 py-3 text-sm">
-              <span class="text-text-secondary">
-                {report.data?.total ?? 0} movement(s)
-                <Show when={(report.data?.rows?.length ?? 0) > 0}>
-                  {" · "}
-                  Net +{fmtQtyOrZero(pageTotals().increase - pageTotals().release)} this page
-                  {" · Ending "}
-                  {fmtQtyOrZero(pageTotals().ending)}
-                  <Show when={pageTotals().ending < -0.0000001}>
-                    {" · Issued more than received in this book."}
+            <div class="flex shrink-0 flex-col gap-2 border-t border-stroke px-5 py-3 text-sm">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <span class="text-text-secondary">
+                  {report.data?.total ?? 0} movement(s)
+                  <Show when={(report.data?.rows?.length ?? 0) > 0}>
+                    {" · "}
+                    Net +{fmtQtyOrZero(pageTotals().increase - pageTotals().release)} this page
+                    {" · Ending (as of "}
+                    {period().date_to}
+                    {") "}
+                    {fmtQtyOrZero(pageTotals().ending)}
+                    <Show when={pageTotals().ending < -0.0000001}>
+                      {" · Issued more than received in this book."}
+                    </Show>
+                    <Show
+                      when={
+                        props.row?.live_on_hand != null &&
+                        Number.isFinite(props.row.live_on_hand) &&
+                        Math.abs(props.row.live_on_hand - pageTotals().ending) > 0.0001
+                      }
+                    >
+                      {" · Live on-hand "}
+                      {fmtQtyOrZero(props.row!.live_on_hand)}
+                      {" (Inv by location) — differs from period ending; extend date range or reconcile movements."}
+                    </Show>
                   </Show>
-                </Show>
-              </span>
-              <div class="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
-                  disabled={page() <= 1 || report.isFetching}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Prev
-                </button>
-                <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
-                <PageJumpControl page={page()} totalPages={totalPages()} onPageChange={setPage} compact />
-                <button
-                  type="button"
-                  class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
-                  disabled={page() >= totalPages() || report.isFetching}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </button>
+                </span>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
+                    disabled={page() <= 1 || report.isFetching}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Prev
+                  </button>
+                  <PageSizeSelect value={pageSize()} onChange={(n) => { setPageSize(n); setPage(1); }} />
+                  <PageJumpControl page={page()} totalPages={totalPages()} onPageChange={setPage} compact />
+                  <button
+                    type="button"
+                    class="rounded border border-stroke px-3 py-1 disabled:opacity-50"
+                    disabled={page() >= totalPages() || report.isFetching}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
+              <p class="text-xs text-text-secondary">
+                Ending is movement running balance through {period().date_to}. Live shelf qty is on Inv by location.
+              </p>
             </div>
           </div>
         </div>

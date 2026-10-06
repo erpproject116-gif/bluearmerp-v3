@@ -820,9 +820,13 @@ function SettingsTab() {
       return;
     }
     toast.success("Settings saved.");
-    setDraft(null);
-    settings.refetch();
+    // Keep draft aligned with server response so selects stay selected before refetch settles.
+    if (res.data) setDraft(res.data);
+    else setDraft(null);
+    void settings.refetch().then(() => setDraft(null));
   };
+
+  const idStr = (id: number | null | undefined) => (id != null && id > 0 ? String(id) : "");
 
   return (
     <Show when={!settings.isLoading} fallback={<p class="text-sm text-text-secondary">Loading settings…</p>}>
@@ -834,12 +838,16 @@ function SettingsTab() {
               <label class="mb-1 block text-xs font-medium text-text-secondary">Default tax type</label>
               <select
                 class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
-                value={current().default_tax_type_id ?? ""}
+                value={idStr(current().default_tax_type_id)}
                 onChange={(e) => update({ default_tax_type_id: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
               >
                 <option value="">— None —</option>
                 <For each={taxTypes() ?? []}>
-                  {(t) => <option value={t.id}>{t.name} ({t.rate_percent}%)</option>}
+                  {(t) => (
+                    <option value={String(t.id)}>
+                      {t.name} ({t.rate_percent}%)
+                    </option>
+                  )}
                 </For>
               </select>
             </div>
@@ -847,12 +855,21 @@ function SettingsTab() {
               <label class="mb-1 block text-xs font-medium text-text-secondary">Default location</label>
               <select
                 class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
-                value={current().default_location_id ?? ""}
+                value={idStr(current().default_location_id)}
                 onChange={(e) => update({ default_location_id: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
               >
                 <option value="">— None —</option>
-                <For each={locations() ?? []}>{(l) => <option value={l.id}>{l.location_name}</option>}</For>
+                <For each={locations() ?? []}>{(l) => <option value={String(l.id)}>{l.location_name}</option>}</For>
               </select>
+              <Show when={(locations() ?? []).length === 0}>
+                <p class="mt-1 text-xs text-amber-700">
+                  No locations loaded. Add a branch under{" "}
+                  <A href="/app/inventory/locations" class="font-medium underline">
+                    Inventory → Locations
+                  </A>{" "}
+                  first.
+                </p>
+              </Show>
             </div>
           </div>
           <label class="mt-4 flex items-center gap-2 text-sm text-text-primary">
@@ -1121,13 +1138,13 @@ function AccountSelect(props: {
       <label class="mb-1 block text-xs font-medium text-text-secondary">{props.label}</label>
       <select
         class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
-        value={props.value ?? ""}
+        value={props.value != null && props.value > 0 ? String(props.value) : ""}
         onChange={(e) => props.onChange(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
       >
         <option value="">— Chart default —</option>
         <For each={props.accounts}>
           {(a) => (
-            <option value={a.id}>
+            <option value={String(a.id)}>
               {a.account_code} — {a.account_name}
             </option>
           )}

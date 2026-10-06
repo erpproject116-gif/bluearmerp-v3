@@ -207,9 +207,8 @@ func loadCostPosting(ctx context.Context, q rowQuerier, tenantID, workOrderID in
 		if p.DebitAccountID == nil {
 			p.DebitAccountID = defaultAccountID(ctx, q, tenantID, financedefaults.RoleCOGS)
 		}
-		if p.CreditConversionAccountID == nil {
-			p.CreditConversionAccountID = defaultAccountID(ctx, q, tenantID, financedefaults.RoleCOGS)
-		}
+		// Do not default credit to RoleCOGS — identical debit/credit posts a net-zero journal.
+		// Leave credit unset so the operator picks a production cost absorption account.
 	}
 	p.DebitAccountLabel = accountLabel(ctx, q, tenantID, p.DebitAccountID)
 	p.CreditMaterialAccountLabel = accountLabel(ctx, q, tenantID, p.CreditMaterialAccountID)
@@ -267,6 +266,11 @@ func validateCostAccount(ctx context.Context, q rowQuerier, tenantID, id int64, 
 		return fmt.Errorf("Choose an %s account.", wantType)
 	}
 	return nil
+}
+
+// sameCostPostingAccounts is true when debit and credit would net to zero on one account.
+func sameCostPostingAccounts(debit, credit int64) bool {
+	return debit > 0 && credit > 0 && debit == credit
 }
 
 func getCostPosting(pool *pgxpool.Pool) http.HandlerFunc {
@@ -347,6 +351,9 @@ func putCostPosting(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := validateCostAccount(r.Context(), tx, tu.TenantID, conversionID, "expense"); err != nil {
 			errs["credit_conversion_account_id"] = err.Error()
+		}
+		if sameCostPostingAccounts(body.DebitAccountID, conversionID) {
+			errs["credit_conversion_account_id"] = "Choose a different account from production expense. Same account posts zero."
 		}
 		accts := costPostingAccounts{Debit: body.DebitAccountID, CreditConversion: conversionID}
 		if len(errs) > 0 {

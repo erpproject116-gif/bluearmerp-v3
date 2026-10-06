@@ -1,6 +1,7 @@
 package pos
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -159,6 +160,10 @@ func putPosSettings(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
 		}
+		if errs := validatePosSettingsRefs(r.Context(), pool, tu.TenantID, body); len(errs) > 0 {
+			response.Validation(w, errs)
+			return
+		}
 		orderTypes := body.OrderTypes
 		if orderTypes == nil {
 			orderTypes = []string{}
@@ -252,4 +257,31 @@ func putPosSettings(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		response.OK(w, s, "Saved.")
 	}
+}
+
+func validatePosSettingsRefs(ctx context.Context, pool *pgxpool.Pool, tenantID int64, body posSettingsBody) map[string]string {
+	errs := map[string]string{}
+	if body.DefaultLocationID != nil && *body.DefaultLocationID > 0 {
+		var ok bool
+		_ = pool.QueryRow(ctx, `
+			select exists(
+			  select 1 from public.inv_locations
+			  where id = $1 and tenant_id = $2 and deleted_at is null
+			)`, *body.DefaultLocationID, tenantID).Scan(&ok)
+		if !ok {
+			errs["default_location_id"] = "Choose a location that belongs to this workspace."
+		}
+	}
+	if body.DefaultTaxTypeID != nil && *body.DefaultTaxTypeID > 0 {
+		var ok bool
+		_ = pool.QueryRow(ctx, `
+			select exists(
+			  select 1 from public.quo_tax_types
+			  where id = $1 and tenant_id = $2
+			)`, *body.DefaultTaxTypeID, tenantID).Scan(&ok)
+		if !ok {
+			errs["default_tax_type_id"] = "Choose a tax type that belongs to this workspace."
+		}
+	}
+	return errs
 }

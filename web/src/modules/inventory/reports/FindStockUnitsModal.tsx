@@ -197,6 +197,14 @@ export function FindStockUnitsModal(props: Props) {
             </Show>
 
             <div class="flex flex-wrap justify-end gap-2 border-t border-stroke pt-3">
+              <Show when={cur().kind === "serials"}>
+                <A
+                  href={`/app/inventory/serial-lot/reports/reconciliation?q=${encodeURIComponent(cur().item_code)}&mismatches_only=1`}
+                  class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100"
+                >
+                  Serial Reconciliation
+                </A>
+              </Show>
               <A
                 href={registryHref(cur())}
                 class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-brand-700 hover:bg-brand-50"
