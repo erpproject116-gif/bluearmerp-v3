@@ -59,6 +59,7 @@ export default function LotBatchesListPage() {
 
   const [registerOpen, setRegisterOpen] = createSignal(false);
   const [regLotNo, setRegLotNo] = createSignal("");
+  const [regAutoGenerate, setRegAutoGenerate] = createSignal(false);
   const [regQty, setRegQty] = createSignal("");
   const [regExpiry, setRegExpiry] = createSignal("");
   const [regItemId, setRegItemId] = createSignal<number | null>(null);
@@ -170,8 +171,12 @@ export default function LotBatchesListPage() {
   });
 
   const saveRegister = async () => {
-    if (!regItemId() || !regLocationId() || !regLotNo().trim()) {
-      toast.warning("Item, location, and lot number are required.");
+    if (!regItemId() || !regLocationId()) {
+      toast.warning("Item and location are required.");
+      return;
+    }
+    if (!regAutoGenerate() && !regLotNo().trim()) {
+      toast.warning("Lot number is required unless automatic generation is enabled.");
       return;
     }
     const qty = parseNum(regQty());
@@ -184,6 +189,7 @@ export default function LotBatchesListPage() {
       item_id: regItemId()!,
       location_id: regLocationId()!,
       lot_no: regLotNo().trim(),
+      auto_generate: regAutoGenerate(),
       qty,
       expiry_date: regExpiry() || null,
     });
@@ -191,7 +197,11 @@ export default function LotBatchesListPage() {
     const ok = handleSaveResult(
       res,
       toast,
-      res.data?.added_to_existing ? "Quantity was added to that lot." : "Lot registered.",
+      res.data?.added_to_existing
+        ? "Quantity was added to that lot."
+        : res.data?.lot_no
+          ? `Lot ${res.data.lot_no} registered.`
+          : "Lot registered.",
     );
     if (!ok) return;
     setRegisterOpen(false);
@@ -390,8 +400,28 @@ export default function LotBatchesListPage() {
             }}
             fetchOptions={fetchLocations}
           />
+          <label class="flex items-start gap-2 rounded-lg border border-stroke bg-slate-50 px-3 py-2 text-sm text-text-primary">
+            <input
+              type="checkbox"
+              class="mt-0.5"
+              checked={regAutoGenerate()}
+              onChange={(e) => setRegAutoGenerate(e.currentTarget.checked)}
+            />
+            <span>
+              <span class="font-medium">Auto-generate lot number</span>
+              <span class="mt-0.5 block text-xs text-text-secondary">
+                Assigns a unique internal number when this lot is registered. Keep this off when using a supplier or manufacturer lot number.
+              </span>
+            </span>
+          </label>
           <Field label="Lot number">
-            <input class={inputClass} value={regLotNo()} onInput={(e) => setRegLotNo(e.currentTarget.value)} />
+            <input
+              class={inputClass}
+              value={regLotNo()}
+              disabled={regAutoGenerate()}
+              placeholder={regAutoGenerate() ? "Assigned when registered" : "Supplier or manufacturer lot number"}
+              onInput={(e) => setRegLotNo(e.currentTarget.value)}
+            />
           </Field>
           <Field label="Quantity">
             <DecimalInput mode="qty" class={inputClass} value={regQty()} onValue={setRegQty} />

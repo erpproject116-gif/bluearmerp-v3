@@ -68,6 +68,7 @@ export async function applyLotAdjustments(body: {
 export async function registerLotBatch(body: {
   item_id: number;
   lot_no: string;
+  auto_generate?: boolean;
   location_id: number;
   qty: number;
   expiry_date?: string | null;

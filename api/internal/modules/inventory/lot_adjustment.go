@@ -1,11 +1,13 @@
 package inventory
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,11 +41,71 @@ type lotAdjustmentBody struct {
 }
 
 type lotRegisterBody struct {
-	ItemID     int64   `json:"item_id"`
-	LotNo      string  `json:"lot_no"`
-	LocationID int64   `json:"location_id"`
-	Qty        float64 `json:"qty"`
-	ExpiryDate *string `json:"expiry_date"`
+	ItemID       int64   `json:"item_id"`
+	LotNo        string  `json:"lot_no"`
+	AutoGenerate bool    `json:"auto_generate"`
+	LocationID   int64   `json:"location_id"`
+	Qty          float64 `json:"qty"`
+	ExpiryDate   *string `json:"expiry_date"`
+}
+
+func validateLotRegisterBody(body lotRegisterBody) map[string]string {
+	errs := map[string]string{}
+	if !body.AutoGenerate && strings.TrimSpace(body.LotNo) == "" {
+		errs["lot_no"] = "Lot number is required."
+	}
+	if body.ItemID <= 0 {
+		errs["item_id"] = "Item is required."
+	}
+	if body.LocationID <= 0 {
+		errs["location_id"] = "Location is required."
+	}
+	if body.Qty <= 0 {
+		errs["qty"] = "Quantity must be greater than zero."
+	}
+	return errs
+}
+
+func generatedLotSequenceKey(now time.Time) string {
+	return "lot_number:" + now.UTC().Format("20060102")
+}
+
+func formatGeneratedLotNumber(now time.Time, sequence int64) string {
+	return fmt.Sprintf("LOT-%s-%06d", now.UTC().Format("20060102"), sequence)
+}
+
+// allocateGeneratedLotNumber serializes allocation per tenant and UTC date.
+// Existing manual numbers are skipped so automatic registration always creates a new lot identity.
+func allocateGeneratedLotNumber(ctx context.Context, tx pgx.Tx, tenantID int64, now time.Time) (string, error) {
+	const maxCollisionRetries = 100
+	sequenceKey := generatedLotSequenceKey(now)
+	for range maxCollisionRetries {
+		var sequence int64
+		err := tx.QueryRow(ctx, `
+			insert into public.inv_label_sequences (tenant_id, sequence_key, last_value)
+			values ($1, $2, 1)
+			on conflict (tenant_id, sequence_key)
+			do update set last_value = inv_label_sequences.last_value + 1, updated_at = now()
+			returning last_value`,
+			tenantID, sequenceKey).Scan(&sequence)
+		if err != nil {
+			return "", err
+		}
+
+		lotNo := formatGeneratedLotNumber(now, sequence)
+		var exists bool
+		if err := tx.QueryRow(ctx, `
+			select exists (
+				select 1 from public.inv_lot_batches
+				where tenant_id = $1 and lot_no = $2
+			)`, tenantID, lotNo).Scan(&exists); err != nil {
+			return "", err
+		}
+		if !exists {
+			return lotNo, nil
+		}
+	}
+	return "", errors.New("failed to allocate a unique lot number")
 }
 
 func listLotAdjustmentCandidates(pool *pgxpool.Pool) http.HandlerFunc {
@@ -287,20 +349,8 @@ func registerLotBatch(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		lotNo := strings.TrimSpace(body.LotNo)
-		if lotNo == "" {
-			response.Validation(w, map[string]string{"lot_no": "Lot number is required."})
-			return
-		}
-		if body.ItemID <= 0 {
-			response.Validation(w, map[string]string{"item_id": "Item is required."})
-			return
-		}
-		if body.LocationID <= 0 {
-			response.Validation(w, map[string]string{"location_id": "Location is required."})
-			return
-		}
-		if body.Qty <= 0 {
-			response.Validation(w, map[string]string{"qty": "Quantity must be greater than zero."})
+		if errs := validateLotRegisterBody(body); len(errs) > 0 {
+			response.Validation(w, errs)
 			return
 		}
 
@@ -319,6 +369,14 @@ func registerLotBatch(pool *pgxpool.Pool) http.HandlerFunc {
 		if err != nil || !trackLot {
 			response.Validation(w, map[string]string{"item_id": "Item must have lot tracking enabled."})
 			return
+		}
+
+		if body.AutoGenerate {
+			lotNo, err = allocateGeneratedLotNumber(r.Context(), tx, tu.TenantID, time.Now().UTC())
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to allocate lot number.", "ERR_INTERNAL")
+				return
+			}
 		}
 
 		var existingID int64
