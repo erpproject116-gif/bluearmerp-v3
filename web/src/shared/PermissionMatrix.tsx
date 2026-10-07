@@ -23,9 +23,17 @@ type Props = {
 export function PermissionMatrix(props: Props) {
   const visibleGroups = () => {
     const codes = props.enabledModuleCodes;
-    if (!codes?.length) return props.groups;
+    if (codes == null) return props.groups;
+    // Empty array = registry present but nothing enabled — hide all toggleable apps.
     const set = new Set(codes);
     return props.groups.filter((g) => set.has(g.module_code));
+  };
+
+  const turnedOffGroups = () => {
+    const codes = props.enabledModuleCodes;
+    if (codes == null) return [];
+    const set = new Set(codes);
+    return props.groups.filter((g) => !set.has(g.module_code));
   };
 
   const columns = () => {
@@ -58,6 +66,28 @@ export function PermissionMatrix(props: Props) {
         {props.title ??
           "App-wide access for every module and feature. Effective access is the role level unless a per-user override changes it."}
       </p>
+      <Show when={turnedOffGroups().length > 0}>
+        <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          <p class="font-medium">Apps turned off for this company (not editable here)</p>
+          <p class="mt-1 text-amber-900/90">
+            Turn them on under{" "}
+            <a href="/app/user-management/tenant-modules" class="font-medium underline hover:no-underline">
+              Apps &amp; features
+            </a>
+            . Existing role permissions are kept but unused while the app is off.
+          </p>
+          <ul class="mt-2 flex flex-wrap gap-1.5">
+            <For each={turnedOffGroups()}>
+              {(g) => (
+                <li class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-amber-200">
+                  {g.module_label || g.module_code}
+                  <span class="ml-1 text-amber-700/80">App off</span>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
+      </Show>
       <div class="max-h-[min(70vh,560px)] overflow-y-auto rounded-lg border border-stroke">
         <table class="w-full text-left text-sm">
           <thead class="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-text-secondary">
