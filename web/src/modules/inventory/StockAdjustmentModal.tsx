@@ -17,8 +17,19 @@ import {
   type StockAdjustmentLineRow,
 } from "./StockAdjustmentLineGrid";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
+import {
+  stockAdjustmentToastErrors,
+  stockAdjustmentTrackingKind,
+  trackedAdjustmentMessage,
+} from "./stockAdjustmentRules";
 
-export type StockAdjustmentInitialItem = { id: number; label: string };
+export type StockAdjustmentInitialItem = {
+  id: number;
+  label: string;
+  item_code?: string;
+  track_serial?: boolean;
+  track_lot?: boolean;
+};
 
 type Props = {
   open: boolean;
@@ -55,8 +66,29 @@ function linesFromInitialItems(items: StockAdjustmentInitialItem[]): StockAdjust
   return items.map((item, i) => ({
     ...emptyStockAdjustmentLine(i + 1),
     item_id: item.id,
+    item_code: item.item_code ?? "",
     item_label: item.label,
+    track_serial: item.track_serial === true,
+    track_lot: item.track_lot === true,
   }));
+}
+
+async function loadInitialItemTracking(item: StockAdjustmentInitialItem) {
+  if (item.track_serial != null || item.track_lot != null) return item;
+  const code = item.item_code?.trim() || item.label.split("—", 1)[0]?.trim() || "";
+  const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "active" });
+  if (code) qs.set("q", code);
+  const res = await apiFetch<
+    { id: number; item_code: string; track_serial: boolean; track_lot: boolean }[]
+  >(`/api/v1/inventory/items?${qs}`);
+  const found = (res.data ?? []).find((row) => row.id === item.id);
+  if (!found) return item;
+  return {
+    ...item,
+    item_code: found.item_code,
+    track_serial: found.track_serial,
+    track_lot: found.track_lot,
+  };
 }
 
 const STOCK_ADJUSTMENT_ENTITY = "inv_stock_adjustment";
@@ -106,6 +138,24 @@ export function StockAdjustmentModal(props: Props) {
     if (initials.length > 0) {
       setSkipDraftAutoApply(true);
       setLines(linesFromInitialItems(initials));
+      if (initials.some((item) => item.track_serial == null && item.track_lot == null)) {
+        void Promise.all(initials.map(loadInitialItemTracking)).then((hydrated) => {
+          const byID = new Map(hydrated.map((item) => [item.id, item]));
+          setLines((current) =>
+            current.map((line) => {
+              const item = line.item_id ? byID.get(line.item_id) : undefined;
+              if (!item) return line;
+              return {
+                ...line,
+                item_code: item.item_code ?? line.item_code,
+                track_serial: item.track_serial === true,
+                track_lot: item.track_lot === true,
+                qty_delta: item.track_serial || item.track_lot ? "" : line.qty_delta,
+              };
+            }),
+          );
+        });
+      }
     } else {
       setSkipDraftAutoApply(false);
     }
@@ -122,6 +172,8 @@ export function StockAdjustmentModal(props: Props) {
         item_id: number;
         item_code: string;
         item_name: string;
+        track_serial: boolean;
+        track_lot: boolean;
         location_id: number;
         location_name: string;
         qty_delta: number;
@@ -142,7 +194,10 @@ export function StockAdjustmentModal(props: Props) {
       ? res.data.lines.map((ln) => ({
           line_no: ln.line_no,
           item_id: ln.item_id,
+          item_code: ln.item_code,
           item_label: `${ln.item_code} — ${ln.item_name}`,
+          track_serial: ln.track_serial,
+          track_lot: ln.track_lot,
           location_id: ln.location_id,
           location_label: ln.location_name,
           qty_delta: String(ln.qty_delta),
@@ -197,6 +252,11 @@ export function StockAdjustmentModal(props: Props) {
         errors.lines = "Each line needs an item and location.";
         break;
       }
+      const trackingKind = stockAdjustmentTrackingKind(ln);
+      if (trackingKind !== "standard") {
+        errors.lines = `Line ${ln.line_no}: ${trackedAdjustmentMessage(trackingKind)}`;
+        break;
+      }
       const qty = Number(ln.qty_delta);
       if (!ln.qty_delta || qty === 0 || Number.isNaN(qty)) {
         errors.lines = "Each line needs a non-zero quantity change.";
@@ -205,7 +265,12 @@ export function StockAdjustmentModal(props: Props) {
     }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      showClientValidationBlocker(errors, toast);
+      // Reason is already highlighted inline. Excluding it from the sticky toast
+      // prevents a stale "Reason is required" blocker after the user types it.
+      const blockerErrors = stockAdjustmentToastErrors(errors);
+      if (Object.keys(blockerErrors).length > 0) {
+        showClientValidationBlocker(blockerErrors, toast);
+      }
       return false;
     }
     return true;

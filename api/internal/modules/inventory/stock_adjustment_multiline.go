@@ -21,6 +21,8 @@ type stockAdjustmentLineRow struct {
 	ItemID       int64    `json:"item_id"`
 	ItemCode     string   `json:"item_code"`
 	ItemName     string   `json:"item_name"`
+	TrackSerial  bool     `json:"track_serial"`
+	TrackLot     bool     `json:"track_lot"`
 	LocationID   int64    `json:"location_id"`
 	LocationName string   `json:"location_name"`
 	QtyBefore    *float64 `json:"qty_before,omitempty"`
@@ -37,7 +39,18 @@ type stockAdjustmentCreateBody struct {
 	CustomValues map[string]any            `json:"custom_values"`
 }
 
-const trackedItemAdjustmentMessage = "This item tracks serials or lots. Use Fix this unit or Change quantity."
+func trackedItemAdjustmentMessage(trackSerial, trackLot bool) string {
+	switch {
+	case trackSerial && trackLot:
+		return "This item tracks serials and lots. Adjust serial units with Fix this unit and lot batches with Change quantity."
+	case trackSerial:
+		return "This item tracks serials. Open Serial Registry and use Fix this unit."
+	case trackLot:
+		return "This item tracks lots. Open Lots and use Change quantity."
+	default:
+		return ""
+	}
+}
 
 func normalizedStockAdjLines(body stockAdjustmentCreateBody) []stockAdjustmentLineBody {
 	if len(body.Lines) > 0 {
@@ -115,7 +128,7 @@ func ensureStockAdjLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 			ln.ItemID, tenantID).Scan(&trackSerial, &trackLot)
 		if trackSerial || trackLot {
 			return map[string]string{
-				fmt.Sprintf("lines[%d].item_id", i): trackedItemAdjustmentMessage,
+				fmt.Sprintf("lines[%d].item_id", i): trackedItemAdjustmentMessage(trackSerial, trackLot),
 			}
 		}
 	}
@@ -142,6 +155,7 @@ func loadStockAdjustmentLines(ctx context.Context, q interface {
 }, requestID int64) ([]stockAdjustmentLineRow, error) {
 	rows, err := q.Query(ctx, `
 		select l.id, l.line_no, l.item_id, i.item_code, i.item_name,
+		  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
 		  l.location_id, loc.location_name,
 		  l.qty_before::float8, l.qty_delta::float8, l.qty_after::float8
 		from public.inv_stock_adjustment_request_lines l
@@ -158,6 +172,7 @@ func loadStockAdjustmentLines(ctx context.Context, q interface {
 		var row stockAdjustmentLineRow
 		var qtyBefore, qtyAfter *float64
 		if err := rows.Scan(&row.ID, &row.LineNo, &row.ItemID, &row.ItemCode, &row.ItemName,
+			&row.TrackSerial, &row.TrackLot,
 			&row.LocationID, &row.LocationName, &qtyBefore, &row.QtyDelta, &qtyAfter); err != nil {
 			return nil, err
 		}
@@ -207,11 +222,14 @@ func stockAdjLinesForRequest(ctx context.Context, q interface {
 	}
 	var row stockAdjustmentLineRow
 	err = q.QueryRow(ctx, `
-		select 0, 1, i.id, i.item_code, i.item_name, l.id, l.location_name
+		select 0, 1, i.id, i.item_code, i.item_name,
+		  coalesce(i.track_serial, false), coalesce(i.track_lot, false),
+		  l.id, l.location_name
 		from public.inv_items i, public.inv_locations l
 		where i.id = $1 and l.id = $2 and i.tenant_id = $3 and l.tenant_id = $3`,
 		headerItemID, headerLocationID, tenantID).Scan(
-		&row.ID, &row.LineNo, &row.ItemID, &row.ItemCode, &row.ItemName, &row.LocationID, &row.LocationName)
+		&row.ID, &row.LineNo, &row.ItemID, &row.ItemCode, &row.ItemName,
+		&row.TrackSerial, &row.TrackLot, &row.LocationID, &row.LocationName)
 	if err != nil {
 		return nil, err
 	}

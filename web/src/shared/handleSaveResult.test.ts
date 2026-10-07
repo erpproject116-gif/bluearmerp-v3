@@ -196,4 +196,25 @@ describe("notification helpers", () => {
     });
     expect(hint?.href).toContain("purchase-receive");
   });
+
+  it("uses tracked-item recovery instead of generic lower-quantity advice", () => {
+    expect(recoveryHintFromError("Quantity is controlled by serial units. Open Serials and use Fix this unit.")).toMatch(
+      /Fix this unit/i,
+    );
+    expect(recoveryHintFromError("Quantity is controlled by lot batches. Open Lots and use Change quantity.")).toMatch(
+      /Change quantity/i,
+    );
+    expect(recoveryHintFromError("Quantity is controlled by serial units.")).not.toMatch(/Lower the quantity/i);
+  });
+
+  it("routes lot-only and serial-only adjustment blockers correctly", () => {
+    expect(resolvePolicyActionHint({ item: "This item tracks lots. Open Lots and use Change quantity." })).toEqual({
+      href: "/app/inventory/serial-lot/lots",
+      label: "Open Lots",
+    });
+    expect(resolvePolicyActionHint({ item: "This item tracks serials. Open Serial Registry and use Fix this unit." })).toEqual({
+      href: "/app/inventory/serial-lot/registry",
+      label: "Open Serials",
+    });
+  });
 });

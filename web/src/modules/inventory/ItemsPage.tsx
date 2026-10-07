@@ -32,7 +32,7 @@ import {
 import { ItemBarcodeModal } from "./ItemBarcodeModal";
 import { ItemsAdvancedSearch, emptyItemsAdvancedFilters, type ItemsAdvancedFilters } from "./ItemsAdvancedSearch";
 import { SerialGenerateModal } from "./serial-lot/SerialGenerateModal";
-import { StockAdjustmentModal } from "./StockAdjustmentModal";
+import { StockAdjustmentModal, type StockAdjustmentInitialItem } from "./StockAdjustmentModal";
 import { downloadReportCsv } from "../../shared/reports/downloadReportCsv";
 
 type Item = {
@@ -143,7 +143,7 @@ export default function ItemsPage() {
   const [moreOpen, setMoreOpen] = createSignal(false);
   const [serialLotMenuOpen, setSerialLotMenuOpen] = createSignal(false);
   const [adjustOpen, setAdjustOpen] = createSignal(false);
-  const [adjustItems, setAdjustItems] = createSignal<{ id: number; label: string }[]>([]);
+  const [adjustItems, setAdjustItems] = createSignal<StockAdjustmentInitialItem[]>([]);
   const toast = useToast();
   const invalidate = useInvalidateInventoryList();
   const lifecycle = useMasterLifecycle({
@@ -453,7 +453,15 @@ export default function ItemsPage() {
       toast.warning(`Select at most ${MAX} items at a time (${rows.length} selected).`);
       return;
     }
-    setAdjustItems(rows.map((item) => ({ id: item.id, label: `${item.item_code} — ${item.item_name}` })));
+    setAdjustItems(
+      rows.map((item) => ({
+        id: item.id,
+        item_code: item.item_code,
+        label: `${item.item_code} — ${item.item_name}`,
+        track_serial: item.track_serial === true,
+        track_lot: item.track_lot === true,
+      })),
+    );
     setAdjustOpen(true);
   };
 

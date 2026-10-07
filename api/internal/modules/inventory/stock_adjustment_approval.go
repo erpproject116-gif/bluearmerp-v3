@@ -124,7 +124,7 @@ func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID, reque
 		where id = $1 and tenant_id = $2 and deleted_at is null`,
 		itemID, tenantID).Scan(&trackSerial, &trackLot)
 	if trackSerial || trackLot {
-		return 0, 0, 0, map[string]string{"item_id": trackedItemAdjustmentMessage}, nil
+		return 0, 0, 0, map[string]string{"item_id": trackedItemAdjustmentMessage(trackSerial, trackLot)}, nil
 	}
 	err = tx.QueryRow(ctx, `
 		select qty_on_hand::float8

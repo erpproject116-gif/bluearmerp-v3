@@ -103,6 +103,18 @@ export const recoveryHintFromError = (fieldError: string): string => {
 
   }
 
+  if (/tracks serials and lots|serial units and lot batches/i.test(t)) {
+    return "Open Serials to fix each unit and Lots to change the affected batch quantity. Standard stock adjustment cannot bypass tracking.";
+  }
+
+  if (/tracks serials|controlled by serial units|fix this unit/i.test(t)) {
+    return "Open Serials for this item and location, then use Fix this unit on each affected serial.";
+  }
+
+  if (/tracks lots|controlled by lot batches|change quantity/i.test(t)) {
+    return "Open Lots for this item and location, then use Change quantity on the affected lot batch.";
+  }
+
   if (/balance|qty|quantity|higher than|exceeds/i.test(t)) {
 
     return "Lower the quantity to what is still open, or finish the prior step first.";
