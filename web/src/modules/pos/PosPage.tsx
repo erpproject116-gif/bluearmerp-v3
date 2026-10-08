@@ -73,6 +73,7 @@ import { PosReceiptSlip } from "./PosReceiptSlip";
 import { PosShiftReportPanel } from "./PosShiftReportPanel";
 import { SaleCompletePanel } from "./SaleCompletePanel";
 import { resolvePosScan } from "./posScan";
+import { posTileBorderClass } from "./posSetup";
 import {
   POS_CASHIER_SHELL_V2,
   fallbackReceiptFromCheckout,
@@ -1428,8 +1429,7 @@ export default function PosPage() {
                       return (
                         <button
                           type="button"
-                          class="group relative flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-emerald-400 hover:shadow-md disabled:opacity-60"
-                          classList={{ "opacity-50 grayscale": soldOut() }}
+                          class={`group relative flex flex-col overflow-hidden rounded-xl bg-white text-left shadow-sm ${posTileBorderClass(item.stock_status)}`}
                           disabled={adding() || soldOut()}
                           onClick={() => addItem(item)}
                         >
@@ -1440,7 +1440,10 @@ export default function PosPage() {
                               </span>
                             )}
                           </Show>
-                          <div class="flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-100">
+                          <div
+                            class="flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-100"
+                            classList={{ "opacity-50 grayscale": soldOut() }}
+                          >
                             <AuthImage
                               src={item.image_url}
                               alt={item.item_name}
@@ -1450,7 +1453,7 @@ export default function PosPage() {
                               )}
                             />
                           </div>
-                          <div class="flex flex-1 flex-col gap-0.5 p-3">
+                          <div class="flex flex-1 flex-col gap-0.5 p-3" classList={{ "opacity-50 grayscale": soldOut() }}>
                             <span class="line-clamp-2 text-sm font-medium leading-snug">{item.item_name}</span>
                             <Show when={item.qty_available != null && item.stock_status !== "untracked"}>
                               <span class="text-[11px] text-slate-400 tabular-nums">Qty {item.qty_available}</span>

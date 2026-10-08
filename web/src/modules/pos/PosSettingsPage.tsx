@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, Show } from "solid-js";
+import { createEffect, createResource, createSignal, For, on, Show } from "solid-js";
 import { A, useSearchParams } from "@solidjs/router";
 import { apiFetch, apiAbsoluteUrl, getAccessToken } from "../../shared/api";
 import { AuthImage } from "../../shared/AuthImage";
@@ -15,6 +15,8 @@ import {
   POS_UI_LABEL_DEFAULTS,
   resolvePosTheme,
 } from "./posBranding";
+import PosRegisterSetupPanel from "./PosRegisterSetupPanel";
+import { parsePosSetupFocus, posSetupFieldValue, posSetupScrollTarget } from "./posSetup";
 
 type ItemRow = {
   id: number;
@@ -78,9 +80,15 @@ async function uploadImage(itemId: number, file: File): Promise<boolean> {
 
 export default function PosSettingsPage() {
   const auth = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams<{ tab?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams<{ tab?: string; focus?: string }>();
   const tab = () => searchParams.tab ?? "products";
   const canManage = () => hasPermission(auth.me, "pos.manage", "read");
+
+  createEffect(() => {
+    if (!parsePosSetupFocus(searchParams.focus)) return;
+    if (tab() === "settings") return;
+    setSearchParams({ tab: "settings" });
+  });
 
   return (
     <Show
@@ -775,6 +783,10 @@ function ModifierGroupCard(props: {
 function SettingsTab() {
   const toast = useToast();
   const settings = usePosSettings();
+  const [searchParams, setSearchParams] = useSearchParams<{ focus?: string }>();
+  let focusBaseline = "";
+  const [outlined, setOutlined] = createSignal(false);
+  const fieldOutline = (focus: string) => outlined() && searchParams.focus === focus;
   const [taxTypes] = createResource(async () => {
     const res = await apiFetch<TaxType[]>("/api/v1/quotation/tax-types?page=1&pageSize=100&status=active&sort=sort_order&order=asc");
     return res.data ?? [];
@@ -803,6 +815,29 @@ function SettingsTab() {
       theme: {},
     };
 
+  createEffect(
+    on(
+      () => [parsePosSetupFocus(searchParams.focus), settings.isLoading] as const,
+      ([focus, loading]) => {
+        if (!focus || loading) {
+          if (!focus) setOutlined(false);
+          return;
+        }
+        focusBaseline = posSetupFieldValue(focus, current());
+        setOutlined(true);
+        const id = posSetupScrollTarget(focus);
+        if (!id) return;
+        queueMicrotask(() => document.getElementById(id)?.scrollIntoView({ block: "center" }));
+      },
+    ),
+  );
+
+  createEffect(() => {
+    const focus = parsePosSetupFocus(searchParams.focus);
+    if (!focus || !outlined()) return;
+    if (posSetupFieldValue(focus, current()) !== focusBaseline) setOutlined(false);
+  });
+
   const update = (patch: Partial<PosSettings>) => setDraft({ ...current(), ...patch });
 
   const toggleIn = (list: string[], value: string): string[] =>
@@ -820,6 +855,7 @@ function SettingsTab() {
       return;
     }
     toast.success("Settings saved.");
+    setSearchParams({ focus: undefined });
     // Keep draft aligned with server response so selects stay selected before refetch settles.
     if (res.data) setDraft(res.data);
     else setDraft(null);
@@ -831,13 +867,16 @@ function SettingsTab() {
   return (
     <Show when={!settings.isLoading} fallback={<p class="text-sm text-text-secondary">Loading settings…</p>}>
       <div class="max-w-4xl space-y-6">
+        <PosRegisterSetupPanel />
         <div class="rounded-xl border border-stroke bg-white p-5">
           <h3 class="mb-4 text-sm font-semibold text-text-primary">Tax &amp; pricing</h3>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="mb-1 block text-xs font-medium text-text-secondary">Default tax type</label>
               <select
+                id="pos-setup-default_tax_type"
                 class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                classList={{ "ring-2 ring-amber-400": fieldOutline("default_tax_type") }}
                 value={idStr(current().default_tax_type_id)}
                 onChange={(e) => update({ default_tax_type_id: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
               >
@@ -854,7 +893,9 @@ function SettingsTab() {
             <div>
               <label class="mb-1 block text-xs font-medium text-text-secondary">Default location</label>
               <select
+                id="pos-setup-default_location"
                 class="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                classList={{ "ring-2 ring-amber-400": fieldOutline("default_location") }}
                 value={idStr(current().default_location_id)}
                 onChange={(e) => update({ default_location_id: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
               >
@@ -908,11 +949,11 @@ function SettingsTab() {
             </div>
           </div>
           <label class="flex items-center gap-2 text-sm text-text-primary">
-            <input type="checkbox" checked={current().require_customer} onChange={(e) => update({ require_customer: e.currentTarget.checked })} />
+            <input id="pos-setup-require_customer" type="checkbox" classList={{ "ring-2 ring-amber-400": fieldOutline("require_customer") }} checked={current().require_customer} onChange={(e) => update({ require_customer: e.currentTarget.checked })} />
             Require customer selection
           </label>
           <label class="mt-2 flex items-center gap-2 text-sm text-text-primary">
-            <input type="checkbox" checked={current().enable_barcode} onChange={(e) => update({ enable_barcode: e.currentTarget.checked })} />
+            <input id="pos-setup-enable_barcode" type="checkbox" classList={{ "ring-2 ring-amber-400": fieldOutline("enable_barcode") }} checked={current().enable_barcode} onChange={(e) => update({ enable_barcode: e.currentTarget.checked })} />
             Enable barcode scanning
           </label>
           <div class="mt-4">

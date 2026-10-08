@@ -17,6 +17,7 @@ import { DEFAULT_HOME_WIDGETS, normalizeHomeWidgets, type HomeWidgetId } from ".
 import { HOME_ONBOARDING_HREF, resolveHomeTab } from "./homeTabs";
 import { useHomeLayout, useSaveHomeLayout } from "./useHomeLayout";
 import { InstallAppBanner } from "../../shell/InstallAppBanner";
+import PosRegisterSetupPanel, { canSeePosRegisterSetup } from "../pos/PosRegisterSetupPanel";
 
 /** Home: Dashboard · Onboarding · Recent updates (product releases). */
 export default function DashboardPage() {
@@ -134,6 +135,9 @@ export default function DashboardPage() {
 
         <Show when={homeTab() === "dashboard"}>
           <div class="space-y-6">
+            <Show when={canSeePosRegisterSetup(auth.me)}>
+              <PosRegisterSetupPanel home />
+            </Show>
             <Show when={selected().includes("finance")}>
               <HomeFinanceOverview hideIntro />
             </Show>

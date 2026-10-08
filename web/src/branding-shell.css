@@ -88,3 +88,35 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-600, #3c50e0) 22%, transparent);
   }
 }
+
+/* POS catalog: sold-out and low tiles breathe on the border only. */
+@keyframes pos-stock-breathe {
+  0%,
+  100% {
+    border-color: var(--pos-breathe-dim);
+  }
+  50% {
+    border-color: var(--pos-breathe-full);
+  }
+}
+
+.pos-stock-breathe {
+  animation: pos-stock-breathe 3s ease-in-out infinite;
+}
+
+.pos-stock-breathe-sold {
+  --pos-breathe-dim: rgb(203 213 225);
+  --pos-breathe-full: rgb(71 85 105);
+}
+
+.pos-stock-breathe-low {
+  --pos-breathe-dim: rgb(253 230 138);
+  --pos-breathe-full: rgb(217 119 6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-stock-breathe {
+    animation: none;
+    border-color: var(--pos-breathe-full);
+  }
+}

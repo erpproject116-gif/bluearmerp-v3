@@ -31,15 +31,15 @@ type PosSettings struct {
 	CashAccountID       *int64   `json:"cash_account_id,omitempty"`
 	CardAccountID       *int64   `json:"card_account_id,omitempty"`
 	// Read-only resolved fields for client-side tax preview.
-	TaxMode            string             `json:"tax_mode,omitempty"`
-	TaxRatePercent     float64            `json:"tax_rate_percent"`
-	StudentDiscountPct float64            `json:"student_discount_pct"`
-	PrivilegeSeniorPct float64            `json:"privilege_senior_pct"`
-	PrivilegePwdPct    float64            `json:"privilege_pwd_pct"`
-	TipEnabled         bool               `json:"tip_enabled"`
-	UiLabels           map[string]string  `json:"ui_labels"`
-	Theme              map[string]string  `json:"theme"`
-	HospitalityProfile string             `json:"hospitality_profile,omitempty"`
+	TaxMode            string            `json:"tax_mode,omitempty"`
+	TaxRatePercent     float64           `json:"tax_rate_percent"`
+	StudentDiscountPct float64           `json:"student_discount_pct"`
+	PrivilegeSeniorPct float64           `json:"privilege_senior_pct"`
+	PrivilegePwdPct    float64           `json:"privilege_pwd_pct"`
+	TipEnabled         bool              `json:"tip_enabled"`
+	UiLabels           map[string]string `json:"ui_labels"`
+	Theme              map[string]string `json:"theme"`
+	HospitalityProfile string            `json:"hospitality_profile,omitempty"`
 }
 
 type posSettingsBody struct {
@@ -66,6 +66,7 @@ func registerSettingsRoutes(r chi.Router, pool *pgxpool.Pool) {
 	// Register config is needed by the terminal (tax, tenders, default location), so allow
 	// either terminal or manage to read it; only managers can change it.
 	r.Get("/settings", getPosSettings(pool))
+	r.Get("/setup-warnings", getPosSetupWarnings(pool))
 	r.With(auth.RequirePermission("pos.manage", auth.AccessWrite)).Put("/settings", putPosSettings(pool))
 }
 
