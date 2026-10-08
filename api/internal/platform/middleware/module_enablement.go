@@ -16,8 +16,11 @@ type moduleRouteRule struct {
 	prefix      string
 	moduleCode  string
 	featureCode string // optional; when set, also require feature enabled
-	message     string
-	nextHint    string
+	// anyModule, when set, allows the write if any listed module is on.
+	// Empty keeps the single moduleCode check. Used by shipping, which Sales and Sales Order both write.
+	anyModule []string
+	message   string
+	nextHint  string
 }
 
 const appsHubHint = "/app/user-management/tenant-modules"
@@ -57,6 +60,8 @@ var moduleMutationRules = []moduleRouteRule{
 		message: "Sales is turned off for this workspace.", nextHint: appsHubHint},
 	{prefix: "/api/v1/sales", moduleCode: "sales",
 		message: "Sales is turned off for this workspace.", nextHint: appsHubHint},
+	{prefix: "/api/v1/shipping", anyModule: []string{"sales", "sales_order"},
+		message: "Shipping is turned off while Sales and Sales Order are off.", nextHint: appsHubHint},
 	{prefix: "/api/v1/purchase-request", moduleCode: "purchase_request",
 		message: "Purchase Request is turned off. Create a Purchase Order directly.", nextHint: "/app/purchase-order/purchase-orders/new"},
 	{prefix: "/api/v1/purchase-order", moduleCode: "purchase_order",
@@ -138,7 +143,7 @@ func ModuleEnablement(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				return
 			}
 
-			enabled, err := tenantModuleEnabled(r.Context(), pool, tu.TenantID, rule.moduleCode)
+			enabled, err := moduleRuleEnabled(r.Context(), pool, tu.TenantID, rule)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to check module access.", "ERR_INTERNAL")
 				return
@@ -178,6 +183,24 @@ func ModuleEnablement(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// moduleRuleEnabled reports whether this rule's module is on.
+// anyModule allows the write when any listed code is enabled. An empty list uses moduleCode once.
+func moduleRuleEnabled(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rule moduleRouteRule) (bool, error) {
+	if len(rule.anyModule) == 0 {
+		return tenantModuleEnabled(ctx, pool, tenantID, rule.moduleCode)
+	}
+	for _, code := range rule.anyModule {
+		on, err := tenantModuleEnabled(ctx, pool, tenantID, code)
+		if err != nil {
+			return false, err
+		}
+		if on {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func matchModuleRule(path string) (moduleRouteRule, bool) {

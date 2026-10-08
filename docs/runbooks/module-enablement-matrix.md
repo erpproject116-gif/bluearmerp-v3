@@ -40,7 +40,7 @@ Longest matching prefix wins.
 | `/api/v1/fixed-assets` | fixed_assets | — | Yes | Phase B |
 | `/api/v1/job-costing` | job_costing | — | Yes | Phase B |
 | `/api/v1/operations` | operations | — | Yes | Phase B |
-| `/api/v1/shipping` | — | — | Debt | No dedicated module_registry code |
+| `/api/v1/shipping` | sales or sales_order | — | Yes | Write allowed when either is on. Sales creates shipments from sales-order lines (`/orders/from-lines`). No shipping registry row. |
 | `/api/v1/sop` | sop | — | Yes | Pre-existing |
 | `/api/v1/okr` | okr | — | Yes | Pre-existing |
 | `/api/v1/cms` | cms | — | Yes | Pre-existing |
@@ -57,11 +57,10 @@ Longest matching prefix wins.
 ## Remaining ungated debt
 
 1. Portal / migration / comms / approvals / copilot / help — intentional or cross-cutting.  
-2. Shipping — no `module_registry` code found; left ungated.  
-3. Finance sub-features (`finance.acct_i`, payment vouchers) cannot be API-split without route redesign; parent `finance` covers writes.  
-4. Sales collective invoicing feature — no dedicated prefix.  
-5. Quotation tax_mngt feature — under `/quotation` parent only.  
-6. GET still allowed when module off (by design).
+2. Finance sub-features (`finance.acct_i`, payment vouchers) cannot be API-split without route redesign; parent `finance` covers writes.  
+3. Sales collective invoicing feature — no dedicated prefix.  
+4. Quotation tax_mngt feature — under `/quotation` parent only.  
+5. GET still allowed when module off (by design).
 
 ## How to extend
 
