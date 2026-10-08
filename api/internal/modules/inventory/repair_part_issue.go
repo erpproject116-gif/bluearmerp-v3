@@ -633,6 +633,10 @@ func derefString(s *string) string {
 	return *s
 }
 
+func repairPartConsumptionWhere() string {
+	return `ro.tenant_id = $1 and ro.deleted_at is null`
+}
+
 func repairPartConsumptionSQL(where string) string {
 	return fmt.Sprintf(`
 		select i.id, i.item_code, i.item_name,

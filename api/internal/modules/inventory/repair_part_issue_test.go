@@ -111,11 +111,15 @@ func TestUnitLinesStayOnStatusReportAndOffPartsTotal(t *testing.T) {
 	if !statusReportKeepsUnitLines(statusReportFromClause()) {
 		t.Fatal(statusReportFromClause())
 	}
-	query := repairPartConsumptionSQL("ro.tenant_id = $1")
+	where := repairPartConsumptionWhere()
+	if strings.Contains(where, "ln.") {
+		t.Fatal(where)
+	}
+	query := repairPartConsumptionSQL(where)
 	if !repairPartConsumptionUsesIssues(query) {
 		t.Fatal(query)
 	}
-	if strings.Contains(query, "inv_repair_order_lines") {
+	if strings.Contains(query, "inv_repair_order_lines") || strings.Contains(query, "ln.") {
 		t.Fatal("parts total still reads repair order lines")
 	}
 }

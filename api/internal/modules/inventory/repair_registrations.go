@@ -625,7 +625,7 @@ func listRepairConsumptionReport(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 
-		where := `ro.tenant_id = $1 and ro.deleted_at is null and ln.qty > 0`
+		where := repairPartConsumptionWhere()
 		args := []any{tu.TenantID}
 		argN := 2
 
