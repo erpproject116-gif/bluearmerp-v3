@@ -19,39 +19,39 @@ import (
 )
 
 type RepairRegistration struct {
-	ID                int64   `json:"id"`
-	RegistrationDate  string  `json:"registration_date"`
-	DateSeq           int     `json:"date_seq"`
-	DateNoDisplay     string  `json:"date_no_display"`
-	RegistrationNo    string  `json:"registration_no"`
-	PartnerID         int64   `json:"partner_id"`
-	PartnerName       string  `json:"partner_name,omitempty"`
-	ItemID            *int64  `json:"item_id,omitempty"`
-	ItemCode          string  `json:"item_code"`
-	ItemName          string  `json:"item_name"`
-	SerialNo          *string `json:"serial_no,omitempty"`
-	IssueDescription  *string `json:"issue_description,omitempty"`
-	Status            string  `json:"status"`
-	RepairOrderID     *int64  `json:"repair_order_id,omitempty"`
-	RepairOrderNo     *string `json:"repair_order_no,omitempty"`
-	CreatedByUserID   *int64  `json:"created_by_user_id,omitempty"`
+	ID               int64   `json:"id"`
+	RegistrationDate string  `json:"registration_date"`
+	DateSeq          int     `json:"date_seq"`
+	DateNoDisplay    string  `json:"date_no_display"`
+	RegistrationNo   string  `json:"registration_no"`
+	PartnerID        int64   `json:"partner_id"`
+	PartnerName      string  `json:"partner_name,omitempty"`
+	ItemID           *int64  `json:"item_id,omitempty"`
+	ItemCode         string  `json:"item_code"`
+	ItemName         string  `json:"item_name"`
+	SerialNo         *string `json:"serial_no,omitempty"`
+	IssueDescription *string `json:"issue_description,omitempty"`
+	Status           string  `json:"status"`
+	RepairOrderID    *int64  `json:"repair_order_id,omitempty"`
+	RepairOrderNo    *string `json:"repair_order_no,omitempty"`
+	CreatedByUserID  *int64  `json:"created_by_user_id,omitempty"`
 }
 
 type repairRegistrationBody struct {
 	RegistrationDate string  `json:"registration_date"`
-	PartnerID      int64   `json:"partner_id"`
-	ItemID         *int64  `json:"item_id"`
-	ItemCode       string  `json:"item_code"`
-	ItemName       string  `json:"item_name"`
-	SerialNo       *string `json:"serial_no"`
+	PartnerID        int64   `json:"partner_id"`
+	ItemID           *int64  `json:"item_id"`
+	ItemCode         string  `json:"item_code"`
+	ItemName         string  `json:"item_name"`
+	SerialNo         *string `json:"serial_no"`
 	IssueDescription *string `json:"issue_description"`
-	Status         string  `json:"status"`
+	Status           string  `json:"status"`
 }
 
 type convertToRepairOrderBody struct {
-	LocationID int64   `json:"location_id"`
-	PicUserID  *int64  `json:"pic_user_id"`
-	PicName    string  `json:"pic_name"`
+	LocationID int64  `json:"location_id"`
+	PicUserID  *int64 `json:"pic_user_id"`
+	PicName    string `json:"pic_name"`
 }
 
 type registrationStatusRow struct {
@@ -69,11 +69,11 @@ type registrationStatusRow struct {
 }
 
 type consumptionReportRow struct {
-	ItemID   *int64  `json:"item_id,omitempty"`
-	ItemCode string  `json:"item_code"`
-	ItemName string  `json:"item_name"`
-	TotalQty float64 `json:"total_qty"`
-	LineCount int    `json:"line_count"`
+	ItemID    *int64  `json:"item_id,omitempty"`
+	ItemCode  string  `json:"item_code"`
+	ItemName  string  `json:"item_name"`
+	TotalQty  float64 `json:"total_qty"`
+	LineCount int     `json:"line_count"`
 }
 
 func registerRepairRegistrationRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -110,9 +110,9 @@ func previewRepairRegistrationSequences(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, map[string]any{
-			"date_seq":          dateSeq,
-			"registration_no":   registrationNo,
-			"date_no_display":   formatDateNo(regDate, dateSeq),
+			"date_seq":        dateSeq,
+			"registration_no": registrationNo,
+			"date_no_display": formatDateNo(regDate, dateSeq),
 		}, "OK")
 	}
 }
@@ -477,6 +477,35 @@ func convertRepairRegistrationToOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if reg.SerialNo != nil && strings.TrimSpace(*reg.SerialNo) != "" {
+			matchRows, err := tx.Query(r.Context(), `
+				select id from public.inv_serial_units
+				where tenant_id = $1 and btrim(serial_no) = $2`, tu.TenantID, strings.TrimSpace(*reg.SerialNo))
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to match serial.", "ERR_INTERNAL")
+				return
+			}
+			var matches []int64
+			for matchRows.Next() {
+				var serialID int64
+				if err := matchRows.Scan(&serialID); err != nil {
+					matchRows.Close()
+					response.Err(w, http.StatusInternalServerError, "Failed to match serial.", "ERR_INTERNAL")
+					return
+				}
+				matches = append(matches, serialID)
+			}
+			matchRows.Close()
+			if serialID := serialUnitIDFromMatches(matches); serialID != nil {
+				if _, err := tx.Exec(r.Context(), `
+					update public.inv_repair_orders set serial_unit_id = $1, updated_at = now()
+					where id = $2 and tenant_id = $3`, *serialID, orderID, tu.TenantID); err != nil {
+					response.Err(w, http.StatusInternalServerError, "Failed to link serial.", "ERR_INTERNAL")
+					return
+				}
+			}
+		}
+
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to convert.", "ERR_INTERNAL")
 			return
@@ -621,14 +650,7 @@ func listRepairConsumptionReport(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 
-		q := fmt.Sprintf(`
-			select ln.item_id, ln.item_code, ln.item_name,
-			  sum(ln.qty)::float8, count(*)::int
-			from public.inv_repair_order_lines ln
-			join public.inv_repair_orders ro on ro.id = ln.repair_order_id
-			where %s
-			group by ln.item_id, ln.item_code, ln.item_name
-			order by ln.item_code`, where)
+		q := repairPartConsumptionSQL(where)
 
 		rows, err := pool.Query(r.Context(), q, args...)
 		if err != nil {

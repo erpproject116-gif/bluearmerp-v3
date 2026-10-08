@@ -23,18 +23,23 @@ import (
 const entityRepairOrder = "inv_repair_order"
 
 type RepairOrderLine struct {
-	ID            int64    `json:"id,omitempty"`
-	LineNo        int      `json:"line_no"`
-	ItemID        *int64   `json:"item_id,omitempty"`
-	ItemCode      string   `json:"item_code"`
-	ItemName      string   `json:"item_name"`
-	ProblemIssue  *string  `json:"problem_issue,omitempty"`
-	ServiceCharge *float64 `json:"service_charge,omitempty"`
-	TaxType       *string  `json:"tax_type,omitempty"`
-	Qty           float64  `json:"qty"`
-	Mop           *string  `json:"mop,omitempty"`
-	SerialLotNo   *string  `json:"serial_lot_no,omitempty"`
-	Remark        *string  `json:"remark,omitempty"`
+	ID             int64    `json:"id,omitempty"`
+	LineNo         int      `json:"line_no"`
+	ItemID         *int64   `json:"item_id,omitempty"`
+	ItemCode       string   `json:"item_code"`
+	ItemName       string   `json:"item_name"`
+	ProblemIssue   *string  `json:"problem_issue,omitempty"`
+	ServiceCharge  *float64 `json:"service_charge,omitempty"`
+	TaxType        *string  `json:"tax_type,omitempty"`
+	Qty            float64  `json:"qty"`
+	Mop            *string  `json:"mop,omitempty"`
+	SerialLotNo    *string  `json:"serial_lot_no,omitempty"`
+	Remark         *string  `json:"remark,omitempty"`
+	LineRole       string   `json:"line_role,omitempty"`
+	PartKey        string   `json:"part_key,omitempty"`
+	PartLocationID *int64   `json:"location_id,omitempty"`
+	SerialUnitID   *int64   `json:"serial_unit_id,omitempty"`
+	LotNo          *string  `json:"lot_no,omitempty"`
 }
 
 type RepairOrder struct {
@@ -64,6 +69,7 @@ type RepairOrder struct {
 	ReleaseLocationID       *int64            `json:"release_location_id,omitempty"`
 	SalesNo                 *string           `json:"sales_no,omitempty"`
 	SerialNo                *string           `json:"serial_no,omitempty"`
+	PriorRepairCount        int               `json:"prior_repair_count"`
 	Lines                   []RepairOrderLine `json:"lines,omitempty"`
 	CustomValues            map[string]any    `json:"custom_values,omitempty"`
 }
@@ -208,7 +214,8 @@ func listRepairOrders(pool *pgxpool.Pool) http.HandlerFunc {
 		q := fmt.Sprintf(`
 			select ro.id, ro.order_date, ro.date_seq, ro.repair_order_no,
 			  ro.partner_id, p.company_name, ro.pic_user_id, ro.pic_name,
-			  ro.location_id, ro.progress_status, ro.scheduled_completion_date,
+			  ro.location_id, ro.progress_status, ro.coverage_decision, ro.supplier_recovery,
+			  ro.scheduled_completion_date,
 			  ro.latest_update, count(*) over()
 			from public.inv_repair_orders ro
 			join public.inv_partners p on p.id = ro.partner_id
@@ -236,6 +243,8 @@ func listRepairOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			PicName                 string
 			LocationID              int64
 			ProgressStatus          string
+			CoverageDecision        string
+			SupplierRecovery        string
 			ScheduledCompletionDate *time.Time
 			LatestUpdate            *string
 			Total                   int64
@@ -247,7 +256,8 @@ func listRepairOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			var row listRow
 			if err := rows.Scan(&row.ID, &row.OrderDate, &row.DateSeq, &row.RepairOrderNo,
 				&row.PartnerID, &row.CustomerName, &row.PicUserID, &row.PicName,
-				&row.LocationID, &row.ProgressStatus, &row.ScheduledCompletionDate,
+				&row.LocationID, &row.ProgressStatus, &row.CoverageDecision, &row.SupplierRecovery,
+				&row.ScheduledCompletionDate,
 				&row.LatestUpdate, &row.Total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read repair orders.", "ERR_INTERNAL")
 				return
@@ -265,6 +275,8 @@ func listRepairOrders(pool *pgxpool.Pool) http.HandlerFunc {
 				PicName:                 row.PicName,
 				LocationID:              row.LocationID,
 				ProgressStatus:          row.ProgressStatus,
+				CoverageDecision:        row.CoverageDecision,
+				SupplierRecovery:        row.SupplierRecovery,
 				ScheduledCompletionDate: datePtrToStr(row.ScheduledCompletionDate),
 				LatestUpdate:            row.LatestUpdate,
 			})
@@ -338,6 +350,12 @@ func loadRepairOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64
 		return RepairOrder{}, err
 	}
 	ro.Lines = lines
+	if ro.SerialUnitID != nil && *ro.SerialUnitID > 0 {
+		_ = pool.QueryRow(ctx, `
+			select count(*) from public.inv_repair_orders
+			where tenant_id = $1 and serial_unit_id = $2 and deleted_at is null and id <> $3`,
+			tenantID, *ro.SerialUnitID, id).Scan(&ro.PriorRepairCount)
+	}
 	ro.CustomValues = attachCustom(ctx, pool, tenantID, entityRepairOrder, id)
 	return ro, nil
 }
@@ -345,7 +363,8 @@ func loadRepairOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64
 func loadRepairOrderLines(ctx context.Context, pool *pgxpool.Pool, orderID int64) ([]RepairOrderLine, error) {
 	rows, err := pool.Query(ctx, `
 		select id, line_no, item_id, item_code, item_name, problem_issue,
-		  service_charge::float8, tax_type, qty::float8, mop, serial_lot_no, remark
+		  service_charge::float8, tax_type, qty::float8, mop, serial_lot_no, remark,
+		  coalesce(line_role,'unit'), coalesce(part_key,''), location_id, serial_unit_id, lot_no
 		from public.inv_repair_order_lines
 		where repair_order_id = $1
 		order by line_no`, orderID)
@@ -357,7 +376,8 @@ func loadRepairOrderLines(ctx context.Context, pool *pgxpool.Pool, orderID int64
 	for rows.Next() {
 		var ln RepairOrderLine
 		if err := rows.Scan(&ln.ID, &ln.LineNo, &ln.ItemID, &ln.ItemCode, &ln.ItemName,
-			&ln.ProblemIssue, &ln.ServiceCharge, &ln.TaxType, &ln.Qty, &ln.Mop, &ln.SerialLotNo, &ln.Remark); err != nil {
+			&ln.ProblemIssue, &ln.ServiceCharge, &ln.TaxType, &ln.Qty, &ln.Mop, &ln.SerialLotNo, &ln.Remark,
+			&ln.LineRole, &ln.PartKey, &ln.PartLocationID, &ln.SerialUnitID, &ln.LotNo); err != nil {
 			return nil, err
 		}
 		lines = append(lines, ln)
@@ -408,19 +428,44 @@ func createRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		decision := "pending"
+		if strings.TrimSpace(body.CoverageDecision) != "" {
+			normalized, ok := normalizeCoverageDecision(body.CoverageDecision)
+			if !ok {
+				response.Validation(w, map[string]string{"coverage_decision": "Must be pending, covered, denied, or goodwill."})
+				return
+			}
+			decision = normalized
+		}
+		recovery := "none"
+		if strings.TrimSpace(body.SupplierRecovery) != "" {
+			normalized, ok := normalizeSupplierRecovery(body.SupplierRecovery)
+			if !ok {
+				response.Validation(w, map[string]string{"supplier_recovery": "Must be none, requested, or recovered."})
+				return
+			}
+			recovery = normalized
+		}
+		if err := assertCoveredWarranty(r.Context(), tx, tu.TenantID, decision, body.SerialUnitID, orderDate); err != nil {
+			writePartStockError(w, err)
+			return
+		}
+
 		var id int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.inv_repair_orders (
 			  tenant_id, order_date, date_seq, repair_order_no,
 			  partner_id, pic_user_id, pic_name, location_id,
 			  project_id, project_name, technician_name, progress_status,
+			  coverage_decision, supplier_recovery,
 			  scheduled_completion_date, latest_update, repair_details,
 			  sales_id, sales_line_id, serial_unit_id, release_location_id
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
 			returning id`,
 			tu.TenantID, orderDate, dateSeq, repairOrderNo,
 			body.PartnerID, body.PicUserID, strings.TrimSpace(body.PicName), body.LocationID,
 			body.ProjectID, body.ProjectName, body.TechnicianName, defaultProgress(body.ProgressStatus),
+			decision, recovery,
 			sched, body.LatestUpdate, body.RepairDetails,
 			body.SalesID, body.SalesLineID, body.SerialUnitID, body.ReleaseLocationID).Scan(&id)
 		if err != nil {
@@ -445,8 +490,8 @@ func createRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		if err := replaceRepairOrderLines(r.Context(), tx, id, body.Lines); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+		if err := syncRepairPartIssues(r.Context(), tx, tu.TenantID, tu.AppUserID, id, orderDate, decision, body.Lines); err != nil {
+			writePartStockError(w, err)
 			return
 		}
 		if errs := saveCustom(r.Context(), tx, tu.TenantID, entityRepairOrder, id, body.CustomValues); errs != nil {
@@ -540,6 +585,19 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"coverage_decision": "Set coverage to Covered or Goodwill before releasing to stock."})
 			return
 		}
+		if err := assertCoveredWarranty(r.Context(), tx, tu.TenantID, nextDecision, body.SerialUnitID, orderDate); err != nil {
+			writePartStockError(w, err)
+			return
+		}
+		issuedQty, err := netIssuedQty(r.Context(), tx, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read issued parts.", "ERR_INTERNAL")
+			return
+		}
+		if msg := coverageDowngradeBlocked(currentDecision, nextDecision, issuedQty); msg != "" {
+			response.Validation(w, map[string]string{"coverage_decision": msg})
+			return
+		}
 
 		tag, err := tx.Exec(r.Context(), `
 			update public.inv_repair_orders set
@@ -583,8 +641,8 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		if err := replaceRepairOrderLines(r.Context(), tx, id, body.Lines); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+		if err := syncRepairPartIssues(r.Context(), tx, tu.TenantID, tu.AppUserID, id, orderDate, nextDecision, body.Lines); err != nil {
+			writePartStockError(w, err)
 			return
 		}
 		if errs := saveCustom(r.Context(), tx, tu.TenantID, entityRepairOrder, id, body.CustomValues); errs != nil {
@@ -601,13 +659,58 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		} else {
 			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.repair_order.update", "inv_repair_order", &id, nil, body)
 		}
+		logRepairCoverageChange(r.Context(), pool, tu.TenantID, tu.AppUserID, id, currentDecision, nextDecision, currentRecovery, nextRecovery)
 		ro, _ := loadRepairOrder(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, ro, "Updated.")
 	}
 }
 
 func deleteRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
-	return softDeleteHandler(pool, "inv_repair_orders", "inventory.repair_order.delete", "inv_repair_order")
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to delete.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		issued, err := netIssuedQty(r.Context(), tx, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read issued parts.", "ERR_INTERNAL")
+			return
+		}
+		if issued > partQtyEpsilon {
+			response.Validation(w, map[string]string{"parts": "Return issued parts before deleting this repair order."})
+			return
+		}
+		tag, err := tx.Exec(r.Context(), `
+			update public.inv_repair_orders
+			set deleted_at = now(), updated_at = now()
+			where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to delete.", "ERR_INTERNAL")
+			return
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.repair_order.delete", "inv_repair_order", &id, nil, nil)
+		response.OK(w, nil, "Deleted.")
+	}
+}
+
+func writePartStockError(w http.ResponseWriter, err error) {
+	if fe, ok := asPartFieldError(err); ok {
+		response.Validation(w, map[string]string{fe.field: fe.message})
+		return
+	}
+	response.Err(w, http.StatusInternalServerError, "Failed to save parts.", "ERR_INTERNAL")
 }
 
 func replaceRepairOrderLines(ctx context.Context, tx pgx.Tx, orderID int64, lines []RepairOrderLine) error {
@@ -619,13 +722,19 @@ func replaceRepairOrderLines(ctx context.Context, tx pgx.Tx, orderID int64, line
 		if lineNo <= 0 {
 			lineNo = i + 1
 		}
+		role := strings.TrimSpace(ln.LineRole)
+		if role == "" {
+			role = "unit"
+		}
 		_, err := tx.Exec(ctx, `
 			insert into public.inv_repair_order_lines (
 			  repair_order_id, line_no, item_id, item_code, item_name,
-			  problem_issue, service_charge, tax_type, qty, mop, serial_lot_no, remark
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+			  problem_issue, service_charge, tax_type, qty, mop, serial_lot_no, remark,
+			  line_role, part_key, location_id, serial_unit_id, lot_no
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
 			orderID, lineNo, ln.ItemID, strings.TrimSpace(ln.ItemCode), strings.TrimSpace(ln.ItemName),
-			ln.ProblemIssue, ln.ServiceCharge, ln.TaxType, ln.Qty, ln.Mop, ln.SerialLotNo, ln.Remark)
+			ln.ProblemIssue, ln.ServiceCharge, ln.TaxType, ln.Qty, ln.Mop, ln.SerialLotNo, ln.Remark,
+			role, nullIfEmpty(ln.PartKey), ln.PartLocationID, ln.SerialUnitID, ln.LotNo)
 		if err != nil {
 			return err
 		}
@@ -735,6 +844,54 @@ func repairProgressLabel(s string) string {
 		return "Released to active stock"
 	default:
 		return s
+	}
+}
+
+func coverageDecisionLabel(s string) string {
+	switch s {
+	case "pending":
+		return "Pending"
+	case "covered":
+		return "Covered"
+	case "goodwill":
+		return "Goodwill"
+	case "denied":
+		return "Denied"
+	default:
+		return s
+	}
+}
+
+func supplierRecoveryLabel(s string) string {
+	switch s {
+	case "none":
+		return "None"
+	case "requested":
+		return "Requested"
+	case "recovered":
+		return "Recovered"
+	default:
+		return s
+	}
+}
+
+func logRepairCoverageChange(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID, id int64, prevDecision, nextDecision, prevRecovery, nextRecovery string) {
+	oldValues := map[string]string{}
+	newValues := map[string]string{}
+	if prevDecision != nextDecision {
+		oldValues["coverage_decision"] = prevDecision
+		newValues["coverage_decision"] = nextDecision
+	}
+	if prevRecovery != nextRecovery {
+		oldValues["supplier_recovery"] = prevRecovery
+		newValues["supplier_recovery"] = nextRecovery
+	}
+	if len(newValues) == 0 {
+		return
+	}
+	err := audit.LogSync(ctx, pool, tenantID, actorUserID, "inventory.repair_order.coverage", "inv_repair_order", &id, oldValues, newValues)
+	if err != nil {
+		log.Printf("repair order coverage audit: %v", err)
 	}
 }
 

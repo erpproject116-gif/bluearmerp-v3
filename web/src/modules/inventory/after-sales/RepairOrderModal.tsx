@@ -7,6 +7,7 @@ import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { EditableLineGrid, emptyLine, type RepairLineRow } from "../../../shared/EditableLineGrid";
+import { RepairPartGrid, type PartLineRow } from "./RepairPartGrid";
 import { INVENTORY_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import type { LookupOption } from "../../../shared/LookupCombo";
@@ -73,6 +74,7 @@ export type RepairOrderDetail = {
   release_location_id?: number | null;
   sales_no?: string | null;
   serial_no?: string | null;
+  prior_repair_count?: number;
   lines?: Array<{
     line_no: number;
     item_id?: number | null;
@@ -85,6 +87,11 @@ export type RepairOrderDetail = {
     mop?: string | null;
     serial_lot_no?: string | null;
     remark?: string | null;
+    line_role?: string;
+    part_key?: string;
+    location_id?: number | null;
+    serial_unit_id?: number | null;
+    lot_no?: string | null;
   }>;
   custom_values?: Record<string, unknown>;
 };
@@ -145,8 +152,9 @@ async function fetchUsers(q: string): Promise<LookupOption[]> {
 }
 
 function linesFromDetail(lines?: RepairOrderDetail["lines"]): RepairLineRow[] {
-  if (!lines?.length) return [emptyLine(1)];
-  return lines.map((ln) => ({
+  const unit = (lines ?? []).filter((ln) => ln.line_role !== "part");
+  if (!unit.length) return [emptyLine(1)];
+  return unit.map((ln) => ({
     line_no: ln.line_no,
     item_id: ln.item_id,
     item_code: ln.item_code ?? "",
@@ -159,6 +167,25 @@ function linesFromDetail(lines?: RepairOrderDetail["lines"]): RepairLineRow[] {
     serial_lot_no: ln.serial_lot_no ?? "",
     remark: ln.remark ?? "",
   }));
+}
+
+function partsFromDetail(lines?: RepairOrderDetail["lines"]): PartLineRow[] {
+  return (lines ?? [])
+    .filter((ln) => ln.line_role === "part")
+    .map((ln) => ({
+      part_key: ln.part_key ?? "",
+      item_id: ln.item_id,
+      item_code: ln.item_code ?? "",
+      item_name: ln.item_name ?? "",
+      qty: ln.qty != null ? String(ln.qty) : "1",
+      location_id: ln.location_id,
+      serial_unit_id: ln.serial_unit_id,
+      serial_no: "",
+      lot_no: ln.lot_no ?? "",
+      track_serial: Boolean(ln.serial_unit_id),
+      track_lot: Boolean(ln.lot_no),
+      track_inventory_qty: true,
+    }));
 }
 
 export function RepairOrderModal(props: Props) {
@@ -204,6 +231,7 @@ export function RepairOrderModal(props: Props) {
   const [latestUpdate, setLatestUpdate] = createSignal("");
   const [repairDetails, setRepairDetails] = createSignal("");
   const [lines, setLines] = createSignal<RepairLineRow[]>([emptyLine(1)]);
+  const [parts, setParts] = createSignal<PartLineRow[]>([]);
   const [soPickerOpen, setSoPickerOpen] = createSignal(false);
   const [quotationPickerOpen, setQuotationPickerOpen] = createSignal(false);
   const [prPickerOpen, setPrPickerOpen] = createSignal(false);
@@ -267,6 +295,7 @@ export function RepairOrderModal(props: Props) {
       setReleaseLocationLabel("");
       setReceiveToRma(true);
       setLines(linesFromDetail(ed.lines));
+      setParts(partsFromDetail(ed.lines));
       loadCustom(ed.custom_values ?? {});
       void loadAttachments(ed.id);
     } else {
@@ -297,6 +326,7 @@ export function RepairOrderModal(props: Props) {
       setReleaseLocationLabel("");
       setReceiveToRma(true);
       setLines([emptyLine(1)]);
+      setParts([]);
       setAttachments([]);
       setPendingFiles([]);
       loadCustom({});
@@ -331,6 +361,7 @@ export function RepairOrderModal(props: Props) {
     location_label: locationLabel(),
     project_label: projectLabel(),
     lines: lines(),
+    parts: parts(),
   });
 
   const draft = useDocumentDraft({
@@ -355,6 +386,7 @@ export function RepairOrderModal(props: Props) {
       setLatestUpdate(payload.latest_update);
       setRepairDetails(payload.repair_details);
       setLines(payload.lines?.length ? payload.lines : [emptyLine(1)]);
+      setParts(payload.parts ?? []);
     },
     enabled: () => props.open,
     // The "new" branch above calls loadPreview() asynchronously, so autoApply could race
@@ -472,19 +504,35 @@ export function RepairOrderModal(props: Props) {
       serial_unit_id: serialUnitId(),
       release_location_id: releaseLocationId(),
       receive_to_rma: receiveToRma() && Boolean(serialUnitId()),
-      lines: lines().map((ln, i) => ({
-        line_no: i + 1,
-        item_id: ln.item_id || null,
-        item_code: ln.item_code,
-        item_name: ln.item_name,
-        problem_issue: ln.problem_issue || null,
-        service_charge: ln.service_charge === "" ? null : Number(ln.service_charge),
-        tax_type: ln.tax_type || null,
-        qty: ln.qty === "" ? 0 : Number(ln.qty),
-        mop: ln.mop || null,
-        serial_lot_no: ln.serial_lot_no || null,
-        remark: ln.remark || null,
-      })),
+      lines: [
+        ...lines().map((ln, i) => ({
+          line_no: i + 1,
+          item_id: ln.item_id || null,
+          item_code: ln.item_code,
+          item_name: ln.item_name,
+          problem_issue: ln.problem_issue || null,
+          service_charge: ln.service_charge === "" ? null : Number(ln.service_charge),
+          tax_type: ln.tax_type || null,
+          qty: ln.qty === "" ? 0 : Number(ln.qty),
+          mop: ln.mop || null,
+          serial_lot_no: ln.serial_lot_no || null,
+          remark: ln.remark || null,
+          line_role: "unit",
+        })),
+        ...parts()
+          .filter((ln) => ln.item_id)
+          .map((ln) => ({
+            line_role: "part",
+            part_key: ln.part_key || "",
+            item_id: ln.item_id,
+            item_code: ln.item_code,
+            item_name: ln.item_name,
+            qty: ln.qty === "" ? 0 : Number(ln.qty),
+            location_id: ln.location_id || null,
+            serial_unit_id: ln.serial_unit_id || null,
+            lot_no: ln.lot_no || null,
+          })),
+      ],
       custom_values: customValues(),
     };
 
@@ -516,6 +564,8 @@ export function RepairOrderModal(props: Props) {
       return;
     }
     setCreatedOrder(res.data);
+    setLines(linesFromDetail(res.data.lines));
+    setParts(partsFromDetail(res.data.lines));
     void loadAttachments(res.data.id);
   };
 
@@ -656,6 +706,11 @@ export function RepairOrderModal(props: Props) {
             </select>
           )}
         </ModalField>
+        <Show when={(effectiveEditing()?.prior_repair_count ?? 0) > 0}>
+          <p class="col-span-full text-sm text-text-secondary">
+            Earlier repair orders for this serial: {effectiveEditing()?.prior_repair_count}
+          </p>
+        </Show>
         <Field label="Coverage decision">
           <select class={inputClass} value={coverageDecision()} onChange={(e) => setCoverageDecision(e.currentTarget.value)}>
             <option value="pending">Pending</option>
@@ -939,6 +994,7 @@ export function RepairOrderModal(props: Props) {
         />
       </div>
       <EditableLineGrid lines={lines} onChange={setLines} onSerialLotBlur={onSerialLotBlur} />
+      <RepairPartGrid lines={parts} onChange={setParts} />
       <CustomFieldsSection entityType={INVENTORY_ENTITY.repairOrder} values={customValues} onChange={setCustom} />
       <ChangeLogPanel targetType="inv_repair_order" targetId={effectiveEditing()?.id} />
       </div>

@@ -21,6 +21,8 @@ export type RepairOrderRow = {
   scheduled_completion_date?: string | null;
   latest_update?: string | null;
   progress_status: string;
+  coverage_decision?: string;
+  supplier_recovery?: string;
 };
 
 export function useRepairOrderList(params: () => RepairOrderListParams) {

@@ -56,10 +56,42 @@ export default function RepairOrderStatusPage() {
     setModalOpen(true);
   };
 
+  const warnPatch = (res: { message?: string; errors?: Record<string, string> }, fallback: string) => {
+    const detail = res.errors && Object.values(res.errors).find((message) => message);
+    toast.warning(detail || res.message || fallback);
+  };
+
   const onProgressChange = async (repairOrderId: number, status: string) => {
-    const res = await patchRepairOrderProgress(repairOrderId, status);
+    const res = await patchRepairOrderProgress(repairOrderId, { progress_status: status });
     if (!res.success) {
-      toast.warning(res.message ?? "Failed to update progress.");
+      warnPatch(res, "Failed to update progress.");
+      invalidate();
+      return;
+    }
+    invalidate();
+  };
+
+  const onCoverageChange = async (repairOrderId: number, progress: string, coverage: string) => {
+    const res = await patchRepairOrderProgress(repairOrderId, {
+      progress_status: progress,
+      coverage_decision: coverage,
+    });
+    if (!res.success) {
+      warnPatch(res, "Failed to update coverage.");
+      invalidate();
+      return;
+    }
+    invalidate();
+  };
+
+  const onRecoveryChange = async (repairOrderId: number, progress: string, recovery: string) => {
+    const res = await patchRepairOrderProgress(repairOrderId, {
+      progress_status: progress,
+      supplier_recovery: recovery,
+    });
+    if (!res.success) {
+      warnPatch(res, "Failed to update supplier recovery.");
+      invalidate();
       return;
     }
     invalidate();
@@ -87,6 +119,8 @@ export default function RepairOrderStatusPage() {
           onPageChange={setPage}
           onDateNoClick={(id) => void openOrder(id)}
           onProgressChange={(id, status) => void onProgressChange(id, status)}
+          onCoverageChange={(id, progress, coverage) => void onCoverageChange(id, progress, coverage)}
+          onRecoveryChange={(id, progress, recovery) => void onRecoveryChange(id, progress, recovery)}
         />
       </Show>
 

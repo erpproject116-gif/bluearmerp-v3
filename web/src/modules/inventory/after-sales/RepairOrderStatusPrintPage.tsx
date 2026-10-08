@@ -11,7 +11,7 @@ import {
   formatDisplayDate,
   type RepairOrderStatusFilters,
 } from "./repairOrderStatusFilters";
-import { repairProgressLabel } from "./repairProgress";
+import { coverageDecisionLabel, repairProgressLabel, supplierRecoveryLabel } from "./repairProgress";
 import "../after-sales/repairOrderPrint.css";
 import "./statusReportPrint.css";
 
@@ -19,6 +19,8 @@ const REPAIR_STATUS_PRINT_COLUMNS_META = [
   { key: "date_no_display", label: "Date-No." },
   { key: "repair_order_no", label: "Repair Order No" },
   { key: "progress_status", label: "Progress" },
+  { key: "coverage_decision", label: "Coverage" },
+  { key: "supplier_recovery", label: "Supplier recovery" },
   { key: "location_name", label: "Location" },
   { key: "pic_name", label: "PIC" },
   { key: "customer_name", label: "Customer" },
@@ -37,6 +39,16 @@ function repairOrderStatusPrintColumns(): StatusPrintColumn<StatusReportRow>[] {
       key: "progress_status",
       label: "Progress",
       render: (r) => repairProgressLabel(r.progress_status),
+    },
+    {
+      key: "coverage_decision",
+      label: "Coverage",
+      render: (r) => coverageDecisionLabel(r.coverage_decision || "pending"),
+    },
+    {
+      key: "supplier_recovery",
+      label: "Supplier recovery",
+      render: (r) => supplierRecoveryLabel(r.supplier_recovery || "none"),
     },
     { key: "location_name", label: "Location", render: (r) => r.location_name },
     { key: "pic_name", label: "PIC", render: (r) => r.pic_name },

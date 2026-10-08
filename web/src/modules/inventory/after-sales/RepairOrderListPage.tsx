@@ -9,7 +9,7 @@ import { useInvalidateRepairOrders, useRepairOrderList, type RepairOrderRow } fr
 import { AfterSalesLayout } from "./AfterSalesLayout";
 import { RepairOrderModal, type RepairOrderDetail } from "./RepairOrderModal";
 import { openRepairOrderPrint } from "./repairOrderPrint";
-import { REPAIR_PROGRESS_STEPS, repairProgressLabel } from "./repairProgress";
+import { REPAIR_PROGRESS_STEPS, coverageDecisionLabel, repairProgressLabel, supplierRecoveryLabel } from "./repairProgress";
 
 type PageOptions = {
   defaultProgressFilter?: string;
@@ -123,6 +123,18 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
             key: "progress_status",
             header: "Progress",
             render: (r) => repairProgressLabel(r.progress_status),
+          },
+          {
+            key: "coverage_decision",
+            header: "Coverage",
+            sortable: false,
+            render: (r) => coverageDecisionLabel(r.coverage_decision || "pending"),
+          },
+          {
+            key: "supplier_recovery",
+            header: "Supplier recovery",
+            sortable: false,
+            render: (r) => supplierRecoveryLabel(r.supplier_recovery || "none"),
           },
           {
             key: "history",

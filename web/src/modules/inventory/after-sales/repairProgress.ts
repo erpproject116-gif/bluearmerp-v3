@@ -37,3 +37,24 @@ export function repairProgressOptions(from: string): RepairProgress[] {
   if (!(REPAIR_PROGRESS_STEPS as readonly string[]).includes(from)) return ["received"];
   return REPAIR_PROGRESS_STEPS.filter((step) => step === from || repairProgressAllowed(from, step));
 }
+
+export const COVERAGE_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "covered", label: "Covered" },
+  { value: "goodwill", label: "Goodwill" },
+  { value: "denied", label: "Denied" },
+] as const;
+
+export const RECOVERY_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "requested", label: "Requested" },
+  { value: "recovered", label: "Recovered" },
+] as const;
+
+export function coverageDecisionLabel(code: string): string {
+  return COVERAGE_OPTIONS.find((option) => option.value === code)?.label ?? (code || "Pending");
+}
+
+export function supplierRecoveryLabel(code: string): string {
+  return RECOVERY_OPTIONS.find((option) => option.value === code)?.label ?? (code || "None");
+}

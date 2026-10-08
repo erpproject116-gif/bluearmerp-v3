@@ -9,6 +9,8 @@ export type StatusReportRow = {
   date_no_display: string;
   repair_order_no: string;
   progress_status: string;
+  coverage_decision?: string;
+  supplier_recovery?: string;
   location_name: string;
   pic_name: string;
   customer_name: string;
@@ -63,9 +65,12 @@ export function useInvalidateStatusReport() {
   return () => void client.invalidateQueries({ queryKey: ["repair-order-status-report"] });
 }
 
-export async function patchRepairOrderProgress(repairOrderId: number, progressStatus: string) {
+export async function patchRepairOrderProgress(
+  repairOrderId: number,
+  body: { progress_status: string; coverage_decision?: string; supplier_recovery?: string },
+) {
   return apiFetch(`/api/v1/inventory/repair-orders/${repairOrderId}/progress-status`, {
     method: "PATCH",
-    body: JSON.stringify({ progress_status: progressStatus }),
+    body: JSON.stringify(body),
   });
 }

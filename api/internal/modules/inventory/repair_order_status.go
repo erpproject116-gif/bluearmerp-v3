@@ -32,19 +32,21 @@ type statusReportFilters struct {
 }
 
 type statusReportRow struct {
-	RepairOrderID   int64   `json:"repair_order_id"`
-	LineID          int64   `json:"line_id"`
-	DateNoDisplay   string  `json:"date_no_display"`
-	RepairOrderNo   string  `json:"repair_order_no"`
-	ProgressStatus  string  `json:"progress_status"`
-	LocationName    string  `json:"location_name"`
-	PicName         string  `json:"pic_name"`
-	CustomerName    string  `json:"customer_name"`
-	LatestUpdate    *string `json:"latest_update,omitempty"`
-	ItemCode        string  `json:"item_code"`
-	ItemNameDisplay string  `json:"item_name_display"`
-	Qty             float64 `json:"qty"`
-	Remark          *string `json:"remark,omitempty"`
+	RepairOrderID    int64   `json:"repair_order_id"`
+	LineID           int64   `json:"line_id"`
+	DateNoDisplay    string  `json:"date_no_display"`
+	RepairOrderNo    string  `json:"repair_order_no"`
+	ProgressStatus   string  `json:"progress_status"`
+	CoverageDecision string  `json:"coverage_decision"`
+	SupplierRecovery string  `json:"supplier_recovery"`
+	LocationName     string  `json:"location_name"`
+	PicName          string  `json:"pic_name"`
+	CustomerName     string  `json:"customer_name"`
+	LatestUpdate     *string `json:"latest_update,omitempty"`
+	ItemCode         string  `json:"item_code"`
+	ItemNameDisplay  string  `json:"item_name_display"`
+	Qty              float64 `json:"qty"`
+	Remark           *string `json:"remark,omitempty"`
 }
 
 type statusReportSummary struct {
@@ -163,7 +165,7 @@ func buildStatusReportWhere(f statusReportFilters, tenantID int64) (string, []an
 	if f.ItemID != nil {
 		where += fmt.Sprintf(` and exists (
 			select 1 from public.inv_repair_order_lines fl
-			where fl.repair_order_id = ro.id and fl.item_id = $%d
+			where fl.repair_order_id = ro.id and fl.line_role = 'unit' and fl.item_id = $%d
 		)`, argN)
 		args = append(args, *f.ItemID)
 		argN++
@@ -176,7 +178,7 @@ func statusReportFromClause() string {
 		from public.inv_repair_orders ro
 		join public.inv_partners p on p.id = ro.partner_id
 		join public.inv_locations l on l.id = ro.location_id
-		join public.inv_repair_order_lines ln on ln.repair_order_id = ro.id
+		join public.inv_repair_order_lines ln on ln.repair_order_id = ro.id and ln.line_role = 'unit'
 		left join public.inv_items i on i.id = ln.item_id`
 }
 
@@ -205,6 +207,7 @@ func queryStatusReportRows(ctx context.Context, pool *pgxpool.Pool, tenantID int
 	orderClause := statusReportOrderBy(sort, order)
 	q := fmt.Sprintf(`
 		select ro.id, ln.id, ro.order_date, ro.date_seq, ro.repair_order_no, ro.progress_status,
+		  ro.coverage_decision, ro.supplier_recovery,
 		  l.location_name, ro.pic_name, p.company_name, ro.latest_update,
 		  ln.item_code, ln.item_name, i.spec_name, ln.qty::float8, ln.remark,
 		  count(*) over()
@@ -231,6 +234,7 @@ func queryStatusReportRows(ctx context.Context, pool *pgxpool.Pool, tenantID int
 		var specName *string
 		if err := rows.Scan(
 			&row.RepairOrderID, &row.LineID, &orderDate, &dateSeq, &row.RepairOrderNo, &row.ProgressStatus,
+			&row.CoverageDecision, &row.SupplierRecovery,
 			&row.LocationName, &row.PicName, &row.CustomerName, &row.LatestUpdate,
 			&row.ItemCode, &itemName, &specName, &row.Qty, &row.Remark, &total,
 		); err != nil {
@@ -322,7 +326,8 @@ func exportRepairOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Disposition", `attachment; filename="repair-order-status.csv"`)
 		cw := csv.NewWriter(w)
 		_ = cw.Write([]string{
-			"Date-No", "Repair Order No", "Progress Status", "Location Name", "PIC Name",
+			"Date-No", "Repair Order No", "Progress Status", "Coverage", "Supplier recovery",
+			"Location Name", "PIC Name",
 			"Customer/Vendor Name", "Latest Update", "Item Code", "Item Name [Spec]", "Qty", "Remark",
 		})
 		for _, row := range rows {
@@ -336,7 +341,9 @@ func exportRepairOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			progress := repairProgressLabel(row.ProgressStatus)
 			_ = cw.Write([]string{
-				row.DateNoDisplay, row.RepairOrderNo, progress, row.LocationName, row.PicName,
+				row.DateNoDisplay, row.RepairOrderNo, progress,
+				coverageDecisionLabel(row.CoverageDecision), supplierRecoveryLabel(row.SupplierRecovery),
+				row.LocationName, row.PicName,
 				row.CustomerName, latest, row.ItemCode, row.ItemNameDisplay,
 				strconv.FormatFloat(row.Qty, 'f', -1, 64), remark,
 			})
@@ -355,6 +362,8 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		var body struct {
 			ProgressStatus    string `json:"progress_status"`
+			CoverageDecision  string `json:"coverage_decision"`
+			SupplierRecovery  string `json:"supplier_recovery"`
 			ReleaseLocationID *int64 `json:"release_location_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -374,11 +383,14 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		var currentProgress, currentDecision string
+		var currentProgress, currentDecision, currentRecovery string
+		var orderDate time.Time
+		var serialID *int64
 		err = tx.QueryRow(r.Context(), `
-			select progress_status, coverage_decision from public.inv_repair_orders
+			select progress_status, coverage_decision, supplier_recovery, order_date, serial_unit_id
+			from public.inv_repair_orders
 			where id = $1 and tenant_id = $2 and deleted_at is null
-			for update`, id, tu.TenantID).Scan(&currentProgress, &currentDecision)
+			for update`, id, tu.TenantID).Scan(&currentProgress, &currentDecision, &currentRecovery, &orderDate, &serialID)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Repair order not found.", "ERR_NOT_FOUND")
 			return
@@ -387,16 +399,49 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"progress_status": "That progress step is not allowed from the current step."})
 			return
 		}
-		if status == "released" && currentProgress != "released" && !repairReleaseAllowed(currentDecision) {
+		nextDecision := currentDecision
+		if strings.TrimSpace(body.CoverageDecision) != "" {
+			decision, ok := normalizeCoverageDecision(body.CoverageDecision)
+			if !ok {
+				response.Validation(w, map[string]string{"coverage_decision": "Must be pending, covered, denied, or goodwill."})
+				return
+			}
+			nextDecision = decision
+		}
+		nextRecovery := currentRecovery
+		if strings.TrimSpace(body.SupplierRecovery) != "" {
+			recovery, ok := normalizeSupplierRecovery(body.SupplierRecovery)
+			if !ok {
+				response.Validation(w, map[string]string{"supplier_recovery": "Must be none, requested, or recovered."})
+				return
+			}
+			nextRecovery = recovery
+		}
+		if status == "released" && currentProgress != "released" && !repairReleaseAllowed(nextDecision) {
 			response.Validation(w, map[string]string{"coverage_decision": "Set coverage to Covered or Goodwill before releasing to stock."})
+			return
+		}
+		if strings.TrimSpace(body.CoverageDecision) != "" && nextDecision == "covered" {
+			if err := assertCoveredWarranty(r.Context(), tx, tu.TenantID, nextDecision, serialID, orderDate); err != nil {
+				writePartStockError(w, err)
+				return
+			}
+		}
+		issuedQty, err := netIssuedQty(r.Context(), tx, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read issued parts.", "ERR_INTERNAL")
+			return
+		}
+		if msg := coverageDowngradeBlocked(currentDecision, nextDecision, issuedQty); msg != "" {
+			response.Validation(w, map[string]string{"coverage_decision": msg})
 			return
 		}
 
 		tag, err := tx.Exec(r.Context(), `
 			update public.inv_repair_orders
-			set progress_status = $1, updated_at = now()
-			where id = $2 and tenant_id = $3 and deleted_at is null`,
-			status, id, tu.TenantID)
+			set progress_status = $1, coverage_decision = $2, supplier_recovery = $3, updated_at = now()
+			where id = $4 and tenant_id = $5 and deleted_at is null`,
+			status, nextDecision, nextRecovery, id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Repair order not found.", "ERR_NOT_FOUND")
 			return
@@ -427,6 +472,7 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		logRepairProgressChange(r.Context(), pool, tu.TenantID, tu.AppUserID, id, currentProgress, status)
+		logRepairCoverageChange(r.Context(), pool, tu.TenantID, tu.AppUserID, id, currentDecision, nextDecision, currentRecovery, nextRecovery)
 		ro, err := loadRepairOrder(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load repair order.", "ERR_INTERNAL")

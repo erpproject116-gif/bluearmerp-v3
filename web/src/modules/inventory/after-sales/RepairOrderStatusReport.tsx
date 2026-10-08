@@ -8,7 +8,7 @@ import type { StatusReportRow } from "../../../shared/useRepairOrderStatusReport
 import { getAccessToken } from "../../../shared/api";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
-import { repairProgressLabel, repairProgressOptions } from "./repairProgress";
+import { COVERAGE_OPTIONS, RECOVERY_OPTIONS, repairProgressLabel, repairProgressOptions } from "./repairProgress";
 
 type Props = {
   filters: RepairOrderStatusFilters;
@@ -23,6 +23,8 @@ type Props = {
   onPageChange: (page: number) => void;
   onDateNoClick: (repairOrderId: number) => void;
   onProgressChange: (repairOrderId: number, status: string) => void;
+  onCoverageChange: (repairOrderId: number, progress: string, coverage: string) => void;
+  onRecoveryChange: (repairOrderId: number, progress: string, recovery: string) => void;
 };
 
 export function RepairOrderStatusReport(props: Props) {
@@ -69,6 +71,8 @@ export function RepairOrderStatusReport(props: Props) {
               <th class="px-3 py-2">Date-No.</th>
               <th class="px-3 py-2">Repair Order No</th>
               <th class="px-3 py-2">Progress Status</th>
+              <th class="px-3 py-2">Coverage</th>
+              <th class="px-3 py-2">Supplier recovery</th>
               <th class="px-3 py-2">Location Name</th>
               <th class="px-3 py-2">PIC Name</th>
               <th class="px-3 py-2">Customer/Vendor Name</th>
@@ -82,10 +86,10 @@ export function RepairOrderStatusReport(props: Props) {
           </thead>
           <tbody>
             <Show when={props.loading}>
-              <ReportLoadingRow colSpan={12} />
+              <ReportLoadingRow colSpan={14} />
             </Show>
             <Show when={!props.loading && props.rows.length === 0}>
-              <ReportEmptyRow colSpan={12} />
+              <ReportEmptyRow colSpan={14} />
             </Show>
             <For each={props.rows}>
               {(row) => (
@@ -108,6 +112,28 @@ export function RepairOrderStatusReport(props: Props) {
                     >
                       <For each={repairProgressOptions(row.progress_status)}>
                         {(step) => <option value={step}>{repairProgressLabel(step)}</option>}
+                      </For>
+                    </select>
+                  </td>
+                  <td class="px-3 py-2">
+                    <select
+                      class="rounded border border-stroke bg-white px-2 py-1 text-sm"
+                      value={row.coverage_decision || "pending"}
+                      onChange={(e) => props.onCoverageChange(row.repair_order_id, row.progress_status, e.currentTarget.value)}
+                    >
+                      <For each={COVERAGE_OPTIONS}>
+                        {(option) => <option value={option.value}>{option.label}</option>}
+                      </For>
+                    </select>
+                  </td>
+                  <td class="px-3 py-2">
+                    <select
+                      class="rounded border border-stroke bg-white px-2 py-1 text-sm"
+                      value={row.supplier_recovery || "none"}
+                      onChange={(e) => props.onRecoveryChange(row.repair_order_id, row.progress_status, e.currentTarget.value)}
+                    >
+                      <For each={RECOVERY_OPTIONS}>
+                        {(option) => <option value={option.value}>{option.label}</option>}
                       </For>
                     </select>
                   </td>
@@ -135,7 +161,7 @@ export function RepairOrderStatusReport(props: Props) {
           </tbody>
           <tfoot class="border-t-2 border-stroke bg-slate-50 font-semibold">
             <tr>
-              <td colSpan={9} class="px-3 py-2 text-right">
+              <td colSpan={11} class="px-3 py-2 text-right">
                 Total
               </td>
               <td class="px-3 py-2 text-right">{props.totalQty}</td>
