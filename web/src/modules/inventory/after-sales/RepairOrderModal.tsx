@@ -62,6 +62,8 @@ export type RepairOrderDetail = {
   project_name?: string | null;
   technician_name?: string | null;
   progress_status: string;
+  coverage_decision?: string;
+  supplier_recovery?: string;
   scheduled_completion_date?: string | null;
   latest_update?: string | null;
   repair_details?: string | null;
@@ -188,6 +190,8 @@ export function RepairOrderModal(props: Props) {
   const [projectName, setProjectName] = createSignal("");
   const [technicianName, setTechnicianName] = createSignal("");
   const [progressStatus, setProgressStatus] = createSignal("received");
+  const [coverageDecision, setCoverageDecision] = createSignal("pending");
+  const [supplierRecovery, setSupplierRecovery] = createSignal("none");
   const [salesId, setSalesId] = createSignal<number | null>(null);
   const [salesNo, setSalesNo] = createSignal("");
   const [salesLineId, setSalesLineId] = createSignal<number | null>(null);
@@ -249,6 +253,8 @@ export function RepairOrderModal(props: Props) {
       setProjectName(ed.project_name ?? "");
       setTechnicianName(ed.technician_name ?? "");
       setProgressStatus(ed.progress_status || "received");
+      setCoverageDecision(ed.coverage_decision || "pending");
+      setSupplierRecovery(ed.supplier_recovery || "none");
       setScheduledDate(ed.scheduled_completion_date ?? "");
       setLatestUpdate(ed.latest_update ?? "");
       setRepairDetails(ed.repair_details ?? "");
@@ -277,6 +283,8 @@ export function RepairOrderModal(props: Props) {
       setProjectName("");
       setTechnicianName("");
       setProgressStatus("received");
+      setCoverageDecision("pending");
+      setSupplierRecovery("none");
       setScheduledDate("");
       setLatestUpdate("");
       setRepairDetails("");
@@ -454,6 +462,8 @@ export function RepairOrderModal(props: Props) {
       project_name: projectName() || null,
       technician_name: technicianName() || null,
       progress_status: status,
+      coverage_decision: coverageDecision(),
+      supplier_recovery: supplierRecovery(),
       scheduled_completion_date: scheduledDate() || null,
       latest_update: latestUpdate() || null,
       repair_details: repairDetails() || null,
@@ -646,6 +656,21 @@ export function RepairOrderModal(props: Props) {
             </select>
           )}
         </ModalField>
+        <Field label="Coverage decision">
+          <select class={inputClass} value={coverageDecision()} onChange={(e) => setCoverageDecision(e.currentTarget.value)}>
+            <option value="pending">Pending</option>
+            <option value="covered">Covered</option>
+            <option value="goodwill">Goodwill</option>
+            <option value="denied">Denied</option>
+          </select>
+        </Field>
+        <Field label="Supplier recovery">
+          <select class={inputClass} value={supplierRecovery()} onChange={(e) => setSupplierRecovery(e.currentTarget.value)}>
+            <option value="none">None</option>
+            <option value="requested">Requested</option>
+            <option value="recovered">Recovered</option>
+          </select>
+        </Field>
         <div class="col-span-full flex flex-wrap items-end gap-2">
           <Field label="Original sales invoice / serial (RMA)">
             <div class="flex flex-wrap gap-2">

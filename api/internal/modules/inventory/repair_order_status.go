@@ -374,17 +374,21 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		var currentProgress string
+		var currentProgress, currentDecision string
 		err = tx.QueryRow(r.Context(), `
-			select progress_status from public.inv_repair_orders
+			select progress_status, coverage_decision from public.inv_repair_orders
 			where id = $1 and tenant_id = $2 and deleted_at is null
-			for update`, id, tu.TenantID).Scan(&currentProgress)
+			for update`, id, tu.TenantID).Scan(&currentProgress, &currentDecision)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Repair order not found.", "ERR_NOT_FOUND")
 			return
 		}
 		if !repairProgressAllowed(currentProgress, status) {
 			response.Validation(w, map[string]string{"progress_status": "That progress step is not allowed from the current step."})
+			return
+		}
+		if status == "released" && currentProgress != "released" && !repairReleaseAllowed(currentDecision) {
+			response.Validation(w, map[string]string{"coverage_decision": "Set coverage to Covered or Goodwill before releasing to stock."})
 			return
 		}
 

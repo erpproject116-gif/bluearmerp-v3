@@ -10,11 +10,11 @@ import {
   type WarrantyAsset,
   type WarrantyAssetStatus,
 } from "../../../shared/useWarrantyAssets";
+import { apiFetch } from "../../../shared/api";
 import { useListState } from "../../../shared/useListState";
 import { useToast } from "../../../shared/toast";
 import { CrmTaskCell } from "../../../shared/CrmTaskCell";
 import { useCrmTaskSummaries } from "../../../shared/useCrmTaskSummaries";
-import { apiFetch } from "../../../shared/api";
 import { serialTraceHref } from "../serial-lot/openSerialTrace";
 import { AfterSalesLayout } from "./AfterSalesLayout";
 
@@ -35,6 +35,11 @@ export default function CustomerWarrantyPage() {
   const [editEnd, setEditEnd] = createSignal("");
   const [editStatus, setEditStatus] = createSignal<WarrantyAssetStatus>("active");
   const [saving, setSaving] = createSignal(false);
+  const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
+  const [bulkOpen, setBulkOpen] = createSignal(false);
+  const [bulkEnd, setBulkEnd] = createSignal("");
+  const [bulkStatus, setBulkStatus] = createSignal("");
+  const [bulkSaving, setBulkSaving] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateWarrantyAssets();
 
@@ -91,6 +96,35 @@ export default function CustomerWarrantyPage() {
       return;
     }
     setModalOpen(false);
+    invalidate();
+  };
+
+  const saveBulk = async () => {
+    const ids = [...selectedIds()];
+    if (ids.length === 0) return;
+    const payload: { ids: number[]; warranty_end?: string; status?: string } = { ids };
+    if (bulkEnd().trim()) payload.warranty_end = bulkEnd().trim();
+    if (bulkStatus()) payload.status = bulkStatus();
+    if (!payload.warranty_end && !payload.status) {
+      toast.warning("Enter a coverage end date or a status.");
+      return;
+    }
+    setBulkSaving(true);
+    const res = await apiFetch<{ updated: number; skipped: number }>(
+      "/api/v1/crm/warranty-assets/bulk",
+      { method: "PATCH", body: JSON.stringify(payload) },
+      { silent: true },
+    );
+    setBulkSaving(false);
+    if (!res.success || !res.data) {
+      toast.warning(res.message ?? "Could not update warranty assets.");
+      return;
+    }
+    toast.success(`Updated ${res.data.updated} serial(s); ${res.data.skipped} skipped.`);
+    setBulkOpen(false);
+    setBulkEnd("");
+    setBulkStatus("");
+    setSelectedIds(new Set<number>());
     invalidate();
   };
 
@@ -239,6 +273,19 @@ export default function CustomerWarrantyPage() {
         loading={list.isFetching}
         selectedId={selectedId()}
         onSelect={setSelectedId}
+        selectable
+        selectedIds={selectedIds()}
+        onSelectionChange={setSelectedIds}
+        toolbarExtra={
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-2 text-sm disabled:opacity-50"
+            disabled={selectedIds().size === 0}
+            onClick={() => setBulkOpen(true)}
+          >
+            Update selected
+          </button>
+        }
         onEdit={openEdit}
         onNew={() => {}}
         showNew={false}
@@ -305,6 +352,28 @@ export default function CustomerWarrantyPage() {
             </>
           )}
         </Show>
+      </EntityModal>
+
+      <EntityModal
+        open={bulkOpen()}
+        title={`Update ${selectedIds().size} serial(s)`}
+        onClose={() => setBulkOpen(false)}
+        onSave={() => void saveBulk()}
+        saving={bulkSaving()}
+        stacked
+      >
+        <p class="text-sm text-text-secondary">Leave a field blank to keep each serial’s current value.</p>
+        <Field label="Coverage end">
+          <DateInput value={bulkEnd()} onInput={(e) => setBulkEnd(e.currentTarget.value)} />
+        </Field>
+        <Field label="Status">
+          <select class={inputClass} value={bulkStatus()} onChange={(e) => setBulkStatus(e.currentTarget.value)}>
+            <option value="">Leave unchanged</option>
+            <option value="active">Active</option>
+            <option value="expired">Expired</option>
+            <option value="void">Void</option>
+          </select>
+        </Field>
       </EntityModal>
     </AfterSalesLayout>
   );

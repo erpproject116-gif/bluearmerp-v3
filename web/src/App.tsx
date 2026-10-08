@@ -631,11 +631,14 @@ export default function App() {
           )} />
           <Route path="/after-sales/repair-orders/new" component={RepairOrderNewPage} />
           <Route path="/after-sales/repair-orders/status" component={RepairOrderStatusPage} />
+          <Route path="/after-sales/repair-orders/parts" component={RegisterRepairConsumptionPage} />
           <Route path="/after-sales/repair-orders/settings" component={RepairOrderSettingsPage} />
           <Route path="/after-sales/repair-orders" component={RepairOrderListPage} />
           <Route path="/after-sales/register-repair/new" component={RegisterRepairNewPage} />
           <Route path="/after-sales/register-repair/status" component={RegisterRepairStatusPage} />
-          <Route path="/after-sales/register-repair/consumption" component={RegisterRepairConsumptionPage} />
+          <Route path="/after-sales/register-repair/consumption" component={() => (
+            <Navigate href="/app/after-sales/repair-orders/parts" />
+          )} />
           <Route path="/after-sales/register-repair" component={RegisterRepairListPage} />
           <Route path="/after-sales/warranty" component={CustomerWarrantyPage} />
           <Route path="/quotation/setup" component={ModuleSetupHubPage} />

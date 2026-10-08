@@ -18,22 +18,22 @@ import (
 )
 
 type WarrantyAsset struct {
-	ID             int64   `json:"id"`
-	PartnerID      int64   `json:"partner_id"`
-	PartnerName    string  `json:"partner_name,omitempty"`
-	ItemID         *int64  `json:"item_id,omitempty"`
-	ItemCode       string  `json:"item_code"`
-	ItemName       string  `json:"item_name"`
-	SerialNo       string  `json:"serial_no"`
-	SalesID        *int64  `json:"sales_id,omitempty"`
-	SalesLineID    *int64  `json:"sales_line_id,omitempty"`
-	SerialUnitID   *int64  `json:"serial_unit_id,omitempty"`
-	WarrantyOrigin string  `json:"warranty_origin,omitempty"`
-	WarrantyStart  string  `json:"warranty_start"`
-	WarrantyEnd    string  `json:"warranty_end"`
-	Status         string  `json:"status"`
-	PicUserID      *int64  `json:"pic_user_id,omitempty"`
-	PicName        string  `json:"pic_name"`
+	ID             int64  `json:"id"`
+	PartnerID      int64  `json:"partner_id"`
+	PartnerName    string `json:"partner_name,omitempty"`
+	ItemID         *int64 `json:"item_id,omitempty"`
+	ItemCode       string `json:"item_code"`
+	ItemName       string `json:"item_name"`
+	SerialNo       string `json:"serial_no"`
+	SalesID        *int64 `json:"sales_id,omitempty"`
+	SalesLineID    *int64 `json:"sales_line_id,omitempty"`
+	SerialUnitID   *int64 `json:"serial_unit_id,omitempty"`
+	WarrantyOrigin string `json:"warranty_origin,omitempty"`
+	WarrantyStart  string `json:"warranty_start"`
+	WarrantyEnd    string `json:"warranty_end"`
+	Status         string `json:"status"`
+	PicUserID      *int64 `json:"pic_user_id,omitempty"`
+	PicName        string `json:"pic_name"`
 }
 
 type warrantyPatchBody struct {
@@ -52,6 +52,7 @@ const warrantyAssetSelect = `
 
 func registerWarrantyAssetRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/warranty-assets", listWarrantyAssets(pool))
+	r.Patch("/warranty-assets/bulk", bulkPatchWarrantyAssets(pool))
 	r.Get("/warranty-assets/{id}", getWarrantyAsset(pool))
 	r.Patch("/warranty-assets/{id}", patchWarrantyAsset(pool))
 	r.Post("/warranty-assets/sync-from-sales/{sales_id}", syncWarrantyFromSales(pool))
@@ -231,6 +232,90 @@ func getWarrantyAsset(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, row, "OK")
+	}
+}
+
+func warrantyBulkError(end, status *string) map[string]string {
+	if end == nil && status == nil {
+		return map[string]string{"body": "Provide a coverage end date or a status."}
+	}
+	errs := map[string]string{}
+	if end != nil {
+		if _, err := parseDate(*end); err != nil {
+			errs["warranty_end"] = "Use YYYY-MM-DD."
+		}
+	}
+	if status != nil {
+		s := strings.TrimSpace(*status)
+		if s != "active" && s != "expired" && s != "void" {
+			errs["status"] = "Must be active, expired, or void."
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs
+}
+
+func bulkPatchWarrantyAssets(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		var body struct {
+			IDs         []int64 `json:"ids"`
+			WarrantyEnd *string `json:"warranty_end"`
+			Status      *string `json:"status"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		if len(body.IDs) == 0 {
+			response.Validation(w, map[string]string{"ids": "At least one id is required."})
+			return
+		}
+		if len(body.IDs) > 500 {
+			response.Validation(w, map[string]string{"ids": "At most 500 ids per request."})
+			return
+		}
+		if errs := warrantyBulkError(body.WarrantyEnd, body.Status); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+
+		sets := []string{"updated_at = now()"}
+		args := []any{tu.TenantID}
+		n := 2
+		if body.WarrantyEnd != nil {
+			t, _ := parseDate(*body.WarrantyEnd)
+			sets = append(sets, fmt.Sprintf("warranty_end = $%d::date", n))
+			args = append(args, t)
+			n++
+		}
+		if body.Status != nil {
+			sets = append(sets, fmt.Sprintf("status = $%d", n))
+			args = append(args, strings.TrimSpace(*body.Status))
+			n++
+		}
+
+		updated, skipped := 0, 0
+		for _, id := range body.IDs {
+			if id <= 0 {
+				skipped++
+				continue
+			}
+			qArgs := append(append([]any{}, args...), id)
+			tag, err := pool.Exec(r.Context(),
+				fmt.Sprintf(`update public.crm_warranty_assets set %s where tenant_id = $1 and id = $%d`,
+					strings.Join(sets, ", "), n),
+				qArgs...)
+			if err != nil || tag.RowsAffected() == 0 {
+				skipped++
+				continue
+			}
+			updated++
+		}
+		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "crm.warranty.bulk_update", "crm_warranty_asset", nil, nil, body)
+		response.OK(w, map[string]int{"updated": updated, "skipped": skipped}, "Updated.")
 	}
 }
 

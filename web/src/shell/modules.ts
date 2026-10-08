@@ -193,7 +193,7 @@ export const appModules: AppModule[] = [
       },
       {
         label: "Parts Consumption",
-        href: "/app/after-sales/register-repair/consumption",
+        href: "/app/after-sales/repair-orders/parts",
         settingsHref: "/app/after-sales/repair-orders/settings",
       },
       {

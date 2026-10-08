@@ -50,7 +50,7 @@ export default function RegisterRepairConsumptionPage() {
     <AfterSalesLayout>
       <div class="mb-4 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <p class="mb-1 text-sm font-medium text-text-primary">A/S Consumption Status</p>
-        <p class="mb-3 text-xs text-text-secondary">Parts used from repair order lines (qty &gt; 0), grouped by item.</p>
+        <p class="mb-3 text-xs text-text-secondary">Parts used on repair orders (qty &gt; 0), grouped by item. This is not the intake queue.</p>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Repair order date from">
             <DateInput value={dateFrom()} onInput={(e) => setDateFrom(e.currentTarget.value)} />

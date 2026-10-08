@@ -26,6 +26,15 @@ func TestRepairProgressAllowed(t *testing.T) {
 	}
 }
 
+func TestRepairReleaseAllowed(t *testing.T) {
+	if repairReleaseAllowed("pending") || repairReleaseAllowed("denied") {
+		t.Fatal("pending and denied must not release")
+	}
+	if !repairReleaseAllowed("covered") || !repairReleaseAllowed("goodwill") {
+		t.Fatal("covered and goodwill may release")
+	}
+}
+
 func TestRepairProgressCreateStartsReceived(t *testing.T) {
 	base := repairOrderBody{PartnerID: 1, LocationID: 1, OrderDate: "2026-01-01"}
 	released := base

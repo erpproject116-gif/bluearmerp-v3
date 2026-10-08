@@ -53,6 +53,8 @@ type RepairOrder struct {
 	ProjectName             *string           `json:"project_name,omitempty"`
 	TechnicianName          *string           `json:"technician_name,omitempty"`
 	ProgressStatus          string            `json:"progress_status"`
+	CoverageDecision        string            `json:"coverage_decision"`
+	SupplierRecovery        string            `json:"supplier_recovery"`
 	ScheduledCompletionDate *string           `json:"scheduled_completion_date,omitempty"`
 	LatestUpdate            *string           `json:"latest_update,omitempty"`
 	RepairDetails           *string           `json:"repair_details,omitempty"`
@@ -76,6 +78,8 @@ type repairOrderBody struct {
 	ProjectName             *string           `json:"project_name"`
 	TechnicianName          *string           `json:"technician_name"`
 	ProgressStatus          string            `json:"progress_status"`
+	CoverageDecision        string            `json:"coverage_decision"`
+	SupplierRecovery        string            `json:"supplier_recovery"`
 	ScheduledCompletionDate *string           `json:"scheduled_completion_date"`
 	LatestUpdate            *string           `json:"latest_update"`
 	RepairDetails           *string           `json:"repair_details"`
@@ -299,7 +303,8 @@ func loadRepairOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64
 		select ro.id, ro.order_date, ro.date_seq, ro.repair_order_no,
 		  ro.partner_id, p.company_name, ro.pic_user_id, ro.pic_name,
 		  ro.location_id, l.location_name, ro.project_id, ro.project_name,
-		  ro.technician_name, ro.progress_status, ro.scheduled_completion_date,
+		  ro.technician_name, ro.progress_status, ro.coverage_decision, ro.supplier_recovery,
+		  ro.scheduled_completion_date,
 		  ro.latest_update, ro.repair_details,
 		  ro.sales_id, ro.sales_line_id, ro.serial_unit_id, ro.release_location_id,
 		  s.sales_no, su.serial_no
@@ -313,7 +318,7 @@ func loadRepairOrder(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64
 		&ro.ID, &orderDate, &ro.DateSeq, &ro.RepairOrderNo,
 		&ro.PartnerID, &ro.CustomerName, &ro.PicUserID, &ro.PicName,
 		&ro.LocationID, &ro.LocationName, &ro.ProjectID, &projectName,
-		&tech, &ro.ProgressStatus, &sched, &latest, &details,
+		&tech, &ro.ProgressStatus, &ro.CoverageDecision, &ro.SupplierRecovery, &sched, &latest, &details,
 		&ro.SalesID, &ro.SalesLineID, &ro.SerialUnitID, &ro.ReleaseLocationID,
 		&ro.SalesNo, &ro.SerialNo,
 	)
@@ -495,11 +500,12 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		var currentProgress string
+		var currentProgress, currentDecision, currentRecovery string
 		err = tx.QueryRow(r.Context(), `
-			select progress_status from public.inv_repair_orders
+			select progress_status, coverage_decision, supplier_recovery
+			from public.inv_repair_orders
 			where id = $1 and tenant_id = $2 and deleted_at is null
-			for update`, id, tu.TenantID).Scan(&currentProgress)
+			for update`, id, tu.TenantID).Scan(&currentProgress, &currentDecision, &currentRecovery)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Repair order not found.", "ERR_NOT_FOUND")
 			return
@@ -512,20 +518,43 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"progress_status": "That progress step is not allowed from the current step."})
 			return
 		}
+		nextDecision := currentDecision
+		if strings.TrimSpace(body.CoverageDecision) != "" {
+			decision, ok := normalizeCoverageDecision(body.CoverageDecision)
+			if !ok {
+				response.Validation(w, map[string]string{"coverage_decision": "Must be pending, covered, denied, or goodwill."})
+				return
+			}
+			nextDecision = decision
+		}
+		nextRecovery := currentRecovery
+		if strings.TrimSpace(body.SupplierRecovery) != "" {
+			recovery, ok := normalizeSupplierRecovery(body.SupplierRecovery)
+			if !ok {
+				response.Validation(w, map[string]string{"supplier_recovery": "Must be none, requested, or recovered."})
+				return
+			}
+			nextRecovery = recovery
+		}
+		if nextProgress == "released" && currentProgress != "released" && !repairReleaseAllowed(nextDecision) {
+			response.Validation(w, map[string]string{"coverage_decision": "Set coverage to Covered or Goodwill before releasing to stock."})
+			return
+		}
 
 		tag, err := tx.Exec(r.Context(), `
 			update public.inv_repair_orders set
 			  order_date = $1, partner_id = $2, pic_user_id = $3, pic_name = $4,
 			  location_id = $5, project_id = $6, project_name = $7, technician_name = $8,
-			  progress_status = $9, scheduled_completion_date = $10,
-			  latest_update = $11, repair_details = $12,
-			  sales_id = $13, sales_line_id = $14, serial_unit_id = coalesce($15, serial_unit_id),
-			  release_location_id = $16,
+			  progress_status = $9, coverage_decision = $10, supplier_recovery = $11,
+			  scheduled_completion_date = $12,
+			  latest_update = $13, repair_details = $14,
+			  sales_id = $15, sales_line_id = $16, serial_unit_id = coalesce($17, serial_unit_id),
+			  release_location_id = $18,
 			  updated_at = now()
-			where id = $17 and tenant_id = $18 and deleted_at is null`,
+			where id = $19 and tenant_id = $20 and deleted_at is null`,
 			orderDate, body.PartnerID, body.PicUserID, strings.TrimSpace(body.PicName),
 			body.LocationID, body.ProjectID, body.ProjectName, body.TechnicianName,
-			nextProgress, sched, body.LatestUpdate, body.RepairDetails,
+			nextProgress, nextDecision, nextRecovery, sched, body.LatestUpdate, body.RepairDetails,
 			body.SalesID, body.SalesLineID, body.SerialUnitID, body.ReleaseLocationID,
 			id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
@@ -652,6 +681,28 @@ func repairWorkshopProgress(s string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func repairReleaseAllowed(decision string) bool {
+	return decision == "covered" || decision == "goodwill"
+}
+
+func normalizeCoverageDecision(s string) (string, bool) {
+	switch strings.TrimSpace(s) {
+	case "pending", "covered", "denied", "goodwill":
+		return strings.TrimSpace(s), true
+	default:
+		return "", false
+	}
+}
+
+func normalizeSupplierRecovery(s string) (string, bool) {
+	switch strings.TrimSpace(s) {
+	case "none", "requested", "recovered":
+		return strings.TrimSpace(s), true
+	default:
+		return "", false
 	}
 }
 
