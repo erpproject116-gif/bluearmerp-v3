@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { repairProgressLabel, repairProgressOptions } from "./repairProgress";
 import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
@@ -10,6 +11,7 @@ import { INVENTORY_ENTITY } from "../../../shared/entityTypes";
 import { handleSaveResult, requireFields } from "../../../shared/handleSaveResult";
 import type { LookupOption } from "../../../shared/LookupCombo";
 import {
+  downloadRepairOrderAttachment,
   formatFileSize,
   listRepairOrderAttachments,
   uploadRepairOrderAttachment,
@@ -203,6 +205,7 @@ export function RepairOrderModal(props: Props) {
   const [prPickerOpen, setPrPickerOpen] = createSignal(false);
   const [rmaSiPickerOpen, setRmaSiPickerOpen] = createSignal(false);
   const [attachments, setAttachments] = createSignal<RepairOrderAttachment[]>([]);
+  const [pendingFiles, setPendingFiles] = createSignal<File[]>([]);
   const [uploading, setUploading] = createSignal(false);
 
   const loadAttachments = async (orderId: number) => {
@@ -225,6 +228,7 @@ export function RepairOrderModal(props: Props) {
     if (!props.open) {
       setCreatedOrder(null);
       setAttachments([]);
+      setPendingFiles([]);
       return;
     }
     const ed = props.editing;
@@ -286,6 +290,7 @@ export function RepairOrderModal(props: Props) {
       setReceiveToRma(true);
       setLines([emptyLine(1)]);
       setAttachments([]);
+      setPendingFiles([]);
       loadCustom({});
       void loadPreview(todayISO());
     }
@@ -483,6 +488,15 @@ export function RepairOrderModal(props: Props) {
       handleSaveResult(res, toast, props.editing ? "Repair order updated." : "Repair order created.");
       return;
     }
+    const failed: File[] = [];
+    for (const file of pendingFiles()) {
+      const up = await uploadRepairOrderAttachment(res.data.id, file);
+      if (!up.success) {
+        failed.push(file);
+        toast.warning(up.message ?? `${file.name} was not uploaded.`);
+      }
+    }
+    setPendingFiles(failed);
     toast.success(props.editing ? "Repair order updated." : "Repair order created.");
     if (props.editing) invalidateRecordHistory(queryClient, "inv_repair_order", props.editing.id);
     await draft.clearOnSave();
@@ -504,14 +518,14 @@ export function RepairOrderModal(props: Props) {
       onSave={() => void save()}
       saving={saving()}
       headerActions={
-        <Show when={effectiveEditing()}>
+        effectiveEditing() ? (
           <RecordHistoryButton
             variant="button"
             targetType="inv_repair_order"
             targetId={effectiveEditing()?.id}
             title={`History — ${effectiveEditing()?.repair_order_no ?? "Repair Order"}`}
           />
-        </Show>
+        ) : undefined
       }
     >
       <div class="space-y-4">
@@ -626,12 +640,9 @@ export function RepairOrderModal(props: Props) {
               disabled={m.disabled}
               onChange={(e) => setProgressStatus(e.currentTarget.value)}
             >
-              <option value="received">Received (RMA in)</option>
-              <option value="diagnosing">Diagnosing</option>
-              <option value="repairing">Repairing</option>
-              <option value="awaiting_parts">Awaiting parts</option>
-              <option value="finished">Finished (repaired)</option>
-              <option value="released">Released to active stock</option>
+              <For each={repairProgressOptions(effectiveEditing()?.progress_status || "")}>
+                {(step) => <option value={step}>{repairProgressLabel(step)}</option>}
+              </For>
             </select>
           )}
         </ModalField>
@@ -775,43 +786,73 @@ export function RepairOrderModal(props: Props) {
       <div class="rounded-lg border border-stroke bg-slate-50 px-4 py-3">
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm font-medium text-text-primary">{uiLabel("common.attachments")}</span>
-          <Show when={effectiveEditing()}>
-            <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
-              {uploading() ? "Uploading…" : "Upload file"}
-              <input
-                type="file"
-                class="hidden"
-                disabled={uploading()}
-                onChange={(e) => {
-                  const file = e.currentTarget.files?.[0];
-                  e.currentTarget.value = "";
-                  const orderId = effectiveEditing()?.id;
-                  if (!file || !orderId) return;
-                  setUploading(true);
-                  void uploadRepairOrderAttachment(orderId, file).then((res) => {
-                    setUploading(false);
-                    if (!res.success) {
-                      toast.warning(res.message ?? "Upload failed.");
-                      return;
-                    }
-                    toast.success("File uploaded.");
-                    void loadAttachments(orderId);
-                  });
-                }}
-              />
-            </label>
-          </Show>
+          <label class="cursor-pointer rounded border border-stroke bg-white px-3 py-1 text-sm hover:bg-slate-50">
+            {uploading() ? "Uploading…" : "Upload file"}
+            <input
+              type="file"
+              class="hidden"
+              disabled={uploading()}
+              onChange={(e) => {
+                const file = e.currentTarget.files?.[0];
+                e.currentTarget.value = "";
+                if (!file) return;
+                const orderId = effectiveEditing()?.id;
+                if (!orderId) {
+                  setPendingFiles((list) => [...list, file]);
+                  return;
+                }
+                setUploading(true);
+                void uploadRepairOrderAttachment(orderId, file).then((res) => {
+                  setUploading(false);
+                  if (!res.success) {
+                    toast.warning(res.message ?? "Upload failed.");
+                    return;
+                  }
+                  toast.success("File uploaded.");
+                  void loadAttachments(orderId);
+                });
+              }}
+            />
+          </label>
         </div>
+        <Show when={pendingFiles().length > 0}>
+          <ul class="mb-2 space-y-1 text-sm">
+            <For each={pendingFiles()}>
+              {(file) => (
+                <li class="flex justify-between gap-2 text-text-primary">
+                  <span>{file.name}</span>
+                  <span class="text-text-secondary">Waiting to save</span>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
         <Show
           when={effectiveEditing()}
-          fallback={<p class="text-sm text-text-secondary">Save the repair order first to attach files (max 25 MB each).</p>}
+          fallback={
+            <Show when={pendingFiles().length === 0}>
+              <p class="text-sm text-text-secondary">Files upload when you save (max 25 MB each).</p>
+            </Show>
+          }
         >
           <Show when={attachments().length > 0} fallback={<p class="text-sm text-text-secondary">No attachments yet.</p>}>
             <ul class="space-y-1 text-sm">
               <For each={attachments()}>
                 {(a) => (
                   <li class="flex justify-between gap-2 text-text-primary">
-                    <span>{a.file_name}</span>
+                    <button
+                      type="button"
+                      class="text-left text-brand-700 hover:underline"
+                      onClick={() => {
+                        const orderId = effectiveEditing()?.id;
+                        if (!orderId) return;
+                        void downloadRepairOrderAttachment(orderId, a.id, a.file_name).catch(() => {
+                          toast.warning("Download failed.");
+                        });
+                      }}
+                    >
+                      {a.file_name}
+                    </button>
                     <span class="text-text-secondary">{formatFileSize(a.size_bytes)}</span>
                   </li>
                 )}

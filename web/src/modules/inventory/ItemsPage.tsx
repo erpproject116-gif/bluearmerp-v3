@@ -203,6 +203,7 @@ export default function ItemsPage() {
     purchase_price?: number;
     sales_price?: number;
     vip_price?: number;
+    warranty_duration_months?: number;
   }) => {
     const ids = [...lifecycle.selectedIds()];
     if (ids.length === 0) return;

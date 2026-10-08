@@ -56,7 +56,7 @@ export default function RepairOrderStatusPage() {
     setModalOpen(true);
   };
 
-  const onProgressChange = async (repairOrderId: number, status: "received" | "finished") => {
+  const onProgressChange = async (repairOrderId: number, status: string) => {
     const res = await patchRepairOrderProgress(repairOrderId, status);
     if (!res.success) {
       toast.warning(res.message ?? "Failed to update progress.");

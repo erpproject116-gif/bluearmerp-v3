@@ -9,6 +9,7 @@ import { useInvalidateRepairOrders, useRepairOrderList, type RepairOrderRow } fr
 import { AfterSalesLayout } from "./AfterSalesLayout";
 import { RepairOrderModal, type RepairOrderDetail } from "./RepairOrderModal";
 import { openRepairOrderPrint } from "./repairOrderPrint";
+import { REPAIR_PROGRESS_STEPS, repairProgressLabel } from "./repairProgress";
 
 type PageOptions = {
   defaultProgressFilter?: string;
@@ -121,7 +122,7 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
           {
             key: "progress_status",
             header: "Progress",
-            render: (r) => (r.progress_status === "finished" ? "Finished" : "Received"),
+            render: (r) => repairProgressLabel(r.progress_status),
           },
           {
             key: "history",
@@ -154,8 +155,7 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
         onStatusChange={setStatusFilter}
         statusLabel="Progress"
         statusOptions={[
-          { value: "received", label: "Received" },
-          { value: "finished", label: "Finished" },
+          ...REPAIR_PROGRESS_STEPS.map((value) => ({ value, label: repairProgressLabel(value) })),
           { value: "", label: "All" },
         ]}
         onRefresh={invalidate}
@@ -164,7 +164,7 @@ export function RepairOrderListPageInner(props: PageOptions = {}) {
 
       <Show when={statusFilter() === ""}>
         <p class="mt-2 text-xs text-text-secondary">
-          Status filter: leave as All or choose Received / Finished. Repair Order Status view presets this filter.
+          Status filter: leave as All or choose a repair step. Repair Order Status view presets this filter.
         </p>
       </Show>
 

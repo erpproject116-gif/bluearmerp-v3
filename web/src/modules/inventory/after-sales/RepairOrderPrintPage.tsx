@@ -13,6 +13,7 @@ import {
   partyContact,
   type RepairOrderPrintPayload,
 } from "./repairOrderPrint";
+import { repairProgressLabel } from "./repairProgress";
 import "./repairOrderPrint.css";
 import "../../quotation/quotation/quotationPrint.css";
 import { PrintBrandingHeader } from "../../../shared/branding/PrintBrandingHeader";
@@ -126,7 +127,7 @@ function PrintDocument(props: { payload: RepairOrderPrintPayload }) {
                 <dd>{p().order.technician_name}</dd>
               </Show>
               <dt>Progress</dt>
-              <dd>{p().order.progress_status === "finished" ? "Finished" : "Received"}</dd>
+              <dd>{repairProgressLabel(p().order.progress_status)}</dd>
               <Show when={p().order.scheduled_completion_date}>
                 <dt>Repair Date</dt>
                 <dd>{formatPrintDate(p().order.scheduled_completion_date)}</dd>

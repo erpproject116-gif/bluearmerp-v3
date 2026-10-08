@@ -75,8 +75,14 @@ export const navGroups: NavGroup[] = [
         href: "/app/inventory/serial-lot/lots",
         basePath: "/app/inventory/serial-lot/lots",
       },
-      { kind: "module", moduleId: "after_sales" },
     ],
+  },
+  {
+    id: "after_sales",
+    label: "After-Sales",
+    iconId: "after_sales",
+    defaultExpanded: true,
+    entries: [{ kind: "module", moduleId: "after_sales" }],
   },
   {
     id: "production_process",

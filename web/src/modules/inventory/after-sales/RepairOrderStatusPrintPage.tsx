@@ -11,6 +11,7 @@ import {
   formatDisplayDate,
   type RepairOrderStatusFilters,
 } from "./repairOrderStatusFilters";
+import { repairProgressLabel } from "./repairProgress";
 import "../after-sales/repairOrderPrint.css";
 import "./statusReportPrint.css";
 
@@ -35,7 +36,7 @@ function repairOrderStatusPrintColumns(): StatusPrintColumn<StatusReportRow>[] {
     {
       key: "progress_status",
       label: "Progress",
-      render: (r) => (r.progress_status === "finished" ? "Finished" : "Received"),
+      render: (r) => repairProgressLabel(r.progress_status),
     },
     { key: "location_name", label: "Location", render: (r) => r.location_name },
     { key: "pic_name", label: "PIC", render: (r) => r.pic_name },

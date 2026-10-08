@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isSellBuyDesktopPreferredPath } from "./DesktopPreferredHint";
 import { shouldShowFloorBottomNav } from "./FloorBottomNav";
 import { HOME_SIDEBAR_AREAS, type HomeSidebarArea } from "./ecount-top-nav";
+import { navGroupForModuleId } from "./navGroups";
 import type { MeData } from "../shared/auth-context";
 
 function me(overrides: Partial<MeData["user"]> & { moduleCodes?: string[] } = {}): MeData {
@@ -53,6 +54,14 @@ describe("isSellBuyDesktopPreferredPath", () => {
 });
 
 describe("HOME_SIDEBAR_AREAS document area landings", () => {
+  it("lifts After-Sales out of Stocks", () => {
+    const ids = HOME_SIDEBAR_AREAS.map((a) => a.id);
+    const stocks = HOME_SIDEBAR_AREAS.find((a) => a.id === "stocks");
+    expect(stocks?.children?.map((c) => c.id)).not.toContain("after_sales");
+    expect(ids.indexOf("after_sales")).toBe(ids.indexOf("stocks") + 1);
+    expect(navGroupForModuleId("after_sales")?.id).toBe("after_sales");
+  });
+
   it("nests Sales and Purchase after Manufacturing", () => {
     const ids = HOME_SIDEBAR_AREAS.map((a) => a.id);
     const mfg = ids.indexOf("production");

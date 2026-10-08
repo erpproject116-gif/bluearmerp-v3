@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
@@ -9,6 +9,7 @@ import {
   todayISO,
   type RepairOrderStatusFilters,
 } from "./repairOrderStatusFilters";
+import { REPAIR_PROGRESS_STEPS, repairProgressLabel } from "./repairProgress";
 
 type Props = {
   value: () => RepairOrderStatusFilters;
@@ -147,8 +148,9 @@ export function RepairOrderStatusFilter(props: Props) {
             onChange={(e) => patch({ progress_status: e.currentTarget.value || undefined })}
           >
             <option value="">All</option>
-            <option value="received">Received</option>
-            <option value="finished">Finished</option>
+            <For each={REPAIR_PROGRESS_STEPS}>
+              {(step) => <option value={step}>{repairProgressLabel(step)}</option>}
+            </For>
           </select>
         </Field>
         <LookupCombo

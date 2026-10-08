@@ -63,7 +63,7 @@ export function useInvalidateStatusReport() {
   return () => void client.invalidateQueries({ queryKey: ["repair-order-status-report"] });
 }
 
-export async function patchRepairOrderProgress(repairOrderId: number, progressStatus: "received" | "finished") {
+export async function patchRepairOrderProgress(repairOrderId: number, progressStatus: string) {
   return apiFetch(`/api/v1/inventory/repair-orders/${repairOrderId}/progress-status`, {
     method: "PATCH",
     body: JSON.stringify({ progress_status: progressStatus }),

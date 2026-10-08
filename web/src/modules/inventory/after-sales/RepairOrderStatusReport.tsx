@@ -8,6 +8,7 @@ import type { StatusReportRow } from "../../../shared/useRepairOrderStatusReport
 import { getAccessToken } from "../../../shared/api";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { ReportEmptyRow, ReportLoadingRow } from "../../../shared/reports/ReportTableStates";
+import { repairProgressLabel, repairProgressOptions } from "./repairProgress";
 
 type Props = {
   filters: RepairOrderStatusFilters;
@@ -21,7 +22,7 @@ type Props = {
   generatedAt: () => Date;
   onPageChange: (page: number) => void;
   onDateNoClick: (repairOrderId: number) => void;
-  onProgressChange: (repairOrderId: number, status: "received" | "finished") => void;
+  onProgressChange: (repairOrderId: number, status: string) => void;
 };
 
 export function RepairOrderStatusReport(props: Props) {
@@ -103,12 +104,11 @@ export function RepairOrderStatusReport(props: Props) {
                     <select
                       class="rounded border border-stroke bg-white px-2 py-1 text-sm text-brand-600"
                       value={row.progress_status}
-                      onChange={(e) =>
-                        props.onProgressChange(row.repair_order_id, e.currentTarget.value as "received" | "finished")
-                      }
+                      onChange={(e) => props.onProgressChange(row.repair_order_id, e.currentTarget.value)}
                     >
-                      <option value="received">Received</option>
-                      <option value="finished">Finished</option>
+                      <For each={repairProgressOptions(row.progress_status)}>
+                        {(step) => <option value={step}>{repairProgressLabel(step)}</option>}
+                      </For>
                     </select>
                   </td>
                   <td class="px-3 py-2">{row.location_name}</td>

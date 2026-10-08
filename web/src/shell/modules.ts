@@ -184,7 +184,7 @@ export const appModules: AppModule[] = [
         href: "/app/after-sales/register-repair",
         settingsHref: "/app/after-sales/repair-orders/settings",
         prefix: "/app/after-sales/register-repair",
-        headerPriority: "primary",
+        headerPriority: "overflow",
       },
       {
         label: "Intake Status",

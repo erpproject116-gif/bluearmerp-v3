@@ -13,7 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
@@ -102,7 +101,7 @@ func parseStatusReportFilters(r *http.Request) (statusReportFilters, map[string]
 		f.ItemID = id
 	}
 	progress := strings.TrimSpace(r.URL.Query().Get("progress_status"))
-	if progress == "received" || progress == "finished" {
+	if isValidRepairProgress(progress) {
 		f.ProgressStatus = progress
 	}
 	return f, nil
@@ -335,10 +334,7 @@ func exportRepairOrderStatusReport(pool *pgxpool.Pool) http.HandlerFunc {
 			if row.Remark != nil {
 				remark = *row.Remark
 			}
-			progress := "Received"
-			if row.ProgressStatus == "finished" {
-				progress = "Finished"
-			}
+			progress := repairProgressLabel(row.ProgressStatus)
 			_ = cw.Write([]string{
 				row.DateNoDisplay, row.RepairOrderNo, progress, row.LocationName, row.PicName,
 				row.CustomerName, latest, row.ItemCode, row.ItemNameDisplay,
@@ -378,6 +374,20 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
+		var currentProgress string
+		err = tx.QueryRow(r.Context(), `
+			select progress_status from public.inv_repair_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			for update`, id, tu.TenantID).Scan(&currentProgress)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Repair order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if !repairProgressAllowed(currentProgress, status) {
+			response.Validation(w, map[string]string{"progress_status": "That progress step is not allowed from the current step."})
+			return
+		}
+
 		tag, err := tx.Exec(r.Context(), `
 			update public.inv_repair_orders
 			set progress_status = $1, updated_at = now()
@@ -388,7 +398,7 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if status == "released" {
+		if status == "released" && currentProgress != "released" {
 			var serialID *int64
 			var releaseLoc *int64
 			_ = tx.QueryRow(r.Context(), `
@@ -412,7 +422,7 @@ func patchRepairOrderProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.repair_order.progress_status", "inv_repair_order", &id, nil, body)
+		logRepairProgressChange(r.Context(), pool, tu.TenantID, tu.AppUserID, id, currentProgress, status)
 		ro, err := loadRepairOrder(r.Context(), pool, tu.TenantID, id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load repair order.", "ERR_INTERNAL")

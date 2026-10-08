@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -152,9 +153,9 @@ func previewRepairSequences(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, map[string]any{
-			"date_seq":          dateSeq,
-			"repair_order_no":   repairOrderNo,
-			"date_no_display":   formatDateNo(orderDate, dateSeq),
+			"date_seq":        dateSeq,
+			"repair_order_no": repairOrderNo,
+			"date_no_display": formatDateNo(orderDate, dateSeq),
 		}, "OK")
 	}
 }
@@ -187,13 +188,12 @@ func listRepairOrders(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 		progress := strings.TrimSpace(r.URL.Query().Get("progress_status"))
-		if progress == "received" || progress == "finished" {
+		if !isValidRepairProgress(progress) {
+			progress = p.Status
+		}
+		if isValidRepairProgress(progress) {
 			where += fmt.Sprintf(" and ro.progress_status = $%d", argN)
 			args = append(args, progress)
-			argN++
-		} else if p.Status == "received" || p.Status == "finished" {
-			where += fmt.Sprintf(" and ro.progress_status = $%d", argN)
-			args = append(args, p.Status)
 			argN++
 		}
 
@@ -495,6 +495,24 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
+		var currentProgress string
+		err = tx.QueryRow(r.Context(), `
+			select progress_status from public.inv_repair_orders
+			where id = $1 and tenant_id = $2 and deleted_at is null
+			for update`, id, tu.TenantID).Scan(&currentProgress)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Repair order not found.", "ERR_NOT_FOUND")
+			return
+		}
+		nextProgress := defaultProgress(body.ProgressStatus)
+		if strings.TrimSpace(body.ProgressStatus) == "" {
+			nextProgress = currentProgress
+		}
+		if !repairProgressAllowed(currentProgress, nextProgress) {
+			response.Validation(w, map[string]string{"progress_status": "That progress step is not allowed from the current step."})
+			return
+		}
+
 		tag, err := tx.Exec(r.Context(), `
 			update public.inv_repair_orders set
 			  order_date = $1, partner_id = $2, pic_user_id = $3, pic_name = $4,
@@ -507,7 +525,7 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			where id = $17 and tenant_id = $18 and deleted_at is null`,
 			orderDate, body.PartnerID, body.PicUserID, strings.TrimSpace(body.PicName),
 			body.LocationID, body.ProjectID, body.ProjectName, body.TechnicianName,
-			defaultProgress(body.ProgressStatus), sched, body.LatestUpdate, body.RepairDetails,
+			nextProgress, sched, body.LatestUpdate, body.RepairDetails,
 			body.SalesID, body.SalesLineID, body.SerialUnitID, body.ReleaseLocationID,
 			id, tu.TenantID)
 		if err != nil || tag.RowsAffected() == 0 {
@@ -515,13 +533,13 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if body.ReceiveToRMA || (body.SerialUnitID != nil && *body.SerialUnitID > 0 && defaultProgress(body.ProgressStatus) == "received") {
+		if body.ReceiveToRMA || (body.SerialUnitID != nil && *body.SerialUnitID > 0 && nextProgress == "received") {
 			if err := applyRepairRMAReceive(r.Context(), tx, tu.TenantID, id, body.LocationID, body.SalesID, body.SalesLineID, body.SerialUnitID); err != nil {
 				response.Validation(w, map[string]string{"serial_unit_id": err.Error()})
 				return
 			}
 		}
-		if defaultProgress(body.ProgressStatus) == "released" {
+		if nextProgress == "released" && currentProgress != "released" {
 			relLoc := int64(0)
 			if body.ReleaseLocationID != nil {
 				relLoc = *body.ReleaseLocationID
@@ -549,7 +567,11 @@ func updateRepairOrder(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.repair_order.update", "inv_repair_order", &id, nil, body)
+		if nextProgress != currentProgress {
+			logRepairProgressChange(r.Context(), pool, tu.TenantID, tu.AppUserID, id, currentProgress, nextProgress)
+		} else {
+			_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.repair_order.update", "inv_repair_order", &id, nil, body)
+		}
 		ro, _ := loadRepairOrder(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, ro, "Updated.")
 	}
@@ -596,6 +618,12 @@ func validateRepairOrderBody(b repairOrderBody, create bool) map[string]string {
 	if b.ProgressStatus != "" && !isValidRepairProgress(b.ProgressStatus) {
 		errs["progress_status"] = "Invalid progress status."
 	}
+	if create {
+		status := strings.TrimSpace(b.ProgressStatus)
+		if status != "" && status != "received" {
+			errs["progress_status"] = "A new repair order starts at Received."
+		}
+	}
 	if len(errs) > 0 {
 		return errs
 	}
@@ -616,6 +644,59 @@ func defaultProgress(s string) string {
 		return s
 	}
 	return "received"
+}
+
+func repairWorkshopProgress(s string) bool {
+	switch s {
+	case "received", "diagnosing", "repairing", "awaiting_parts":
+		return true
+	default:
+		return false
+	}
+}
+
+func repairProgressAllowed(from, to string) bool {
+	if from == to {
+		return isValidRepairProgress(from)
+	}
+	if repairWorkshopProgress(from) {
+		return repairWorkshopProgress(to) || to == "finished"
+	}
+	if from == "finished" {
+		return to == "repairing" || to == "awaiting_parts" || to == "released"
+	}
+	return false
+}
+
+func repairProgressLabel(s string) string {
+	switch s {
+	case "received":
+		return "Received (RMA in)"
+	case "diagnosing":
+		return "Diagnosing"
+	case "repairing":
+		return "Repairing"
+	case "awaiting_parts":
+		return "Awaiting parts"
+	case "finished":
+		return "Finished (repaired)"
+	case "released":
+		return "Released to active stock"
+	default:
+		return s
+	}
+}
+
+func logRepairProgressChange(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID, id int64, previous, next string) {
+	if previous == next {
+		return
+	}
+	err := audit.LogSync(ctx, pool, tenantID, actorUserID, "inventory.repair_order.progress_status", "inv_repair_order", &id,
+		map[string]string{"progress_status": previous},
+		map[string]string{"progress_status": next})
+	if err != nil {
+		log.Printf("repair order progress audit: %v", err)
+	}
 }
 
 func lookupAfterSalesUsers(pool *pgxpool.Pool) http.HandlerFunc {

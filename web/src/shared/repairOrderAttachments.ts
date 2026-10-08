@@ -41,6 +41,21 @@ export async function uploadRepairOrderAttachment(orderId: number, file: File): 
   return { ...body, status: res.status, ok: res.ok };
 }
 
+export async function downloadRepairOrderAttachment(orderId: number, attachmentId: number, fileName: string): Promise<void> {
+  const res = await fetch(
+    `${apiBase}/api/v1/inventory/repair-orders/${orderId}/attachments/${attachmentId}/download`,
+    { headers: await authHeaders() },
+  );
+  if (!res.ok) throw new Error("Download failed.");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;

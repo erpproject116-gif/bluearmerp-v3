@@ -14,12 +14,13 @@ import (
 )
 
 type bulkItemEditBody struct {
-	IDs           []int64  `json:"ids"`
-	ItemName      *string  `json:"item_name"`
-	SpecName      *string  `json:"spec_name"`
-	PurchasePrice *float64 `json:"purchase_price"`
-	SalesPrice    *float64 `json:"sales_price"`
-	VipPrice      *float64 `json:"vip_price"`
+	IDs                    []int64  `json:"ids"`
+	ItemName               *string  `json:"item_name"`
+	SpecName               *string  `json:"spec_name"`
+	PurchasePrice          *float64 `json:"purchase_price"`
+	SalesPrice             *float64 `json:"sales_price"`
+	VipPrice               *float64 `json:"vip_price"`
+	WarrantyDurationMonths *int     `json:"warranty_duration_months"`
 }
 
 type bulkItemEditOutcome struct {
@@ -47,8 +48,13 @@ func bulkEditItems(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"ids": "At most 500 ids per request."})
 			return
 		}
+		if msg := bulkWarrantyMonthsError(body.WarrantyDurationMonths); msg != "" {
+			response.Validation(w, map[string]string{"warranty_duration_months": msg})
+			return
+		}
 		hasPatch := body.ItemName != nil || body.SpecName != nil ||
-			body.PurchasePrice != nil || body.SalesPrice != nil || body.VipPrice != nil
+			body.PurchasePrice != nil || body.SalesPrice != nil || body.VipPrice != nil ||
+			body.WarrantyDurationMonths != nil
 		if !hasPatch {
 			response.Validation(w, map[string]string{"body": "Provide at least one field to update."})
 			return
@@ -86,6 +92,11 @@ func bulkEditItems(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, *body.VipPrice)
 			argN++
 		}
+		if body.WarrantyDurationMonths != nil {
+			setClauses = append(setClauses, fmt.Sprintf("warranty_duration_months = $%d", argN))
+			args = append(args, *body.WarrantyDurationMonths)
+			argN++
+		}
 
 		out := bulkItemEditOutcome{}
 		for _, id := range body.IDs {
@@ -107,4 +118,14 @@ func bulkEditItems(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "inventory.items.bulk_edit", "inv_item", nil, nil, body)
 		response.OK(w, out, "OK")
 	}
+}
+
+func bulkWarrantyMonthsError(n *int) string {
+	if n == nil {
+		return ""
+	}
+	if *n < 0 {
+		return "Warranty months cannot be negative."
+	}
+	return ""
 }
