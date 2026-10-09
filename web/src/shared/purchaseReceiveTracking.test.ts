@@ -30,6 +30,30 @@ describe("purchase receive tracking policy 2B", () => {
     ).toContain("serial count");
   });
 
+  it("allows a required lot with no lines and still rejects a partial or blank number", () => {
+    expect(
+      validatePurchaseTrackingLine({ line_no: 1, qty: 2, track_lot: true, lot_policy: "required" }),
+    ).toBeNull();
+    expect(
+      validatePurchaseTrackingLine({
+        line_no: 1,
+        qty: 2,
+        track_lot: true,
+        lot_policy: "required",
+        lot_lines: [{ lot_no: "A", qty: 1 }],
+      }),
+    ).toContain("lot qty");
+    expect(
+      validatePurchaseTrackingLine({
+        line_no: 1,
+        qty: 2,
+        track_lot: true,
+        lot_policy: "required",
+        lot_lines: [{ lot_no: " ", qty: 2 }],
+      }),
+    ).toContain("lot number");
+  });
+
   it("allows empty optional lots but requires entered lots to balance", () => {
     const base = { line_no: 3, qty: 5, track_lot: true, lot_policy: "optional" };
     expect(validatePurchaseTrackingLine(base)).toBeNull();

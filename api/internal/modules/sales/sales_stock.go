@@ -12,7 +12,21 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/processpolicy"
 )
 
-// validateSaleLotRequirements enforces lot_batch_id per item lot_policy before save.
+// saleInvoiceAllowsBlankLot is the sales-invoice rule. POS checkout does not use it.
+func saleInvoiceAllowsBlankLot(lotBatchID *int64) bool {
+	return lotBatchID == nil || *lotBatchID <= 0
+}
+
+// saleAutoMethod picks lots for a blank sales-invoice line.
+// FEFO stays first-expired. FIFO and manual both take the oldest lot.
+func saleAutoMethod(resolved string) string {
+	if inventory.NormalizeLotAllocationMethod(resolved) == inventory.LotAllocationFEFO {
+		return inventory.LotAllocationFEFO
+	}
+	return inventory.LotAllocationFIFO
+}
+
+// validateSaleLotRequirements enforces lot_batch_id per item lot_policy before POS checkout.
 func validateSaleLotRequirements(ctx context.Context, q pgx.Tx, tenantID int64, lines []saleLineBody) error {
 	for _, ln := range lines {
 		if ln.ItemID == nil || ln.Qty <= 0 {
@@ -23,6 +37,27 @@ func validateSaleLotRequirements(ctx context.Context, q pgx.Tx, tenantID int64, 
 			continue
 		}
 		if err := inventory.ValidateLotBatchCapture(ln.LineNo, settings.LotPolicy, ln.LotBatchID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateSaleInvoiceLots allows a blank lot. A chosen lot must match the item and the sale location.
+func validateSaleInvoiceLots(ctx context.Context, q pgx.Tx, tenantID, locationID int64, lines []saleLineBody) error {
+	for _, ln := range lines {
+		if ln.ItemID == nil || ln.Qty <= 0 || saleInvoiceAllowsBlankLot(ln.LotBatchID) {
+			continue
+		}
+		var lotItemID, lotLocationID int64
+		err := q.QueryRow(ctx, `
+			select item_id, location_id
+			from public.inv_lot_batches
+			where id = $1 and tenant_id = $2`, *ln.LotBatchID, tenantID).Scan(&lotItemID, &lotLocationID)
+		if err != nil {
+			return fmt.Errorf("line %d: lot batch not found", ln.LineNo)
+		}
+		if err := validateLotBatchForSaleLine(ln.LineNo, ln.ItemID, locationID, lotItemID, lotLocationID); err != nil {
 			return err
 		}
 	}
@@ -193,9 +228,9 @@ func validateLotBatchForSaleLine(lineNo int, lineItemID *int64, saleLocationID, 
 	return nil
 }
 
-// applySaleLot deducts lot batch qty for sales lines with lot_batch_id set.
-// When lot_batch_id is unset and item uses fefo/fifo, auto-allocates before deduct.
-func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
+// applySaleLot deducts lot batch qty. Blank lines stay manual unless autoBlank is set.
+// autoBlank is for the sales invoice only. POS checkout calls this with false.
+func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64, autoBlank bool) error {
 	var saleLocationID int64
 	if err := tx.QueryRow(ctx, `
 		select location_id from public.sa_sales
@@ -251,6 +286,9 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 			continue
 		}
 		method := inventory.ResolveLotAllocationMethod(settings.LotAllocationMethod, pol.InventoryDefaultLotAllocation)
+		if autoBlank {
+			method = saleAutoMethod(method)
+		}
 		if method == inventory.LotAllocationManual {
 			if inventory.IsTrackingPolicyRequired(settings.LotPolicy) {
 				return fmt.Errorf("line %d: lot batch is required for this item", ln.lineNo)
@@ -374,12 +412,46 @@ func applySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error
 	return nil
 }
 
+func allocationRestores(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]lotRestore, map[int64]bool, error) {
+	rows, err := tx.Query(ctx, `
+		select a.sales_line_id, a.lot_batch_id, a.qty::float8
+		from public.sa_sales_line_lot_allocations a
+		join public.sa_sales_lines ln on ln.id = a.sales_line_id
+		where `+where, args...)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	var out []lotRestore
+	lines := map[int64]bool{}
+	for rows.Next() {
+		var lineID, lotBatchID int64
+		var qty float64
+		if err := rows.Scan(&lineID, &lotBatchID, &qty); err != nil {
+			return nil, nil, err
+		}
+		lines[lineID] = true
+		out = append(out, lotRestore{lotBatchID: lotBatchID, lineQty: qty, qtyIsBase: true})
+	}
+	return out, lines, rows.Err()
+}
+
 // reverseSaleLot restores lot batch qty for lines on this sales invoice.
 func reverseSaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
+	allocated, _, err := allocationRestores(ctx, tx, "ln.sales_id = $1", salesID)
+	if err != nil {
+		return err
+	}
+	if err := applyLotRestores(ctx, tx, tenantID, &salesID, allocated); err != nil {
+		return err
+	}
 	rows, err := tx.Query(ctx, `
 		select ln.item_id, ln.unit_id, ln.lot_batch_id, ln.qty::float8
 		from public.sa_sales_lines ln
-		where ln.sales_id = $1 and ln.lot_batch_id is not null`, salesID)
+		where ln.sales_id = $1 and ln.lot_batch_id is not null
+		  and not exists (
+		    select 1 from public.sa_sales_line_lot_allocations a where a.sales_line_id = ln.id
+		  )`, salesID)
 	if err != nil {
 		return err
 	}
@@ -395,6 +467,7 @@ type lotRestore struct {
 	unitID     *int64
 	lotBatchID int64
 	lineQty    float64
+	qtyIsBase  bool
 }
 
 func collectLotRestores(rows pgx.Rows) ([]lotRestore, error) {
@@ -416,7 +489,7 @@ func collectLotRestores(rows pgx.Rows) ([]lotRestore, error) {
 func applyLotRestores(ctx context.Context, tx pgx.Tx, tenantID int64, salesID *int64, restores []lotRestore) error {
 	for _, r := range restores {
 		qty := r.lineQty
-		if r.itemID != nil {
+		if !r.qtyIsBase && r.itemID != nil {
 			converted, err := inventory.BaseQtyForLine(ctx, tx, tenantID, *r.itemID, r.unitID, r.lineQty)
 			if err != nil {
 				return err
@@ -683,10 +756,20 @@ func reverseSaleLotForLines(ctx context.Context, tx pgx.Tx, tenantID int64, line
 	if len(lineIDs) == 0 {
 		return nil
 	}
+	allocated, _, err := allocationRestores(ctx, tx, "ln.id = any($1)", lineIDs)
+	if err != nil {
+		return err
+	}
+	if err := applyLotRestores(ctx, tx, tenantID, nil, allocated); err != nil {
+		return err
+	}
 	rows, err := tx.Query(ctx, `
 		select ln.item_id, ln.unit_id, ln.lot_batch_id, ln.qty::float8
 		from public.sa_sales_lines ln
-		where ln.id = any($1) and ln.lot_batch_id is not null`, lineIDs)
+		where ln.id = any($1) and ln.lot_batch_id is not null
+		  and not exists (
+		    select 1 from public.sa_sales_line_lot_allocations a where a.sales_line_id = ln.id
+		  )`, lineIDs)
 	if err != nil {
 		return err
 	}

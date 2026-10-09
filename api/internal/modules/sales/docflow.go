@@ -1,4 +1,4 @@
-﻿package sales
+package sales
 
 import (
 	"context"
@@ -292,18 +292,21 @@ func CreateFromSalesOrder(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 	if err := validateSaleSerialRequirements(ctx, tx, tu.TenantID, lineBodies); err != nil {
 		return 0, docflowValidation(map[string]string{"lines": err.Error()})
 	}
-	if err := validateSaleLotRequirements(ctx, tx, tu.TenantID, lineBodies); err != nil {
+	if err := validateSaleInvoiceLots(ctx, tx, tu.TenantID, locationID, lineBodies); err != nil {
 		return 0, docflowValidation(map[string]string{"lines": err.Error()})
 	}
 
 	if err := applySaleSerialUnits(ctx, tx, tu.TenantID, id, partnerID, lineBodies); err != nil {
 		return 0, docflowValidation(map[string]string{"lines": err.Error()})
 	}
-	if err := applySaleStock(ctx, tx, tu.TenantID, id, locationID, tu.AppUserID); err != nil {
-		return 0, docflowValidation(map[string]string{"lines": err.Error()})
-	}
-	if err := applySaleLot(ctx, tx, tu.TenantID, id); err != nil {
-		return 0, docflowValidation(map[string]string{"lines": err.Error()})
+	// The invoice is inserted unconfirmed. Stock and lots move when it is completed.
+	if processpolicy.IsConfirmingProgress(processpolicy.DocSales, "unconfirmed") {
+		if err := applySaleStock(ctx, tx, tu.TenantID, id, locationID, tu.AppUserID); err != nil {
+			return 0, docflowValidation(map[string]string{"lines": err.Error()})
+		}
+		if err := applySaleLot(ctx, tx, tu.TenantID, id, true); err != nil {
+			return 0, docflowValidation(map[string]string{"lines": err.Error()})
+		}
 	}
 
 	if _, err := crm.SyncWarrantyAssetsFromSale(ctx, tx, tu.TenantID, id); err != nil {

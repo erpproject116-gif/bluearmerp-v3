@@ -108,6 +108,11 @@ func allocateGeneratedLotNumber(ctx context.Context, tx pgx.Tx, tenantID int64, 
 	return "", errors.New("failed to allocate a unique lot number")
 }
 
+// AllocateGeneratedLotNumber returns the next LOT-YYYYMMDD-###### for this tenant.
+func AllocateGeneratedLotNumber(ctx context.Context, tx pgx.Tx, tenantID int64, now time.Time) (string, error) {
+	return allocateGeneratedLotNumber(ctx, tx, tenantID, now)
+}
+
 func listLotAdjustmentCandidates(pool *pgxpool.Pool) http.HandlerFunc {
 	allowed := map[string]string{
 		"lot_no":      "lb.lot_no",

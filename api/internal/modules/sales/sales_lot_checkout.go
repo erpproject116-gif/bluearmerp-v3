@@ -30,5 +30,5 @@ func ValidateSaleLotForCheckout(ctx context.Context, tx pgx.Tx, tenantID int64, 
 
 // ApplySaleLot deducts lot batch qty for sales lines with lot_batch_id set (exported for POS checkout).
 func ApplySaleLot(ctx context.Context, tx pgx.Tx, tenantID, salesID int64) error {
-	return applySaleLot(ctx, tx, tenantID, salesID)
+	return applySaleLot(ctx, tx, tenantID, salesID, false)
 }

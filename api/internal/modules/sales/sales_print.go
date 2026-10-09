@@ -206,7 +206,7 @@ func patchSalesProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Validation(w, map[string]string{"lines": err.Error()})
 				return
 			}
-			if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+			if err := applySaleLot(r.Context(), tx, tu.TenantID, id, true); err != nil {
 				response.Validation(w, map[string]string{"lines": err.Error()})
 				return
 			}

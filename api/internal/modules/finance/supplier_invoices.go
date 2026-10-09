@@ -1268,9 +1268,12 @@ func insertSupplierInvoiceLines(ctx context.Context, tx pgx.Tx, tenantID, invoic
 		}
 		grLineID := ln.GoodsReceiptLineID
 		if grLineID == nil || *grLineID <= 0 {
-			autoGR, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, partnerID, ln)
+			autoGR, filledLots, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, partnerID, ln)
 			if err != nil {
 				return fmt.Errorf("line %d: %w", lineNo, err)
+			}
+			if len(filledLots) > 0 {
+				ln.LotLines = filledLots
 			}
 			if autoGR != nil {
 				grLineID = autoGR
@@ -1572,9 +1575,18 @@ func confirmOpenReceivesOnSupplierInvoiceTx(ctx context.Context, tx pgx.Tx, tena
 			SerialNos:           ln.SerialNos,
 			LotLines:            ln.LotLines,
 		}
-		autoGR, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, inv.PartnerID, body)
+		autoGR, filledLots, err := receiveForSupplierInvoiceLineTx(ctx, tx, tenantID, userID, locationID, inv.PartnerID, body)
 		if err != nil {
 			return fmt.Errorf("line %d: %w", ln.LineNo, err)
+		}
+		if len(filledLots) > 0 && ln.ID > 0 {
+			if _, err := tx.Exec(ctx, `
+				update public.fin_supplier_invoice_lines
+				set lot_lines = $1::jsonb
+				where id = $2 and supplier_invoice_id = $3`,
+				string(marshalLotLines(filledLots)), ln.ID, inv.ID); err != nil {
+				return err
+			}
 		}
 		if autoGR == nil || ln.ID <= 0 {
 			continue

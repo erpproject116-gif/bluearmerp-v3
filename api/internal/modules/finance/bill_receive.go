@@ -66,6 +66,11 @@ func validateTrackingCapture(
 		}
 	}
 	if trackLot {
+		for _, lot := range lots {
+			if strings.TrimSpace(lot.LotNo) == "" {
+				return errors.New("enter a lot number for every lot quantity")
+			}
+		}
 		required := trackingPolicyRequired(lotPolicy)
 		if len(lots) > 0 || required {
 			var sum float64
@@ -80,7 +85,7 @@ func validateTrackingCapture(
 	return nil
 }
 
-func validateBillLineSerialLots(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody) (trackSerial, trackLot bool, itemID int64, serialPolicy, lotPolicy string, err error) {
+func loadBillLineTracking(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody) (trackSerial, trackLot bool, itemID int64, serialPolicy, lotPolicy string, err error) {
 	var id *int64
 	if ln.ItemID != nil && *ln.ItemID > 0 {
 		id = ln.ItemID
@@ -119,7 +124,14 @@ func validateBillLineSerialLots(ctx context.Context, tx pgx.Tx, tenantID int64, 
 		       coalesce(serial_policy, 'required'), coalesce(lot_policy, 'required')
 		from public.inv_items where id = $1 and tenant_id = $2`, itemID, tenantID).
 		Scan(&trackSerial, &trackLot, &serialPolicy, &lotPolicy)
+	return trackSerial, trackLot, itemID, serialPolicy, lotPolicy, nil
+}
 
+func validateBillLineSerialLots(ctx context.Context, tx pgx.Tx, tenantID int64, ln supplierInvoiceLineBody) (trackSerial, trackLot bool, itemID int64, serialPolicy, lotPolicy string, err error) {
+	trackSerial, trackLot, itemID, serialPolicy, lotPolicy, err = loadBillLineTracking(ctx, tx, tenantID, ln)
+	if err != nil || itemID <= 0 {
+		return trackSerial, trackLot, itemID, serialPolicy, lotPolicy, err
+	}
 	if err := validateTrackingCapture(
 		trackSerial,
 		serialPolicy,
@@ -136,32 +148,59 @@ func validateBillLineSerialLots(ctx context.Context, tx pgx.Tx, tenantID int64, 
 
 // receiveForSupplierInvoiceLineTx posts stock (and serials/lots) under the hood via a posted GR.
 // Returns GR line id when a new receive was created, or nil when bill-only (already received / GR-sourced).
+// purchaseLotLinesBlank reports that the line did not name a lot.
+func purchaseLotLinesBlank(lots []billLotLine) bool {
+	return len(lots) == 0
+}
+
+// purchaseReceiveLots keeps a typed lot list. A blank lot-tracked line gets one generated number for the full quantity.
+func purchaseReceiveLots(trackLot bool, lineQty float64, existing []billLotLine, generatedNo string) []billLotLine {
+	if !trackLot || !purchaseLotLinesBlank(existing) || lineQty <= 0 || strings.TrimSpace(generatedNo) == "" {
+		return existing
+	}
+	return []billLotLine{{LotNo: strings.TrimSpace(generatedNo), Qty: lineQty}}
+}
+
 func receiveForSupplierInvoiceLineTx(
 	ctx context.Context, tx pgx.Tx,
 	tenantID, userID, locationID, partnerID int64,
 	ln supplierInvoiceLineBody,
-) (*int64, error) {
-	// Already linked to a posted GR — bill only.
+) (*int64, []billLotLine, error) {
+	// Already linked to a posted GR — bill only. Do not create another lot.
 	if ln.GoodsReceiptLineID != nil && *ln.GoodsReceiptLineID > 0 {
-		return ln.GoodsReceiptLineID, nil
+		return ln.GoodsReceiptLineID, ln.LotLines, nil
 	}
 
-	trackSerial, trackLot, itemID, _, _, err := validateBillLineSerialLots(ctx, tx, tenantID, ln)
+	trackSerial, trackLot, itemID, serialPolicy, lotPolicy, err := loadBillLineTracking(ctx, tx, tenantID, ln)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	if trackLot && purchaseLotLinesBlank(ln.LotLines) && ln.Qty > 0 {
+		lotNo, err := inventory.AllocateGeneratedLotNumber(ctx, tx, tenantID, time.Now())
+		if err != nil {
+			return nil, nil, err
+		}
+		ln.LotLines = purchaseReceiveLots(true, ln.Qty, nil, lotNo)
+	}
+	if itemID > 0 {
+		if err := validateTrackingCapture(trackSerial, serialPolicy, trackLot, lotPolicy, ln.Qty, ln.SerialNos, ln.LotLines); err != nil {
+			return nil, nil, err
+		}
 	}
 	serials := normalizeSerialNos(ln.SerialNos)
 
 	if ln.PurchaseOrderLineID != nil && *ln.PurchaseOrderLineID > 0 {
-		return receiveFromPOLine(ctx, tx, tenantID, userID, locationID, partnerID, *ln.PurchaseOrderLineID, ln.Qty, serials, ln.LotLines, trackSerial, trackLot, ln.WarrantyDurationMonths)
+		grLineID, err := receiveFromPOLine(ctx, tx, tenantID, userID, locationID, partnerID, *ln.PurchaseOrderLineID, ln.Qty, serials, ln.LotLines, trackSerial, trackLot, ln.WarrantyDurationMonths)
+		return grLineID, ln.LotLines, err
 	}
 
 	// Blank Purchase Receive line: post stock as soon as serials/lots (if required) are complete —
 	// same as PO-linked lines. Progress can stay Unconfirmed for AP; confirm still links journal.
 	if itemID <= 0 {
-		return nil, nil
+		return nil, ln.LotLines, nil
 	}
-	return receiveBlankItem(ctx, tx, tenantID, userID, locationID, partnerID, itemID, ln, serials, trackSerial, trackLot)
+	grLineID, err := receiveBlankItem(ctx, tx, tenantID, userID, locationID, partnerID, itemID, ln, serials, trackSerial, trackLot)
+	return grLineID, ln.LotLines, err
 }
 
 func receiveFromPOLine(

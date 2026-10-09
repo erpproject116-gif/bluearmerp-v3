@@ -685,7 +685,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
-		if err := validateSaleLotRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
+		if err := validateSaleInvoiceLots(r.Context(), tx, tu.TenantID, body.LocationID, body.Lines); err != nil {
 			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
@@ -701,7 +701,7 @@ func createSale(pool *pgxpool.Pool) http.HandlerFunc {
 				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 				return
 			}
-			if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+			if err := applySaleLot(r.Context(), tx, tu.TenantID, id, true); err != nil {
 				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 				return
 			}
@@ -920,7 +920,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
-		if err := validateSaleLotRequirements(r.Context(), tx, tu.TenantID, body.Lines); err != nil {
+		if err := validateSaleInvoiceLots(r.Context(), tx, tu.TenantID, body.LocationID, body.Lines); err != nil {
 			response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 			return
 		}
@@ -935,7 +935,7 @@ func updateSale(pool *pgxpool.Pool) http.HandlerFunc {
 				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 				return
 			}
-			if err := applySaleLot(r.Context(), tx, tu.TenantID, id); err != nil {
+			if err := applySaleLot(r.Context(), tx, tu.TenantID, id, true); err != nil {
 				response.ValidationSmartContext(w, map[string]string{"lines": err.Error()}, saleAssistLinks(body.SourceSalesOrderID))
 				return
 			}

@@ -231,7 +231,7 @@ func applySaleApprovalTransition(ctx context.Context, pool *pgxpool.Pool, tu aut
 		if err := applySaleStock(ctx, tx, tu.TenantID, id, locationID, tu.AppUserID); err != nil {
 			return err
 		}
-		if err := applySaleLot(ctx, tx, tu.TenantID, id); err != nil {
+		if err := applySaleLot(ctx, tx, tu.TenantID, id, true); err != nil {
 			return err
 		}
 	}

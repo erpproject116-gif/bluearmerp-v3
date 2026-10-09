@@ -1,6 +1,10 @@
 package sales
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
+)
 
 func TestValidateLotBatchForSaleLine(t *testing.T) {
 	item := func(v int64) *int64 { return &v }
@@ -24,6 +28,38 @@ func TestValidateLotBatchForSaleLine(t *testing.T) {
 		if (err != nil) != tc.wantErr {
 			t.Errorf("%s: got err=%v, wantErr=%v", tc.name, err, tc.wantErr)
 		}
+	}
+}
+
+func TestSaleInvoiceAllowsBlankLot(t *testing.T) {
+	if !saleInvoiceAllowsBlankLot(nil) {
+		t.Fatal("nil lot")
+	}
+	zero := int64(0)
+	if !saleInvoiceAllowsBlankLot(&zero) {
+		t.Fatal("zero lot")
+	}
+	chosen := int64(4)
+	if saleInvoiceAllowsBlankLot(&chosen) {
+		t.Fatal("a chosen lot is not blank")
+	}
+	if err := inventory.ValidateLotBatchCapture(1, inventory.TrackingPolicyRequired, nil); err == nil {
+		t.Fatal("checkout still requires a lot")
+	}
+}
+
+func TestSaleAutoMethod(t *testing.T) {
+	if saleAutoMethod("manual") != inventory.LotAllocationFIFO {
+		t.Fatal("manual")
+	}
+	if saleAutoMethod("fifo") != inventory.LotAllocationFIFO {
+		t.Fatal("fifo")
+	}
+	if saleAutoMethod("fefo") != inventory.LotAllocationFEFO {
+		t.Fatal("fefo")
+	}
+	if saleAutoMethod(inventory.ResolveLotAllocationMethod("manual", "fefo")) != inventory.LotAllocationFEFO {
+		t.Fatal("item manual with tenant fefo stays fefo")
 	}
 }
 

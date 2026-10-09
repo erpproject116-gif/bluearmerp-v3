@@ -31,16 +31,15 @@ export function validatePurchaseTrackingLine(line: PurchaseTrackingLine): string
 
   if (line.track_lot) {
     const lots = line.lot_lines ?? [];
-    if (lots.length > 0 || trackingPolicyIsRequired(line.lot_policy)) {
-      if (lots.some((lot) => !lot.lot_no.trim())) {
-        return `Line ${line.line_no}: enter a lot number for every lot quantity.`;
-      }
-      const total = lots.reduce((sum, lot) => sum + (Number(lot.qty) || 0), 0);
-      if (Math.abs(total - qty) > 0.0001) {
-        const lotQty = Math.round(total * 10000) / 10000;
-        const lineQty = Math.round(qty * 10000) / 10000;
-        return `Line ${line.line_no}: lot qty (${lotQty}) must equal line qty (${lineQty}).`;
-      }
+    if (lots.length === 0) return null;
+    if (lots.some((lot) => !lot.lot_no.trim())) {
+      return `Line ${line.line_no}: enter a lot number for every lot quantity.`;
+    }
+    const total = lots.reduce((sum, lot) => sum + (Number(lot.qty) || 0), 0);
+    if (Math.abs(total - qty) > 0.0001) {
+      const lotQty = Math.round(total * 10000) / 10000;
+      const lineQty = Math.round(qty * 10000) / 10000;
+      return `Line ${line.line_no}: lot qty (${lotQty}) must equal line qty (${lineQty}).`;
     }
   }
 
