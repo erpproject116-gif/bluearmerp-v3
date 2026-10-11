@@ -1,6 +1,6 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { Show, createEffect, createSignal, For, onCleanup, onMount } from "solid-js";
+import { Show, Suspense, createEffect, createSignal, For, lazy, onCleanup, onMount } from "solid-js";
 import { useAuth, canViewCrmNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
@@ -18,13 +18,17 @@ import {
   navGroupForModuleId,
 } from "./navGroups";
 import { isSubBranchPath } from "./sub-branch-nav";
-import { TaxMngtHeaderNav } from "./TaxMngtHeaderNav";
-import { CollectiveInvoicingHeaderNav } from "./CollectiveInvoicingHeaderNav";
-import { SerialLotHeaderNav } from "./SerialLotHeaderNav";
-import { WmsHeaderNav } from "./WmsHeaderNav";
-import { AcctIHeaderNav } from "./AcctIHeaderNav";
-import { AcctIIHeaderNav } from "./AcctIIHeaderNav";
-import { ReviewPurchasesHeaderNav } from "./ReviewPurchasesHeaderNav";
+const TaxMngtHeaderNav = lazy(() => import("./TaxMngtHeaderNav").then((m) => ({ default: m.TaxMngtHeaderNav })));
+const CollectiveInvoicingHeaderNav = lazy(() =>
+  import("./CollectiveInvoicingHeaderNav").then((m) => ({ default: m.CollectiveInvoicingHeaderNav })),
+);
+const SerialLotHeaderNav = lazy(() => import("./SerialLotHeaderNav").then((m) => ({ default: m.SerialLotHeaderNav })));
+const WmsHeaderNav = lazy(() => import("./WmsHeaderNav").then((m) => ({ default: m.WmsHeaderNav })));
+const AcctIHeaderNav = lazy(() => import("./AcctIHeaderNav").then((m) => ({ default: m.AcctIHeaderNav })));
+const AcctIIHeaderNav = lazy(() => import("./AcctIIHeaderNav").then((m) => ({ default: m.AcctIIHeaderNav })));
+const ReviewPurchasesHeaderNav = lazy(() =>
+  import("./ReviewPurchasesHeaderNav").then((m) => ({ default: m.ReviewPurchasesHeaderNav })),
+);
 import { taxMngtHeaderTitle } from "./tax-mngt-nav";
 import { TAX_MNGT_PREFIX } from "./tax-mngt-nav";
 import { collectiveInvoicingHeaderTitle, COLLECTIVE_INVOICING_PREFIX } from "./collective-invoicing-nav";
@@ -38,23 +42,31 @@ import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
 import { navFeatureLabelKey, navModuleLabelKey } from "../shared/branding/navLabels";
 import { UserAccountMenu } from "./UserAccountMenu";
-import { BusinessBranchSwitcher } from "./BusinessBranchSwitcher";
+const BusinessBranchSwitcher = lazy(() =>
+  import("./BusinessBranchSwitcher").then((m) => ({ default: m.BusinessBranchSwitcher })),
+);
 import { SupportSessionBanner } from "./SupportSessionBanner";
 import { RolePreviewBanner } from "./RolePreviewBanner";
-import { SidebarNav } from "./SidebarNav";
+const SidebarNav = lazy(() => import("./SidebarNav").then((m) => ({ default: m.SidebarNav })));
 import { EntitlementBanner } from "../shared/EntitlementBanner";
 import { DemoTenantBanner } from "../shared/DemoTenantBanner";
 import { SetupBreadcrumbHint, SetupReminderBar } from "../shared/SetupReminderBar";
 import { CommercialPaywallHost } from "../shared/CommercialPaywall";
 import { SetupFirstRunRedirect } from "../shared/SetupFirstRunRedirect";
-import { HelpAssistantProvider } from "../modules/help-assistant/helpAssistantContext";
+const HelpAssistantProvider = lazy(() =>
+  import("../modules/help-assistant/helpAssistantContext").then((m) => ({ default: m.HelpAssistantProvider })),
+);
 import { ModuleAccessGate } from "../shared/ModuleAccessGate";
 import { OnboardingProminentPanel } from "../shared/OnboardingProminentPanel";
 import { JoinCompanyConfirm } from "../shared/JoinCompanyConfirm";
 import { useBootstrapDisplayCurrency } from "../shared/useBootstrapDisplayCurrency";
-import { CommandPalette, useCommandPaletteHotkey } from "./CommandPalette";
-import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
-import { FloorBottomNav } from "./FloorBottomNav";
+import { useCommandPaletteHotkey } from "./commandPaletteHotkey";
+
+const CommandPalette = lazy(() => import("./CommandPalette").then((m) => ({ default: m.CommandPalette })));
+const WorkflowGuideHeaderControl = lazy(() =>
+  import("../shared/WorkflowGuideHeader").then((m) => ({ default: m.WorkflowGuideHeaderControl })),
+);
+const FloorBottomNav = lazy(() => import("./FloorBottomNav").then((m) => ({ default: m.FloorBottomNav })));
 import { DesktopPreferredHint } from "./DesktopPreferredHint";
 
 function subBranchHeaderTitle(pathname: string, prefix?: string): string {
@@ -244,6 +256,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
   const shell = useShell();
   const branding = useBranding();
   const [paletteOpen, setPaletteOpen] = createSignal(false);
+  const [guideOn, setGuideOn] = createSignal(false);
   useCommandPaletteHotkey(() => setPaletteOpen(true));
   useBootstrapDisplayCurrency();
 
@@ -267,6 +280,9 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
     document.addEventListener("keydown", onKey);
     onCleanup(() => document.removeEventListener("keydown", onKey));
     void import("../shared/pushSubscribe").then((m) => m.subscribeWebPushIfConfigured());
+    const showGuide = () => setGuideOn(true);
+    if (typeof requestIdleCallback === "function") requestIdleCallback(showGuide, { timeout: 2000 });
+    else window.setTimeout(showGuide, 500);
   });
 
   const activeModule = () => resolveModule(loc.pathname);
@@ -373,10 +389,16 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           </Show>
         </div>
 
-        <SidebarNav />
+        <Show when={!shell.viewport.useDrawer() || shell.drawerOpen()}>
+          <Suspense>
+            <SidebarNav />
+          </Suspense>
+        </Show>
 
         <div class="mt-4 shrink-0 space-y-2 border-t border-stroke pt-3">
-          <BusinessBranchSwitcher />
+          <Suspense>
+            <BusinessBranchSwitcher />
+          </Suspense>
           {/* View as role temporarily hidden — recovery banner still mounts if preview is active. */}
           <UserAccountMenu />
           <Show when={!shell.collapsed()}>
@@ -441,10 +463,10 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                   <Show
                     when={activeModule()}
                     fallback={
-                      <>
+                      <p class="h-4 truncate text-xs font-medium leading-4 text-text-secondary">
                         <SetupBreadcrumbHint />
-                        <p class="text-xs font-medium text-text-secondary">{appTitle()}</p>
-                      </>
+                        {appTitle()}
+                      </p>
                     }
                   >
                     {(mod) => {
@@ -482,7 +504,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                         return uniqueCrumbs(parts);
                       };
                       return (
-                        <p class="text-xs font-medium text-text-secondary">
+                        <p class="h-4 truncate text-xs font-medium leading-4 text-text-secondary">
                           <SetupBreadcrumbHint />
                           <For each={crumbParts()}>
                             {(part, i) => (
@@ -501,9 +523,6 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               </div>
             </div>
             <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
-              <Show when={!shell.viewport.isStandalone()}>
-                <WorkflowGuideHeaderControl />
-              </Show>
               <button
                 type="button"
                 class="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm text-text-secondary transition hover:bg-slate-50 hover:text-text-primary md:min-w-[7.5rem] md:px-3"
@@ -534,6 +553,11 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
                 userId={auth.me?.user?.id ?? null}
               />
               <CrmNotificationBell enabled={canViewCrmNotifications(auth.me)} />
+              <Show when={guideOn() && !shell.viewport.isStandalone()}>
+                <Suspense>
+                  <WorkflowGuideHeaderControl />
+                </Suspense>
+              </Show>
             </div>
           </div>
           <SetupReminderBar />
@@ -548,14 +572,28 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             )}
           </Show>
           <Show when={!shell.viewport.isStandalone()}>
-            <TaxMngtHeaderNav />
-            <CollectiveInvoicingHeaderNav />
             <MasterListHeaderNav />
-            <SerialLotHeaderNav />
-            <WmsHeaderNav />
-            <ReviewPurchasesHeaderNav />
-            <AcctIHeaderNav />
-            <AcctIIHeaderNav />
+            <Show when={loc.pathname.startsWith(TAX_MNGT_PREFIX)}>
+              <Suspense><TaxMngtHeaderNav /></Suspense>
+            </Show>
+            <Show when={loc.pathname.startsWith(COLLECTIVE_INVOICING_PREFIX)}>
+              <Suspense><CollectiveInvoicingHeaderNav /></Suspense>
+            </Show>
+            <Show when={loc.pathname.startsWith(SERIAL_LOT_PREFIX)}>
+              <Suspense><SerialLotHeaderNav /></Suspense>
+            </Show>
+            <Show when={loc.pathname.startsWith(WMS_PREFIX)}>
+              <Suspense><WmsHeaderNav /></Suspense>
+            </Show>
+            <Show when={isReviewPurchasesPath(loc.pathname)}>
+              <Suspense><ReviewPurchasesHeaderNav /></Suspense>
+            </Show>
+            <Show when={loc.pathname.startsWith(ACCT_I_PREFIX)}>
+              <Suspense><AcctIHeaderNav /></Suspense>
+            </Show>
+            <Show when={loc.pathname.startsWith(ACCT_II_PREFIX)}>
+              <Suspense><AcctIIHeaderNav /></Suspense>
+            </Show>
           </Show>
         </header>
         <main class="flex-1 p-4 sm:p-6">
@@ -567,14 +605,18 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
           <ModuleAccessGate>{props.children}</ModuleAccessGate>
         </main>
       </div>
-      <FloorBottomNav />
+      <Show when={shell.viewport.isStandalone() || shell.viewport.isNarrow()}>
+        <Suspense>
+          <FloorBottomNav />
+        </Suspense>
+      </Show>
     </div>
   );
 
   return (
-    <HelpAssistantProvider>
+    <>
       {layout}
-      <CommandPalette open={paletteOpen()} onClose={() => setPaletteOpen(false)} />
+      <DeferredShellChrome open={paletteOpen()} onClose={() => setPaletteOpen(false)} />
       <Show when={updateReady()}>
         <div
           class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
@@ -612,7 +654,28 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
         <JoinCompanyConfirm />
         <OnboardingProminentPanel />
       </Show>
-    </HelpAssistantProvider>
+    </>
+  );
+}
+
+function DeferredShellChrome(props: { open: boolean; onClose: () => void }) {
+  const [ready, setReady] = createSignal(false);
+  onMount(() => {
+    const start = () => setReady(true);
+    if (typeof requestIdleCallback === "function") requestIdleCallback(start, { timeout: 1500 });
+    else window.setTimeout(start, 400);
+  });
+
+  return (
+    <Show when={ready() || props.open}>
+      <Suspense>
+        <HelpAssistantProvider>
+          <Show when={props.open}>
+            <CommandPalette open onClose={props.onClose} />
+          </Show>
+        </HelpAssistantProvider>
+      </Suspense>
+    </Show>
   );
 }
 

@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { defineConfig, loadEnv } from "vite";
 import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
@@ -49,6 +51,10 @@ export default defineConfig(({ mode }) => {
         configurePreviewServer(server) {
           return () => {
             const handle = (req: { url?: string }, res: { setHeader: (k: string, v: string) => void; end: (b: string) => void }, next: () => void) => {
+              res.setHeader(
+                "Content-Security-Policy",
+                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+              );
               const path = req.url?.split("?")[0];
               if (path !== "/robots.txt") {
                 next();
@@ -79,13 +85,19 @@ export default defineConfig(({ mode }) => {
         },
       },
       {
-        name: "non-blocking-css",
+        name: "inline-entry-css",
         apply: "build" as const,
-        transformIndexHtml(html: string) {
-          return html.replace(
-            /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/g,
-            '<link rel="preload" as="style" href="$1" onload="this.onload=null;this.rel=\'stylesheet\'"><noscript><link rel="stylesheet" href="$1"></noscript>',
-          );
+        writeBundle(options) {
+          const dir = options.dir;
+          if (!dir) return;
+          const htmlPath = path.join(dir, "index.html");
+          let source = fs.readFileSync(htmlPath, "utf8");
+          const match = source.match(/<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/);
+          if (!match) return;
+          const cssPath = path.join(dir, match[1].slice(1));
+          const text = fs.readFileSync(cssPath, "utf8").replace(/<\/style/gi, "<\\/style");
+          source = source.replace(match[0], `<style>${text}</style>`);
+          fs.writeFileSync(htmlPath, source);
         },
       },
       VitePWA({
@@ -179,6 +191,13 @@ export default defineConfig(({ mode }) => {
       dedupe: ["solid-js", "@solidjs/router"],
     },
     build: {
+      modulePreload: {
+        resolveDependencies(_filename, deps) {
+          // Route-only nav data is not needed for the sign-in paint. Preloading it
+          // competes with the entry script on a slow connection.
+          return deps.filter((dep) => !dep.includes("-nav-"));
+        },
+      },
       rollupOptions: {
         output: {
           manualChunks(id) {

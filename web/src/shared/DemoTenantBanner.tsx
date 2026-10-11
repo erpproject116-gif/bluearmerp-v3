@@ -1,21 +1,21 @@
-import { Show, createSignal, onMount } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { A } from "@solidjs/router";
 import { useAuth } from "./auth-context";
 
 const DISMISS_KEY = "bluearm.demoTenantBanner.dismissed";
 
+function readDemoBannerDismissed(): boolean {
+  try {
+    return sessionStorage.getItem(DISMISS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** Persistent notice when the active tenant is a demo / sample-data workspace. */
 export function DemoTenantBanner() {
   const auth = useAuth();
-  const [dismissed, setDismissed] = createSignal(false);
-
-  onMount(() => {
-    try {
-      setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1");
-    } catch {
-      /* ignore */
-    }
-  });
+  const [dismissed, setDismissed] = createSignal(readDemoBannerDismissed());
 
   const isDemo = () => Boolean(auth.me?.tenant?.is_demo);
 

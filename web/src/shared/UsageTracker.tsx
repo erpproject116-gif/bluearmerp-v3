@@ -2,7 +2,6 @@ import { createEffect, onCleanup, onMount } from "solid-js";
 import { useLocation } from "@solidjs/router";
 import { apiFetch } from "./api";
 import { useAuth } from "./auth-context";
-import { describePresencePath } from "./presenceLabels";
 import { isIdleLogoutExemptPath, LAST_ACTIVITY_STORAGE_KEY, readLocalActivity } from "./sessionIdleClient";
 
 const HEARTBEAT_MS = 30_000;
@@ -36,6 +35,7 @@ let clientSessionId: string | null = null;
 let sessionStarted = false;
 let ending = false;
 let seqCounter = 0;
+let visitGen = 0;
 let openVisit: OpenVisit | null = null;
 let pendingPages: PendingPage[] = [];
 let activeDeltaMs = 0;
@@ -85,9 +85,12 @@ function flushVisit(exitedAt = Date.now()) {
   openVisit = null;
 }
 
-function openNewVisit(pathname: string) {
+async function openNewVisit(pathname: string) {
+  const gen = ++visitGen;
   seqCounter += 1;
   const now = Date.now();
+  const { describePresencePath } = await import("./presenceLabels");
+  if (gen !== visitGen) return;
   openVisit = {
     clientVisitId: newId(),
     seq: seqCounter,
@@ -192,7 +195,8 @@ async function startSession(pathname: string) {
   }
 
   seqCounter = 0;
-  openNewVisit(pathname);
+  await openNewVisit(pathname);
+  if (!openVisit) return;
   lastTickAt = Date.now();
   lastActivityAt = Math.max(Date.now(), readLocalActivity());
 
@@ -312,8 +316,7 @@ export function UsageTracker() {
     }
     if (openVisit && openVisit.path === pathname) return;
     flushVisit();
-    openNewVisit(pathname);
-    void sendHeartbeat();
+    void openNewVisit(pathname).then(() => sendHeartbeat());
   };
 
   onMount(() => {

@@ -11,12 +11,36 @@ const anon = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 export const supabaseConfigured = Boolean(url && anon);
 
 let clientPromise: Promise<SupabaseClient> | null = null;
+let clientReady = false;
+
+/** Still-valid access token from the auth library's storage, without loading that library. */
+export function readPersistedAccessToken(): string | null {
+  if (typeof localStorage === "undefined" || !url) return null;
+  let ref = "";
+  try {
+    ref = new URL(url).hostname.split(".")[0] ?? "";
+  } catch {
+    return null;
+  }
+  if (!ref) return null;
+  const raw = localStorage.getItem(`sb-${ref}-auth-token`);
+  if (!raw) return null;
+  try {
+    const session = JSON.parse(raw) as { access_token?: string; expires_at?: number };
+    if (!session.access_token || typeof session.expires_at !== "number") return null;
+    // Match the auth client's refresh window so a token it is about to replace is not sent.
+    if (session.expires_at * 1000 - Date.now() < 90_000) return null;
+    return session.access_token;
+  } catch {
+    return null;
+  }
+}
 
 /** Loads the auth client on first use so the sign-in screen can paint without it. */
 export function getSupabase(): Promise<SupabaseClient> {
   if (!clientPromise) {
-    clientPromise = import("@supabase/supabase-js").then(({ createClient }) =>
-      createClient(url || "http://localhost", anon || "anon", {
+    clientPromise = import("@supabase/supabase-js").then(({ createClient }) => {
+      const client = createClient(url || "http://localhost", anon || "anon", {
         auth: {
           flowType: "pkce",
           // Callback page exchanges the code once — avoid double exchange on client init.
@@ -24,8 +48,10 @@ export function getSupabase(): Promise<SupabaseClient> {
           persistSession: true,
           autoRefreshToken: true,
         },
-      }),
-    );
+      });
+      clientReady = true;
+      return client;
+    });
   }
   return clientPromise;
 }
@@ -77,6 +103,10 @@ export function apiNetworkErrorMessage(): string {
 }
 
 export async function getAccessToken(): Promise<string | null> {
+  if (!clientReady) {
+    const cached = readPersistedAccessToken();
+    if (cached) return cached;
+  }
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
 }

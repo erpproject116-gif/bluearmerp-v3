@@ -1,6 +1,6 @@
 import { createContext, onCleanup, onMount, useContext, type ParentComponent } from "solid-js";
 import { createStore } from "solid-js/store";
-import { apiFetch, apiNetworkErrorMessage, getSupabase } from "./api";
+import { apiFetch, apiNetworkErrorMessage, getSupabase, readPersistedAccessToken, type ApiResult } from "./api";
 import {
   clearRolePreviewAttempt,
   clearRolePreviewFlag,
@@ -358,6 +358,13 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState>();
 
+// Returning visits already have a token in storage. Ask who the user is while
+// the auth library is still downloading, instead of after it finishes.
+let bootMe: Promise<ApiResult<MeData>> | null =
+  typeof window !== "undefined" && readPersistedAccessToken()
+    ? apiFetch<MeData>("/api/v1/auth/me")
+    : null;
+
 export const AuthProvider: ParentComponent = (props) => {
   const [state, setState] = createStore({
     me: null as MeData | null,
@@ -380,12 +387,16 @@ export const AuthProvider: ParentComponent = (props) => {
 
   const refresh = async (options?: { background?: boolean; _previewRecoveryTried?: boolean }) => {
     const background = options?.background ?? false;
-    const {
-      data: { session },
-    } = await (await getSupabase()).auth.getSession();
-    if (!session) {
-      setState({ me: null, loading: false, bootstrapError: null, bootstrapMessage: null });
-      return;
+    const earlyToken = readPersistedAccessToken();
+    if (!earlyToken) {
+      const {
+        data: { session },
+      } = await (await getSupabase()).auth.getSession();
+      if (!session) {
+        bootMe = null;
+        setState({ me: null, loading: false, bootstrapError: null, bootstrapMessage: null });
+        return;
+      }
     }
 
     if (!background && !state.me) {
@@ -393,7 +404,21 @@ export const AuthProvider: ParentComponent = (props) => {
     }
 
     try {
-      const res = await apiFetch<MeData>("/api/v1/auth/me", {}, background ? { background: true } : undefined);
+      const pendingBoot = !background ? bootMe : null;
+      bootMe = null;
+      let res = pendingBoot
+        ? await pendingBoot
+        : await apiFetch<MeData>("/api/v1/auth/me", {}, background ? { background: true } : undefined);
+      if (res.status === 401 && earlyToken) {
+        const {
+          data: { session },
+        } = await (await getSupabase()).auth.getSession();
+        if (!session) {
+          setState({ me: null, loading: false, bootstrapError: null, bootstrapMessage: null });
+          return;
+        }
+        res = await apiFetch<MeData>("/api/v1/auth/me", {}, background ? { background: true } : undefined);
+      }
       if (res.success && res.data) {
         // Keep the persisted active tenant in sync with what the server resolved, so
         // subsequent requests send a stable X-Tenant-ID header.

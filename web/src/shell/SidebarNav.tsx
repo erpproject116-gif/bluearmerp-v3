@@ -1,6 +1,7 @@
-import { createEffect, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createSignal, For, lazy, on, Show, Suspense } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { ModuleIcon } from "./ModuleIcon";
+
+const ModuleIcon = lazy(() => import("./ModuleIcon").then((m) => ({ default: m.ModuleIcon })));
 import { useShell } from "./shell-context";
 import { navGroups, navGroupStorageKey, isFinanceUnderSalesReportPath } from "./navGroups";
 import { isReviewPurchasesPath } from "./review-purchases-nav";
@@ -138,7 +139,9 @@ function NavAreaLink(props: {
           "erp-panel text-text-secondary": !active(),
         }}
       >
-        <ModuleIcon id={props.area.iconId} class={props.nested ? "h-3.5 w-3.5" : undefined} />
+        <Suspense>
+          <ModuleIcon id={props.area.iconId} class={props.nested ? "h-3.5 w-3.5" : undefined} />
+        </Suspense>
         <Show when={shell.collapsed() && badgeText()}>
           <span
             class="absolute -right-1 -top-1 min-w-[1rem] rounded-full bg-brand-600 px-1 text-center text-[9px] font-semibold leading-4 text-white"

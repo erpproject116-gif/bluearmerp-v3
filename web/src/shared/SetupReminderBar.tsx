@@ -37,7 +37,7 @@ export function SetupReminderBar() {
   return (
     <>
       <Show when={nudge() === "setup" && data()?.show_setup_banner}>
-        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950">
+        <div class="fixed inset-x-3 bottom-4 z-[35] flex max-lg:bottom-24 flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950 shadow-lg">
           <div class="min-w-0">
             <p class="font-medium">Workspace setup incomplete ({data()!.percent}%)</p>
             <p class="text-xs text-amber-900/80">
@@ -67,7 +67,7 @@ export function SetupReminderBar() {
       </Show>
 
       <Show when={nudge() === "commercial"}>
-        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm text-slate-800">
+        <div class="fixed inset-x-3 bottom-4 z-[35] flex max-lg:bottom-24 flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm text-slate-800 shadow-lg">
           <div class="min-w-0">
             <p class="font-medium">
               {auth.me?.commercial?.status === "awaiting_payment"
@@ -90,7 +90,7 @@ export function SetupReminderBar() {
       </Show>
 
       <Show when={nudge() === "setup" && !canManage() && data() && !data()!.required_complete}>
-        <div class="mt-3 rounded-lg border border-stroke bg-slate-50 px-4 py-2 text-xs text-text-secondary">
+        <div class="fixed inset-x-3 bottom-4 z-[35] max-lg:bottom-24 rounded-lg border border-stroke bg-slate-50 px-4 py-2 text-xs text-text-secondary shadow-lg">
           Workspace setup is still in progress. Your administrator is finishing the initial configuration.
         </div>
       </Show>

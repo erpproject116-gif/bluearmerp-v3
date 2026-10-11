@@ -1,6 +1,5 @@
 import { createSignal, onCleanup, onMount } from "solid-js";
 import { hasPermission, useAuth } from "../../shared/auth-context";
-import { fetchChatUnreadTotal } from "./chatApi";
 
 /** Polls Team Chat unread total for the Communications sidebar badge. */
 export function useChatUnreadTotal() {
@@ -14,6 +13,7 @@ export function useChatUnreadTotal() {
       setTotal(0);
       return;
     }
+    const { fetchChatUnreadTotal } = await import("./chatApi");
     const res = await fetchChatUnreadTotal();
     if (res.success && res.data) {
       setTotal(Number(res.data.unread_total) || 0);
@@ -21,7 +21,8 @@ export function useChatUnreadTotal() {
   };
 
   onMount(() => {
-    void refresh();
+    if (typeof requestIdleCallback === "function") requestIdleCallback(() => void refresh(), { timeout: 2000 });
+    else window.setTimeout(() => void refresh(), 400);
     const onVis = () => {
       if (document.visibilityState === "visible") void refresh();
     };

@@ -39,7 +39,9 @@ export function useViewportMode(): ViewportMode {
   const [band, setBand] = createSignal<ViewportBand>(
     typeof window !== "undefined" ? readBand(window.innerWidth) : "xl",
   );
-  const [standalone, setStandalone] = createSignal(false);
+  const [standalone, setStandalone] = createSignal(
+    typeof window !== "undefined" ? readStandalone() : false,
+  );
 
   onMount(() => {
     setBand(readBand(window.innerWidth));

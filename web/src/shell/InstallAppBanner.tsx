@@ -36,13 +36,9 @@ function setDismissed() {
 export function InstallAppBanner() {
   const viewport = useViewportMode();
   const [deferred, setDeferred] = createSignal<BeforeInstallPromptEvent | null>(null);
-  const [dismissed, setDismissedSig] = createSignal(true);
-  const [iosHint, setIosHint] = createSignal(false);
+  const [dismissed, setDismissedSig] = createSignal(isDismissed());
 
   onMount(() => {
-    setDismissedSig(isDismissed());
-    setIosHint(isIosDevice() && !viewport.isStandalone());
-
     const onBip = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);
@@ -54,7 +50,7 @@ export function InstallAppBanner() {
   const showAndroid = () =>
     !viewport.isStandalone() && !dismissed() && deferred() != null;
   const showIos = () =>
-    !viewport.isStandalone() && !dismissed() && iosHint() && deferred() == null;
+    !viewport.isStandalone() && !dismissed() && isIosDevice() && deferred() == null;
 
   const dismiss = () => {
     setDismissed();
@@ -77,7 +73,11 @@ export function InstallAppBanner() {
   return (
     <Show when={showAndroid() || showIos()}>
       <div
-        class="mb-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/70 px-4 py-3 text-sm text-text-primary"
+        class="fixed inset-x-3 z-30 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/70 px-4 py-3 text-sm text-text-primary shadow-lg"
+        classList={{
+          "bottom-44": viewport.isNarrow(),
+          "bottom-28": !viewport.isNarrow(),
+        }}
         role="status"
       >
         <div class="min-w-0 flex-1 space-y-1">

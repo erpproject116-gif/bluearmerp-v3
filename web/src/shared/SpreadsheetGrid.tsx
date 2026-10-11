@@ -14,6 +14,7 @@ import { GridExportButtons, type GridExportColumn } from "./gridExport";
 import { useGridColumnPrefs } from "./useGridColumnPrefs";
 import { PageJumpControl } from "./PageJumpControl";
 import { PageSizeSelect, snapPageSize } from "./pageSize";
+import { toolbarControlClass } from "./inputClass";
 
 const NON_HIDEABLE_KEYS = new Set(["actions", "print", "history", "lifecycle", "date_no_display"]);
 
@@ -991,8 +992,4 @@ export function ModalMessage(props: { children: JSX.Element }) {
   return <div class="col-span-full">{props.children}</div>;
 }
 
-export const inputClass =
-  "erp-input w-full rounded-lg border px-3 py-2 text-sm shadow-sm outline-none transition";
-
-export const toolbarControlClass =
-  "erp-input rounded-lg border px-3 py-2 text-sm shadow-sm outline-none transition";
+export { inputClass, toolbarControlClass } from "./inputClass";

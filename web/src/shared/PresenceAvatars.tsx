@@ -1,6 +1,5 @@
 import { useNavigate } from "@solidjs/router";
 import { createSignal, For, Show } from "solid-js";
-import { createOrGetDM } from "../modules/comms/chatApi";
 import { presenceActivityLabel } from "./presenceLabels";
 import { hasPermission, useAuth } from "./auth-context";
 import { UserAvatar } from "./UserAvatar";
@@ -42,6 +41,7 @@ export function PresenceAvatars(props: { compact?: boolean } = {}) {
     if (user.is_self || !canMessage() || messagingId() !== null) return;
     setMessagingId(user.user_id);
     try {
+      const { createOrGetDM } = await import("../modules/comms/chatApi");
       const res = await createOrGetDM(user.user_id);
       if (!res.success || !res.data) {
         toast.error(res.message || "Failed to open DM.");

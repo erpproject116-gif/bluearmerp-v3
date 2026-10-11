@@ -1,4 +1,12 @@
-import { Show, createSignal, onMount } from "solid-js";
+import { Show, createSignal } from "solid-js";
+
+function readCoachDismissed(storageKey: string): boolean {
+  try {
+    return localStorage.getItem(storageKey) === "1";
+  } catch {
+    return false;
+  }
+}
 
 /** Dismissible one-line hint; persisted in localStorage (optional route-scoped coach marks). */
 export function PageCoachMark(props: {
@@ -7,15 +15,7 @@ export function PageCoachMark(props: {
   actionHref?: string;
   actionLabel?: string;
 }) {
-  const [hidden, setHidden] = createSignal(true);
-
-  onMount(() => {
-    try {
-      setHidden(localStorage.getItem(props.storageKey) === "1");
-    } catch {
-      setHidden(false);
-    }
-  });
+  const [hidden, setHidden] = createSignal(readCoachDismissed(props.storageKey));
 
   const dismiss = () => {
     try {

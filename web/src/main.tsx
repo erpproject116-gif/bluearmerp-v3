@@ -63,6 +63,13 @@ function startServiceWorker() {
   });
 }
 
+function hideBootSplash() {
+  const bootSplash = document.getElementById("boot-splash");
+  if (!bootSplash) return;
+  bootSplash.classList.add("is-done");
+  window.setTimeout(() => bootSplash.remove(), 220);
+}
+
 render(() => <App />, document.getElementById("root")!);
 
 if (typeof requestIdleCallback === "function") {
@@ -71,8 +78,4 @@ if (typeof requestIdleCallback === "function") {
   window.setTimeout(startServiceWorker, 1);
 }
 
-const bootSplash = document.getElementById("boot-splash");
-if (bootSplash) {
-  bootSplash.classList.add("is-done");
-  window.setTimeout(() => bootSplash.remove(), 220);
-}
+hideBootSplash();

@@ -1,5 +1,5 @@
 import { A, useLocation, useNavigate } from "@solidjs/router";
-import { Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { Show, Suspense, createEffect, createSignal, lazy, onCleanup, onMount } from "solid-js";
 import { useAuth, canManageBranding } from "../shared/auth-context";
 import { apiFetch } from "../shared/api";
 import { AvatarUploadButton } from "../shared/AvatarUploadButton";
@@ -9,10 +9,11 @@ import { brandingLabel } from "../shared/branding/brandingStore";
 import { useShell } from "./shell-context";
 import { hasInlineGuidesStoredPref, useInlineGuides } from "../shared/inlineGuides";
 import { ThemeSwitcher } from "../shared/ThemeSwitcher";
-import { WorkflowGuideHeaderControl } from "../shared/WorkflowGuideHeader";
 import { useToast } from "../shared/toast";
-import { resolveWorkflowForPath } from "../shared/workflowGuides";
-import { handleSaveResult } from "../shared/handleSaveResult";
+
+const WorkflowGuideHeaderControl = lazy(() =>
+  import("../shared/WorkflowGuideHeader").then((m) => ({ default: m.WorkflowGuideHeaderControl })),
+);
 
 function BookIcon() {
   return (
@@ -48,7 +49,15 @@ export function UserAccountMenu() {
   const [open, setOpen] = createSignal(false);
   const [avatarSaving, setAvatarSaving] = createSignal(false);
 
-  const hasWorkflowGuide = () => Boolean(resolveWorkflowForPath(loc.pathname, auth.me));
+  const [hasGuide, setHasGuide] = createSignal(false);
+  createEffect(() => {
+    if (!open()) return;
+    const path = loc.pathname;
+    const me = auth.me;
+    void import("../shared/workflowGuides").then((m) => {
+      setHasGuide(Boolean(m.resolveWorkflowForPath(path, me)));
+    });
+  });
   const canHideAvatar = () => {
     const u = auth.me?.user;
     return Boolean(u?.is_tenant_owner || u?.is_platform_superadmin);
@@ -85,6 +94,7 @@ export function UserAccountMenu() {
         { method: "PATCH", body: JSON.stringify({ avatar_hidden_from_others: next }) },
         { silent: true },
       );
+      const { handleSaveResult } = await import("../shared/handleSaveResult");
       if (!handleSaveResult(res, toast, next ? "Photo hidden from others" : "Photo visible to others")) return;
       await auth.refresh({ background: true });
     } catch {
@@ -202,9 +212,11 @@ export function UserAccountMenu() {
                   Tips on forms and list pages. Does not turn off Help &amp; guides.
                 </p>
                 <ThemeSwitcher labeled />
-                <Show when={hasWorkflowGuide()}>
+                <Show when={hasGuide()}>
                   <div class="px-1">
-                    <WorkflowGuideHeaderControl class="w-full justify-center rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 transition hover:bg-brand-50" compact />
+                    <Suspense>
+                      <WorkflowGuideHeaderControl class="w-full justify-center rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-brand-700 transition hover:bg-brand-50" compact />
+                    </Suspense>
                   </div>
                 </Show>
                 <A

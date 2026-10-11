@@ -2,7 +2,7 @@ import { createContext, createEffect, createSignal, useContext, type ParentCompo
 import { useQueryClient } from "@tanstack/solid-query";
 import { useSearchParams } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { inputClass } from "../../shared/SpreadsheetGrid";
+import { inputClass } from "../../shared/inputClass";
 import { LoadingText } from "../../shared/LoadingText";
 import {
   boardWorkItemsQueryKey,

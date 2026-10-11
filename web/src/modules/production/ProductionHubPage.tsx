@@ -1,6 +1,6 @@
 import { A, useNavigate } from "@solidjs/router";
 import { For, Show, createResource } from "solid-js";
-import { apiFetch } from "../../shared/api";
+import { apiFetch, readPersistedAccessToken } from "../../shared/api";
 import { floorStatusLabel } from "./mfgRules";
 import { PageCoachMark } from "../../shared/PageCoachMark";
 import { newAssemblyOrderHref, newCuttingOrderHref, newRecipeOrderHref } from "./mfgProductionMode";
@@ -92,12 +92,24 @@ function jobsHrefForOrder(o: RecentOrder) {
   return `/app/production/assembly/jobs`;
 }
 
+function loadDashboard() {
+  return apiFetch<Dashboard>("/api/v1/manufacturing/dashboard", undefined, { silent: true }).then((res) =>
+    res.success && res.data ? res.data : null,
+  );
+}
+
+const hubPath = typeof window !== "undefined" ? window.location.pathname : "";
+let bootDash: Promise<Dashboard | null> | null =
+  (hubPath === "/app/production" || hubPath === "/app/production/") && readPersistedAccessToken()
+    ? loadDashboard()
+    : null;
+
 export function ProductionHubPage() {
   const navigate = useNavigate();
-  const [dash] = createResource(async () => {
-    const res = await apiFetch<Dashboard>("/api/v1/manufacturing/dashboard", undefined, { silent: true });
-    if (!res.success || !res.data) return null;
-    return res.data;
+  const [dash] = createResource(() => {
+    const pending = bootDash;
+    bootDash = null;
+    return pending ?? loadDashboard();
   });
 
   return (
