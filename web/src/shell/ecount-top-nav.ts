@@ -266,6 +266,14 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
     expandGroupId: "after_sales",
   },
   {
+    id: "services",
+    label: "Services",
+    href: "/app/services/requests",
+    iconId: "services",
+    topId: "inv1",
+    moduleId: "services",
+  },
+  {
     id: "production",
     label: "Manufacturing",
     href: "/app/production",

@@ -19,6 +19,7 @@ import { SalesOrderLayout } from "../SalesOrderLayout";
 import { CreatedSlipModal } from "./CreatedSlipModal";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesOrderModal, type SalesOrderDetail } from "./SalesOrderModal";
+import { ServiceJobGenerateButton, ServiceJobsPanel } from "../../services/pages";
 import { formatMoney, openSalesOrderPrint } from "./salesOrderPrint";
 import { progressStatusLabel } from "./progressStatus";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
@@ -293,6 +294,8 @@ export function SalesOrderListPageInner(props: PageOptions = {}) {
                 {woBusy() ? "Creating…" : "Create work order(s)"}
               </button>
             </Show>
+            <ServiceJobGenerateButton salesOrderId={selectedId()} />
+            <ServiceJobsPanel salesOrderId={selectedId()} />
             <GenerateOtherSlipsMenu
               sourceEntity="sales_order"
               targets={[

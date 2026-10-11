@@ -56,10 +56,14 @@ var formEntityTypes = map[string]bool{
 	"sa_sales": true, "so_sales_order": true,
 	"pr_purchase_request": true, "po_purchase_order": true, "gr_goods_receipt": true, "rfq_request": true,
 	"fin_official_receipt": true, "fin_supplier_invoice": true, "vendor_credit": true,
-	"ops_work_item":        true,
-	"cms_page":             true,
-	"inv_stock_adjustment": true,
-	"inv_stock_entry":      true,
+	"ops_work_item":          true,
+	"cms_page":               true,
+	"inv_stock_adjustment":   true,
+	"inv_stock_entry":        true,
+	"svc_request":            true,
+	"svc_job":                true,
+	"svc_customer_equipment": true,
+	"svc_load_slip":          true,
 }
 
 type querier interface {

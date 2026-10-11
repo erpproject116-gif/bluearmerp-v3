@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Route, Router, type RouteSectionProps, Navigate, useLocation, useParams } from "@solidjs/router";
-import { Suspense } from "solid-js";
-import { AppShell } from "./shell/AppShell";
+import { lazy, Suspense } from "solid-js";
+const AppShell = lazy(() => import("./shell/AppShell").then((m) => ({ default: m.AppShell })));
 import { AuthProvider } from "./shared/auth-context";
 import { ToastProvider } from "./shared/toast";
 import { InlineGuidesProvider } from "./shared/inlineGuides";
@@ -17,6 +17,19 @@ import DemoSignupPage from "./modules/auth/DemoSignupPage";
 import WelcomePage from "./modules/auth/WelcomePage";
 import PendingApprovalPage from "./modules/auth/PendingApprovalPage";
 import AuthCallbackPage from "./modules/auth/AuthCallbackPage";
+const ReleasePrintPage = lazy(() => import("./modules/services/ReleasePrintPage"));
+const ServiceRequestsPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceRequestsPage })));
+const ServiceRequestSettingsPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceRequestSettingsPage })));
+const ServiceJobsPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceJobsPage })));
+const ServiceJobSettingsPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceJobSettingsPage })));
+const CustomerEquipmentPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.CustomerEquipmentPage })));
+const ServiceEquipmentSettingsPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceEquipmentSettingsPage })));
+const TechnicianSchedulePage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.TechnicianSchedulePage })));
+const ServiceReleasePage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceReleasePage })));
+const ServiceSlipSettingsPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceSlipSettingsPage })));
+const ServiceHistoryPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceHistoryPage })));
+const ServiceReportsPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceReportsPage })));
+const ServiceSettingsPage = lazy(() => import("./modules/services/pages").then((m) => ({ default: m.ServiceSettingsPage })));
 import {
   RepairOrderReceiptPrintPage,
   RepairOrderWarrantyPrintPage,
@@ -366,14 +379,20 @@ import { BookingRoute } from "./shared/BookingRoute";
 import { FixedAssetsRoute } from "./shared/FixedAssetsRoute";
 import { JobCostingRoute } from "./shared/JobCostingRoute";
 import { ManufacturingRoute } from "./shared/ManufacturingRoute";
-import ProductionCostsPage from "./modules/production/ProductionCostsPage";
-import { ProductionModeLayout } from "./modules/production/ProductionModeLayout";
-import { ProductionHubPage } from "./modules/production/ProductionHubPage";
-import ProductionOrderNewPage from "./modules/manufacturing/ProductionOrderNewPage";
-import WasteReasonsPage from "./modules/manufacturing/WasteReasonsPage";
+const ProductionCostsPage = lazy(() => import("./modules/production/ProductionCostsPage"));
+const ProductionModeLayout = lazy(() =>
+  import("./modules/production/ProductionModeLayout").then((m) => ({ default: m.ProductionModeLayout })),
+);
+const ProductionHubPage = lazy(() =>
+  import("./modules/production/ProductionHubPage").then((m) => ({ default: m.ProductionHubPage })),
+);
+const ProductionOrderNewPage = lazy(() => import("./modules/manufacturing/ProductionOrderNewPage"));
+const WasteReasonsPage = lazy(() => import("./modules/manufacturing/WasteReasonsPage"));
 import { QualityRoute } from "./shared/QualityRoute";
 import { CrmAnalyticsRoute } from "./shared/CrmAnalyticsRoute";
-import { CrmTaskModalProvider } from "./shared/CrmTaskModal";
+const CrmTaskModalProvider = lazy(() =>
+  import("./shared/CrmTaskModal").then((m) => ({ default: m.CrmTaskModalProvider })),
+);
 import { PlatformCommandRoute } from "./shared/PlatformCommandRoute";
 import { BrandingProvider } from "./shared/branding/BrandingProvider";
 import { SetupGate } from "./shared/SetupGate";
@@ -395,7 +414,9 @@ function AppLayout(props: RouteSectionProps) {
   return (
     <ProtectedRoute>
       <SetupGate>
-        <AppShell>{props.children}</AppShell>
+        <CrmTaskModalProvider>
+          <AppShell>{props.children}</AppShell>
+        </CrmTaskModalProvider>
       </SetupGate>
     </ProtectedRoute>
   );
@@ -416,7 +437,6 @@ export default function App() {
       <AuthProvider>
         <InlineGuidesProvider>
         <BrandingProvider>
-        <CrmTaskModalProvider>
         <Router root={(props) => (
           <Suspense fallback={<PageLoader />}>
             <UsageTracker />
@@ -890,6 +910,20 @@ export default function App() {
           <Route path="/support/tickets/:id" component={() => (
             <SupportRoute><TicketDetailPage /></SupportRoute>
           )} />
+          <Route path="/services/requests" component={ServiceRequestsPage} />
+          <Route path="/services/requests/settings" component={ServiceRequestSettingsPage} />
+          <Route path="/services/jobs" component={ServiceJobsPage} />
+          <Route path="/services/jobs/settings" component={ServiceJobSettingsPage} />
+          <Route path="/services/equipment" component={CustomerEquipmentPage} />
+          <Route path="/services/equipment/settings" component={ServiceEquipmentSettingsPage} />
+          <Route path="/services/schedule" component={TechnicianSchedulePage} />
+          <Route path="/services/releases" component={ServiceReleasePage} />
+          <Route path="/services/releases/settings" component={ServiceSlipSettingsPage} />
+          <Route path="/services/releases/:id/print" component={ReleasePrintPage} />
+          <Route path="/services/history" component={ServiceHistoryPage} />
+          <Route path="/services/reports" component={ServiceReportsPage} />
+          <Route path="/services/settings" component={ServiceSettingsPage} />
+          <Route path="/services" component={ServiceRequestsPage} />
           <Route path="/booking/calendar" component={() => (
             <BookingRoute><BookingCalendarPage /></BookingRoute>
           )} />
@@ -1103,7 +1137,6 @@ export default function App() {
         </Route>
         <Route path="*" component={AuthEntryRedirect} />
       </Router>
-        </CrmTaskModalProvider>
         </BrandingProvider>
         </InlineGuidesProvider>
       </AuthProvider>

@@ -235,6 +235,32 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "project_id", Label: "Project", FieldType: "select", SortOrder: 60},
 		{FieldKey: "notes", Label: "Reason", FieldType: "textarea", DefaultRequired: true, SortOrder: 70},
 	},
+	"svc_request": {
+		{FieldKey: "subject", Label: "Subject", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "description", Label: "Description", FieldType: "textarea", SortOrder: 20},
+		{FieldKey: "partner_id", Label: "Customer", FieldType: "select", SortOrder: 30},
+		{FieldKey: "location_id", Label: "Branch", FieldType: "select", DefaultRequired: true, SortOrder: 40},
+		{FieldKey: "source", Label: "Source", FieldType: "select", SortOrder: 50},
+	},
+	"svc_job": {
+		{FieldKey: "subject", Label: "Subject", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "description", Label: "Work description", FieldType: "textarea", SortOrder: 20},
+		{FieldKey: "diagnosis", Label: "Diagnosis", FieldType: "textarea", SortOrder: 30},
+		{FieldKey: "partner_id", Label: "Customer", FieldType: "select", SortOrder: 40},
+		{FieldKey: "location_id", Label: "Branch", FieldType: "select", DefaultRequired: true, SortOrder: 50},
+	},
+	"svc_customer_equipment": {
+		{FieldKey: "name", Label: "Equipment name", FieldType: "text", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "serial_no", Label: "Serial number", FieldType: "text", SortOrder: 20},
+		{FieldKey: "partner_id", Label: "Customer", FieldType: "select", DefaultRequired: true, SortOrder: 30},
+		{FieldKey: "condition", Label: "Condition", FieldType: "text", SortOrder: 40},
+	},
+	"svc_load_slip": {
+		{FieldKey: "slip_type", Label: "Slip type", FieldType: "select", DefaultRequired: true, SortOrder: 10},
+		{FieldKey: "origin_location_id", Label: "Origin", FieldType: "select", DefaultRequired: true, SortOrder: 20},
+		{FieldKey: "remarks", Label: "Remarks", FieldType: "textarea", SortOrder: 30},
+		{FieldKey: "recipient_name", Label: "Recipient", FieldType: "text", SortOrder: 40},
+	},
 }
 
 func StandardFields(entityType string) []StandardField {

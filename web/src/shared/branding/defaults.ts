@@ -3,6 +3,9 @@ import type { BrandingSettings } from "./types";
 /** Static fallback when the tenant has not uploaded a branding logo yet. */
 export const DEFAULT_BRAND_LOGO_URL = "/bluearmerp-logo.png";
 
+/** 2KB mark already used by the HTML splash. Loaders must not fetch the 138KB logo. */
+export const BOOT_MARK_URL = "/favicon.png";
+
 export const DEFAULT_BRANDING: BrandingSettings = {
   colors: {
     primary: "#3c50e0",

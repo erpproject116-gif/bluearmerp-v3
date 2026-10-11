@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { apiFetch } from "./api";
 import { EntityModal, Field, inputClass } from "./SpreadsheetGrid";
@@ -58,7 +57,8 @@ export function rowsToPrintHtml(title: string, columns: GridExportColumn[], rows
   return buildPrintHtml(title, columns, rows);
 }
 
-export function exportRowsToXlsx(filename: string, columns: GridExportColumn[], rows: Record<string, unknown>[]) {
+export async function exportRowsToXlsx(filename: string, columns: GridExportColumn[], rows: Record<string, unknown>[]) {
+  const XLSX = await import("xlsx");
   const aoa: (string | number)[][] = [
     columns.map((c) => c.header),
     ...rows.map((row) => columns.map((c) => c.value(row))),
@@ -425,7 +425,7 @@ export function GridExportButtons(props: {
                   const data = resolve();
                   if (!data) return;
                   try {
-                    exportRowsToXlsx(props.filename, data.columns, data.rows);
+                    await exportRowsToXlsx(props.filename, data.columns, data.rows);
                   } catch (err) {
                     console.error(err);
                     window.alert("Excel download failed. Try Download CSV instead.");

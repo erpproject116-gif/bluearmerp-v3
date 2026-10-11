@@ -1,7 +1,7 @@
 import { Show } from "solid-js";
 import { useAuth } from "../auth-context";
 import { useBranding } from "./BrandingProvider";
-import { DEFAULT_BRAND_LOGO_URL } from "./defaults";
+import { BOOT_MARK_URL } from "./defaults";
 import { usePrintLogoUrl } from "./usePrintLogoUrl";
 
 type Props = {
@@ -18,7 +18,8 @@ export function AppBrandingMark(props: Props) {
     return id ? { id, source: "branding" as const } : null;
   };
   const tenantLogoUrl = usePrintLogoUrl(logoRef);
-  const logoUrl = () => tenantLogoUrl() ?? DEFAULT_BRAND_LOGO_URL;
+  const logoUrl = () => tenantLogoUrl() ?? BOOT_MARK_URL;
+  const px = () => (props.size === "sm" ? 32 : 40);
   const companyName = () =>
     branding.settings().receipt.company_name?.trim() ||
     auth.me?.tenant.company_name ||
@@ -32,12 +33,22 @@ export function AppBrandingMark(props: Props) {
         <img
           src={logoUrl()}
           alt=""
+          width={px()}
+          height={px()}
+          decoding="async"
           class={`shrink-0 rounded-xl object-contain ${props.size === "sm" ? "h-8 w-8" : "h-10 w-10"}`}
         />
       }
     >
       <div class="flex min-w-0 items-center gap-3">
-        <img src={logoUrl()} alt="" class={`shrink-0 rounded-xl object-contain ${boxClass()}`} />
+        <img
+          src={logoUrl()}
+          alt=""
+          width={px()}
+          height={px()}
+          decoding="async"
+          class={`shrink-0 rounded-xl object-contain ${boxClass()}`}
+        />
         <div class="min-w-0">
           <p class="truncate text-lg font-semibold text-text-primary">{companyName()}</p>
         </div>

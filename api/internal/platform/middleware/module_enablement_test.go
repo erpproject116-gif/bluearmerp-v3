@@ -18,6 +18,8 @@ func TestMatchModuleRuleLongestPrefix(t *testing.T) {
 		{"/api/v1/finance/supplier-invoices", "purchases", "", true},
 		{"/api/v1/manufacturing/work-orders", "manufacturing", "", true},
 		{"/api/v1/pos/sessions", "pos", "", true},
+		{"/api/v1/booking/bookings", "booking", "", true},
+		{"/api/v1/services/jobs", "services", "", true},
 		{"/api/v1/sales/sales", "sales", "", true},
 		{"/api/v1/purchase-order/rfq", "purchase_order", "", true},
 		{"/api/v1/shipping/orders", "", "", true},

@@ -1,6 +1,6 @@
 import { createContext, onCleanup, onMount, useContext, type ParentComponent } from "solid-js";
 import { createStore } from "solid-js/store";
-import { apiFetch, apiNetworkErrorMessage, supabase } from "./api";
+import { apiFetch, apiNetworkErrorMessage, getSupabase } from "./api";
 import {
   clearRolePreviewAttempt,
   clearRolePreviewFlag,
@@ -382,7 +382,7 @@ export const AuthProvider: ParentComponent = (props) => {
     const background = options?.background ?? false;
     const {
       data: { session },
-    } = await supabase.auth.getSession();
+    } = await (await getSupabase()).auth.getSession();
     if (!session) {
       setState({ me: null, loading: false, bootstrapError: null, bootstrapMessage: null });
       return;
@@ -497,21 +497,30 @@ export const AuthProvider: ParentComponent = (props) => {
   onMount(() => {
     void refreshCoalesced();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "TOKEN_REFRESHED") {
-        void refreshCoalesced({ background: true });
-        return;
-      }
-      if (event === "SIGNED_IN") {
-        void refreshCoalesced({ background: state.me != null });
-        return;
-      }
-      if (event === "SIGNED_OUT" || (event === "INITIAL_SESSION" && !session)) {
-        setState({ me: null, loading: false, bootstrapError: null, bootstrapMessage: null });
-      }
+    let unsubscribe = () => {};
+    let alive = true;
+    void getSupabase().then((client) => {
+      if (!alive) return;
+      const { data: sub } = client.auth.onAuthStateChange((event, session) => {
+        if (event === "TOKEN_REFRESHED") {
+          void refreshCoalesced({ background: true });
+          return;
+        }
+        if (event === "SIGNED_IN") {
+          void refreshCoalesced({ background: state.me != null });
+          return;
+        }
+        if (event === "SIGNED_OUT" || (event === "INITIAL_SESSION" && !session)) {
+          setState({ me: null, loading: false, bootstrapError: null, bootstrapMessage: null });
+        }
+      });
+      unsubscribe = () => sub.subscription.unsubscribe();
     });
 
-    onCleanup(() => sub.subscription.unsubscribe());
+    onCleanup(() => {
+      alive = false;
+      unsubscribe();
+    });
   });
 
   return (

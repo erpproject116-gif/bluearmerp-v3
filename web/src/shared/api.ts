@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { invalidateAfterMutation } from "./queryInvalidation";
 import { getGlobalToast } from "./toast";
 import { getActiveTenantId, getActiveBranchIdCurrent } from "./activeContext";
@@ -10,15 +10,48 @@ const anon = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 
 export const supabaseConfigured = Boolean(url && anon);
 
-export const supabase = createClient(url || "http://localhost", anon || "anon", {
-  auth: {
-    flowType: "pkce",
-    // Callback page exchanges the code once — avoid double exchange on client init.
-    detectSessionInUrl: false,
-    persistSession: true,
-    autoRefreshToken: true,
+let clientPromise: Promise<SupabaseClient> | null = null;
+
+/** Loads the auth client on first use so the sign-in screen can paint without it. */
+export function getSupabase(): Promise<SupabaseClient> {
+  if (!clientPromise) {
+    clientPromise = import("@supabase/supabase-js").then(({ createClient }) =>
+      createClient(url || "http://localhost", anon || "anon", {
+        auth: {
+          flowType: "pkce",
+          // Callback page exchanges the code once — avoid double exchange on client init.
+          detectSessionInUrl: false,
+          persistSession: true,
+          autoRefreshToken: true,
+        },
+      }),
+    );
+  }
+  return clientPromise;
+}
+
+// Every screen checks the session. Start the download while the entry script
+// evaluates instead of waiting for the first Solid mount.
+if (typeof window !== "undefined") void getSupabase();
+
+function authCall(prop: PropertyKey) {
+  return (...args: unknown[]) =>
+    getSupabase().then((client) => {
+      const fn = (client.auth as unknown as Record<PropertyKey, unknown>)[prop];
+      if (typeof fn !== "function") return fn;
+      return (fn as (...a: unknown[]) => unknown).apply(client.auth, args);
+    });
+}
+
+export const supabase = {
+  get auth() {
+    return new Proxy({} as SupabaseClient["auth"], {
+      get(_target, prop) {
+        return authCall(prop);
+      },
+    });
   },
-});
+};
 
 // Dev: Vite proxies /api → localhost:8080. Ignore VITE_API_BASE_URL in dev to avoid wrong ports.
 export const apiBase = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "");

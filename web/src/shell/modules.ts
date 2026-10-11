@@ -405,6 +405,22 @@ export const appModules: AppModule[] = [
     ],
   },
   {
+    id: "services",
+    label: "Services",
+    href: "/app/services/requests",
+    basePath: "/app/services",
+    features: [
+      { label: "Service Requests", href: "/app/services/requests", settingsHref: "/app/services/requests/settings", headerPriority: "primary" },
+      { label: "Service Job Orders", href: "/app/services/jobs", settingsHref: "/app/services/jobs/settings", headerPriority: "primary" },
+      { label: "Customer Equipment", href: "/app/services/equipment", settingsHref: "/app/services/equipment/settings", headerPriority: "primary" },
+      { label: "Technician Schedule", href: "/app/services/schedule", settingsHref: "/app/services/jobs/settings", headerPriority: "primary" },
+      { label: "Service Release", href: "/app/services/releases", settingsHref: "/app/services/releases/settings", headerPriority: "primary" },
+      { label: "Service History", href: "/app/services/history", settingsHref: "/app/services/settings", headerPriority: "primary" },
+      { label: "Service Reports", href: "/app/services/reports", settingsHref: "/app/services/settings", headerPriority: "primary" },
+      { label: "Service Settings", href: "/app/services/settings", settingsHref: "/app/services/settings", headerPriority: "primary" },
+    ],
+  },
+  {
     id: "booking",
     label: "Booking",
     href: "/app/booking/bookings",
@@ -815,11 +831,9 @@ function capPrimaryHeaderTabs(primary: ModuleFeature[], overflow: ModuleFeature[
 export function splitHeaderFeatures(module: AppModule, me?: MeData | null): HeaderFeatureSplit {
   const all = visibleHeaderFeatures(module, me);
   const hasExplicit = all.some((f) => f.headerPriority != null);
-  if (!hasExplicit) {
-    return capPrimaryHeaderTabs(all, []);
-  }
-  return capPrimaryHeaderTabs(
-    all.filter((f) => f.headerPriority === "primary"),
-    all.filter((f) => f.headerPriority !== "primary"),
-  );
+  const primary = hasExplicit ? all.filter((f) => f.headerPriority === "primary") : all;
+  const overflow = hasExplicit ? all.filter((f) => f.headerPriority !== "primary") : [];
+  // Services is specified as eight header tabs. Other modules keep the shared cap.
+  if (module.id === "services") return { primary, overflow };
+  return capPrimaryHeaderTabs(primary, overflow);
 }

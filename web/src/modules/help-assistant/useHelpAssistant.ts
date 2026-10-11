@@ -1,5 +1,4 @@
 import { createSignal } from "solid-js";
-import { composeHelpReply } from "./composeHelpReply";
 import type { ExtractedAttachment } from "./extractAttachment";
 import {
   askCopilot,
@@ -142,6 +141,7 @@ export function useHelpAssistant(getPathname: () => string) {
           }
         }
 
+        const { composeHelpReply } = await import("./composeHelpReply");
         let reply: HelpReply = composeHelpReply(displayQ, pathname);
         if ((!reply.fallback && reply.hits.length > 0 && cfg?.enabled) || (cfg?.enabled && attachments.length > 0 && reply.hits.length > 0)) {
           try {

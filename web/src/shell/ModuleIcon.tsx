@@ -30,6 +30,12 @@ export function ModuleIcon(props: Props): JSX.Element {
           <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17l-5.42 5.42a2.121 2.121 0 01-3-3l5.42-5.42m8.49-2.83a3 3 0 10-4.24-4.24l-6.36 6.36a3 3 0 004.24 4.24l6.36-6.36z" />
         </svg>
       );
+    case "services":
+      return (
+        <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6M8 4h5l5 5v11a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z" />
+        </svg>
+      );
     case "customers":
       return (
         <svg class={cls()} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">

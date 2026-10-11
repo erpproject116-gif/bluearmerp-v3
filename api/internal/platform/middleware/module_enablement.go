@@ -91,6 +91,8 @@ var moduleMutationRules = []moduleRouteRule{
 		message: "Support is turned off for this workspace.", nextHint: appsHubHint},
 	{prefix: "/api/v1/booking", moduleCode: "booking",
 		message: "Booking is turned off for this workspace.", nextHint: appsHubHint},
+	{prefix: "/api/v1/services", moduleCode: "services",
+		message: "Services is turned off for this workspace.", nextHint: appsHubHint},
 	{prefix: "/api/v1/hr", moduleCode: "hr",
 		message: "HR is turned off for this workspace.", nextHint: appsHubHint},
 	{prefix: "/api/v1/fixed-assets", moduleCode: "fixed_assets",

@@ -155,8 +155,9 @@ export default function SignInPage() {
 
           <form class="mt-4 space-y-4" onSubmit={(e) => void signInEmail(e)}>
             <div>
-              <label class="mb-1 block text-sm font-medium text-text-primary">Email</label>
+              <label for="signin-email" class="mb-1 block text-sm font-medium text-text-primary">Email</label>
               <input
+                id="signin-email"
                 type="email"
                 required
                 autocomplete="email"
@@ -168,7 +169,7 @@ export default function SignInPage() {
             </div>
             <div>
               <div class="mb-1 flex items-center justify-between">
-                <label class="text-sm font-medium text-text-primary">Password</label>
+                <label for="signin-password" class="text-sm font-medium text-text-primary">Password</label>
                 <button
                   type="button"
                   class="text-xs font-medium text-brand-600 hover:underline"
@@ -178,6 +179,7 @@ export default function SignInPage() {
                 </button>
               </div>
               <input
+                id="signin-password"
                 type="password"
                 required
                 autocomplete="current-password"

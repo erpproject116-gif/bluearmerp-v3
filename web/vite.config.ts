@@ -44,6 +44,50 @@ export default defineConfig(({ mode }) => {
     plugins: [
       solid(),
       tailwindcss(),
+      {
+        name: "preview-robots",
+        configurePreviewServer(server) {
+          return () => {
+            const handle = (req: { url?: string }, res: { setHeader: (k: string, v: string) => void; end: (b: string) => void }, next: () => void) => {
+              const path = req.url?.split("?")[0];
+              if (path !== "/robots.txt") {
+                next();
+                return;
+              }
+              res.setHeader("Content-Type", "text/plain; charset=utf-8");
+              res.end(
+                [
+                  "User-agent: *",
+                  "Allow: /articles",
+                  "Allow: /articles.md",
+                  "Allow: /llms.txt",
+                  "Allow: /sitemap.xml",
+                  "Disallow: /app",
+                  "Disallow: /api",
+                  "",
+                  "User-agent: GPTBot",
+                  "Allow: /articles",
+                  "Allow: /llms.txt",
+                  "",
+                  "Sitemap: https://app.bluearmerp.com/sitemap.xml",
+                  "",
+                ].join("\n"),
+              );
+            };
+            server.middlewares.stack.unshift({ route: "", handle });
+          };
+        },
+      },
+      {
+        name: "non-blocking-css",
+        apply: "build" as const,
+        transformIndexHtml(html: string) {
+          return html.replace(
+            /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/g,
+            '<link rel="preload" as="style" href="$1" onload="this.onload=null;this.rel=\'stylesheet\'"><noscript><link rel="stylesheet" href="$1"></noscript>',
+          );
+        },
+      },
       VitePWA({
         registerType: "autoUpdate",
         includeAssets: [
@@ -88,8 +132,10 @@ export default defineConfig(({ mode }) => {
         workbox: {
           // Precache JS/CSS/icons only — never precache index.html (stale shell trapped PWAs
           // behind old paywall UI after deploy). Documents are NetworkFirst below.
-          globPatterns: ["**/*.{js,css,ico,png,svg,woff2,webmanifest}"],
-          globIgnores: ["**/tess/**", "**/index.html"],
+          // Online-only app. Precache the shell CSS and icons, not every lazy route
+          // chunk — downloading the whole ERP on first visit stalls LCP and INP.
+          globPatterns: ["**/*.{css,ico,woff2,webmanifest}", "favicon.png"],
+          globIgnores: ["**/tess/**", "**/index.html", "**/bluearm*.png"],
           importScripts: ["push-sw.js"],
           cleanupOutdatedCaches: true,
           skipWaiting: true,
@@ -146,10 +192,10 @@ export default defineConfig(({ mode }) => {
             }
 
             if (path.includes("solid-js") || path.includes("@solidjs/")) return "vendor-solid";
-            if (path.includes("@supabase")) return "vendor-supabase";
             if (path.includes("@tanstack")) return "vendor-query";
-            if (path.includes("tesseract") || path.includes("pdfjs-dist")) return "vendor-ocr";
-            return "vendor";
+            // Leave xlsx, chart.js, jspdf, pdf.js, and tesseract with the screen that imports them.
+            // A shared OCR chunk pulled the preload helper into the sign-in download.
+            return undefined;
           },
         },
       },

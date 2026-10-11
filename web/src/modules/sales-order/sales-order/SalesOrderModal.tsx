@@ -25,6 +25,7 @@ import {
 } from "../../../shared/CustomFieldsSection";
 import { mapCustomValuesToEntity, mergeCustomValues } from "../../../shared/mapCustomValues";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
+import { ServiceJobGenerateButton, ServiceJobsPanel } from "../../services/pages";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
@@ -1149,6 +1150,8 @@ export function SalesOrderModal(props: Props) {
               </p>
             </div>
           </Show>
+          <ServiceJobGenerateButton salesOrderId={effectiveEditing()?.id ?? null} />
+          <ServiceJobsPanel salesOrderId={effectiveEditing()?.id ?? null} />
         </div>
         <SalesOrderLineGrid
           lines={lines}

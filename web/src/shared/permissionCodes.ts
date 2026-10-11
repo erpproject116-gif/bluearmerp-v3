@@ -75,6 +75,14 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/after-sales/register-repair": "after_sales.register_repair",
   "/app/after-sales/register-repair/status": "after_sales.register_repair_status",
   "/app/after-sales/register-repair/consumption": "after_sales.register_repair_consumption",
+  "/app/services/requests": "services.requests",
+  "/app/services/jobs": "services.jobs",
+  "/app/services/equipment": "services.equipment",
+  "/app/services/schedule": "services.schedule",
+  "/app/services/releases": "services.releases",
+  "/app/services/history": "services.jobs",
+  "/app/services/reports": "services.reports",
+  "/app/services/settings": "services.settings",
   "/app/quotation/quotations/new": "quotation.quotations_new",
   "/app/quotation/quotations": "quotation.quotations",
   "/app/quotation/quotations/status": "quotation.quotations_status",
@@ -290,6 +298,10 @@ export function permissionCodeForHref(href: string): string | undefined {
   if (path.startsWith("/app/support/tickets/")) return "support.tickets";
   if (path.startsWith("/app/cms/pages/") || /^\/app\/cms\/p\//.test(path) || path.startsWith("/app/articles/")) return "cms.pages";
   if (path.startsWith("/app/booking/")) return "booking.bookings";
+  if (path.startsWith("/app/services/releases")) return "services.releases";
+  if (path.startsWith("/app/services/equipment")) return "services.equipment";
+  if (path.startsWith("/app/services/requests")) return "services.requests";
+  if (path.startsWith("/app/services/")) return "services.jobs";
   if (path.startsWith("/app/user-management/migration-center")) return "migration.center";
   if (path.startsWith("/app/finance/budgets/")) return "finance.budget_read";
   if (path.startsWith("/app/finance/banking")) return "finance.official_receipts";
