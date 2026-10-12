@@ -2,6 +2,8 @@ import { createSignal, For, Show } from "solid-js";
 import type { PermissionModuleGroup } from "./usePermissions";
 import {
   orderPermissionGroups,
+  permissionModuleGroup,
+  permissionModuleLabel,
   visibleGroupPermissions,
   type AccessLevel,
   type MatrixValue,
@@ -56,13 +58,13 @@ export function PermissionMatrix(props: Props) {
         { key: "inherit" as const, label: "Role", title: "Use role default" },
         { key: "read" as const, label: "Read-only", title: "View only" },
         { key: "write" as const, label: "Read & Write", title: "Create and edit" },
-        { key: "deny" as const, label: "D/A", title: "Do not allow" },
+        { key: "deny" as const, label: "No access", title: "Do not allow" },
       ];
     }
     return [
       { key: "read" as const, label: "Read-only", title: "View only" },
       { key: "write" as const, label: "Read & Write", title: "Create and edit" },
-      { key: "deny" as const, label: "D/A", title: "Do not allow" },
+      { key: "deny" as const, label: "No access", title: "Do not allow" },
     ];
   };
 
@@ -80,9 +82,22 @@ export function PermissionMatrix(props: Props) {
     for (const code of codes) props.onCancelChange?.(code, enabledFlag);
   };
 
+  const labelFor = (code: string, apiLabel: string) => permissionModuleLabel(code, apiLabel);
+
+  const grouped = () => {
+    const buckets = new Map<string, ReturnType<typeof sections>>();
+    for (const section of sections()) {
+      const name = permissionModuleGroup(section.group.module_code);
+      const list = buckets.get(name) ?? [];
+      list.push(section);
+      buckets.set(name, list);
+    }
+    return [...buckets.entries()].map(([label, items]) => ({ label, items }));
+  };
+
   const jump = (code: string) => {
-    setOpened((prev) => ({ ...prev, [code]: true }));
-    document.getElementById(`perm-mod-${code}`)?.scrollIntoView({ block: "start" });
+    setOpened({ [code]: true });
+    document.getElementById(`perm-mod-${code}`)?.scrollIntoView({ block: "nearest" });
   };
 
   return (
@@ -105,64 +120,91 @@ export function PermissionMatrix(props: Props) {
           <button type="button" class="rounded-full border border-stroke px-2 py-1" classList={{ "bg-brand-600 text-white": filter() === "denied" }} onClick={() => setFilter("denied")}>Not allowed</button>
         </div>
       </div>
-      <div class="mb-3 flex flex-wrap gap-1.5">
-        <For each={sections()}>
-          {(section) => (
-            <button
-              type="button"
-              class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-200"
-              onClick={() => jump(section.group.module_code)}
-            >
-              {section.group.module_label || section.group.module_code}
-            </button>
-          )}
-        </For>
-      </div>
+      <label class="mb-3 flex flex-wrap items-center gap-2 text-sm">
+        <span class="text-text-secondary">Go to</span>
+        <select
+          class="min-w-[14rem] rounded-lg border border-stroke bg-white px-2 py-1.5 text-sm"
+          value=""
+          onChange={(e) => {
+            const code = e.currentTarget.value;
+            e.currentTarget.value = "";
+            if (code) jump(code);
+          }}
+        >
+          <option value="">Choose an app</option>
+          <For each={grouped()}>
+            {(bucket) => (
+              <optgroup label={bucket.label}>
+                <For each={bucket.items}>
+                  {(section) => (
+                    <option value={section.group.module_code}>
+                      {labelFor(section.group.module_code, section.group.module_label)}
+                    </option>
+                  )}
+                </For>
+              </optgroup>
+            )}
+          </For>
+        </select>
+      </label>
       <Show when={turnedOffGroups().length > 0}>
-        <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          <p class="font-medium">Apps turned off for this company (not editable here)</p>
-          <p class="mt-1 text-amber-900/90">
+        <details class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          <summary class="cursor-pointer font-medium">
+            {turnedOffGroups().length} app{turnedOffGroups().length === 1 ? "" : "s"} turned off. Their saved permissions stay unused.
+          </summary>
+          <p class="mt-2 text-amber-900/90">
             Turn them on under{" "}
             <a href="/app/user-management/tenant-modules" class="font-medium underline hover:no-underline">
               Apps &amp; features
             </a>
-            . Existing role permissions are kept but unused while the app is off.
+            .
           </p>
           <ul class="mt-2 flex flex-wrap gap-1.5">
             <For each={turnedOffGroups()}>
               {(g) => (
                 <li class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-amber-200">
-                  {g.module_label || g.module_code}
-                  <span class="ml-1 text-amber-700/80">App off</span>
+                  {labelFor(g.module_code, g.module_label)}
                 </li>
               )}
             </For>
           </ul>
-        </div>
+        </details>
       </Show>
-      <div class="max-h-[min(70vh,560px)] space-y-2 overflow-y-auto">
-        <For each={sections()}>
+      <div class="space-y-4">
+        <For each={grouped()}>
+          {(bucket) => (
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-text-secondary">{bucket.label}</h3>
+        <For each={bucket.items}>
           {(section) => {
             const codes = () => section.rows.map((row) => row.permission_code);
+            const name = () => labelFor(section.group.module_code, section.group.module_label);
             return (
               <section id={`perm-mod-${section.group.module_code}`} class="rounded-lg border border-stroke">
                 <button
                   type="button"
-                  class="flex w-full items-center justify-between gap-2 bg-slate-50 px-3 py-2 text-left"
+                  class="flex w-full items-center gap-2 bg-slate-50 px-3 py-2 text-left"
+                  aria-expanded={isOpen(section.group.module_code)}
+                  aria-label={isOpen(section.group.module_code) ? `Collapse ${name()}` : `Expand ${name()}`}
                   onClick={() =>
                     setOpened((prev) => ({ ...prev, [section.group.module_code]: !isOpen(section.group.module_code) }))
                   }
                 >
-                  <span class="text-sm font-semibold text-text-primary">
-                    {section.group.module_label || section.group.module_code}
+                  <span
+                    class="block w-3 shrink-0 text-[10px] text-text-secondary transition-transform"
+                    classList={{ "rotate-90": isOpen(section.group.module_code) }}
+                    aria-hidden="true"
+                  >
+                    ▶
                   </span>
-                  <span class="text-xs text-text-secondary">{isOpen(section.group.module_code) ? "Hide" : "Show"}</span>
+                  <span class="min-w-0 flex-1 text-sm font-semibold text-text-primary">{name()}</span>
+                  <span class="text-xs text-text-secondary">{section.rows.length}</span>
                 </button>
                 <Show when={isOpen(section.group.module_code)}>
                   <div class="flex flex-wrap gap-1 border-t border-stroke px-3 py-2 text-xs">
-                    <button type="button" class="rounded border border-stroke px-2 py-0.5 hover:bg-slate-50" onClick={() => applyLevel(codes(), "read")}>Read</button>
-                    <button type="button" class="rounded border border-stroke px-2 py-0.5 hover:bg-slate-50" onClick={() => applyLevel(codes(), "write")}>Write</button>
-                    <button type="button" class="rounded border border-stroke px-2 py-0.5 hover:bg-slate-50" onClick={() => applyLevel(codes(), "deny")}>Deny</button>
+                    <button type="button" class="rounded border border-stroke px-2 py-0.5 hover:bg-slate-50" onClick={() => applyLevel(codes(), "read")}>All read-only</button>
+                    <button type="button" class="rounded border border-stroke px-2 py-0.5 hover:bg-slate-50" onClick={() => applyLevel(codes(), "write")}>All read &amp; write</button>
+                    <button type="button" class="rounded border border-stroke px-2 py-0.5 hover:bg-slate-50" onClick={() => applyLevel(codes(), "deny")}>All no access</button>
                     <Show when={showActions()}>
                       <button type="button" class="rounded border border-stroke px-2 py-0.5 hover:bg-slate-50" onClick={() => applySubmit(codes(), true)}>All submit</button>
                       <button type="button" class="rounded border border-stroke px-2 py-0.5 hover:bg-slate-50" onClick={() => applyCancel(codes(), true)}>All cancel</button>
@@ -243,13 +285,16 @@ export function PermissionMatrix(props: Props) {
             );
           }}
         </For>
+            </div>
+          )}
+        </For>
       </div>
       <p class="mt-2 text-xs text-text-secondary">
-        <strong>Read-only</strong> — view lists and details. <strong>Read & Write</strong> — create and edit.{" "}
-        <strong>D/A</strong> — do not allow.
-        {showActions() ? " Submit — post/confirm/submit actions. Cancel — cancel or undo actions." : null}
-        {props.allowInherit ? " Role — inherit from the user’s assigned role (overrides can raise or lower it)." : null}
-        {" "}Module Read, Write, and Deny, and All submit / All cancel, apply only to the rows shown in that module.
+        <strong>Read-only</strong> — view lists and details. <strong>Read &amp; Write</strong> — create and edit.{" "}
+        <strong>No access</strong> — the role cannot open it.
+        {showActions() ? " Submit — post, confirm, or submit. Cancel — cancel or undo." : null}
+        {props.allowInherit ? " Role — use the person’s assigned role." : null}
+        {" "}The buttons at the top of an open app change only the rows shown in that app.
       </p>
     </Show>
   );

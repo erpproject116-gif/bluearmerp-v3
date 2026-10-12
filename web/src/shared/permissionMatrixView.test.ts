@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PermissionModuleGroup } from "./usePermissions";
-import { orderPermissionGroups, permissionHiddenByFeature, visibleGroupPermissions } from "./permissionMatrixView";
+import {
+  orderPermissionGroups,
+  permissionHiddenByFeature,
+  permissionModuleLabel,
+  visibleGroupPermissions,
+} from "./permissionMatrixView";
 
 const inventory: PermissionModuleGroup = {
   module_code: "inventory",
@@ -12,6 +17,14 @@ const inventory: PermissionModuleGroup = {
 };
 
 describe("permission matrix view", () => {
+  it("uses plain app names instead of codes", () => {
+    expect(permissionModuleLabel("after_sales", "after_sales")).toBe("After-Sales");
+    expect(permissionModuleLabel("pos", "pos")).toBe("Point of Sale");
+    expect(permissionModuleLabel("hr", "hr")).toBe("HR");
+    expect(permissionModuleLabel("data_center", "data_center")).toBe("Data Center");
+    expect(permissionModuleLabel("inventory", "Inventory")).toBe("Inventory");
+  });
+
   it("orders modules like Apps and features", () => {
     const ordered = orderPermissionGroups([
       { module_code: "user_management", module_label: "Users", permissions: [] },

@@ -325,7 +325,7 @@ export default function RolesPage() {
           groups={registry.data ?? []}
           values={permValues()}
           loading={registry.isLoading || rolePerms.isLoading}
-          title="Defaults for this role (modules turned on under Module & Features). Per-user Overrides on Users can change them."
+          title="These are the defaults for this role. Only apps that are turned on are listed. A person’s own access can still be different."
           enabledModuleCodes={auth.me?.enabled_module_codes ?? null}
           onChange={(code, level) => setPermValues((prev) => ({ ...prev, [code]: level }))}
           submitFlags={submitFlags()}

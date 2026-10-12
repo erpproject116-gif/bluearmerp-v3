@@ -1,5 +1,5 @@
 import type { PermissionModuleGroup, PermissionRegistryRow } from "./usePermissions";
-import { groupFor } from "../modules/user-management/tenant-modules/tenantModulesDraft";
+import { groupFor, MODULE_DISPLAY_NAMES } from "../modules/user-management/tenant-modules/tenantModulesDraft";
 import type { TenantModuleRow } from "./moduleAccess";
 
 export type AccessLevel = "deny" | "read" | "write";
@@ -18,6 +18,30 @@ const FEATURE_PREFIXES: { feature: string; prefixes: string[] }[] = [
 ];
 
 const GROUP_RANK = ["Stocks Management", "Sales Process", "Procurement Process", "CRM & Finance", "Other", "Misc"];
+
+const MODULE_ACRONYMS = new Set(["hr", "bi", "cms", "wms", "pos", "crm", "okr", "sop"]);
+
+function humanizeModuleCode(code: string): string {
+  return code
+    .split("_")
+    .map((part) =>
+      MODULE_ACRONYMS.has(part) ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1),
+    )
+    .join(" ");
+}
+
+/** Name shown on the role screen. Prefers the Apps & features label over a raw code. */
+export function permissionModuleLabel(code: string, apiLabel: string): string {
+  const known = MODULE_DISPLAY_NAMES[code];
+  if (known) return known;
+  const label = apiLabel.trim();
+  if (label && label !== code && !label.includes("_")) return label;
+  return humanizeModuleCode(code);
+}
+
+export function permissionModuleGroup(code: string): string {
+  return groupFor(stub(code));
+}
 
 function stub(code: string): TenantModuleRow {
   return {
