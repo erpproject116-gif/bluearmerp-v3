@@ -93,10 +93,12 @@ export function BrandingProvider(props: { children?: import("solid-js").JSX.Elem
     void refresh();
   });
 
-  // Refresh branding only when the signed-in user id changes — not on every auth.me object tick.
+  // Reload when the person or the active company changes. Remoting keeps the
+  // same login but switches tenant; the header name has to follow that company.
   createEffect(() => {
     const userId = auth.me?.user?.id;
-    if (userId) void refresh();
+    const tenantId = auth.me?.tenant?.id;
+    if (userId && tenantId) void refresh();
   });
 
   const save = async (patch: Partial<BrandingSettings>) => {

@@ -270,6 +270,11 @@ func parseActiveTenantHeader(r *http.Request) int64 {
 // auth_revision on every hit only bought cross-process freshness, which this
 // process-local cache cannot provide anyway. Staleness is bounded by the TTL.
 func resolveTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, tenantID int64) (TenantUser, error) {
+	// Key the cache by the support workspace when one is open. A hit stored
+	// under the operator's own X-Tenant-ID would otherwise keep them there.
+	if supportTenant := openSupportTenantID(ctx, pool, authUserID); supportTenant > 0 {
+		tenantID = supportTenant
+	}
 	key := cacheKey(authUserID, tenantID)
 	if cached, _, ok := cacheGet(key); ok {
 		return cached, nil

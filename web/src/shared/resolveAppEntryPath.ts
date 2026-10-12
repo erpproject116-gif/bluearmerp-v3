@@ -58,6 +58,7 @@ export const WORKSPACE_ONBOARDING_HREF = "/app/dashboard/onboarding";
 /** First screen after sign-in — unfinished foundation opens Home onboarding. */
 export async function resolveAppEntryPath(me: MeData | null | undefined): Promise<string> {
   if (!me) return "/signin";
+  if (me.support_session?.tenant_id) return resolveRoleHomePath(me);
   if (!canManageWorkspaceSetup(me)) return resolveRoleHomePath(me);
 
   try {

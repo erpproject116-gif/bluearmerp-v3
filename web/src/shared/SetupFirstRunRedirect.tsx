@@ -20,6 +20,8 @@ export function SetupFirstRunRedirect() {
     const me = auth.me;
     const data = readiness.data;
     if (!me || !data || readiness.isLoading) return;
+    // Remoting another company must not bounce into that operator's setup.
+    if (me.support_session) return;
 
     const canManage =
       me.user.is_tenant_owner || me.user.is_store_admin || me.user.is_platform_superadmin;

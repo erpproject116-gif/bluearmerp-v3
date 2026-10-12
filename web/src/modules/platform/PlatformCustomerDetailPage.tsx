@@ -181,6 +181,10 @@ export default function PlatformCustomerDetailPage() {
     const stealthOpened = res.data.stealth !== false;
     setWsStealth(true);
     await auth.refresh();
+    if (auth.me?.tenant?.id !== res.data.tenant_id && auth.me?.support_session?.tenant_id !== res.data.tenant_id) {
+      toast.error("The workspace opened, but this screen is still your own company. Stay here and try again.");
+      return;
+    }
     toast.success(stealthOpened ? "Workspace opened (stealth)." : "Support workspace opened.");
     navigate("/app/dashboard", { replace: true });
   };
