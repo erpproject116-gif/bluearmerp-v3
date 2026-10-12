@@ -21,14 +21,17 @@ func TestMutationAllowed(t *testing.T) {
 	if MutationAllowed("POST", "/api/v1/inventory/items", ModeReadOnly) {
 		t.Fatal("post blocked in read_only")
 	}
-	if MutationAllowed("POST", "/api/v1/inventory/items", ModeReadWrite) {
-		t.Fatal("post blocked in read_write")
+	if !MutationAllowed("POST", "/api/v1/inventory/items", ModeReadWrite) {
+		t.Fatal("post allowed in read_write")
 	}
-	if MutationAllowed("POST", "/api/v1/sales/invoices/1/confirm", ModeReadWrite) {
-		t.Fatal("sale confirm blocked")
+	if !MutationAllowed("POST", "/api/v1/sales/invoices/1/confirm", ModeReadWrite) {
+		t.Fatal("sale confirm allowed in read_write")
 	}
-	if MutationAllowed("POST", "/api/v1/goods-receipts/1/post", ModeReadWrite) {
-		t.Fatal("goods receipt post blocked")
+	if !MutationAllowed("POST", "/api/v1/goods-receipts/1/post", ModeReadWrite) {
+		t.Fatal("goods receipt post allowed in read_write")
+	}
+	if !MutationAllowed("POST", "/api/v1/usage/events", ModeReadOnly) {
+		t.Fatal("usage events allowlisted")
 	}
 	if !MutationAllowed("POST", "/api/v1/auth/session-ended", ModeReadWrite) {
 		t.Fatal("session-ended allowlisted")

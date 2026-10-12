@@ -464,15 +464,21 @@ func notifyOwner(ctx context.Context, pool *pgxpool.Pool, tenantID, sessionID in
 }
 
 // MutationAllowed reports whether method/path may proceed for a support session.
-// Reads are allowed. Mutations are allowed only on the support-session allowlist,
-// for both read-only and read-write sessions.
+// Reads are allowed. Read-only sessions may only call the session allowlist.
+// Read-write sessions may change the customer workspace, except wipe and suspend.
 func MutationAllowed(method, path, accessMode string) bool {
-	_ = accessMode
 	m := strings.ToUpper(method)
 	if m == httpMethodGet || m == httpMethodHead || m == httpMethodOptions {
 		return true
 	}
-	return isSupportAllowlistedPath(strings.ToLower(path))
+	p := strings.ToLower(path)
+	if IsDestructiveRequest(method, p) {
+		return false
+	}
+	if isSupportAllowlistedPath(p) {
+		return true
+	}
+	return NormalizeMode(accessMode) == ModeReadWrite
 }
 
 const (
@@ -486,6 +492,7 @@ func isSupportAllowlistedPath(p string) bool {
 		"/api/v1/auth/me",
 		"/api/v1/auth/session-ended",
 		"/api/v1/presence/",
+		"/api/v1/usage/events",
 		"/api/v1/platform/console/support-sessions/",
 	}
 	for _, a := range allow {
