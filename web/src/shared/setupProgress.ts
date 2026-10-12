@@ -28,7 +28,7 @@ export const GETTING_STARTED_COPY: Record<string, { label: string; blurb: string
   },
   process_policies: {
     label: "The order you use for selling and buying",
-    blurb: "Look at the order, then say it looks right.",
+    blurb: "Open it and confirm it looks right.",
     href: "/app/user-management/process-policies",
   },
   location: {

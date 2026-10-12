@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gettingStartedModuleHref, resolveGettingStarted, wizardFoundationPercent } from "./setupProgress";
+import { GETTING_STARTED_COPY, gettingStartedModuleHref, resolveGettingStarted, wizardFoundationPercent } from "./setupProgress";
 
 describe("resolveGettingStarted", () => {
   it("stays visible until first sale and bank are done", () => {
@@ -94,5 +94,13 @@ describe("gettingStartedModuleHref", () => {
     expect(gettingStartedModuleHref("partners")).toBe("/app/inventory/partners");
     expect(gettingStartedModuleHref("company")).toBe("/app/settings/branding");
     expect(gettingStartedModuleHref("ready")).toBeUndefined();
+  });
+});
+
+describe("process policy setup copy", () => {
+  it("sends the owner to the policies page to confirm", () => {
+    expect(GETTING_STARTED_COPY.process_policies?.href).toBe("/app/user-management/process-policies");
+    expect(GETTING_STARTED_COPY.process_policies?.blurb).toBe("Open it and confirm it looks right.");
+    expect(gettingStartedModuleHref("process_policies")).toBe("/app/user-management/process-policies");
   });
 });

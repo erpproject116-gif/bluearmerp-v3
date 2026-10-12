@@ -8,6 +8,7 @@ import { useAuth } from "../../../shared/auth-context";
 import { isTenantModuleEnabled } from "../../../shared/moduleAccess";
 import { getActiveTenantId } from "../../../shared/activeContext";
 import { processPolicyQueryKey } from "../../../shared/useProcessPolicy";
+import { useSetupReadiness } from "../../../shared/usePlatform";
 
 type ProcessPolicy = {
   tenant_id: number;
@@ -341,6 +342,10 @@ export default function ProcessPoliciesPage() {
   const [canManage, setCanManage] = createSignal(false);
   const [moduleEnabled, setModuleEnabled] = createSignal(true);
   const [policy, setPolicy] = createSignal<ProcessPolicy | null>(null);
+  const [acking, setAcking] = createSignal(false);
+  const readiness = useSetupReadiness();
+  const policiesNeedConfirm = () =>
+    readiness.data?.steps?.some((step) => step.id === "process_policies" && !step.done) ?? false;
 
   const load = async () => {
     setLoading(true);
@@ -389,6 +394,25 @@ export default function ProcessPoliciesPage() {
     setPolicy({ ...p, inventory_default_lot_allocation: mode });
   };
 
+  const confirmPolicies = async () => {
+    setAcking(true);
+    try {
+      const res = await apiFetch("/api/v1/platform/setup-readiness/ack-step", {
+        method: "POST",
+        body: JSON.stringify({ step_id: "process_policies" }),
+      });
+      if (!res.success) {
+        toast.error(res.message || "Could not confirm.");
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["setup-readiness"] });
+      await queryClient.invalidateQueries({ queryKey: ["onboarding"] });
+      toast.success("Confirmed.");
+    } finally {
+      setAcking(false);
+    }
+  };
+
   const save = async () => {
     const p = policy();
     if (!p || !canManage()) return;
@@ -426,6 +450,20 @@ export default function ProcessPoliciesPage() {
           to bypass every require-* rule at once (stored toggles are kept for later).
         </p>
       </div>
+
+      <Show when={policiesNeedConfirm()}>
+        <div class="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-slate-900">
+          <p>These are the steps your papers follow. When this looks right, confirm it here.</p>
+          <button
+            type="button"
+            disabled={acking()}
+            class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            onClick={() => void confirmPolicies()}
+          >
+            This looks right
+          </button>
+        </div>
+      </Show>
 
       <Show when={!moduleEnabled()}>
         <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
