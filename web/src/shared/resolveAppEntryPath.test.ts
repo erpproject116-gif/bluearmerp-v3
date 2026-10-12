@@ -9,6 +9,7 @@ import {
 
 vi.mock("./api", () => ({
   apiFetch: vi.fn(),
+  readPersistedAccessToken: () => null,
 }));
 
 import { apiFetch } from "./api";
@@ -68,11 +69,11 @@ describe("resolveAppEntryPath role home", () => {
     await expect(resolveAppEntryPath(me)).resolves.toBe("/app/dashboard");
   });
 
-  it("sends new workspace admins to setup when foundation is incomplete", async () => {
+  it("sends new workspace admins to Home onboarding when foundation is incomplete", async () => {
     vi.mocked(apiFetch).mockResolvedValue({
       data: { required_complete: false, setup_wizard_skipped: false },
     } as never);
     const me = baseMe({ is_store_admin: true });
-    await expect(resolveAppEntryPath(me)).resolves.toBe("/app/setup");
+    await expect(resolveAppEntryPath(me)).resolves.toBe("/app/dashboard/onboarding");
   });
 });

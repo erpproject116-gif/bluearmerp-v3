@@ -86,6 +86,7 @@ type PurchaseRequest struct {
 	CreatedByName     string                `json:"created_by_name,omitempty"`
 	ItemNameSummary   string                `json:"item_name_summary,omitempty"`
 	Lines             []PurchaseRequestLine `json:"lines,omitempty"`
+	CustomValues      map[string]any        `json:"custom_values,omitempty"`
 }
 
 type purchaseRequestLineBody struct {
@@ -127,6 +128,7 @@ type purchaseRequestBody struct {
 	Reference       *string                   `json:"reference"`
 	Notes           *string                   `json:"notes"`
 	Lines           []purchaseRequestLineBody `json:"lines"`
+	CustomValues    map[string]any            `json:"custom_values"`
 }
 
 type computedLine struct {
@@ -510,6 +512,7 @@ func loadPurchaseRequest(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		return PurchaseRequest{}, err
 	}
 	pr.Lines = lines
+	pr.CustomValues = attachCustom(ctx, pool, tenantID, id)
 	return pr, nil
 }
 
@@ -626,6 +629,10 @@ func createPurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
 			return
 		}
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, id, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
 			return
@@ -738,6 +745,10 @@ func updatePurchaseRequest(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if err := replacePurchaseRequestLines(r.Context(), tx, id, computed); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save lines.", "ERR_INTERNAL")
+			return
+		}
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, id, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
 			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {

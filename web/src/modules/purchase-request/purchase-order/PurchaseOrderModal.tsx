@@ -12,7 +12,9 @@ import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
 import { mergeFormErrors } from "../../../shared/formValidation";
 import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { CustomFieldsSection } from "../../../shared/CustomFieldsSection";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
+import { useCustomValues } from "../../../shared/useCustomValues";
 import { useToast } from "../../../shared/toast";
 import { useAuth, hasPermission } from "../../../shared/auth-context";
 import { coalesceSpecDescription } from "../../../shared/itemLineSpecDescription";
@@ -80,6 +82,7 @@ type PoDraftPayload = {
   project_name: string;
   reference: string;
   notes: string;
+  custom_values?: Record<string, unknown>;
   partner_id: number | null;
   partner_label: string;
   partner_code: string;
@@ -108,6 +111,7 @@ export type PurchaseOrderDetail = {
   status: string;
   reference?: string | null;
   notes?: string | null;
+  custom_values?: Record<string, unknown>;
   subtotal: number;
   tax_total: number;
   grand_total: number;
@@ -212,6 +216,7 @@ export function PurchaseOrderModal(props: Props) {
   const toast = useToast();
   const processPolicy = useProcessPolicy(() => props.open);
   const { fields, byKey } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseOrder);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const PO_FORM_ID = "purchase-order-form";
   const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [_attachmentCount, setAttachmentCount] = createSignal(0);
@@ -285,6 +290,7 @@ export function PurchaseOrderModal(props: Props) {
     project_name: projectName(),
     reference: reference(),
     notes: notes(),
+    custom_values: customValues(),
     partner_id: partnerId(),
     partner_label: partnerLabel(),
     partner_code: partnerCode(),
@@ -305,6 +311,7 @@ export function PurchaseOrderModal(props: Props) {
     setProjectName(payload.project_name);
     setReference(payload.reference);
     setNotes(payload.notes);
+    loadCustom(payload.custom_values ?? {});
     setPartnerId(payload.partner_id);
     setPartnerLabel(payload.partner_label);
     setPartnerCode(payload.partner_code);
@@ -337,6 +344,7 @@ export function PurchaseOrderModal(props: Props) {
     setProjectName(po.project_name ?? "");
     setReference(po.reference ?? "");
     setNotes(po.notes ?? "");
+    loadCustom(po.custom_values ?? {});
     setPartnerId(po.partner_id ?? null);
     setPartnerLabel(po.partner_name ?? "");
     setPartnerCode(po.lines?.[0]?.partner_code ?? "");
@@ -384,6 +392,7 @@ export function PurchaseOrderModal(props: Props) {
     setProjectName("");
     setReference("");
     setNotes("");
+    loadCustom({});
     setPartnerId(seed?.partner_id ?? null);
     setPartnerLabel(seed?.partner_name ?? "");
     setPartnerCode(seed?.partner_code ?? "");
@@ -628,6 +637,7 @@ export function PurchaseOrderModal(props: Props) {
       project_name: projectName() || null,
       reference: reference() || null,
       notes: notes() || null,
+      custom_values: customValues(),
       lines: lines().map((ln, i) => ({
         id: ln.id || null,
         line_no: i + 1,
@@ -1007,6 +1017,13 @@ export function PurchaseOrderModal(props: Props) {
                   />
                 )}
               </ModalField>
+              <div class="col-span-full">
+                <CustomFieldsSection
+                  entityType={PURCHASE_REQUEST_ENTITY.purchaseOrder}
+                  values={customValues}
+                  onChange={setCustom}
+                />
+              </div>
             </div>
 
             <Show

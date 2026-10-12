@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { apiFetch } from "../../shared/api";
+import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
+import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
@@ -8,7 +9,58 @@ import { HrLayout } from "./HrLayout";
 type Alert = {
   id: number; employee_id: number; employee_no?: string; employee_name?: string;
   alert_code: string; message: string; occurrence_count: number; discipline_case_id?: number | null;
+  reason?: string; remarks?: string;
 };
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const tenantId = getActiveTenantId();
+  if (tenantId) headers["X-Tenant-ID"] = String(tenantId);
+  const branchId = getActiveBranchIdCurrent();
+  if (branchId) headers["X-Branch-ID"] = String(branchId);
+  return headers;
+}
+
+function AlertNotes(props: { alert: Alert; onSaved: () => void }) {
+  const toast = useToast();
+  const [reason, setReason] = createSignal(props.alert.reason ?? "");
+  const [remarks, setRemarks] = createSignal(props.alert.remarks ?? "");
+
+  const save = async () => {
+    const res = await apiFetch(`/api/v1/hr/absence-alerts/${props.alert.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ reason: reason(), remarks: remarks() }),
+    });
+    if (!res.success) return toast.warning(res.message ?? "Could not save.");
+    toast.success("Absenteeism notes saved. Pay is unchanged.");
+    props.onSaved();
+  };
+
+  const upload = async (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`${apiBase}/api/v1/hr/absence-alerts/${props.alert.id}/files`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: fd,
+    });
+    if (!res.ok) return toast.warning("File upload failed.");
+    toast.success("File stored on the alert.");
+  };
+
+  return (
+    <div class="mt-2 grid gap-2 sm:grid-cols-2">
+      <Field label="Reason"><input class={inputClass} value={reason()} placeholder="Optional" onInput={(e) => setReason(e.currentTarget.value)} /></Field>
+      <Field label="Remarks"><input class={inputClass} value={remarks()} placeholder="Optional" onInput={(e) => setRemarks(e.currentTarget.value)} /></Field>
+      <Field label="File"><input type="file" class={inputClass} onChange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ""; if (f) void upload(f); }} /></Field>
+      <div class="flex items-end">
+        <button type="button" class="rounded border border-stroke px-3 py-1.5 text-xs" onClick={() => void save()}>Save notes</button>
+      </div>
+    </div>
+  );
+}
 type ReportRow = {
   employee_id: number; employee_no: string; employee_name: string; department: string;
   absent_days: number; awol_days: number; late_days: number; leave_days: number;
@@ -68,6 +120,7 @@ export default function AbsenteeismPage() {
               <div>
                 <p class="font-medium">{a.employee_no} — {a.employee_name}</p>
                 <p class="text-text-secondary">{a.message}</p>
+                <AlertNotes alert={a} onSaved={() => void qc.invalidateQueries({ queryKey: ["hr-absence-alerts"] })} />
               </div>
               <Show when={!a.discipline_case_id}>
                 <button type="button" class="text-xs text-amber-800" onClick={() => void createDiscipline(a)}>Create discipline draft</button>

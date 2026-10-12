@@ -7,7 +7,9 @@ import { DateInput } from "../../../shared/DateInput";
 import { ModalField } from "../../../shared/ModalField";
 import { ModalLookupField } from "../../../shared/ModalLookupField";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
+import { CustomFieldsSection } from "../../../shared/CustomFieldsSection";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
+import { useCustomValues } from "../../../shared/useCustomValues";
 import { submitEntity, collectRequiredFieldErrors, showClientValidationBlocker } from "../../../shared/handleSaveResult";
 import { FormErrorSummary } from "../../../shared/FormErrorSummary";
 import { collectDocumentLookupErrors } from "../../../shared/documentFormValidation";
@@ -71,6 +73,7 @@ export type PurchaseRequestDetail = {
   total_qty: number;
   reference?: string | null;
   notes?: string | null;
+  custom_values?: Record<string, unknown>;
   subtotal: number;
   tax_total: number;
   grand_total: number;
@@ -170,6 +173,7 @@ export function PurchaseRequestModal(props: Props) {
   const taxTypes = () => taxTypesQuery.data ?? [];
   const currencies = () => currenciesQuery.data ?? [];
   const { fields, byKey } = useFormFieldSettings(PURCHASE_REQUEST_ENTITY.purchaseRequest);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const PR_FORM_ID = "purchase-request-form";
   const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [saving, setSaving] = createSignal(false);
@@ -231,6 +235,7 @@ export function PurchaseRequestModal(props: Props) {
     send_status: sendStatus(),
     reference: reference(),
     notes: notes(),
+    custom_values: customValues(),
     progress_status: progressStatus(),
     lines: lines(),
   });
@@ -253,6 +258,7 @@ export function PurchaseRequestModal(props: Props) {
     setSendStatus(payload.send_status);
     setReference(payload.reference);
     setNotes(payload.notes);
+    loadCustom(payload.custom_values ?? {});
     setProgressStatus(payload.progress_status || "unconfirmed");
     setLines(payload.lines);
     setDateNoDisplay(formatDateNoDisplay(payload.request_date, payload.date_seq));
@@ -407,6 +413,7 @@ export function PurchaseRequestModal(props: Props) {
       setSendStatus(ed.send_status === "sent" ? "sent" : "unsent");
       setReference(ed.reference ?? "");
       setNotes(ed.notes ?? "");
+      loadCustom(ed.custom_values ?? {});
       setProgressStatus(ed.progress_status || "unconfirmed");
       setApprovedAt(ed.approved_at ?? null);
       setApprovedByName(ed.approved_by_name ?? "");
@@ -431,6 +438,7 @@ export function PurchaseRequestModal(props: Props) {
       setSendStatus("unsent");
       setReference("");
       setNotes("");
+      loadCustom({});
       setProgressStatus("unconfirmed");
       seededNewLines = seedLines.length > 0;
       if (seededNewLines) {
@@ -536,6 +544,7 @@ export function PurchaseRequestModal(props: Props) {
       send_status: sendStatus(),
       reference: reference() || null,
       notes: notes() || null,
+      custom_values: customValues(),
       progress_status: status,
       lines: lines().map((ln, i) => ({
         line_no: i + 1,
@@ -794,6 +803,13 @@ export function PurchaseRequestModal(props: Props) {
           />
         )}
       </ModalField>
+      <div class="col-span-full">
+        <CustomFieldsSection
+          entityType={PURCHASE_REQUEST_ENTITY.purchaseRequest}
+          values={customValues}
+          onChange={setCustom}
+        />
+      </div>
       <Show when={props.editing}>
         <Field label="Created by">
           <input class={inputClass} value={props.editing?.created_by_name ?? ""} readOnly />

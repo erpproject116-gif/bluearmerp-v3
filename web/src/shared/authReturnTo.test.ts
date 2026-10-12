@@ -98,4 +98,11 @@ describe("resolvePostLoginPath", () => {
     await expect(resolvePostLoginPath({} as never)).resolves.toBe("/app/setup");
     expect(consumeReturnTo()).toBe("/app/sales/sales");
   });
+
+  it("keeps Home onboarding and does not consume return-to", async () => {
+    vi.mocked(resolveAppEntryPath).mockResolvedValue("/app/dashboard/onboarding");
+    captureReturnTo("/app/sales/sales");
+    await expect(resolvePostLoginPath({} as never)).resolves.toBe("/app/dashboard/onboarding");
+    expect(consumeReturnTo()).toBe("/app/sales/sales");
+  });
 });

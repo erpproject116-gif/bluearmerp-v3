@@ -171,7 +171,7 @@ export default function WelcomePage() {
         navigate(href, { replace: true });
         return;
       }
-      navigate("/app/setup", { replace: true });
+      navigate("/app/dashboard/onboarding", { replace: true });
     } catch {
       setError("Network error. Check your connection and try again.");
     } finally {

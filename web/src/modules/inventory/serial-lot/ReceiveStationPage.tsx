@@ -4,6 +4,9 @@ import { apiFetch } from "../../../shared/api";
 import { showBlockerResult } from "../../../shared/handleSaveResult";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { DateInput } from "../../../shared/DateInput";
+import { CustomFieldsSection } from "../../../shared/CustomFieldsSection";
+import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
+import { useCustomValues } from "../../../shared/useCustomValues";
 import { Field, inputClass } from "../../../shared/SpreadsheetGrid";
 import { useToast } from "../../../shared/toast";
 import { useInvalidateSerialLotLists } from "../../../shared/useSerialLotList";
@@ -159,6 +162,7 @@ async function enrichLinesWithCatchWeight(lines: GoodsReceiptLine[]): Promise<Go
 export default function ReceiveStationPage() {
   const toast = useToast();
   const invalidate = useInvalidateSerialLotLists();
+  const { customValues, setCustom } = useCustomValues();
   const [params] = useSearchParams();
 
   const [poLabel, setPoLabel] = createSignal("");
@@ -308,6 +312,7 @@ export default function ReceiveStationPage() {
           purchase_order_id: po.id,
           receipt_date: receiptDate(),
           location_id: po.location_id,
+          custom_values: customValues(),
         }),
       },
       { silent: true },
@@ -696,6 +701,13 @@ export default function ReceiveStationPage() {
             <Field label="Receipt date">
               <DateInput value={receiptDate()} onInput={(e) => setReceiptDate(e.currentTarget.value)} />
             </Field>
+            <div class="col-span-full">
+              <CustomFieldsSection
+                entityType={PURCHASE_REQUEST_ENTITY.goodsReceipt}
+                values={customValues}
+                onChange={setCustom}
+              />
+            </div>
           </div>
 
           <Show when={selectedPo()}>

@@ -18,13 +18,13 @@ import (
 )
 
 type Location struct {
-	ID                int64  `json:"id"`
-	LocationCode      string `json:"location_code"`
-	LocationName      string `json:"location_name"`
-	LocationType      string `json:"location_type"`
-	ProductionProcess string `json:"production_process"`
-	Status            string `json:"status"`
-	IsRMA             bool   `json:"is_rma"`
+	ID                int64          `json:"id"`
+	LocationCode      string         `json:"location_code"`
+	LocationName      string         `json:"location_name"`
+	LocationType      string         `json:"location_type"`
+	ProductionProcess string         `json:"production_process"`
+	Status            string         `json:"status"`
+	IsRMA             bool           `json:"is_rma"`
 	CustomValues      map[string]any `json:"custom_values,omitempty"`
 }
 
@@ -39,6 +39,8 @@ type locationBody struct {
 
 func registerLocationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/locations/next-code", nextCodeHandler(pool, "location"))
+	r.With(auth.RequirePermission("inventory.locations", auth.AccessRead)).Get("/locations/import-template", locationImportTemplateHandler())
+	r.With(auth.RequirePermission("inventory.locations", auth.AccessWrite)).Post("/locations/import", locationImportCSVHandler(pool))
 	r.Get("/locations", listLocations(pool))
 	r.Post("/locations", createLocation(pool))
 	r.Post("/locations/actions/bulk-delete", bulkSoftDeleteHandler(pool, "inv_locations", "inventory.location.delete", "inv_location"))

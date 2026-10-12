@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveGettingStarted, wizardFoundationPercent } from "./setupProgress";
+import { gettingStartedModuleHref, resolveGettingStarted, wizardFoundationPercent } from "./setupProgress";
 
 describe("resolveGettingStarted", () => {
   it("stays visible until first sale and bank are done", () => {
@@ -85,5 +85,14 @@ describe("resolveGettingStarted", () => {
       ],
     });
     expect(percent).toBe(100);
+  });
+});
+
+describe("gettingStartedModuleHref", () => {
+  it("points foundation steps at the module page", () => {
+    expect(gettingStartedModuleHref("location")).toBe("/app/inventory/locations");
+    expect(gettingStartedModuleHref("partners")).toBe("/app/inventory/partners");
+    expect(gettingStartedModuleHref("company")).toBe("/app/settings/branding");
+    expect(gettingStartedModuleHref("ready")).toBeUndefined();
   });
 });

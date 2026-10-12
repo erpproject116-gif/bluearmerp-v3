@@ -10,6 +10,7 @@ import {
   type UserDataScope,
 } from "../../../shared/usePermissions";
 import { apiFetch } from "../../../shared/api";
+import { clearScopeTypes, SCOPE_OPTION_PAGE_SIZE, selectLoadedScopes, setLocationScope } from "./scopeBulk";
 
 type ScopeOption = { id: number; label: string };
 
@@ -47,9 +48,11 @@ export default function UserPermissionsPage() {
   const loadOptions = async () => {
     const [partnersRes, locRes] = await Promise.all([
       apiFetch<Array<{ id: number; company_name: string; partner_kind: string }>>(
-        "/api/v1/inventory/partners?pageSize=500&status=active",
+        `/api/v1/inventory/partners?pageSize=${SCOPE_OPTION_PAGE_SIZE}&status=active`,
       ),
-      apiFetch<Array<{ id: number; location_name: string }>>("/api/v1/inventory/locations?pageSize=500"),
+      apiFetch<Array<{ id: number; location_name: string }>>(
+        `/api/v1/inventory/locations?pageSize=${SCOPE_OPTION_PAGE_SIZE}`,
+      ),
     ]);
     const partners = (partnersRes.data ?? []).filter(
       (p) => p.partner_kind === "customer" || p.partner_kind === "both",
@@ -114,6 +117,17 @@ export default function UserPermissionsPage() {
       return [...without, { scope_type: scopeType, record_id: recordId }];
     });
   };
+
+  const selectCustomers = () => {
+    const ids = customers().map((c) => c.id);
+    setScopes((prev) => selectLoadedScopes(prev, ["customer"], ids));
+  };
+  const clearCustomers = () => setScopes((prev) => clearScopeTypes(prev, ["customer"]));
+  const selectLocations = () => {
+    const ids = locations().map((l) => l.id);
+    setScopes((prev) => selectLoadedScopes(prev, ["location", "warehouse"], ids));
+  };
+  const clearLocations = () => setScopes((prev) => clearScopeTypes(prev, ["location", "warehouse"]));
 
   const isChecked = (scopeType: string, recordId: number) =>
     scopes().some((s) => s.scope_type === scopeType && s.record_id === recordId);
@@ -233,6 +247,14 @@ export default function UserPermissionsPage() {
             </div>
           </Show>
           <Field label="Customers">
+            <div class="mb-2 flex flex-wrap gap-3">
+              <button type="button" class="text-xs font-medium text-brand-600 hover:underline disabled:opacity-40" disabled={customers().length === 0} onClick={selectCustomers}>
+                Select all ({customers().length})
+              </button>
+              <button type="button" class="text-xs font-medium text-brand-600 hover:underline disabled:opacity-40" disabled={customers().length === 0} onClick={clearCustomers}>
+                Deselect all ({customers().length})
+              </button>
+            </div>
             <div class="max-h-40 overflow-y-auto rounded border border-stroke p-2 space-y-1">
               <For each={customers()}>
                 {(opt) => (
@@ -252,6 +274,14 @@ export default function UserPermissionsPage() {
             </div>
           </Field>
           <Field label="Locations / Warehouses">
+            <div class="mb-2 flex flex-wrap gap-3">
+              <button type="button" class="text-xs font-medium text-brand-600 hover:underline disabled:opacity-40" disabled={locations().length === 0} onClick={selectLocations}>
+                Select all ({locations().length})
+              </button>
+              <button type="button" class="text-xs font-medium text-brand-600 hover:underline disabled:opacity-40" disabled={locations().length === 0} onClick={clearLocations}>
+                Deselect all ({locations().length})
+              </button>
+            </div>
             <div class="max-h-40 overflow-y-auto rounded border border-stroke p-2 space-y-1">
               <For each={locations()}>
                 {(opt) => (
@@ -259,10 +289,7 @@ export default function UserPermissionsPage() {
                     <input
                       type="checkbox"
                       checked={isChecked("location", opt.id) || isChecked("warehouse", opt.id)}
-                      onChange={(e) => {
-                        toggleScope("location", opt.id, e.currentTarget.checked);
-                        toggleScope("warehouse", opt.id, e.currentTarget.checked);
-                      }}
+                      onChange={(e) => setScopes((prev) => setLocationScope(prev, opt.id, e.currentTarget.checked))}
                     />
                     {opt.label}
                   </label>

@@ -39,6 +39,8 @@ type DTR = {
   night_diff_hours: number;
   holiday_name?: string;
   holiday_type?: string;
+  absence_reason?: string;
+  absence_remarks?: string;
 };
 
 export default function AttendancePage() {
@@ -60,6 +62,7 @@ export default function AttendancePage() {
   const [dtrOt, setDtrOt] = createSignal("0");
   const [dtrNightDiff, setDtrNightDiff] = createSignal("0");
   const [dtrReason, setDtrReason] = createSignal("");
+  const [dtrRemarks, setDtrRemarks] = createSignal("");
   const [selectedDtrId, setSelectedDtrId] = createSignal<number | null>(null);
   const [importingDtr, setImportingDtr] = createSignal(false);
   const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
@@ -115,6 +118,8 @@ export default function AttendancePage() {
       dtr_hours: dtrHours(),
       dtr_ot: dtrOt(),
       dtr_night_diff: dtrNightDiff(),
+      dtr_reason: dtrReason(),
+      dtr_remarks: dtrRemarks(),
     }),
     onApply: (payload) => {
       setDtrEmp(payload.dtr_emp);
@@ -123,6 +128,8 @@ export default function AttendancePage() {
       setDtrHours(payload.dtr_hours);
       setDtrOt(payload.dtr_ot);
       setDtrNightDiff(payload.dtr_night_diff ?? "0");
+      setDtrReason(payload.dtr_reason ?? "");
+      setDtrRemarks(payload.dtr_remarks ?? "");
     },
     enabled: () => true,
     localOnly: true,
@@ -181,6 +188,7 @@ export default function AttendancePage() {
         ot_hours: Number(dtrOt()) || 0,
         night_diff_hours: Number(dtrNightDiff()) || 0,
         absence_reason: dtrReason().trim() || undefined,
+        absence_remarks: dtrRemarks().trim() || undefined,
       }),
     });
     if (!res.success) {
@@ -350,6 +358,7 @@ export default function AttendancePage() {
           <Field label="OT hours"><input class={inputClass} value={dtrOt()} onInput={(e) => setDtrOt(e.currentTarget.value)} /></Field>
           <Field label="Night diff hours"><input class={inputClass} value={dtrNightDiff()} onInput={(e) => setDtrNightDiff(e.currentTarget.value)} /></Field>
           <Field label="Absence reason"><input class={inputClass} value={dtrReason()} onInput={(e) => setDtrReason(e.currentTarget.value)} placeholder="Optional" /></Field>
+          <Field label="Remarks"><input class={inputClass} value={dtrRemarks()} onInput={(e) => setDtrRemarks(e.currentTarget.value)} placeholder="Optional" /></Field>
         </div>
         <div class="mb-4 flex flex-wrap gap-2">
           <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => void saveDtr()}>
@@ -402,6 +411,8 @@ export default function AttendancePage() {
             { key: "ot_hours", header: "OT", render: (row) => <span class="tabular-nums">{row.ot_hours}</span> },
             { key: "night_diff_hours", header: "Night diff", render: (row) => <span class="tabular-nums">{row.night_diff_hours}</span> },
             { key: "holiday_name", header: "Holiday", render: (row) => <span>{row.holiday_name ? `${row.holiday_name} (${row.holiday_type})` : "—"}</span> },
+            { key: "absence_reason", header: "Reason", render: (row) => <span>{row.absence_reason || "—"}</span> },
+            { key: "absence_remarks", header: "Remarks", render: (row) => <span>{row.absence_remarks || "—"}</span> },
           ]}
           rows={dtr.data ?? []}
           loading={dtr.isFetching}

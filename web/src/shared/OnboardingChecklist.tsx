@@ -190,7 +190,14 @@ export function OnboardingTrackPanel(props: { track: OnboardingTrack; defaultOpe
                       </Show>
                     </div>
                     <Show when={step.description}>
-                      <p class="mt-1 text-xs text-text-secondary">{step.description}</p>
+                      <Show
+                        when={!step.done}
+                        fallback={<p class="mt-1 text-xs text-text-secondary">{step.description}</p>}
+                      >
+                        <A href={step.href} class="mt-1 block text-xs text-text-secondary hover:text-brand-700 hover:underline">
+                          {step.description}
+                        </A>
+                      </Show>
                     </Show>
                     <Show when={step.kb_article_id}>
                       <A

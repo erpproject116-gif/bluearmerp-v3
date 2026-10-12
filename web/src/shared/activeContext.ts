@@ -5,6 +5,14 @@ import { resetTenantScopedCache } from "./queryClient";
 
 const TENANT_KEY = "bluearm.activeTenantId";
 
+// Bumps when the pinned business changes so an in-flight /auth/me from the
+// previous pin cannot write that older tenant back.
+let tenantPinGen = 0;
+
+export function tenantPinGeneration(): number {
+  return tenantPinGen;
+}
+
 function branchKey(tenantId: number): string {
   return `bluearm.activeBranch.${tenantId}`;
 }
@@ -33,7 +41,10 @@ export function setActiveTenantId(id: number | null): void {
   if (next) ls.setItem(TENANT_KEY, String(next));
   else ls.removeItem(TENANT_KEY);
   // Clear React Query so form fields / policies / lists cannot leak across workspaces.
-  if (prev !== next) resetTenantScopedCache();
+  if (prev !== next) {
+    tenantPinGen += 1;
+    resetTenantScopedCache();
+  }
 }
 
 export type ActiveBranch = { id: number; name: string };

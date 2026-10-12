@@ -243,6 +243,7 @@ import {
   RemittancesPage,
   AttendancePage,
   LeavePage,
+  CompanyRecordsPage,
   AbsenteeismPage,
   DisciplinePage,
   HrOverviewPage,
@@ -1046,6 +1047,9 @@ export default function App() {
           )} />
           <Route path="/hr/leave" component={() => (
             <HrRoute><LeavePage /></HrRoute>
+          )} />
+          <Route path="/hr/records" component={() => (
+            <HrRoute><CompanyRecordsPage /></HrRoute>
           )} />
           <Route path="/hr/absenteeism" component={() => (
             <HrRoute><AbsenteeismPage /></HrRoute>

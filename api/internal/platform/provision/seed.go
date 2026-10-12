@@ -72,5 +72,9 @@ func SeedTenantDefaults(ctx context.Context, db sqlExecer, tenantID int64) error
 		return fmt.Errorf("member permissions: %w", err)
 	}
 
+	if _, err := db.Exec(ctx, `select public.seed_job_presets($1)`, tenantID); err != nil {
+		return fmt.Errorf("job presets: %w", err)
+	}
+
 	return nil
 }

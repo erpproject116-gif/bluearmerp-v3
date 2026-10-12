@@ -85,6 +85,12 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 func registerPartnerRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/partners/next-code", nextCodeHandler(pool, "partner"))
+	if partnerCSVTemplate != nil {
+		r.With(auth.RequirePermission("inventory.partners", auth.AccessRead)).Get("/partners/import-template", partnerCSVTemplate)
+	}
+	if partnerCSVImport != nil {
+		r.With(auth.RequirePermission("inventory.partners", auth.AccessWrite)).Post("/partners/import", partnerCSVImport(pool))
+	}
 	r.Get("/partners", listPartners(pool))
 	r.Post("/partners", createPartner(pool))
 	r.Post("/partners/actions/bulk-delete", bulkSoftDeleteHandler(pool, "inv_partners", "inventory.partner.delete", "inv_partner"))
@@ -92,6 +98,17 @@ func registerPartnerRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Patch("/partners/{id}", updatePartner(pool))
 	r.Post("/partners/{id}/restore", softRestoreHandler(pool, "inv_partners", "inventory.partner.restore", "inv_partner"))
 	r.Delete("/partners/{id}", deletePartner(pool))
+}
+
+var (
+	partnerCSVImport   func(*pgxpool.Pool) http.HandlerFunc
+	partnerCSVTemplate http.HandlerFunc
+)
+
+// SetPartnerCSVImport wires the migration partners importer onto the Partners page routes.
+func SetPartnerCSVImport(importFn func(*pgxpool.Pool) http.HandlerFunc, template http.HandlerFunc) {
+	partnerCSVImport = importFn
+	partnerCSVTemplate = template
 }
 
 func listPartners(pool *pgxpool.Pool) http.HandlerFunc {

@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/solid-query";
 import { OnboardingTrackPanel } from "../../shared/OnboardingChecklist";
 import { apiFetch } from "../../shared/api";
 import { canManageWorkspaceSetup } from "../../shared/resolveAppEntryPath";
-import { resolveGettingStarted } from "../../shared/setupProgress";
+import { GETTING_STARTED_COPY, gettingStartedModuleHref, resolveGettingStarted } from "../../shared/setupProgress";
 import { useAuth } from "../../shared/auth-context";
 import { useOnboarding, useSetupReadiness } from "../../shared/usePlatform";
 import {
@@ -24,7 +24,19 @@ export function HomeOnboarding() {
   const canManage = () => canManageWorkspaceSetup(auth.me);
   const progress = () => resolveGettingStarted(setup.data);
   const data = () => onboarding.data;
-  const tracks = () => data()?.tracks ?? [];
+  const tracks = () =>
+    (data()?.tracks ?? []).map((track) => {
+      if (track.id !== "foundation") return track;
+      return {
+        ...track,
+        steps: track.steps.map((step) => {
+          const copy = GETTING_STARTED_COPY[step.id];
+          const href = gettingStartedModuleHref(step.id);
+          if (!copy || !href) return step;
+          return { ...step, label: copy.label, href, description: copy.blurb };
+        }),
+      };
+    });
   const overall = () => data()?.overall_percent ?? 0;
   const showPlaybook = () => data()?.show_playbook ?? false;
 
@@ -139,7 +151,7 @@ export function HomeOnboarding() {
             </div>
             <Show when={!data()!.required_complete && canManage()}>
               <A
-                href="/app/setup"
+                href={progress().next?.href ?? "/app/dashboard/onboarding"}
                 class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
               >
                 Continue required setup
@@ -173,15 +185,16 @@ export function HomeOnboarding() {
                               {step.done ? "✓" : ""}
                             </span>
                             <div class="min-w-0 flex-1">
-                              <p
-                                class="text-sm leading-snug"
+                              <A
+                                href={step.href}
+                                class="text-sm leading-snug hover:underline"
                                 classList={{
                                   "text-text-secondary line-through": step.done,
                                   "text-text-primary": !step.done,
                                 }}
                               >
                                 {step.sentence}
-                              </p>
+                              </A>
                               <Show when={!step.done}>
                                 <A
                                   href={step.href}

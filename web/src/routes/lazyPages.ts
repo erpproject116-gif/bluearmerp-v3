@@ -242,6 +242,7 @@ export const PayrollRunsPage = lazy(() => import("../modules/hr/PayrollRunsPage"
 export const RemittancesPage = lazy(() => import("../modules/hr/RemittancesPage"));
 export const AttendancePage = lazy(() => import("../modules/hr/AttendancePage"));
 export const LeavePage = lazy(() => import("../modules/hr/LeavePage"));
+export const CompanyRecordsPage = lazy(() => import("../modules/hr/CompanyRecordsPage"));
 export const AbsenteeismPage = lazy(() => import("../modules/hr/AbsenteeismPage"));
 export const DisciplinePage = lazy(() => import("../modules/hr/DisciplinePage"));
 export const HrOverviewPage = lazy(() => import("../modules/hr/HrOverviewPage"));

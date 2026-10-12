@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, type JSX } from "solid-js";
 import { Navigate } from "@solidjs/router";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useAuth, canManageBranding } from "../../shared/auth-context";
@@ -43,6 +43,17 @@ const RECEIPT_FIELDS: { key: keyof BrandingReceipt; label: string; multiline?: b
 ];
 
 const MAX_LOGO_MB = 2;
+
+function BrandingFold(props: { title: string; open?: boolean; children: JSX.Element }) {
+  return (
+    <details class="erp-surface rounded-xl border border-stroke shadow-sm" open={props.open || undefined}>
+      <summary class="cursor-pointer list-none px-5 py-4 text-lg font-medium text-text-primary [&::-webkit-details-marker]:hidden">
+        {props.title}
+      </summary>
+      <div class="px-5 pb-5">{props.children}</div>
+    </details>
+  );
+}
 
 export default function BrandingSettingsPage() {
   const auth = useAuth();
@@ -163,9 +174,8 @@ export default function BrandingSettingsPage() {
         </p>
       </Show>
 
-      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
-        <div class="flex items-center justify-between gap-4">
-          <h2 class="text-lg font-medium text-text-primary">Color palette</h2>
+      <BrandingFold title="Color palette">
+        <div class="flex justify-end">
           <button
             type="button"
             class="text-sm text-brand-600 hover:underline"
@@ -199,11 +209,10 @@ export default function BrandingSettingsPage() {
             )}
           </For>
         </div>
-      </section>
+      </BrandingFold>
 
-      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
-        <h2 class="text-lg font-medium text-text-primary">Stage / progress colors</h2>
-        <p class="mt-1 text-sm text-text-secondary">Background and text for workflow stage badges.</p>
+      <BrandingFold title="Stage / progress colors">
+        <p class="text-sm text-text-secondary">Background and text for workflow stage badges.</p>
         <div class="mt-4 space-y-3">
           <For each={STAGE_KEYS}>
             {(key) => (
@@ -229,10 +238,9 @@ export default function BrandingSettingsPage() {
             )}
           </For>
         </div>
-      </section>
+      </BrandingFold>
 
-      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
-        <h2 class="text-lg font-medium text-text-primary">Company logo &amp; print header</h2>
+      <BrandingFold title="Company logo & print header" open>
         <p class="mt-1 text-sm text-text-secondary">
           Upload a company logo for sidebar and all printables (invoices, quotations, receipts, ledgers). If no logo is uploaded, the Bluearm default mark is used until you add yours. Company name prints once as the title — put only address/contact in Extra header text.
         </p>
@@ -292,10 +300,9 @@ export default function BrandingSettingsPage() {
             )}
           </For>
         </div>
-      </section>
+      </BrandingFold>
 
-      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
-        <h2 class="text-lg font-medium text-text-primary">Navigation</h2>
+      <BrandingFold title="Navigation">
         <p class="mt-1 text-sm text-text-secondary">
           Rename sidebar modules and header feature tabs. Leave blank to keep the default product name.
         </p>
@@ -325,10 +332,9 @@ export default function BrandingSettingsPage() {
             )}
           </For>
         </div>
-      </section>
+      </BrandingFold>
 
-      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
-        <h2 class="text-lg font-medium text-text-primary">App &amp; progress labels</h2>
+      <BrandingFold title="App & progress labels">
         <p class="mt-1 text-sm text-text-secondary">Sidebar, sign-out, and workflow stage badge text.</p>
         <div class="mt-4 space-y-3">
           <For each={LABEL_PRESETS}>
@@ -345,10 +351,9 @@ export default function BrandingSettingsPage() {
             )}
           </For>
         </div>
-      </section>
+      </BrandingFold>
 
-      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
-        <h2 class="text-lg font-medium text-text-primary">Screen copy</h2>
+      <BrandingFold title="Screen copy">
         <p class="mt-1 text-sm text-text-secondary">
           Section headings, buttons, empty states, and filter labels across selling, purchasing, lists, and reports.
         </p>
@@ -379,10 +384,9 @@ export default function BrandingSettingsPage() {
             )}
           </For>
         </div>
-      </section>
+      </BrandingFold>
 
-      <section class="erp-surface rounded-xl border border-stroke p-5 shadow-sm">
-        <h2 class="text-lg font-medium text-text-primary">Custom placeholders</h2>
+      <BrandingFold title="Custom placeholders">
         <div class="mt-4 space-y-3">
           <For each={PLACEHOLDER_PRESETS}>
             {(p) => (
@@ -398,7 +402,7 @@ export default function BrandingSettingsPage() {
             )}
           </For>
         </div>
-      </section>
+      </BrandingFold>
 
       <div class="flex gap-3 pb-8">
         <button

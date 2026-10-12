@@ -76,14 +76,16 @@ type GoodsReceipt struct {
 	CreatedAt        string             `json:"created_at"`
 	UpdatedAt        string             `json:"updated_at"`
 	Lines            []GoodsReceiptLine `json:"lines,omitempty"`
+	CustomValues     map[string]any     `json:"custom_values,omitempty"`
 }
 
 type createGoodsReceiptBody struct {
-	PurchaseOrderID int64   `json:"purchase_order_id"`
-	ReceiptDate     string  `json:"receipt_date"`
-	LocationID      int64   `json:"location_id"`
-	Reference       *string `json:"reference"`
-	Notes           *string `json:"notes"`
+	PurchaseOrderID int64          `json:"purchase_order_id"`
+	ReceiptDate     string         `json:"receipt_date"`
+	LocationID      int64          `json:"location_id"`
+	Reference       *string        `json:"reference"`
+	Notes           *string        `json:"notes"`
+	CustomValues    map[string]any `json:"custom_values"`
 }
 
 type addSerialBody struct {
@@ -273,6 +275,7 @@ func getGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Goods receipt not found.", "ERR_NOT_FOUND")
 			return
 		}
+		gr.CustomValues = attachCustom(r.Context(), pool, tu.TenantID, id)
 		if err := branchiso.AssertCommercialLocationAccess(r.Context(), pool, tu, gr.LocationID); err != nil {
 			code, msg, errCode := branchiso.HTTPStatus(err)
 			response.Err(w, code, msg, errCode)
@@ -598,6 +601,10 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		if errs := saveCustom(r.Context(), tx, tu.TenantID, grID, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create goods receipt.", "ERR_INTERNAL")
 			return
@@ -608,6 +615,7 @@ func createGoodsReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Created but failed to load goods receipt.", "ERR_INTERNAL")
 			return
 		}
+		gr.CustomValues = attachCustom(r.Context(), pool, tu.TenantID, grID)
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "goods_receipt.create", "gr_goods_receipt", &grID, nil, body)
 		response.OK(w, gr, "Goods receipt created.")
 	}

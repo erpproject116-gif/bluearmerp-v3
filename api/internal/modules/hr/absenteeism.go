@@ -2,6 +2,7 @@ package hr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -17,19 +18,21 @@ import (
 )
 
 type AbsenceAlert struct {
-	ID               int64   `json:"id"`
-	EmployeeID       int64   `json:"employee_id"`
-	EmployeeNo       string  `json:"employee_no,omitempty"`
-	EmployeeName     string  `json:"employee_name,omitempty"`
-	RuleID           *int64  `json:"rule_id,omitempty"`
-	AlertCode        string  `json:"alert_code"`
-	Message          string  `json:"message"`
-	OccurrenceCount  int     `json:"occurrence_count"`
-	WindowStart      string  `json:"window_start"`
-	WindowEnd        string  `json:"window_end"`
-	Status           string  `json:"status"`
-	DisciplineCaseID *int64  `json:"discipline_case_id,omitempty"`
-	CreatedAt        string  `json:"created_at,omitempty"`
+	ID               int64  `json:"id"`
+	EmployeeID       int64  `json:"employee_id"`
+	EmployeeNo       string `json:"employee_no,omitempty"`
+	EmployeeName     string `json:"employee_name,omitempty"`
+	RuleID           *int64 `json:"rule_id,omitempty"`
+	AlertCode        string `json:"alert_code"`
+	Message          string `json:"message"`
+	OccurrenceCount  int    `json:"occurrence_count"`
+	WindowStart      string `json:"window_start"`
+	WindowEnd        string `json:"window_end"`
+	Status           string `json:"status"`
+	DisciplineCaseID *int64 `json:"discipline_case_id,omitempty"`
+	Reason           string `json:"reason"`
+	Remarks          string `json:"remarks"`
+	CreatedAt        string `json:"created_at,omitempty"`
 }
 
 type AbsenteeismRow struct {
@@ -46,6 +49,8 @@ type AbsenteeismRow struct {
 func registerAbsenteeismRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/absence-alerts", listAbsenceAlerts(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/absence-alerts/{id}/acknowledge", ackAbsenceAlert(pool))
+	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Patch("/absence-alerts/{id}", patchAbsenceAlert(pool))
+	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/absence-alerts/{id}/files", addAbsenceAlertFile(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/absence-alerts/evaluate", evaluateAbsenceAlerts(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/absenteeism-report", absenteeismReport(pool))
 }
@@ -62,7 +67,8 @@ func listAbsenceAlerts(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
 			select a.id, a.employee_id, e.employee_no, e.full_name, a.rule_id, a.alert_code, a.message,
-			  a.occurrence_count, a.window_start::text, a.window_end::text, a.status, a.discipline_case_id, a.created_at::text
+			  a.occurrence_count, a.window_start::text, a.window_end::text, a.status, a.discipline_case_id,
+			  a.reason, a.remarks, a.created_at::text
 			from public.hr_absence_alerts a
 			join public.hr_employees e on e.id=a.employee_id
 			where %s
@@ -77,7 +83,8 @@ func listAbsenceAlerts(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row AbsenceAlert
 			if err := rows.Scan(&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.RuleID, &row.AlertCode, &row.Message,
-				&row.OccurrenceCount, &row.WindowStart, &row.WindowEnd, &row.Status, &row.DisciplineCaseID, &row.CreatedAt); err != nil {
+				&row.OccurrenceCount, &row.WindowStart, &row.WindowEnd, &row.Status, &row.DisciplineCaseID,
+				&row.Reason, &row.Remarks, &row.CreatedAt); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read alert.", "ERR_INTERNAL")
 				return
 			}
@@ -103,6 +110,86 @@ func ackAbsenceAlert(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, map[string]any{"id": id}, "Acknowledged.")
+	}
+}
+
+func patchAbsenceAlert(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var body struct {
+			Reason  string `json:"reason"`
+			Remarks string `json:"remarks"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			update public.hr_absence_alerts
+			set reason=$3, remarks=$4, updated_at=now()
+			where id=$1 and tenant_id=$2`,
+			id, tu.TenantID, strings.TrimSpace(body.Reason), strings.TrimSpace(body.Remarks))
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Alert not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.OK(w, map[string]any{"id": id}, "Saved.")
+	}
+}
+
+func addAbsenceAlertFile(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		name, mimeType, data, fileErr := readDisciplineUpload(r)
+		if fileErr != "" {
+			response.Err(w, http.StatusBadRequest, fileErr, "ERR_VALIDATION")
+			return
+		}
+		var empID int64
+		err = pool.QueryRow(r.Context(), `
+			select employee_id from public.hr_absence_alerts where id=$1 and tenant_id=$2`, id, tu.TenantID).Scan(&empID)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Alert not found.", "ERR_NOT_FOUND")
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		var docID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.hr_employee_documents
+			  (tenant_id, employee_id, doc_type, title, file_name, file_url, mime_type, file_bytes, uploaded_by_user_id)
+			values ($1,$2,'other',$3,$4,'',$5,$6,$7) returning id`,
+			tu.TenantID, empID, name, name, mimeType, data, tu.AppUserID,
+		).Scan(&docID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `
+			insert into public.hr_absence_alert_files (tenant_id, alert_id, document_id)
+			values ($1,$2,$3)`, tu.TenantID, id, docID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to link the file.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"id": id, "document_id": docID}, "File stored.")
 	}
 }
 

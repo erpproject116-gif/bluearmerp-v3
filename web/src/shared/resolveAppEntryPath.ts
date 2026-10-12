@@ -52,7 +52,10 @@ export function resolveRoleHomePath(me: MeData | null | undefined): string {
   return "/app/dashboard";
 }
 
-/** First screen after sign-in — send new workspace admins to setup when foundation is incomplete. */
+/** Home onboarding. Trial and activated workspaces use this screen, not the setup wizard. */
+export const WORKSPACE_ONBOARDING_HREF = "/app/dashboard/onboarding";
+
+/** First screen after sign-in — unfinished foundation opens Home onboarding. */
 export async function resolveAppEntryPath(me: MeData | null | undefined): Promise<string> {
   if (!me) return "/signin";
   if (!canManageWorkspaceSetup(me)) return resolveRoleHomePath(me);
@@ -64,7 +67,7 @@ export async function resolveAppEntryPath(me: MeData | null | undefined): Promis
       { silent: true, background: true },
     );
     if (res.data && !res.data.required_complete && !res.data.setup_wizard_skipped) {
-      return "/app/setup";
+      return WORKSPACE_ONBOARDING_HREF;
     }
   } catch {
     /* fall through */

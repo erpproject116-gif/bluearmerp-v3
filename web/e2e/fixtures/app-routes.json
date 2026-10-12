@@ -137,6 +137,7 @@
     "/app/hr/leave",
     "/app/hr/pay-items",
     "/app/hr/payroll-runs",
+    "/app/hr/records",
     "/app/hr/remittances",
     "/app/hr/special-runs",
     "/app/inventory",
@@ -937,6 +938,10 @@
     {
       "path": "/app/hr/payslips/:payslipId/print",
       "kind": "parametrized"
+    },
+    {
+      "path": "/app/hr/records",
+      "kind": "app_static"
     },
     {
       "path": "/app/hr/remittances",

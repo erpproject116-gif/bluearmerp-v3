@@ -1,9 +1,10 @@
 import { createEffect } from "solid-js";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { useAuth } from "./auth-context";
+import { WORKSPACE_ONBOARDING_HREF } from "./resolveAppEntryPath";
 import { useSetupReadiness } from "./usePlatform";
 
-/** Send new workspace admins to the setup wizard once until they skip or finish. */
+/** Keep unfinished workspace admins on Home onboarding until they skip or finish. */
 export function SetupFirstRunRedirect() {
   const loc = useLocation();
   const navigate = useNavigate();
@@ -13,7 +14,8 @@ export function SetupFirstRunRedirect() {
   createEffect(() => {
     const path = loc.pathname;
     if (!path.startsWith("/app/dashboard")) return;
-    if (path.startsWith("/app/setup")) return;
+    if (path.startsWith(WORKSPACE_ONBOARDING_HREF) || path.startsWith("/app/dashboard/getting-started")) return;
+    if (path.startsWith("/app/dashboard/recent-updates")) return;
 
     const me = auth.me;
     const data = readiness.data;
@@ -24,7 +26,7 @@ export function SetupFirstRunRedirect() {
     if (!canManage) return;
     if (data.required_complete || data.setup_wizard_skipped) return;
 
-    navigate("/app/setup", { replace: true });
+    navigate(WORKSPACE_ONBOARDING_HREF, { replace: true });
   });
 
   return null;

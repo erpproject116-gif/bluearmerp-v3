@@ -140,6 +140,11 @@ func applyRolePreviewOverlay(ctx context.Context, pool *pgxpool.Pool, tu *Tenant
 	if tu == nil || tu.AppUserID <= 0 || tu.PlatformOnly {
 		return nil
 	}
+	// Support remoting and role preview cannot run together. The ghost row must
+	// stay the customer workspace, not a preview of the operator's role.
+	if tu.SupportSessionID > 0 {
+		return nil
+	}
 
 	var roleCode *string
 	var homeID *int64

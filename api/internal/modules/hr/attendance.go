@@ -19,13 +19,13 @@ import (
 )
 
 type Holiday struct {
-	ID             int64    `json:"id"`
-	HolidayDate    string   `json:"holiday_date"`
-	Name           string   `json:"name"`
-	HolidayType    string   `json:"holiday_type"`
-	PayMultiplier  float64  `json:"pay_multiplier"`
-	IsActive       bool     `json:"is_active"`
-	Notes          *string  `json:"notes,omitempty"`
+	ID            int64   `json:"id"`
+	HolidayDate   string  `json:"holiday_date"`
+	Name          string  `json:"name"`
+	HolidayType   string  `json:"holiday_type"`
+	PayMultiplier float64 `json:"pay_multiplier"`
+	IsActive      bool    `json:"is_active"`
+	Notes         *string `json:"notes,omitempty"`
 }
 
 type PayCutoff struct {
@@ -38,21 +38,22 @@ type PayCutoff struct {
 }
 
 type DTREntry struct {
-	ID              int64    `json:"id"`
-	EmployeeID      int64    `json:"employee_id"`
-	EmployeeNo      string   `json:"employee_no,omitempty"`
-	EmployeeName    string   `json:"employee_name,omitempty"`
-	WorkDate        string   `json:"work_date"`
-	Source          string   `json:"source"`
-	Status          string   `json:"status"`
-	HoursWorked     float64  `json:"hours_worked"`
-	OTHours         float64  `json:"ot_hours"`
-	NightDiffHours  float64  `json:"night_diff_hours"`
-	HolidayID       *int64   `json:"holiday_id,omitempty"`
-	HolidayName     string   `json:"holiday_name,omitempty"`
-	HolidayType     string   `json:"holiday_type,omitempty"`
-	AbsenceReason   string   `json:"absence_reason,omitempty"`
-	Notes           *string  `json:"notes,omitempty"`
+	ID             int64   `json:"id"`
+	EmployeeID     int64   `json:"employee_id"`
+	EmployeeNo     string  `json:"employee_no,omitempty"`
+	EmployeeName   string  `json:"employee_name,omitempty"`
+	WorkDate       string  `json:"work_date"`
+	Source         string  `json:"source"`
+	Status         string  `json:"status"`
+	HoursWorked    float64 `json:"hours_worked"`
+	OTHours        float64 `json:"ot_hours"`
+	NightDiffHours float64 `json:"night_diff_hours"`
+	HolidayID      *int64  `json:"holiday_id,omitempty"`
+	HolidayName    string  `json:"holiday_name,omitempty"`
+	HolidayType    string  `json:"holiday_type,omitempty"`
+	AbsenceReason  string  `json:"absence_reason,omitempty"`
+	AbsenceRemarks string  `json:"absence_remarks,omitempty"`
+	Notes          *string `json:"notes,omitempty"`
 }
 
 func registerAttendanceRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -279,7 +280,7 @@ func listDTR(pool *pgxpool.Pool) http.HandlerFunc {
 		q := fmt.Sprintf(`
 			select d.id, d.employee_id, e.employee_no, e.full_name, d.work_date::text, d.source, d.status,
 			  d.hours_worked::float8, d.ot_hours::float8, d.night_diff_hours::float8,
-			  d.holiday_id, coalesce(h.name,''), coalesce(h.holiday_type,''), coalesce(d.absence_reason,''), d.notes,
+			  d.holiday_id, coalesce(h.name,''), coalesce(h.holiday_type,''), coalesce(d.absence_reason,''), coalesce(d.absence_remarks,''), d.notes,
 			  count(*) over()
 			from public.hr_dtr_entries d
 			join public.hr_employees e on e.id = d.employee_id
@@ -299,7 +300,7 @@ func listDTR(pool *pgxpool.Pool) http.HandlerFunc {
 			var row DTREntry
 			if err := rows.Scan(&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.WorkDate,
 				&row.Source, &row.Status, &row.HoursWorked, &row.OTHours, &row.NightDiffHours,
-				&row.HolidayID, &row.HolidayName, &row.HolidayType, &row.AbsenceReason, &row.Notes, &total); err != nil {
+				&row.HolidayID, &row.HolidayName, &row.HolidayType, &row.AbsenceReason, &row.AbsenceRemarks, &row.Notes, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read DTR.", "ERR_INTERNAL")
 				return
 			}
@@ -316,15 +317,16 @@ func upsertDTR(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		var body struct {
-			EmployeeID     int64    `json:"employee_id"`
-			WorkDate       string   `json:"work_date"`
-			Source         string   `json:"source"`
-			Status         string   `json:"status"`
-			HoursWorked    float64  `json:"hours_worked"`
-			OTHours        float64  `json:"ot_hours"`
-			NightDiffHours float64  `json:"night_diff_hours"`
-			AbsenceReason  string   `json:"absence_reason"`
-			Notes          *string  `json:"notes"`
+			EmployeeID     int64   `json:"employee_id"`
+			WorkDate       string  `json:"work_date"`
+			Source         string  `json:"source"`
+			Status         string  `json:"status"`
+			HoursWorked    float64 `json:"hours_worked"`
+			OTHours        float64 `json:"ot_hours"`
+			NightDiffHours float64 `json:"night_diff_hours"`
+			AbsenceReason  string  `json:"absence_reason"`
+			AbsenceRemarks string  `json:"absence_remarks"`
+			Notes          *string `json:"notes"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
@@ -370,8 +372,8 @@ func upsertDTR(pool *pgxpool.Pool) http.HandlerFunc {
 		var id int64
 		err = pool.QueryRow(r.Context(), `
 			insert into public.hr_dtr_entries (
-			  tenant_id, employee_id, work_date, source, status, hours_worked, ot_hours, night_diff_hours, holiday_id, absence_reason, notes
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			  tenant_id, employee_id, work_date, source, status, hours_worked, ot_hours, night_diff_hours, holiday_id, absence_reason, absence_remarks, notes
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 			on conflict (tenant_id, employee_id, work_date) do update set
 			  source = excluded.source,
 			  status = excluded.status,
@@ -380,11 +382,12 @@ func upsertDTR(pool *pgxpool.Pool) http.HandlerFunc {
 			  night_diff_hours = excluded.night_diff_hours,
 			  holiday_id = excluded.holiday_id,
 			  absence_reason = excluded.absence_reason,
+			  absence_remarks = excluded.absence_remarks,
 			  notes = excluded.notes,
 			  updated_at = now()
 			returning id`,
 			tu.TenantID, body.EmployeeID, d, src, st, body.HoursWorked, body.OTHours, body.NightDiffHours, holidayID,
-			strings.TrimSpace(body.AbsenceReason), body.Notes,
+			strings.TrimSpace(body.AbsenceReason), strings.TrimSpace(body.AbsenceRemarks), body.Notes,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save DTR.", "ERR_INTERNAL")

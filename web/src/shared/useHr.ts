@@ -21,6 +21,11 @@ export type Employee = {
   tax_status?: string;
   bank_name?: string;
   bank_account_no?: string;
+  birthdate?: string;
+  national_id?: string;
+  emergency_contact_name?: string;
+  emergency_contact_address?: string;
+  emergency_contact_phone?: string;
 };
 
 export type HrDepartment = {

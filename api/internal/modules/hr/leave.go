@@ -33,38 +33,40 @@ type LeaveType struct {
 }
 
 type LeaveBalance struct {
-	ID            int64   `json:"id"`
-	EmployeeID    int64   `json:"employee_id"`
-	EmployeeNo    string  `json:"employee_no,omitempty"`
-	EmployeeName  string  `json:"employee_name,omitempty"`
-	LeaveTypeID   int64   `json:"leave_type_id"`
-	LeaveCode     string  `json:"leave_code,omitempty"`
-	LeaveName     string  `json:"leave_name,omitempty"`
-	IsCashable    bool    `json:"is_cashable"`
-	BalanceYear   int     `json:"balance_year"`
-	Opening       float64 `json:"opening_balance"`
-	Accrued       float64 `json:"accrued"`
-	Used          float64 `json:"used"`
-	Reserved      float64 `json:"reserved"`
-	Adjusted      float64 `json:"adjusted"`
-	Available     float64 `json:"available"`
+	ID           int64   `json:"id"`
+	EmployeeID   int64   `json:"employee_id"`
+	EmployeeNo   string  `json:"employee_no,omitempty"`
+	EmployeeName string  `json:"employee_name,omitempty"`
+	LeaveTypeID  int64   `json:"leave_type_id"`
+	LeaveCode    string  `json:"leave_code,omitempty"`
+	LeaveName    string  `json:"leave_name,omitempty"`
+	IsCashable   bool    `json:"is_cashable"`
+	BalanceYear  int     `json:"balance_year"`
+	Opening      float64 `json:"opening_balance"`
+	Accrued      float64 `json:"accrued"`
+	Used         float64 `json:"used"`
+	Reserved     float64 `json:"reserved"`
+	Adjusted     float64 `json:"adjusted"`
+	Available    float64 `json:"available"`
 }
 
 type LeaveRequest struct {
-	ID             int64   `json:"id"`
-	EmployeeID     int64   `json:"employee_id"`
-	EmployeeNo     string  `json:"employee_no,omitempty"`
-	EmployeeName   string  `json:"employee_name,omitempty"`
-	LeaveTypeID    int64   `json:"leave_type_id"`
-	LeaveCode      string  `json:"leave_code,omitempty"`
-	LeaveName      string  `json:"leave_name,omitempty"`
-	DateFrom       string  `json:"date_from"`
-	DateTo         string  `json:"date_to"`
-	Days           float64 `json:"days"`
-	Status         string  `json:"status"`
-	Reason         string  `json:"reason"`
-	ReviewNotes    *string `json:"review_notes,omitempty"`
-	ReviewedAt     *string `json:"reviewed_at,omitempty"`
+	ID           int64   `json:"id"`
+	EmployeeID   int64   `json:"employee_id"`
+	EmployeeNo   string  `json:"employee_no,omitempty"`
+	EmployeeName string  `json:"employee_name,omitempty"`
+	LeaveTypeID  int64   `json:"leave_type_id"`
+	LeaveCode    string  `json:"leave_code,omitempty"`
+	LeaveName    string  `json:"leave_name,omitempty"`
+	DateFrom     string  `json:"date_from"`
+	DateTo       string  `json:"date_to"`
+	Days         float64 `json:"days"`
+	Status       string  `json:"status"`
+	Reason       string  `json:"reason"`
+	Notes        string  `json:"notes"`
+	FileCount    int     `json:"file_count"`
+	ReviewNotes  *string `json:"review_notes,omitempty"`
+	ReviewedAt   *string `json:"reviewed_at,omitempty"`
 }
 
 func registerLeaveRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -78,6 +80,7 @@ func registerLeaveRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 	r.With(auth.RequirePermission("hr.leave", auth.AccessRead)).Get("/leave-requests", listLeaveRequests(pool))
 	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-requests", createLeaveRequest(pool))
+	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-requests/{id}/files", addLeaveRequestFile(pool))
 	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-requests/{id}/approve", approveLeaveRequest(pool))
 	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-requests/{id}/reject", rejectLeaveRequest(pool))
 	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-requests/{id}/cancel", cancelLeaveRequest(pool))
@@ -409,7 +412,8 @@ func listLeaveRequests(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
 			select lr.id, lr.employee_id, e.employee_no, e.full_name, lr.leave_type_id, lt.code, lt.name,
-			  lr.date_from::text, lr.date_to::text, lr.days::float8, lr.status, lr.reason,
+			  lr.date_from::text, lr.date_to::text, lr.days::float8, lr.status, lr.reason, lr.notes,
+			  (select count(*)::int from public.hr_leave_request_files f where f.leave_request_id = lr.id),
 			  lr.review_notes, lr.reviewed_at::text,
 			  count(*) over() as total
 			from public.hr_leave_requests lr
@@ -429,7 +433,7 @@ func listLeaveRequests(pool *pgxpool.Pool) http.HandlerFunc {
 			var row LeaveRequest
 			var notes, reviewed sql.NullString
 			if err := rows.Scan(&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.LeaveTypeID, &row.LeaveCode, &row.LeaveName,
-				&row.DateFrom, &row.DateTo, &row.Days, &row.Status, &row.Reason, &notes, &reviewed, &total); err != nil {
+				&row.DateFrom, &row.DateTo, &row.Days, &row.Status, &row.Reason, &row.Notes, &row.FileCount, &notes, &reviewed, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read request.", "ERR_INTERNAL")
 				return
 			}
@@ -463,13 +467,14 @@ func createLeaveRequest(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		var body struct {
-			EmployeeID  int64  `json:"employee_id"`
-			LeaveTypeID int64  `json:"leave_type_id"`
-			DateFrom    string `json:"date_from"`
-			DateTo      string `json:"date_to"`
+			EmployeeID  int64   `json:"employee_id"`
+			LeaveTypeID int64   `json:"leave_type_id"`
+			DateFrom    string  `json:"date_from"`
+			DateTo      string  `json:"date_to"`
 			Days        float64 `json:"days"`
-			Reason      string `json:"reason"`
-			Status      string `json:"status"`
+			Reason      string  `json:"reason"`
+			Notes       string  `json:"notes"`
+			Status      string  `json:"status"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
@@ -525,9 +530,9 @@ func createLeaveRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		var id int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.hr_leave_requests
-			  (tenant_id, employee_id, leave_type_id, date_from, date_to, days, status, reason, created_by_user_id)
-			values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-			tu.TenantID, body.EmployeeID, body.LeaveTypeID, from, to, days, status, strings.TrimSpace(body.Reason), tu.AppUserID,
+			  (tenant_id, employee_id, leave_type_id, date_from, date_to, days, status, reason, notes, created_by_user_id)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
+			tu.TenantID, body.EmployeeID, body.LeaveTypeID, from, to, days, status, strings.TrimSpace(body.Reason), strings.TrimSpace(body.Notes), tu.AppUserID,
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create request.", "ERR_INTERNAL")
@@ -550,6 +555,57 @@ func createLeaveRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "hr.leave.request", "hr_leave_request", &id, nil, body)
 		response.OK(w, map[string]any{"id": id, "days": days, "status": status}, "Created.")
+	}
+}
+
+func addLeaveRequestFile(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		name, mimeType, data, fileErr := readDisciplineUpload(r)
+		if fileErr != "" {
+			response.Err(w, http.StatusBadRequest, fileErr, "ERR_VALIDATION")
+			return
+		}
+		var empID int64
+		err = pool.QueryRow(r.Context(), `
+			select employee_id from public.hr_leave_requests where id=$1 and tenant_id=$2`, id, tu.TenantID).Scan(&empID)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Leave request not found.", "ERR_NOT_FOUND")
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		var docID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.hr_employee_documents
+			  (tenant_id, employee_id, doc_type, title, file_name, file_url, mime_type, file_bytes, uploaded_by_user_id)
+			values ($1,$2,'other',$3,$4,'',$5,$6,$7) returning id`,
+			tu.TenantID, empID, name, name, mimeType, data, tu.AppUserID,
+		).Scan(&docID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `
+			insert into public.hr_leave_request_files (tenant_id, leave_request_id, document_id)
+			values ($1,$2,$3)`, tu.TenantID, id, docID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to link the file.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"id": id, "document_id": docID}, "File stored.")
 	}
 }
 

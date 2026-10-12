@@ -230,6 +230,15 @@ export function UserAccountMenu() {
                   <BookIcon />
                   Help &amp; guides
                 </A>
+                <A
+                  href="/app/documentation/whats-new"
+                  role="menuitem"
+                  class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary"
+                  onClick={() => setOpen(false)}
+                >
+                  <BookIcon />
+                  What&apos;s New
+                </A>
                 <Show when={canManageBranding(auth.me)}>
                   <A
                     href="/app/settings/branding"

@@ -122,6 +122,12 @@ export function wizardFoundationSteps(setup: SetupReadiness | null | undefined) 
   return (setup?.steps ?? []).filter((s) => WIZARD_STEP_IDS.has(s.id) && s.id !== "ready");
 }
 
+/** Module page for a foundation step. Wizard paths stay on the setup API. */
+export function gettingStartedModuleHref(stepId: string | null | undefined): string | undefined {
+  if (!stepId) return undefined;
+  return GETTING_STARTED_COPY[stepId]?.href;
+}
+
 export function wizardFoundationPercent(setup: SetupReadiness | null | undefined): number {
   const steps = wizardFoundationSteps(setup).filter((s) => s.required);
   if (steps.length === 0) return 0;

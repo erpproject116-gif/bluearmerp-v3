@@ -19,66 +19,81 @@ import (
 )
 
 type Employee struct {
-	ID             int64   `json:"id"`
-	EmployeeNo     string  `json:"employee_no"`
-	FullName       string  `json:"full_name"`
-	Department     string  `json:"department"`
-	DepartmentID   *int64  `json:"department_id,omitempty"`
-	JobTitle       string  `json:"job_title"`
-	HireDate       string  `json:"hire_date"`
-	Status         string  `json:"status"`
-	BaseSalary     float64 `json:"base_salary"`
-	UserID         *int64  `json:"user_id,omitempty"`
-	Email          string  `json:"email,omitempty"`
-	Notes          *string `json:"notes,omitempty"`
-	TIN            string  `json:"tin,omitempty"`
-	SSSNo          string  `json:"sss_no,omitempty"`
-	PhilHealthNo   string  `json:"philhealth_no,omitempty"`
-	PagibigNo      string  `json:"pagibig_no,omitempty"`
-	TaxStatus      string  `json:"tax_status,omitempty"`
-	BankName       string  `json:"bank_name,omitempty"`
-	BankAccountNo  string  `json:"bank_account_no,omitempty"`
+	ID                      int64   `json:"id"`
+	EmployeeNo              string  `json:"employee_no"`
+	FullName                string  `json:"full_name"`
+	Department              string  `json:"department"`
+	DepartmentID            *int64  `json:"department_id,omitempty"`
+	JobTitle                string  `json:"job_title"`
+	HireDate                string  `json:"hire_date"`
+	Status                  string  `json:"status"`
+	BaseSalary              float64 `json:"base_salary"`
+	UserID                  *int64  `json:"user_id,omitempty"`
+	Email                   string  `json:"email,omitempty"`
+	Notes                   *string `json:"notes,omitempty"`
+	TIN                     string  `json:"tin,omitempty"`
+	SSSNo                   string  `json:"sss_no,omitempty"`
+	PhilHealthNo            string  `json:"philhealth_no,omitempty"`
+	PagibigNo               string  `json:"pagibig_no,omitempty"`
+	TaxStatus               string  `json:"tax_status,omitempty"`
+	BankName                string  `json:"bank_name,omitempty"`
+	BankAccountNo           string  `json:"bank_account_no,omitempty"`
+	Birthdate               string  `json:"birthdate,omitempty"`
+	NationalID              string  `json:"national_id,omitempty"`
+	EmergencyContactName    string  `json:"emergency_contact_name,omitempty"`
+	EmergencyContactAddress string  `json:"emergency_contact_address,omitempty"`
+	EmergencyContactPhone   string  `json:"emergency_contact_phone,omitempty"`
 }
 
 type employeeBody struct {
-	EmployeeNo     string  `json:"employee_no"`
-	FullName       string  `json:"full_name"`
-	Department     string  `json:"department"`
-	DepartmentID   *int64  `json:"department_id"`
-	JobTitle       string  `json:"job_title"`
-	HireDate       string  `json:"hire_date"`
-	Status         string  `json:"status"`
-	BaseSalary     float64 `json:"base_salary"`
-	UserID         *int64  `json:"user_id"`
-	Email          *string `json:"email"`
-	Notes          *string `json:"notes"`
-	TIN            *string `json:"tin"`
-	SSSNo          *string `json:"sss_no"`
-	PhilHealthNo   *string `json:"philhealth_no"`
-	PagibigNo      *string `json:"pagibig_no"`
-	TaxStatus      *string `json:"tax_status"`
-	BankName       *string `json:"bank_name"`
-	BankAccountNo  *string `json:"bank_account_no"`
+	EmployeeNo              string  `json:"employee_no"`
+	FullName                string  `json:"full_name"`
+	Department              string  `json:"department"`
+	DepartmentID            *int64  `json:"department_id"`
+	JobTitle                string  `json:"job_title"`
+	HireDate                string  `json:"hire_date"`
+	Status                  string  `json:"status"`
+	BaseSalary              float64 `json:"base_salary"`
+	UserID                  *int64  `json:"user_id"`
+	Email                   *string `json:"email"`
+	Notes                   *string `json:"notes"`
+	TIN                     *string `json:"tin"`
+	SSSNo                   *string `json:"sss_no"`
+	PhilHealthNo            *string `json:"philhealth_no"`
+	PagibigNo               *string `json:"pagibig_no"`
+	TaxStatus               *string `json:"tax_status"`
+	BankName                *string `json:"bank_name"`
+	BankAccountNo           *string `json:"bank_account_no"`
+	Birthdate               *string `json:"birthdate"`
+	NationalID              *string `json:"national_id"`
+	EmergencyContactName    *string `json:"emergency_contact_name"`
+	EmergencyContactAddress *string `json:"emergency_contact_address"`
+	EmergencyContactPhone   *string `json:"emergency_contact_phone"`
 }
 
 type employeePatch struct {
-	FullName       *string  `json:"full_name"`
-	Department     *string  `json:"department"`
-	DepartmentID   *int64   `json:"department_id"`
-	JobTitle       *string  `json:"job_title"`
-	HireDate       *string  `json:"hire_date"`
-	Status         *string  `json:"status"`
-	BaseSalary     *float64 `json:"base_salary"`
-	UserID         *int64   `json:"user_id"`
-	Email          *string  `json:"email"`
-	Notes          *string  `json:"notes"`
-	TIN            *string  `json:"tin"`
-	SSSNo          *string  `json:"sss_no"`
-	PhilHealthNo   *string  `json:"philhealth_no"`
-	PagibigNo      *string  `json:"pagibig_no"`
-	TaxStatus      *string  `json:"tax_status"`
-	BankName       *string  `json:"bank_name"`
-	BankAccountNo  *string  `json:"bank_account_no"`
+	FullName                *string  `json:"full_name"`
+	Department              *string  `json:"department"`
+	DepartmentID            *int64   `json:"department_id"`
+	JobTitle                *string  `json:"job_title"`
+	HireDate                *string  `json:"hire_date"`
+	Status                  *string  `json:"status"`
+	BaseSalary              *float64 `json:"base_salary"`
+	UserID                  *int64   `json:"user_id"`
+	Email                   *string  `json:"email"`
+	Notes                   *string  `json:"notes"`
+	TIN                     *string  `json:"tin"`
+	SSSNo                   *string  `json:"sss_no"`
+	PhilHealthNo            *string  `json:"philhealth_no"`
+	PagibigNo               *string  `json:"pagibig_no"`
+	TaxStatus               *string  `json:"tax_status"`
+	BankName                *string  `json:"bank_name"`
+	BankAccountNo           *string  `json:"bank_account_no"`
+	Birthdate               *string  `json:"birthdate"`
+	NationalID              *string  `json:"national_id"`
+	EmergencyContactName    *string  `json:"emergency_contact_name"`
+	EmergencyContactAddress *string  `json:"emergency_contact_address"`
+	EmergencyContactPhone   *string  `json:"emergency_contact_phone"`
 }
 
 func registerEmployeeRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -135,7 +150,9 @@ func listEmployees(pool *pgxpool.Pool) http.HandlerFunc {
 			select e.id, e.employee_no, e.full_name, e.department, e.department_id, e.job_title, e.hire_date::text,
 			  e.status, e.base_salary::float8, e.user_id, coalesce(e.email,''), e.notes,
 			  coalesce(e.tin,''), coalesce(e.sss_no,''), coalesce(e.philhealth_no,''), coalesce(e.pagibig_no,''),
-			  coalesce(e.tax_status,'S'), coalesce(e.bank_name,''), coalesce(e.bank_account_no,''), count(*) over()
+			  coalesce(e.tax_status,'S'), coalesce(e.bank_name,''), coalesce(e.bank_account_no,''),
+			  coalesce(e.birthdate::text,''), coalesce(e.national_id,''), coalesce(e.emergency_contact_name,''),
+			  coalesce(e.emergency_contact_address,''), coalesce(e.emergency_contact_phone,''), count(*) over()
 			from public.hr_employees e where %s order by %s %s limit $%d offset $%d`,
 			where, sortCol, orderSQL(p.Order), n, n+1)
 		args = append(args, p.PageSize, offset)
@@ -153,7 +170,9 @@ func listEmployees(pool *pgxpool.Pool) http.HandlerFunc {
 			if err := rows.Scan(&row.ID, &row.EmployeeNo, &row.FullName, &row.Department, &row.DepartmentID, &row.JobTitle, &row.HireDate,
 				&row.Status, &row.BaseSalary, &row.UserID, &row.Email, &notes,
 				&row.TIN, &row.SSSNo, &row.PhilHealthNo, &row.PagibigNo, &row.TaxStatus,
-				&row.BankName, &row.BankAccountNo, &total); err != nil {
+				&row.BankName, &row.BankAccountNo,
+				&row.Birthdate, &row.NationalID, &row.EmergencyContactName, &row.EmergencyContactAddress, &row.EmergencyContactPhone,
+				&total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read employee.", "ERR_INTERNAL")
 				return
 			}
@@ -206,17 +225,25 @@ func createEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"department_id": "Invalid department."})
 			return
 		}
+		birthdate, birthErr := optionalEmployeeDate(body.Birthdate)
+		if birthErr != nil {
+			response.Validation(w, map[string]string{"birthdate": "Invalid date."})
+			return
+		}
 		var id int64
 		err = pool.QueryRow(r.Context(), `
 			insert into public.hr_employees (
 			  tenant_id, employee_no, full_name, department, department_id, job_title, hire_date, status, base_salary, user_id, email, notes,
-			  tin, sss_no, philhealth_no, pagibig_no, tax_status, bank_name, bank_account_no
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) returning id`,
+			  tin, sss_no, philhealth_no, pagibig_no, tax_status, bank_name, bank_account_no,
+			  birthdate, national_id, emergency_contact_name, emergency_contact_address, emergency_contact_phone
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) returning id`,
 			tu.TenantID, strings.TrimSpace(body.EmployeeNo), strings.TrimSpace(body.FullName),
 			deptName, body.DepartmentID, strings.TrimSpace(body.JobTitle), hireDate,
 			normalizeEmployeeStatus(body.Status), body.BaseSalary, body.UserID, body.Email, body.Notes,
 			strPtrVal(body.TIN), strPtrVal(body.SSSNo), strPtrVal(body.PhilHealthNo), strPtrVal(body.PagibigNo),
 			normalizeTaxStatus(strPtrVal(body.TaxStatus)), strPtrVal(body.BankName), strPtrVal(body.BankAccountNo),
+			birthdate, strPtrVal(body.NationalID), strPtrVal(body.EmergencyContactName),
+			strPtrVal(body.EmergencyContactAddress), strPtrVal(body.EmergencyContactPhone),
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create employee.", "ERR_INTERNAL")
@@ -348,6 +375,36 @@ func patchEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 		if body.BankAccountNo != nil {
 			sets = append(sets, fmt.Sprintf("bank_account_no = $%d", n))
 			args = append(args, strings.TrimSpace(*body.BankAccountNo))
+			n++
+		}
+		if body.Birthdate != nil {
+			birthdate, birthErr := optionalEmployeeDate(body.Birthdate)
+			if birthErr != nil {
+				response.Validation(w, map[string]string{"birthdate": "Invalid date."})
+				return
+			}
+			sets = append(sets, fmt.Sprintf("birthdate = $%d", n))
+			args = append(args, birthdate)
+			n++
+		}
+		if body.NationalID != nil {
+			sets = append(sets, fmt.Sprintf("national_id = $%d", n))
+			args = append(args, strings.TrimSpace(*body.NationalID))
+			n++
+		}
+		if body.EmergencyContactName != nil {
+			sets = append(sets, fmt.Sprintf("emergency_contact_name = $%d", n))
+			args = append(args, strings.TrimSpace(*body.EmergencyContactName))
+			n++
+		}
+		if body.EmergencyContactAddress != nil {
+			sets = append(sets, fmt.Sprintf("emergency_contact_address = $%d", n))
+			args = append(args, strings.TrimSpace(*body.EmergencyContactAddress))
+			n++
+		}
+		if body.EmergencyContactPhone != nil {
+			sets = append(sets, fmt.Sprintf("emergency_contact_phone = $%d", n))
+			args = append(args, strings.TrimSpace(*body.EmergencyContactPhone))
 			n++
 		}
 		q := fmt.Sprintf(`update public.hr_employees set %s where id = $1 and tenant_id = $2 and deleted_at is null`, strings.Join(sets, ", "))
@@ -593,12 +650,15 @@ func loadEmployee(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		select id, employee_no, full_name, department, department_id, job_title, hire_date::text,
 		  status, base_salary::float8, user_id, coalesce(email,''), notes,
 		  coalesce(tin,''), coalesce(sss_no,''), coalesce(philhealth_no,''), coalesce(pagibig_no,''),
-		  coalesce(tax_status,'S'), coalesce(bank_name,''), coalesce(bank_account_no,'')
+		  coalesce(tax_status,'S'), coalesce(bank_name,''), coalesce(bank_account_no,''),
+		  coalesce(birthdate::text,''), coalesce(national_id,''), coalesce(emergency_contact_name,''),
+		  coalesce(emergency_contact_address,''), coalesce(emergency_contact_phone,'')
 		from public.hr_employees where id = $1 and tenant_id = $2 and deleted_at is null`, id, tenantID).Scan(
 		&row.ID, &row.EmployeeNo, &row.FullName, &row.Department, &row.DepartmentID, &row.JobTitle, &row.HireDate,
 		&row.Status, &row.BaseSalary, &row.UserID, &row.Email, &notes,
 		&row.TIN, &row.SSSNo, &row.PhilHealthNo, &row.PagibigNo, &row.TaxStatus,
-		&row.BankName, &row.BankAccountNo)
+		&row.BankName, &row.BankAccountNo,
+		&row.Birthdate, &row.NationalID, &row.EmergencyContactName, &row.EmergencyContactAddress, &row.EmergencyContactPhone)
 	row.Notes = notes
 	return row, err
 }
@@ -615,6 +675,21 @@ func resolveDepartmentName(ctx context.Context, pool *pgxpool.Pool, tenantID int
 		return name, nil
 	}
 	return strings.TrimSpace(fallback), nil
+}
+
+func optionalEmployeeDate(p *string) (any, error) {
+	if p == nil {
+		return nil, nil
+	}
+	raw := strings.TrimSpace(*p)
+	if raw == "" {
+		return nil, nil
+	}
+	d, err := parseDate(raw)
+	if err != nil {
+		return nil, err
+	}
+	return d, nil
 }
 
 func strPtrVal(p *string) string {

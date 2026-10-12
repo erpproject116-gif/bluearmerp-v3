@@ -6,6 +6,7 @@ import { useAuth } from "./auth-context";
 import { apiFetch } from "./api";
 import { useOnboarding, useSetupReadiness } from "./usePlatform";
 import { resolvePrimaryNudge } from "./resolvePrimaryNudge";
+import { gettingStartedModuleHref } from "./setupProgress";
 
 export function SetupReminderBar() {
   const auth = useAuth();
@@ -119,7 +120,7 @@ export function SetupBreadcrumbHint() {
         <span class="text-amber-700">
           Setup incomplete ({data()!.percent}%) ·{" "}
           <A
-            href={data()!.next_step?.href ?? "/app/setup"}
+            href={gettingStartedModuleHref(data()!.next_step?.id) ?? "/app/dashboard/onboarding"}
             class="font-medium underline hover:text-amber-900"
           >
             Resume setup

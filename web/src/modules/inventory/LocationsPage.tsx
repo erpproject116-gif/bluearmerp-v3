@@ -14,6 +14,8 @@ import { useInventoryList, useInvalidateInventoryList } from "../../shared/useIn
 import { useListState } from "../../shared/useListState";
 import { useMasterLifecycle } from "../../shared/masterLifecycle";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import { CsvImportButtons } from "../../shared/CsvImportButtons";
+import { downloadLocationImportTemplate, importLocationsCsv } from "../../shared/masterCsvImport";
 
 type Location = {
   id: number;
@@ -159,6 +161,12 @@ export default function LocationsPage() {
           <div class="flex flex-wrap items-end gap-2">
             <lifecycle.BulkToolbar />
             <lifecycle.FilterControl />
+            <CsvImportButtons
+              canWrite={hasPermission(auth.me, "inventory.locations", "write")}
+              download={downloadLocationImportTemplate}
+              importFile={importLocationsCsv}
+              onImported={() => invalidate("locations")}
+            />
           </div>
         }
       />

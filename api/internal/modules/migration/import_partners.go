@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/inventory"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 )
 
@@ -16,6 +17,10 @@ var partnerRequired = []string{"company_name", "partner_kind"}
 
 func importPartnersMapped(pool *pgxpool.Pool) http.HandlerFunc {
 	return mappedPartnersHandler(pool, false)
+}
+
+func init() {
+	inventory.SetPartnerCSVImport(importPartnersMapped, importTemplateHandler("partners"))
 }
 
 func previewPartnersMapped(pool *pgxpool.Pool) http.HandlerFunc {

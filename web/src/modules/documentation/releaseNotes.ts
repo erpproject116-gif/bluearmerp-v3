@@ -7,6 +7,19 @@ export type ReleaseNote = {
 /** User-facing release notes for Help → What’s New. Newest first. */
 export const releaseNotes: ReleaseNote[] = [
   {
+    date: "2026-10-12",
+    title: "Roles, imports, and people records",
+    bullets: [
+      "Home setup links open the real screens, such as locations, partners, and branding. Branding sections start closed except the company logo.",
+      "On a person’s access, you can select or clear every loaded customer or branch at once.",
+      "The role screen can search and jump by module. New stores get ready-made jobs such as Sales, Cashier, Stocks, Purchasing, Accountant, HR, and Payroll. Store Admin and Sales Team stay as they are.",
+      "Partners and locations can be imported from a spreadsheet on those lists. Custom fields on purchase requests, purchase orders, and goods receipts stay when you reopen the document.",
+      "Employee records can store a birthdate, national ID, emergency contact, and photo. National ID is on the form, not the employee list.",
+      "Leave notes are optional and can include a file. Absenteeism alerts can store a reason, remarks, and a file. That does not add another pay deduction. Policies, announcements, and events are records only. A discipline penalty changes pay only after you add it as a pay item.",
+      "What’s New is in the account menu for everyone who is signed in.",
+    ],
+  },
+  {
     date: "2026-09-13",
     title: "Install Bluearm on phone + clearer laptop chrome",
     bullets: [

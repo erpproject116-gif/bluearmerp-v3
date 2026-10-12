@@ -9,7 +9,7 @@ import {
   rolePreviewBootstrapMessage,
   setRolePreviewFlag,
 } from "./rolePreviewClient";
-import { getActiveTenantId, setActiveTenantId } from "./activeContext";
+import { getActiveTenantId, setActiveTenantId, tenantPinGeneration } from "./activeContext";
 
 export type TenantMembership = {
   tenant_id: number;
@@ -358,12 +358,19 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState>();
 
+type StampedMe = { pin: number; promise: Promise<ApiResult<MeData>> };
+
+function fetchStampedMe(background?: boolean): StampedMe {
+  return {
+    pin: tenantPinGeneration(),
+    promise: apiFetch<MeData>("/api/v1/auth/me", {}, background ? { background: true } : undefined),
+  };
+}
+
 // Returning visits already have a token in storage. Ask who the user is while
 // the auth library is still downloading, instead of after it finishes.
-let bootMe: Promise<ApiResult<MeData>> | null =
-  typeof window !== "undefined" && readPersistedAccessToken()
-    ? apiFetch<MeData>("/api/v1/auth/me")
-    : null;
+let bootMe: StampedMe | null =
+  typeof window !== "undefined" && readPersistedAccessToken() ? fetchStampedMe() : null;
 
 export const AuthProvider: ParentComponent = (props) => {
   const [state, setState] = createStore({
@@ -406,9 +413,14 @@ export const AuthProvider: ParentComponent = (props) => {
     try {
       const pendingBoot = !background ? bootMe : null;
       bootMe = null;
-      let res = pendingBoot
-        ? await pendingBoot
-        : await apiFetch<MeData>("/api/v1/auth/me", {}, background ? { background: true } : undefined);
+      let stamped = pendingBoot ?? fetchStampedMe(background);
+      let res = await stamped.promise;
+      if (tenantPinGeneration() !== stamped.pin) {
+        // This /me started before the workspace switch. Fetch again for the
+        // pin the caller just set, and do not apply the older response.
+        stamped = fetchStampedMe(background);
+        res = await stamped.promise;
+      }
       if (res.status === 401 && earlyToken) {
         const {
           data: { session },
@@ -417,12 +429,19 @@ export const AuthProvider: ParentComponent = (props) => {
           setState({ me: null, loading: false, bootstrapError: null, bootstrapMessage: null });
           return;
         }
-        res = await apiFetch<MeData>("/api/v1/auth/me", {}, background ? { background: true } : undefined);
+        stamped = fetchStampedMe(background);
+        res = await stamped.promise;
       }
+      if (tenantPinGeneration() !== stamped.pin) return;
       if (res.success && res.data) {
         // Keep the persisted active tenant in sync with what the server resolved, so
         // subsequent requests send a stable X-Tenant-ID header.
-        const resolved = res.data.active_tenant_id ?? res.data.tenant?.id;
+        // An open support session's tenant wins over the operator membership.
+        const supportTenant = res.data.support_session?.tenant_id;
+        const resolved =
+          typeof supportTenant === "number" && supportTenant > 0
+            ? supportTenant
+            : (res.data.active_tenant_id ?? res.data.tenant?.id);
         if (resolved && getActiveTenantId() !== resolved) {
           setActiveTenantId(resolved);
         }

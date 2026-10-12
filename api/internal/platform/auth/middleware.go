@@ -28,16 +28,16 @@ const UserContextKey contextKey = "tenantUser"
 const ActiveTenantHeader = "X-Tenant-ID"
 
 type TenantUser struct {
-	AuthUserID               string
-	AppUserID                int64
-	TenantID                 int64
-	Email                    string
-	FullName                 string
-	TenantRole               string
-	CompanyCode              string
-	IsPlatformSuperadmin     bool
-	IsTenantOwner            bool
-	IsStoreAdmin             bool
+	AuthUserID                string
+	AppUserID                 int64
+	TenantID                  int64
+	Email                     string
+	FullName                  string
+	TenantRole                string
+	CompanyCode               string
+	IsPlatformSuperadmin      bool
+	IsTenantOwner             bool
+	IsStoreAdmin              bool
 	canManageUsersRole        bool
 	canManageFormSettingsRole bool
 	canViewActivityLogsRole   bool
@@ -49,9 +49,9 @@ type TenantUser struct {
 	AutoEnableAllModules      bool
 	// ApplyUserScopes mirrors tenant_roles.apply_user_scopes so branch resolution
 	// and every datascope-filtered list read it from context instead of re-querying.
-	ApplyUserScopes           bool
-	AuthRevision              int64
-	ActiveBranchID            int64
+	ApplyUserScopes bool
+	AuthRevision    int64
+	ActiveBranchID  int64
 	// HomeLocationID is the user's primary operating branch (branch isolation).
 	HomeLocationID int64
 	// StrictBranchIsolation / TransferHandoffV2 mirror tenant_process_policies (default false).
@@ -65,8 +65,8 @@ type TenantUser struct {
 	PlatformPermissions map[string]bool
 	PlatformOnly        bool
 	// Support remote workspace access (ghost membership).
-	SupportSessionID   int64
-	SupportAccessMode  string
+	SupportSessionID  int64
+	SupportAccessMode string
 
 	// Role preview overlay ("View as …"). Effective flags are stripped; Real* keep lifecycle power.
 	RolePreviewActive         bool
@@ -291,12 +291,38 @@ func bearerToken(r *http.Request) string {
 	return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
 }
 
+// openSupportTenantID is the customer workspace for a live support session.
+// The ghost (or attached) users row must win over X-Tenant-ID, which is often
+// still the operator's own company when remoting starts.
+func openSupportTenantID(ctx context.Context, pool *pgxpool.Pool, authUserID string) int64 {
+	var tenantID int64
+	err := pool.QueryRow(ctx, `
+		select s.tenant_id
+		from public.platform_support_sessions s
+		join public.users u
+		  on u.auth_user_id = s.auth_user_id and u.tenant_id = s.tenant_id
+		where s.auth_user_id = $1::uuid
+		  and s.ended_at is null
+		  and s.ends_at > now()
+		  and u.status = 'active'
+		order by s.id desc
+		limit 1`, authUserID).Scan(&tenantID)
+	if err != nil || tenantID <= 0 {
+		return 0
+	}
+	return tenantID
+}
+
 func loadTenantUser(ctx context.Context, pool *pgxpool.Pool, authUserID string, tenantID int64) (TenantUser, error) {
+	if supportTenant := openSupportTenantID(ctx, pool, authUserID); supportTenant > 0 {
+		tenantID = supportTenant
+	}
 	// A single query resolves the active business with a natural fallback order:
 	// (1) the requested tenant ($2) if it is a real membership, else
 	// (2) the user's saved default (user_active_tenant), else
 	// (3) the lowest tenant_id. This can only ever select a genuine membership row,
 	// so a stale/forged X-Tenant-ID degrades gracefully instead of locking the user out.
+	// An open support session replaces $2 with that session's tenant before this runs.
 	const q = `
 		select
 		  u.id,

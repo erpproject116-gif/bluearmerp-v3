@@ -27,11 +27,35 @@ import { UserSearchModal, type UserSearchRow } from "../purchase-request/purchas
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { requireFields } from "../../shared/handleSaveResult";
 import { useQueryClient } from "@tanstack/solid-query";
+import { apiBase, getAccessToken } from "../../shared/api";
+import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { QuickDepartmentModal } from "../../shared/QuickDepartmentModal";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 
 const STATUS_OPTIONS = ["active", "inactive", "terminated"];
+
+async function uploadEmployeePhoto(employeeId: number, file: File): Promise<boolean> {
+  const headers: Record<string, string> = {};
+  const token = await getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const tenantId = getActiveTenantId();
+  if (tenantId) headers["X-Tenant-ID"] = String(tenantId);
+  const branchId = getActiveBranchIdCurrent();
+  if (branchId) headers["X-Branch-ID"] = String(branchId);
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("doc_type", "photo");
+  fd.append("title", file.name);
+  const res = await fetch(`${apiBase}/api/v1/hr/employees/${employeeId}/documents`, {
+    method: "POST",
+    headers,
+    body: fd,
+  });
+  if (!res.ok) return false;
+  const body = (await res.json()) as { success?: boolean };
+  return Boolean(body.success);
+}
 
 export default function HrEmployeesPage() {
   const { page, setPage, q, setQ, sort, order, toggleSort, pageSize, setPageSize } = useListState("full_name");
@@ -61,6 +85,12 @@ export default function HrEmployeesPage() {
   const [taxStatus, setTaxStatus] = createSignal("S");
   const [bankName, setBankName] = createSignal("");
   const [bankAccountNo, setBankAccountNo] = createSignal("");
+  const [birthdate, setBirthdate] = createSignal("");
+  const [nationalId, setNationalId] = createSignal("");
+  const [emergencyName, setEmergencyName] = createSignal("");
+  const [emergencyAddress, setEmergencyAddress] = createSignal("");
+  const [emergencyPhone, setEmergencyPhone] = createSignal("");
+  const [photoFile, setPhotoFile] = createSignal<File | null>(null);
   const [saving, setSaving] = createSignal(false);
   const [importing, setImporting] = createSignal(false);
   const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
@@ -116,6 +146,12 @@ export default function HrEmployeesPage() {
     setTaxStatus("S");
     setBankName("");
     setBankAccountNo("");
+    setBirthdate("");
+    setNationalId("");
+    setEmergencyName("");
+    setEmergencyAddress("");
+    setEmergencyPhone("");
+    setPhotoFile(null);
   };
 
   const openNew = () => {
@@ -146,6 +182,12 @@ export default function HrEmployeesPage() {
     setTaxStatus(row.tax_status || "S");
     setBankName(row.bank_name ?? "");
     setBankAccountNo(row.bank_account_no ?? "");
+    setBirthdate(row.birthdate ?? "");
+    setNationalId(row.national_id ?? "");
+    setEmergencyName(row.emergency_contact_name ?? "");
+    setEmergencyAddress(row.emergency_contact_address ?? "");
+    setEmergencyPhone(row.emergency_contact_phone ?? "");
+    setPhotoFile(null);
     setFormSection("employment");
     setModalOpen(true);
   };
@@ -170,6 +212,11 @@ export default function HrEmployeesPage() {
     tax_status: taxStatus(),
     bank_name: bankName(),
     bank_account_no: bankAccountNo(),
+    birthdate: birthdate(),
+    national_id: nationalId(),
+    emergency_contact_name: emergencyName(),
+    emergency_contact_address: emergencyAddress(),
+    emergency_contact_phone: emergencyPhone(),
   });
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
@@ -192,6 +239,11 @@ export default function HrEmployeesPage() {
     setTaxStatus(payload.tax_status);
     setBankName(payload.bank_name);
     setBankAccountNo(payload.bank_account_no);
+    setBirthdate(payload.birthdate);
+    setNationalId(payload.national_id);
+    setEmergencyName(payload.emergency_contact_name);
+    setEmergencyAddress(payload.emergency_contact_address);
+    setEmergencyPhone(payload.emergency_contact_phone);
   };
 
   const draft = useDocumentDraft({
@@ -259,6 +311,11 @@ export default function HrEmployeesPage() {
       tax_status: taxStatus(),
       bank_name: bankName().trim() || undefined,
       bank_account_no: bankAccountNo().trim() || undefined,
+      birthdate: birthdate(),
+      national_id: nationalId().trim(),
+      emergency_contact_name: emergencyName().trim(),
+      emergency_contact_address: emergencyAddress().trim(),
+      emergency_contact_phone: emergencyPhone().trim(),
     };
     const row = selected();
     const res = row ? await patchEmployee(row.id, body) : await createEmployee(body);
@@ -268,6 +325,13 @@ export default function HrEmployeesPage() {
       return;
     }
     await draft.clearOnSave();
+    const savedId = row?.id ?? (res.data as Employee | undefined)?.id;
+    const file = photoFile();
+    if (savedId && file) {
+      const uploaded = await uploadEmployeePhoto(savedId, file);
+      setPhotoFile(null);
+      if (!uploaded) toast.warning("Employee saved, but the photo upload failed.");
+    }
     if (!row && res.data) {
       setSelected(res.data as Employee);
       setFormSection("documents");
@@ -475,6 +539,29 @@ export default function HrEmployeesPage() {
           </Field>
           <Field label="Hire date">
             <input type="date" class={inputClass} value={hireDate()} onInput={(e) => setHireDate(e.currentTarget.value)} />
+          </Field>
+          <Field label="Birthdate">
+            <input type="date" class={inputClass} value={birthdate()} onInput={(e) => setBirthdate(e.currentTarget.value)} />
+          </Field>
+          <Field label="National ID">
+            <input class={inputClass} value={nationalId()} onInput={(e) => setNationalId(e.currentTarget.value)} />
+          </Field>
+          <Field label="Emergency contact">
+            <input class={inputClass} value={emergencyName()} onInput={(e) => setEmergencyName(e.currentTarget.value)} />
+          </Field>
+          <Field label="Emergency address">
+            <input class={inputClass} value={emergencyAddress()} onInput={(e) => setEmergencyAddress(e.currentTarget.value)} />
+          </Field>
+          <Field label="Emergency phone">
+            <input class={inputClass} value={emergencyPhone()} onInput={(e) => setEmergencyPhone(e.currentTarget.value)} />
+          </Field>
+          <Field label="Photo">
+            <input
+              type="file"
+              accept="image/*"
+              class={inputClass}
+              onChange={(e) => setPhotoFile(e.currentTarget.files?.[0] ?? null)}
+            />
           </Field>
           <Field label="Status">
             <select class={inputClass} value={status()} onChange={(e) => setStatus(e.currentTarget.value)}>

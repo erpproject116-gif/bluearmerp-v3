@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { apiFetch } from "../../shared/api";
+import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
+import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { useEmployees } from "../../shared/useHr";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
@@ -14,7 +15,19 @@ type LeaveBalance = {
 type LeaveRequest = {
   id: number; employee_no?: string; employee_name?: string; leave_code?: string;
   date_from: string; date_to: string; days: number; status: string; reason: string;
+  notes?: string; file_count?: number;
 };
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const tenantId = getActiveTenantId();
+  if (tenantId) headers["X-Tenant-ID"] = String(tenantId);
+  const branchId = getActiveBranchIdCurrent();
+  if (branchId) headers["X-Branch-ID"] = String(branchId);
+  return headers;
+}
 
 export default function LeavePage() {
   const toast = useToast();
@@ -25,6 +38,8 @@ export default function LeavePage() {
   const [from, setFrom] = createSignal("");
   const [to, setTo] = createSignal("");
   const [reason, setReason] = createSignal("");
+  const [notes, setNotes] = createSignal("");
+  const [file, setFile] = createSignal<File | null>(null);
   const [statusFilter, setStatusFilter] = createSignal("submitted");
 
   const types = createQuery(() => ({
@@ -53,16 +68,29 @@ export default function LeavePage() {
 
   const submit = async () => {
     if (!empId() || !typeId() || !from() || !to()) return toast.warning("Employee, type, and dates required.");
-    const res = await apiFetch("/api/v1/hr/leave-requests", {
+    const res = await apiFetch<{ id: number }>("/api/v1/hr/leave-requests", {
       method: "POST",
       body: JSON.stringify({
         employee_id: Number(empId()), leave_type_id: Number(typeId()),
-        date_from: from(), date_to: to(), reason: reason(), status: "submitted",
+        date_from: from(), date_to: to(), reason: reason(), notes: notes(), status: "submitted",
       }),
     });
-    if (!res.success) return toast.warning(res.message ?? "Submit failed.");
+    if (!res.success || !res.data) return toast.warning(res.message ?? "Submit failed.");
+    const chosen = file();
+    if (chosen) {
+      const fd = new FormData();
+      fd.append("file", chosen);
+      const uploaded = await fetch(`${apiBase}/api/v1/hr/leave-requests/${res.data.id}/files`, {
+        method: "POST",
+        headers: await authHeaders(),
+        body: fd,
+      });
+      if (!uploaded.ok) toast.warning("Leave was saved, but the file upload failed.");
+    }
     toast.success("Leave request submitted.");
     setReason("");
+    setNotes("");
+    setFile(null);
     void qc.invalidateQueries({ queryKey: ["hr-leave-requests"] });
     void qc.invalidateQueries({ queryKey: ["hr-leave-balances"] });
   };
@@ -102,7 +130,9 @@ export default function LeavePage() {
           </Field>
           <Field label="From"><input type="date" class={inputClass} value={from()} onInput={(e) => setFrom(e.currentTarget.value)} /></Field>
           <Field label="To"><input type="date" class={inputClass} value={to()} onInput={(e) => setTo(e.currentTarget.value)} /></Field>
-          <Field label="Reason"><input class={inputClass} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} /></Field>
+          <Field label="Reason"><input class={inputClass} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} placeholder="Optional" /></Field>
+          <Field label="Notes"><input class={inputClass} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} placeholder="Optional" /></Field>
+          <Field label="Attachment"><input type="file" class={inputClass} onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} /></Field>
         </div>
         <button type="button" class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void submit()}>Submit leave</button>
       </section>
@@ -121,16 +151,18 @@ export default function LeavePage() {
           <table class="min-w-full text-left text-sm">
             <thead><tr class="border-b border-stroke text-text-secondary">
               <th class="py-2 pr-3">Employee</th><th class="py-2 pr-3">Type</th><th class="py-2 pr-3">Dates</th>
-              <th class="py-2 pr-3">Days</th><th class="py-2 pr-3">Status</th><th class="py-2">Actions</th>
+              <th class="py-2 pr-3">Days</th><th class="py-2 pr-3">Notes</th><th class="py-2 pr-3">Files</th><th class="py-2 pr-3">Status</th><th class="py-2">Actions</th>
             </tr></thead>
             <tbody>
-              <For each={requests.data ?? []} fallback={<tr><td colSpan={6} class="py-3 text-text-secondary">No requests.</td></tr>}>
+              <For each={requests.data ?? []} fallback={<tr><td colSpan={8} class="py-3 text-text-secondary">No requests.</td></tr>}>
                 {(r) => (
                   <tr class="border-b border-slate-100">
                     <td class="py-2 pr-3">{r.employee_no} — {r.employee_name}</td>
                     <td class="py-2 pr-3">{r.leave_code}</td>
                     <td class="py-2 pr-3">{r.date_from} → {r.date_to}</td>
                     <td class="py-2 pr-3">{r.days}</td>
+                    <td class="py-2 pr-3">{r.notes || r.reason || "—"}</td>
+                    <td class="py-2 pr-3">{r.file_count ?? 0}</td>
                     <td class="py-2 pr-3">{r.status}</td>
                     <td class="py-2">
                       <Show when={r.status === "submitted"}>

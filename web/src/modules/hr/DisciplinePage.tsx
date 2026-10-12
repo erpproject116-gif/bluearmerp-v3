@@ -11,7 +11,10 @@ type CaseRow = {
   id: number; case_no: string; case_type: string; status: string; subject: string;
   employee_no?: string; employee_name?: string; employee_id: number;
   has_real_file?: boolean;
+  penalty_amount?: number | null;
+  authority_to_deduct?: boolean;
 };
+type PayItemType = { id: number; item_code: string; item_name: string; item_kind: string };
 type CaseFile = { id: number; document_id: number; title: string; file_name: string };
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -42,9 +45,17 @@ export default function DisciplinePage() {
   const [caseType, setCaseType] = createSignal("nte");
   const [subject, setSubject] = createSignal("");
   const [details, setDetails] = createSignal("");
+  const [penalty, setPenalty] = createSignal("");
+  const [authority, setAuthority] = createSignal(false);
+  const [payItemTypeId, setPayItemTypeId] = createSignal("");
   const [file, setFile] = createSignal<File | null>(null);
   let fileInput: HTMLInputElement | undefined;
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+
+  const payItems = createQuery(() => ({
+    queryKey: ["hr-pay-item-types", "deduction"],
+    queryFn: async () => (await apiFetch<PayItemType[]>("/api/v1/hr/pay-item-types?kind=deduction&page=1&pageSize=200")).data ?? [],
+  }));
 
   const cases = createQuery(() => ({
     queryKey: ["hr-discipline-cases"],
@@ -70,6 +81,8 @@ export default function DisciplinePage() {
       case_type: caseType(),
       subject: subject().trim(),
       details: details().trim(),
+      penalty_amount: penalty().trim(),
+      authority_to_deduct: authority() ? "true" : "false",
     }, chosen);
     if (!posted.ok) return toast.warning(posted.message ?? "Create failed.");
     toast.success("Case created.");
@@ -136,6 +149,15 @@ export default function DisciplinePage() {
           </Field>
           <Field label="Subject"><input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} /></Field>
           <Field label="Details"><textarea class={inputClass} rows={2} value={details()} onInput={(e) => setDetails(e.currentTarget.value)} /></Field>
+          <Field label="Penalty amount">
+            <input type="number" min="0" step="0.01" class={inputClass} value={penalty()} placeholder="Optional" onInput={(e) => setPenalty(e.currentTarget.value)} />
+          </Field>
+          <Field label="Authority to deduct">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={authority()} onChange={(e) => setAuthority(e.currentTarget.checked)} />
+              Record only. Pay changes when a pay item includes it.
+            </label>
+          </Field>
           <Field label="File">
             <input ref={fileInput} class={inputClass} type="file" onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} />
           </Field>
@@ -165,6 +187,38 @@ export default function DisciplinePage() {
             {(d) => (
               <div class="space-y-3 text-sm">
                 <p class="font-medium">{d().case.case_no} — {d().case.subject}</p>
+                <p class="text-text-secondary">
+                  Penalty {d().case.penalty_amount ?? 0}
+                  {d().case.authority_to_deduct ? " · authority to deduct recorded" : ""}
+                  . Pay is unchanged until a deduction pay item includes it.
+                </p>
+                <Show when={d().case.authority_to_deduct && (d().case.penalty_amount ?? 0) > 0}>
+                  <div class="flex flex-wrap items-end gap-2">
+                    <select class={inputClass + " w-56"} value={payItemTypeId()} onChange={(e) => setPayItemTypeId(e.currentTarget.value)}>
+                      <option value="">Deduction pay item…</option>
+                      <For each={(payItems.data ?? []).filter((t) => t.item_kind === "deduction")}>
+                        {(t) => <option value={t.id}>{t.item_code} — {t.item_name}</option>}
+                      </For>
+                    </select>
+                    <button
+                      type="button"
+                      class="rounded border border-stroke px-2 py-1 text-xs"
+                      onClick={() => {
+                        const id = selectedId();
+                        if (!id || !payItemTypeId()) return toast.warning("Choose a deduction pay item.");
+                        void apiFetch(`/api/v1/hr/discipline/cases/${id}/include-pay-item`, {
+                          method: "POST",
+                          body: JSON.stringify({ pay_item_type_id: Number(payItemTypeId()) }),
+                        }).then((res) => {
+                          if (!res.success) toast.warning(res.message ?? "Pay item was not added.");
+                          else toast.success(res.message ?? "Pay item added.");
+                        });
+                      }}
+                    >
+                      Include in pay
+                    </button>
+                  </div>
+                </Show>
                 <Show when={!d().case.has_real_file}>
                   <p class="text-amber-800">Attach a stored file before Under review, Decide, or Close. A generated letter does not count.</p>
                 </Show>

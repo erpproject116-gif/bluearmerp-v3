@@ -108,13 +108,13 @@ export function buildSignInHref(opts?: { reason?: string; next?: string | null }
 }
 
 /**
- * After sign-in: setup gate wins; otherwise restore captured return-to if safe.
- * Does not consume return-to when sending the user to /app/setup.
+ * After sign-in: unfinished onboarding wins; otherwise restore captured return-to if safe.
+ * Does not consume return-to when sending the user to Home onboarding or the setup wizard.
  */
 export async function resolvePostLoginPath(me: MeData | null | undefined): Promise<string> {
   const entry = await resolveAppEntryPath(me);
   if (!me) return entry;
-  if (entry === "/app/setup") return entry;
+  if (entry === "/app/setup" || entry === "/app/dashboard/onboarding") return entry;
   const ret = consumeReturnTo();
   return ret ?? entry;
 }

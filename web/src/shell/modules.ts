@@ -513,6 +513,7 @@ export const appModules: AppModule[] = [
       { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees/settings" },
       { label: "Attendance / DTR", href: "/app/hr/attendance", settingsHref: "/app/hr/attendance" },
       { label: "Leave", href: "/app/hr/leave", settingsHref: "/app/hr/leave" },
+      { label: "Policies & notices", href: "/app/hr/records", settingsHref: "/app/hr/records" },
       { label: "Absenteeism", href: "/app/hr/absenteeism", settingsHref: "/app/hr/absenteeism" },
       { label: "Discipline", href: "/app/hr/discipline", settingsHref: "/app/hr/discipline" },
       { label: "Reports", href: "/app/hr/reports", settingsHref: "/app/hr/reports" },

@@ -20,6 +20,8 @@ import { useInventoryList, useInvalidateInventoryList } from "../../shared/useIn
 import { useListState } from "../../shared/useListState";
 import { useMasterLifecycle } from "../../shared/masterLifecycle";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import { CsvImportButtons } from "../../shared/CsvImportButtons";
+import { downloadPartnerImportTemplate, importPartnersCsv } from "../../shared/masterCsvImport";
 import {
   buildPartnerContactPayload,
   PHTIN_PLACEHOLDER,
@@ -326,6 +328,12 @@ export default function PartnersPage() {
             </label>
             <lifecycle.BulkToolbar />
             <lifecycle.FilterControl />
+            <CsvImportButtons
+              canWrite={hasPermission(auth.me, "inventory.partners", "write")}
+              download={downloadPartnerImportTemplate}
+              importFile={importPartnersCsv}
+              onImported={() => invalidate("partners")}
+            />
           </div>
         }
       />
