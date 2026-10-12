@@ -75,6 +75,7 @@ export default function RfqListPage() {
   const [notes, setNotes] = createSignal("");
   const [customValues, setCustomValues] = createSignal<Record<string, unknown>>({});
   const [creating, setCreating] = createSignal(false);
+  const [selectedId, setSelectedId] = createSignal<number | null>(null);
 
   // Baiko approve-to-seed handoff: staged RFQ lines open the create panel prefilled.
   onMount(() => {
@@ -223,6 +224,8 @@ export default function RfqListPage() {
         ]}
         rows={list.data?.rows ?? []}
         loading={list.isFetching}
+        selectedId={selectedId()}
+        onSelect={setSelectedId}
         onEdit={(row) => navigate(`/app/purchase-order/rfq/${row.id}`)}
         onNew={() => setCreateOpen(true)}
         newLabel="New RFQ"
