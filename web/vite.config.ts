@@ -195,7 +195,7 @@ export default defineConfig(({ mode }) => {
         resolveDependencies(_filename, deps) {
           // Route-only nav data is not needed for the sign-in paint. Preloading it
           // competes with the entry script on a slow connection.
-          return deps.filter((dep) => !dep.includes("-nav-"));
+          return deps.filter((dep) => !dep.includes("-nav-") && !dep.includes("/App-"));
         },
       },
       rollupOptions: {

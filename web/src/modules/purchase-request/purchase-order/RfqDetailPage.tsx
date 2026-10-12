@@ -43,6 +43,21 @@ type SupplierQuotationRow = {
   line_count: number;
 };
 
+type ComparisonQuote = {
+  supplier: string;
+  quote_no: string;
+  unit_price: number;
+  line_total: number;
+  valid_until?: string | null;
+};
+
+type ComparisonGroup = {
+  rfq_request_line_id?: number | null;
+  item_code: string;
+  item_name: string;
+  quotes: ComparisonQuote[];
+};
+
 function statusBadgeClass(status: string) {
   if (status === "accepted") return "bg-emerald-100 text-emerald-700";
   if (status === "rejected") return "bg-rose-100 text-rose-700";
@@ -80,9 +95,22 @@ export default function RfqDetailPage() {
     },
   }));
 
+  const comparison = createQuery(() => ({
+    queryKey: ["rfq-comparison", rfqId()],
+    queryFn: async () => {
+      const res = await apiFetch<{ groups: ComparisonGroup[] }>(
+        `/api/v1/purchase-order/rfq/${rfqId()}/comparison`,
+      );
+      if (!res.success) throw new Error(res.message ?? "Failed to load comparison");
+      return res.data?.groups ?? [];
+    },
+    enabled: rfqId() > 0,
+  }));
+
   const invalidate = () => {
     void client.invalidateQueries({ queryKey: ["rfq-detail", rfqId()] });
     void client.invalidateQueries({ queryKey: ["rfq-supplier-quotations", rfqId()] });
+    void client.invalidateQueries({ queryKey: ["rfq-comparison", rfqId()] });
     void client.invalidateQueries({ queryKey: ["purchase-orders"] });
   };
 
@@ -123,7 +151,11 @@ export default function RfqDetailPage() {
       toast.warning(res.message ?? "Failed to create purchase order.");
       return;
     }
-    toast.success("Purchase order created from supplier quotation.");
+    toast.success(
+      res.message?.startsWith("Purchase order already")
+        ? res.message
+        : "Purchase order created from supplier quotation.",
+    );
     invalidate();
   };
 
@@ -245,6 +277,53 @@ export default function RfqDetailPage() {
       }>
         <p class="text-sm text-slate-500">Loading RFQ…</p>
       </Show>
+
+      <div class="rounded-lg border border-stroke bg-white p-4">
+        <h2 class="text-base font-semibold">Quote comparison</h2>
+        <p class="mt-1 text-xs text-text-secondary">Read only. Supplier, unit price, line total, and valid until from saved quotations.</p>
+        <Show when={!comparison.isError} fallback={<p class="mt-2 text-sm text-slate-500">Quote comparison is not available for this login.</p>}>
+          <Show when={!comparison.isLoading} fallback={<p class="mt-2 text-sm text-slate-500">Loading comparison…</p>}>
+            <Show when={(comparison.data ?? []).length > 0} fallback={<p class="mt-2 text-sm text-slate-500">No quotes to compare yet.</p>}>
+              <div class="mt-3 space-y-4">
+                <For each={comparison.data ?? []}>
+                  {(group) => (
+                    <div>
+                      <h3 class="text-sm font-medium text-slate-800">
+                        {group.item_code ? `${group.item_code} — ` : ""}
+                        {group.item_name}
+                      </h3>
+                      <div class="mt-1 overflow-x-auto rounded border border-stroke">
+                        <table class="min-w-full text-sm">
+                          <thead class="bg-slate-50 text-left">
+                            <tr>
+                              <th class="px-2 py-2">Supplier</th>
+                              <th class="px-2 py-2 text-right">Unit price</th>
+                              <th class="px-2 py-2 text-right">Line total</th>
+                              <th class="px-2 py-2">Valid until</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <For each={group.quotes}>
+                              {(quote) => (
+                                <tr class="border-t border-stroke">
+                                  <td class="px-2 py-2">{quote.supplier || quote.quote_no}</td>
+                                  <td class="px-2 py-2 text-right">{formatMoney(quote.unit_price)}</td>
+                                  <td class="px-2 py-2 text-right">{formatMoney(quote.line_total)}</td>
+                                  <td class="px-2 py-2">{quote.valid_until || "—"}</td>
+                                </tr>
+                              )}
+                            </For>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </Show>
+        </Show>
+      </div>
 
       <div class="rounded-lg border border-stroke bg-white p-4">
         <h2 class="text-base font-semibold">Supplier quotations</h2>

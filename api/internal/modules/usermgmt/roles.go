@@ -61,7 +61,7 @@ func listRoles(pool *pgxpool.Pool) http.HandlerFunc {
 			  tr.is_system, tr.can_manage_users, tr.can_manage_form_settings,
 			  coalesce(tr.apply_user_scopes, false),
 			  tr.is_active, tr.sort_order,
-			  (select count(*) from public.users u where u.tenant_id = tr.tenant_id and u.tenant_role = tr.role_code)
+			  (select count(*) from public.users u where u.tenant_id = tr.tenant_id and u.tenant_role = tr.role_code and coalesce(u.is_support_ghost, false) = false)
 			from public.tenant_roles tr
 			where tr.tenant_id = $1
 			order by tr.sort_order, tr.role_name`, tu.TenantID)
@@ -292,7 +292,7 @@ func patchRole(pool *pgxpool.Pool) http.HandlerFunc {
 
 		_ = pool.QueryRow(r.Context(), `
 			select count(*) from public.users u
-			where u.tenant_id = $1 and u.tenant_role = $2`, tu.TenantID, row.RoleCode).Scan(&row.UserCount)
+			where u.tenant_id = $1 and u.tenant_role = $2 and coalesce(u.is_support_ghost, false) = false`, tu.TenantID, row.RoleCode).Scan(&row.UserCount)
 
 		// Role flags (apply_user_scopes, can_manage_*) are cached on TenantUser, so
 		// members must be evicted or they keep the pre-edit capabilities until TTL.

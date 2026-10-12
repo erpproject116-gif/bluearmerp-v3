@@ -528,8 +528,16 @@ export function SidebarNav() {
       return pathStarts(p, ["/app/inventory/partners"]) && new URLSearchParams(loc.search).get("kind") === "vendor";
     }
     if (area.id === "rfq") {
-      const norm = p.replace(/\/$/, "");
-      return norm === "/app/rfq";
+      const view = new URLSearchParams(loc.search).get("view");
+      const isNew =
+        new URLSearchParams(loc.search).get("new") === "1" ||
+        new URLSearchParams(loc.search).get("new") === "true";
+      return (
+        pathStarts(p, ["/app/purchase-order/rfq"]) &&
+        !p.startsWith("/app/purchase-order/rfq/") &&
+        !view &&
+        !isNew
+      );
     }
     if (area.id === "rfq_overview") {
       const norm = p.replace(/\/$/, "");

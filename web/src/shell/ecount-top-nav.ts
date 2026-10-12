@@ -610,7 +610,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
   {
     id: "purchase_process",
     label: "Purchase",
-    href: "/app/rfq",
+    href: "/app/purchase-order/rfq",
     iconId: "purchase_process",
     topId: "inv1",
     expandGroupId: "procurement_process",
@@ -620,7 +620,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "rfq",
         label: "RFQ",
-        href: "/app/rfq",
+        href: "/app/purchase-order/rfq",
         iconId: "rfq",
         topId: "inv1",
         expandGroupId: "procurement_process",
@@ -1044,7 +1044,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       { id: "reports", label: "Reports", href: "/app/reports", iconId: "reports", topId: "more", moduleId: "reports", expandGroupId: "more_apps" },
       { id: "support", label: "Support", href: "/app/support/tickets", iconId: "support", topId: "more", moduleId: "support", expandGroupId: "more_apps" },
       { id: "pos", label: "POS", href: "/app/pos", iconId: "pos", topId: "more", moduleId: "pos", expandGroupId: "more_apps" },
-      { id: "hr", label: "HR & Payroll", href: "/app/hr/employees", iconId: "hr", topId: "more", moduleId: "hr", expandGroupId: "more_apps" },
+      { id: "hr", label: "HR & Payroll", href: "/app/hr", iconId: "hr", topId: "more", moduleId: "hr", expandGroupId: "more_apps" },
     ],
   },
   {

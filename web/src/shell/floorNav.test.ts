@@ -198,7 +198,8 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
 
   it("RFQ New opens create via ?new=1; Vendors and AP are Purchase siblings", () => {
     const rfq = findArea("rfq");
-    expect(rfq?.href).toBe("/app/rfq");
+    expect(rfq?.href).toBe("/app/purchase-order/rfq");
+    expect(rfq?.children?.find((c) => c.id === "rfq_overview")?.href).toBe("/app/rfq");
     expect(rfq?.children?.find((c) => c.id === "rfq_new")?.href).toBe("/app/purchase-order/rfq?new=1");
 
     const buy = findArea("buy");

@@ -740,6 +740,14 @@ func createFromSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if existingID, found, findErr := findPurchaseOrderForSupplierQuotation(r.Context(), pool, tu.TenantID, sqID); findErr != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to look up purchase order.", "ERR_INTERNAL")
+			return
+		} else if found {
+			writeExistingPurchaseOrder(w, r, pool, tu.TenantID, existingID)
+			return
+		}
+
 		var body fromSupplierQuotationBody
 		if r.ContentLength > 0 {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -837,7 +845,7 @@ func createFromSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		rows, err := pool.Query(r.Context(), `
-			select ln.id, ln.rfq_request_line_id, rl.item_id, rl.item_code, rl.item_name,
+			select ln.id, ln.rfq_request_line_id, rl.purchase_request_line_id, rl.item_id, rl.item_code, rl.item_name,
 			  ln.qty::float8, coalesce(ln.unit_id, rl.unit_id), coalesce(ln.unit_code, rl.unit_code, ''),
 			  ln.unit_price::float8
 			from public.rfq_supplier_quotation_lines ln
@@ -855,12 +863,13 @@ func createFromSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var sqLineID int64
 			var rfqLineID *int64
+			var purchaseRequestLineID *int64
 			var itemID *int64
 			var itemCode, itemName string
 			var unitID *int64
 			var unitCode string
 			var qty, unitPrice float64
-			if err := rows.Scan(&sqLineID, &rfqLineID, &itemID, &itemCode, &itemName, &qty, &unitID, &unitCode, &unitPrice); err != nil {
+			if err := rows.Scan(&sqLineID, &rfqLineID, &purchaseRequestLineID, &itemID, &itemCode, &itemName, &qty, &unitID, &unitCode, &unitPrice); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read supplier quotation lines.", "ERR_INTERNAL")
 				return
 			}
@@ -886,7 +895,7 @@ func createFromSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			computed = append(computed, computedLine{
 				LineNo:                  lineNo,
-				PurchaseRequestLineID:   nil,
+				PurchaseRequestLineID:   purchaseRequestLineID,
 				RFQRequestLineID:        rfqLineID,
 				SupplierQuotationLineID: &sqLineIDCopy,
 				PartnerID:               &partnerID,
@@ -935,6 +944,23 @@ func createFromSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
+
+		var lockedQuote int64
+		if err := tx.QueryRow(r.Context(), `
+			select id from public.rfq_supplier_quotations
+			where id = $1 and tenant_id = $2
+			for update`, sqID, tu.TenantID).Scan(&lockedQuote); err != nil {
+			response.Err(w, http.StatusNotFound, "Supplier quotation not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if existingID, found, findErr := findPurchaseOrderForSupplierQuotation(r.Context(), tx, tu.TenantID, sqID); findErr != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to look up purchase order.", "ERR_INTERNAL")
+			return
+		} else if found {
+			_ = tx.Rollback(r.Context())
+			writeExistingPurchaseOrder(w, r, pool, tu.TenantID, existingID)
+			return
+		}
 
 		dateSeq, purchaseOrderNo, seqErrs := allocatePurchaseOrderSequences(r.Context(), tx, tu.TenantID, orderDate, body.DateSeq, 0)
 		if seqErrs != nil {
@@ -989,6 +1015,33 @@ func createFromSupplierQuotation(pool *pgxpool.Pool) http.HandlerFunc {
 		po, _ := loadPurchaseOrder(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, po, "Created.")
 	}
+}
+
+func findPurchaseOrderForSupplierQuotation(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}, tenantID, sqID int64) (int64, bool, error) {
+	var id int64
+	err := q.QueryRow(ctx, `
+		select id from public.po_purchase_orders
+		where tenant_id = $1 and supplier_quotation_id = $2 and deleted_at is null
+		order by id
+		limit 1`, tenantID, sqID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return id, true, nil
+}
+
+func writeExistingPurchaseOrder(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, tenantID, id int64) {
+	po, err := loadPurchaseOrder(r.Context(), pool, tenantID, id)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to load purchase order.", "ERR_INTERNAL")
+		return
+	}
+	response.OK(w, po, "Purchase order already exists for this quotation.")
 }
 
 func updatePurchaseOrder(pool *pgxpool.Pool) http.HandlerFunc {

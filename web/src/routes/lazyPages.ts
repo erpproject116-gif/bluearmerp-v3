@@ -244,6 +244,8 @@ export const AttendancePage = lazy(() => import("../modules/hr/AttendancePage"))
 export const LeavePage = lazy(() => import("../modules/hr/LeavePage"));
 export const AbsenteeismPage = lazy(() => import("../modules/hr/AbsenteeismPage"));
 export const DisciplinePage = lazy(() => import("../modules/hr/DisciplinePage"));
+export const HrOverviewPage = lazy(() => import("../modules/hr/HrOverviewPage"));
+export const HrReportsPage = lazy(() => import("../modules/hr/HrReportsPage"));
 export const HireOnboardingPage = lazy(() => import("../modules/hr/HireOnboardingPage"));
 export const PerformancePage = lazy(() => import("../modules/hr/PerformancePage"));
 export const LearningPage = lazy(() => import("../modules/hr/LearningPage"));

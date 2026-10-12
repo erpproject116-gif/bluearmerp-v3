@@ -82,6 +82,14 @@ func heartbeatHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			activity = activity[:50]
 		}
 
+		if tu.SupportSessionID > 0 {
+			_, _ = pool.Exec(r.Context(), `
+				delete from public.tenant_user_presence
+				where tenant_id = $1 and user_id = $2`, tu.TenantID, tu.AppUserID)
+			response.OK(w, map[string]string{"status": "ok"}, "OK")
+			return
+		}
+
 		avatarURL := strings.TrimSpace(body.AvatarURL)
 		if len(avatarURL) > 2048 {
 			avatarURL = avatarURL[:2048]
@@ -145,6 +153,7 @@ func onlineHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.users u on u.id = p.user_id and u.tenant_id = p.tenant_id
 			where p.tenant_id = $1
 			  and u.status = 'active'
+			  and coalesce(u.is_support_ghost, false) = false
 			  and p.last_seen_at >= now() - ($2::int * interval '1 second')
 			order by p.last_seen_at desc`,
 			tu.TenantID, staleSec, tu.AppUserID)

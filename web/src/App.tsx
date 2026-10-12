@@ -1,8 +1,8 @@
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Route, Router, type RouteSectionProps, Navigate, useLocation, useParams } from "@solidjs/router";
-import { lazy, Suspense } from "solid-js";
+import { lazy, Show, Suspense } from "solid-js";
 const AppShell = lazy(() => import("./shell/AppShell").then((m) => ({ default: m.AppShell })));
-import { AuthProvider } from "./shared/auth-context";
+import { AuthProvider, useAuth } from "./shared/auth-context";
 import { ToastProvider } from "./shared/toast";
 import { InlineGuidesProvider } from "./shared/inlineGuides";
 import { AuthEntryRedirect } from "./shared/AuthRedirect";
@@ -245,6 +245,8 @@ import {
   LeavePage,
   AbsenteeismPage,
   DisciplinePage,
+  HrOverviewPage,
+  HrReportsPage,
   HireOnboardingPage,
   PerformancePage,
   LearningPage,
@@ -398,6 +400,8 @@ import { BrandingProvider } from "./shared/branding/BrandingProvider";
 import { SetupGate } from "./shared/SetupGate";
 
 import { queryClient } from "./shared/queryClient";
+import { readPersistedAccessToken } from "./shared/api";
+import { AppBootPlaceholder } from "./shell/AppBootPlaceholder";
 
 function LegacyInventoryAfterSalesRedirect() {
   const loc = useLocation();
@@ -411,11 +415,16 @@ function AuthLoginRedirect() {
 }
 
 function AppLayout(props: RouteSectionProps) {
+  const auth = useAuth();
   return (
-    <ProtectedRoute>
+    <ProtectedRoute optimistic={auth.bootstrapping && !!readPersistedAccessToken()}>
       <SetupGate>
         <CrmTaskModalProvider>
-          <AppShell>{props.children}</AppShell>
+          <AppShell>
+            <Show when={!auth.bootstrapping} fallback={<AppBootPlaceholder />}>
+              {props.children}
+            </Show>
+          </AppShell>
         </CrmTaskModalProvider>
       </SetupGate>
     </ProtectedRoute>
@@ -1052,6 +1061,12 @@ export default function App() {
           )} />
           <Route path="/hr/learning" component={() => (
             <HrRoute><LearningPage /></HrRoute>
+          )} />
+          <Route path="/hr/reports" component={() => (
+            <HrRoute><HrReportsPage /></HrRoute>
+          )} />
+          <Route path="/hr" component={() => (
+            <HrRoute><HrOverviewPage /></HrRoute>
           )} />
           <Route path="/fixed-assets" component={() => (
             <FixedAssetsRoute><FixedAssetsPage /></FixedAssetsRoute>

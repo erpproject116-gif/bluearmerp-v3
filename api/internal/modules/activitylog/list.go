@@ -148,7 +148,7 @@ func listActivityLogs(pool *pgxpool.Pool) http.HandlerFunc {
 			select
 			  al.id,
 			  al.actor_user_id,
-			  u.full_name,
+			  case when coalesce(u.is_support_ghost, false) then '' else u.full_name end,
 			  al.action_code,
 			  al.target_type,
 			  al.target_id,

@@ -20,9 +20,11 @@ export async function handleServerSessionIdle() {
       : "";
   try {
     captureReturnTo(returnPath);
-    await signOutApp("idle_timeout");
-  } finally {
+    const ok = await signOutApp("idle_timeout");
+    if (!ok) return;
     window.location.href = buildSignInHref({ reason: "idle", next: returnPath });
+  } finally {
+    handling = false;
   }
 }
 

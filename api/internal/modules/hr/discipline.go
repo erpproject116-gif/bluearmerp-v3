@@ -3,7 +3,9 @@ package hr
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +37,17 @@ type DisciplineCase struct {
 	AcknowledgedAt      *string `json:"acknowledged_at,omitempty"`
 	LetterHTML          *string `json:"letter_html,omitempty"`
 	DocumentID          *int64  `json:"document_id,omitempty"`
+	HasRealFile         bool    `json:"has_real_file"`
 	CreatedAt           string  `json:"created_at,omitempty"`
+}
+
+type DisciplineFile struct {
+	ID         int64  `json:"id"`
+	DocumentID int64  `json:"document_id"`
+	Title      string `json:"title"`
+	FileName   string `json:"file_name"`
+	MimeType   string `json:"mime_type"`
+	CreatedAt  string `json:"created_at"`
 }
 
 type DisciplineEvent struct {
@@ -46,10 +58,46 @@ type DisciplineEvent struct {
 	CreatedAt string `json:"created_at"`
 }
 
+const generatedDisciplineLetterNote = "Auto-generated discipline letter"
+
+const disciplineHasRealFileSQL = `exists (
+  select 1
+  from public.hr_discipline_case_files f
+  join public.hr_employee_documents d on d.id = f.document_id and d.tenant_id = f.tenant_id
+  where f.case_id = c.id and f.tenant_id = c.tenant_id
+    and d.file_bytes is not null
+    and octet_length(d.file_bytes) > 0
+    and coalesce(d.notes, '') <> '` + generatedDisciplineLetterNote + `'
+    and d.id is distinct from c.document_id
+)`
+
+func disciplineAdvanceNeedsFile(action string) bool {
+	switch action {
+	case "under_review", "decide", "close":
+		return true
+	default:
+		return false
+	}
+}
+
+func isStoredDisciplineFile(byteLen int, notes string, documentID, letterDocumentID int64) bool {
+	if byteLen <= 0 {
+		return false
+	}
+	if notes == generatedDisciplineLetterNote {
+		return false
+	}
+	if letterDocumentID > 0 && documentID == letterDocumentID {
+		return false
+	}
+	return true
+}
+
 func registerDisciplineRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.discipline", auth.AccessRead)).Get("/discipline/cases", listDisciplineCases(pool))
 	r.With(auth.RequirePermission("hr.discipline", auth.AccessRead)).Get("/discipline/cases/{id}", getDisciplineCase(pool))
 	r.With(auth.RequirePermission("hr.discipline", auth.AccessWrite)).Post("/discipline/cases", createDisciplineCase(pool))
+	r.With(auth.RequirePermission("hr.discipline", auth.AccessWrite)).Post("/discipline/cases/{id}/files", addDisciplineCaseFile(pool))
 	r.With(auth.RequirePermission("hr.discipline", auth.AccessWrite)).Post("/discipline/cases/{id}/advance", advanceDisciplineCase(pool))
 	r.With(auth.RequirePermission("hr.discipline", auth.AccessWrite)).Post("/discipline/cases/{id}/render-letter", renderDisciplineLetter(pool))
 }
@@ -75,7 +123,7 @@ func listDisciplineCases(pool *pgxpool.Pool) http.HandlerFunc {
 			select c.id, c.employee_id, e.employee_no, e.full_name, c.case_no, c.case_type, c.status,
 			  c.subject, c.details, c.policy_ref, c.absence_alert_id, c.explanation_due::text,
 			  c.employee_explanation, c.decision_notes, c.decided_at::text, c.acknowledged_at::text,
-			  c.document_id, c.created_at::text
+			  c.document_id, c.created_at::text, `+disciplineHasRealFileSQL+`
 			from public.hr_discipline_cases c
 			join public.hr_employees e on e.id=c.employee_id
 			where %s
@@ -92,7 +140,7 @@ func listDisciplineCases(pool *pgxpool.Pool) http.HandlerFunc {
 			if err := rows.Scan(&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.CaseNo, &row.CaseType, &row.Status,
 				&row.Subject, &row.Details, &row.PolicyRef, &row.AbsenceAlertID, &row.ExplanationDue,
 				&row.EmployeeExplanation, &row.DecisionNotes, &row.DecidedAt, &row.AcknowledgedAt,
-				&row.DocumentID, &row.CreatedAt); err != nil {
+				&row.DocumentID, &row.CreatedAt, &row.HasRealFile); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read case.", "ERR_INTERNAL")
 				return
 			}
@@ -115,14 +163,14 @@ func getDisciplineCase(pool *pgxpool.Pool) http.HandlerFunc {
 			select c.id, c.employee_id, e.employee_no, e.full_name, c.case_no, c.case_type, c.status,
 			  c.subject, c.details, c.policy_ref, c.absence_alert_id, c.explanation_due::text,
 			  c.employee_explanation, c.decision_notes, c.decided_at::text, c.acknowledged_at::text,
-			  c.letter_html, c.document_id, c.created_at::text
+			  c.letter_html, c.document_id, c.created_at::text, `+disciplineHasRealFileSQL+`
 			from public.hr_discipline_cases c
 			join public.hr_employees e on e.id=c.employee_id
 			where c.id=$1 and c.tenant_id=$2`, id, tu.TenantID,
 		).Scan(&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.CaseNo, &row.CaseType, &row.Status,
 			&row.Subject, &row.Details, &row.PolicyRef, &row.AbsenceAlertID, &row.ExplanationDue,
 			&row.EmployeeExplanation, &row.DecisionNotes, &row.DecidedAt, &row.AcknowledgedAt,
-			&row.LetterHTML, &row.DocumentID, &row.CreatedAt)
+			&row.LetterHTML, &row.DocumentID, &row.CreatedAt, &row.HasRealFile)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Case not found.", "ERR_NOT_FOUND")
 			return
@@ -139,13 +187,17 @@ func getDisciplineCase(pool *pgxpool.Pool) http.HandlerFunc {
 				events = append(events, ev)
 			}
 		}
-		response.OK(w, map[string]any{"case": row, "events": events}, "OK")
+		response.OK(w, map[string]any{"case": row, "events": events, "files": listDisciplineFiles(r, pool, tu.TenantID, id)}, "OK")
 	}
 }
 
 func createDisciplineCase(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type"))), "multipart/form-data") {
+			createDisciplineCaseWithFile(w, r, pool, tu)
+			return
+		}
 		var body struct {
 			EmployeeID     int64  `json:"employee_id"`
 			CaseType       string `json:"case_type"`
@@ -229,6 +281,21 @@ func advanceDisciplineCase(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"action": "Invalid action."})
 			return
 		}
+		if disciplineAdvanceNeedsFile(action) {
+			var ready bool
+			err = pool.QueryRow(r.Context(), `
+				select `+disciplineHasRealFileSQL+`
+				from public.hr_discipline_cases c
+				where c.id=$1 and c.tenant_id=$2`, id, tu.TenantID).Scan(&ready)
+			if err != nil {
+				response.Err(w, http.StatusNotFound, "Case not found.", "ERR_NOT_FOUND")
+				return
+			}
+			if !ready {
+				response.Err(w, http.StatusBadRequest, "Attach a stored file before this step. A generated letter does not count.", "ERR_VALIDATION")
+				return
+			}
+		}
 		sets := "status=$3, updated_at=now()"
 		args := []any{id, tu.TenantID, newStatus}
 		if action == "decide" {
@@ -288,7 +355,7 @@ func renderDisciplineLetter(pool *pgxpool.Pool) http.HandlerFunc {
 			insert into public.hr_employee_documents
 			  (tenant_id, employee_id, doc_type, title, notes, file_bytes)
 			values ($1,$2,$3,$4,$5,convert_to($6,'UTF8')) returning id`,
-			tu.TenantID, empID, docType, title, "Auto-generated discipline letter", html,
+			tu.TenantID, empID, docType, title, generatedDisciplineLetterNote, html,
 		).Scan(&docID)
 		if err != nil {
 			// fallback without file_bytes if convert fails for some reason
@@ -309,5 +376,212 @@ func renderDisciplineLetter(pool *pgxpool.Pool) http.HandlerFunc {
 			insert into public.hr_discipline_events (tenant_id, case_id, event_type, notes, actor_user_id)
 			values ($1,$2,'letter_rendered',$3,$4)`, tu.TenantID, id, "Letter stored in 201", tu.AppUserID)
 		response.OK(w, map[string]any{"document_id": docID, "letter_html": html}, "Letter rendered into 201 file.")
+	}
+}
+
+func listDisciplineFiles(r *http.Request, pool *pgxpool.Pool, tenantID, caseID int64) []DisciplineFile {
+	rows, err := pool.Query(r.Context(), `
+		select d.id, d.id, d.title, d.file_name, coalesce(d.mime_type, ''), d.created_at::text
+		from public.hr_discipline_case_files f
+		join public.hr_employee_documents d on d.id = f.document_id and d.tenant_id = f.tenant_id
+		where f.tenant_id=$1 and f.case_id=$2
+		  and d.file_bytes is not null and octet_length(d.file_bytes) > 0
+		  and coalesce(d.notes, '') <> $3
+		order by f.id`, tenantID, caseID, generatedDisciplineLetterNote)
+	out := []DisciplineFile{}
+	if err != nil || rows == nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var row DisciplineFile
+		if err := rows.Scan(&row.ID, &row.DocumentID, &row.Title, &row.FileName, &row.MimeType, &row.CreatedAt); err != nil {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func readDisciplineUpload(r *http.Request) (string, string, []byte, string) {
+	if err := r.ParseMultipartForm(maxEmployeeDocBytes + 1024); err != nil {
+		return "", "", nil, "Choose a file before continuing. Maximum size is 25 MB."
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return "", "", nil, "Choose a file before continuing."
+	}
+	defer file.Close()
+	if header.Size > maxEmployeeDocBytes {
+		return "", "", nil, "File exceeds 25 MB."
+	}
+	name := filepath.Base(strings.TrimSpace(header.Filename))
+	if name == "" || name == "." {
+		return "", "", nil, "Invalid file name."
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxEmployeeDocBytes+1))
+	if err != nil {
+		return "", "", nil, "Could not read the file."
+	}
+	if len(data) == 0 {
+		return "", "", nil, "The file is empty."
+	}
+	if int64(len(data)) > maxEmployeeDocBytes {
+		return "", "", nil, "File exceeds 25 MB."
+	}
+	mimeType := header.Header.Get("Content-Type")
+	return name, mimeType, data, ""
+}
+
+func createDisciplineCaseWithFile(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, tu auth.TenantUser) {
+	name, mimeType, data, fileErr := readDisciplineUpload(r)
+	if fileErr != "" {
+		response.Err(w, http.StatusBadRequest, fileErr, "ERR_VALIDATION")
+		return
+	}
+	empID, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("employee_id")), 10, 64)
+	if err != nil || empID <= 0 {
+		response.Err(w, http.StatusBadRequest, "Employee is required.", "ERR_VALIDATION")
+		return
+	}
+	subject := strings.TrimSpace(r.FormValue("subject"))
+	if subject == "" {
+		response.Err(w, http.StatusBadRequest, "Subject is required.", "ERR_VALIDATION")
+		return
+	}
+	ct := strings.ToLower(strings.TrimSpace(r.FormValue("case_type")))
+	valid := map[string]bool{"coaching": true, "nte": true, "written_warning": true, "final_warning": true, "suspension": true, "termination": true}
+	if !valid[ct] {
+		ct = "nte"
+	}
+	status := "open"
+	if ct == "nte" {
+		status = "awaiting_explanation"
+	}
+	var due *string
+	if v := strings.TrimSpace(r.FormValue("explanation_due")); v != "" {
+		due = &v
+	}
+	var alertID *int64
+	if v := strings.TrimSpace(r.FormValue("absence_alert_id")); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			alertID = &n
+		}
+	}
+	caseNo := fmt.Sprintf("DA-%d-%d", time.Now().Year(), time.Now().Unix()%100000)
+	title := subject
+	if title == "" {
+		title = name
+	}
+
+	tx, err := pool.Begin(r.Context())
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to create case.", "ERR_INTERNAL")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var id int64
+	err = tx.QueryRow(r.Context(), `
+		insert into public.hr_discipline_cases
+		  (tenant_id, employee_id, case_no, case_type, status, subject, details, policy_ref, absence_alert_id, explanation_due, issued_by_user_id)
+		values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::date,$11) returning id`,
+		tu.TenantID, empID, caseNo, ct, status, subject, strings.TrimSpace(r.FormValue("details")),
+		strings.TrimSpace(r.FormValue("policy_ref")), alertID, due, tu.AppUserID,
+	).Scan(&id)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to create case.", "ERR_INTERNAL")
+		return
+	}
+	var docID int64
+	err = tx.QueryRow(r.Context(), `
+		insert into public.hr_employee_documents
+		  (tenant_id, employee_id, doc_type, title, file_name, file_url, mime_type, file_bytes, uploaded_by_user_id)
+		values ($1,$2,'da',$3,$4,'',$5,$6,$7) returning id`,
+		tu.TenantID, empID, title, name, mimeType, data, tu.AppUserID,
+	).Scan(&docID)
+	if err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+		return
+	}
+	if _, err := tx.Exec(r.Context(), `
+		insert into public.hr_discipline_case_files (tenant_id, case_id, document_id)
+		values ($1,$2,$3)`, tu.TenantID, id, docID); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to link the file.", "ERR_INTERNAL")
+		return
+	}
+	if _, err := tx.Exec(r.Context(), `
+		insert into public.hr_discipline_events (tenant_id, case_id, event_type, notes, actor_user_id)
+		values ($1,$2,'opened',$3,$4)`, tu.TenantID, id, "Case opened: "+ct, tu.AppUserID); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to create case.", "ERR_INTERNAL")
+		return
+	}
+	if alertID != nil {
+		if _, err := tx.Exec(r.Context(), `
+			update public.hr_absence_alerts set status='escalated', discipline_case_id=$3, updated_at=now()
+			where id=$1 and tenant_id=$2`, *alertID, tu.TenantID, id); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create case.", "ERR_INTERNAL")
+			return
+		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		response.Err(w, http.StatusInternalServerError, "Failed to create case.", "ERR_INTERNAL")
+		return
+	}
+	_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "hr.discipline.create", "hr_discipline_case", &id, nil, map[string]any{
+		"case_no": caseNo, "document_id": docID, "file_name": name,
+	})
+	response.OK(w, map[string]any{"id": id, "case_no": caseNo, "status": status, "has_real_file": true}, "Created.")
+}
+
+func addDisciplineCaseFile(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		name, mimeType, data, fileErr := readDisciplineUpload(r)
+		if fileErr != "" {
+			response.Err(w, http.StatusBadRequest, fileErr, "ERR_VALIDATION")
+			return
+		}
+		var empID int64
+		err = pool.QueryRow(r.Context(), `
+			select employee_id from public.hr_discipline_cases
+			where id=$1 and tenant_id=$2`, id, tu.TenantID).Scan(&empID)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Case not found.", "ERR_NOT_FOUND")
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		var docID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.hr_employee_documents
+			  (tenant_id, employee_id, doc_type, title, file_name, file_url, mime_type, file_bytes, uploaded_by_user_id)
+			values ($1,$2,'da',$3,$4,'',$5,$6,$7) returning id`,
+			tu.TenantID, empID, name, name, mimeType, data, tu.AppUserID,
+		).Scan(&docID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `
+			insert into public.hr_discipline_case_files (tenant_id, case_id, document_id)
+			values ($1,$2,$3)`, tu.TenantID, id, docID); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to link the file.", "ERR_INTERNAL")
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"id": docID, "file_name": name}, "File stored.")
 	}
 }

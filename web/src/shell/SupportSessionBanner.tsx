@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { apiFetch } from "../shared/api";
 import { useAuth, hasPlatformPermission } from "../shared/auth-context";
 import { setActiveTenantId } from "../shared/activeContext";
+import { endSupportSessionById, restoredTenantId } from "../shared/leaveSupportSession";
 import { getGlobalToast } from "../shared/toast";
 
 type SupportSession = {
@@ -75,17 +76,15 @@ export function SupportSessionBanner() {
     setBusy(true);
     try {
       if (!opts?.skipEndApi) {
-        const res = await apiFetch(`/api/v1/platform/console/support-sessions/${s.id}/end`, {
-          method: "POST",
-          body: "{}",
-        });
-        if (!res.ok && res.code !== "ERR_SUPPORT_SESSION_EXPIRED") {
-          getGlobalToast()?.error(res.message ?? "Could not end support session.");
+        const ended = await endSupportSessionById(s.id);
+        if (!ended.ok) {
+          getGlobalToast()?.error(ended.message);
           return;
         }
       }
       // Drop remoted X-Tenant-ID before refresh so subsequent calls are not pinned.
-      setActiveTenantId(previous);
+      // Only restore a previous business that is still an active membership.
+      setActiveTenantId(restoredTenantId(previous, auth.me?.memberships));
       await auth.refresh();
       navigate(`/app/platform-command/customers/${customerId}`, { replace: true });
     } finally {

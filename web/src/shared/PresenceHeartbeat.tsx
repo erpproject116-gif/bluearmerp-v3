@@ -94,7 +94,7 @@ export function PresenceHeartbeat() {
   return null;
 }
 
-/** Clears presence on sign-out (call before supabase.auth.signOut). */
-export async function signOutWithPresenceClear() {
-  await signOutApp();
+/** Clears presence on sign-out (call before supabase.auth.signOut). False when support end failed. */
+export async function signOutWithPresenceClear(): Promise<boolean> {
+  return signOutApp();
 }

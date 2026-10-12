@@ -21,14 +21,29 @@ func TestMutationAllowed(t *testing.T) {
 	if MutationAllowed("POST", "/api/v1/inventory/items", ModeReadOnly) {
 		t.Fatal("post blocked in read_only")
 	}
-	if !MutationAllowed("POST", "/api/v1/inventory/items", ModeReadWrite) {
-		t.Fatal("post allowed in read_write")
+	if MutationAllowed("POST", "/api/v1/inventory/items", ModeReadWrite) {
+		t.Fatal("post blocked in read_write")
+	}
+	if MutationAllowed("POST", "/api/v1/sales/invoices/1/confirm", ModeReadWrite) {
+		t.Fatal("sale confirm blocked")
+	}
+	if MutationAllowed("POST", "/api/v1/goods-receipts/1/post", ModeReadWrite) {
+		t.Fatal("goods receipt post blocked")
+	}
+	if !MutationAllowed("POST", "/api/v1/auth/session-ended", ModeReadWrite) {
+		t.Fatal("session-ended allowlisted")
+	}
+	if !MutationAllowed("POST", "/api/v1/presence/heartbeat", ModeReadOnly) {
+		t.Fatal("presence allowlisted")
+	}
+	if !MutationAllowed("POST", "/api/v1/platform/console/support-sessions/4/end", ModeReadWrite) {
+		t.Fatal("support end allowlisted")
 	}
 	if !MutationAllowed("POST", "/api/v1/auth/me", ModeReadOnly) {
 		t.Fatal("allowlisted")
 	}
 	if MutationAllowed("POST", "/api/v1/platform/console/customers/1/wipe", ModeReadWrite) {
-		t.Fatal("wipe always blocked via MutationAllowed destructive path")
+		t.Fatal("wipe always blocked")
 	}
 }
 

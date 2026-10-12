@@ -1,9 +1,19 @@
 import { supabase, apiFetch } from "./api";
 import { LAST_ACTIVITY_STORAGE_KEY } from "./sessionIdleClient";
 import { clearReturnTo } from "./authReturnTo";
+import { endOpenSupportSessionForSignOut } from "./leaveSupportSession";
+import { getGlobalToast } from "./toast";
 
-/** Clears presence, usage session, server idle tracking, local activity, then Supabase session. */
-export async function signOutApp(reason: "logout" | "idle_timeout" = "logout") {
+/**
+ * Ends an open support session first, then clears presence, usage, and the Supabase session.
+ * Returns false when that end fails so the caller stays on the page.
+ */
+export async function signOutApp(reason: "logout" | "idle_timeout" = "logout"): Promise<boolean> {
+  const ended = await endOpenSupportSessionForSignOut();
+  if (!ended.ok) {
+    getGlobalToast()?.error(ended.message);
+    return false;
+  }
   try {
     const { endUsageSession } = await import("./UsageTracker");
     await endUsageSession(reason);
@@ -31,4 +41,5 @@ export async function signOutApp(reason: "logout" | "idle_timeout" = "logout") {
     clearReturnTo();
   }
   await supabase.auth.signOut();
+  return true;
 }

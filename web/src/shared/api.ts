@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GoTrueClient } from "@supabase/auth-js";
 import { invalidateAfterMutation } from "./queryInvalidation";
 import { getGlobalToast } from "./toast";
 import { getActiveTenantId, getActiveBranchIdCurrent } from "./activeContext";
@@ -10,7 +10,7 @@ const anon = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 
 export const supabaseConfigured = Boolean(url && anon);
 
-let clientPromise: Promise<SupabaseClient> | null = null;
+let clientPromise: Promise<{ auth: GoTrueClient }> | null = null;
 let clientReady = false;
 
 /** Still-valid access token from the auth library's storage, without loading that library. */
@@ -36,21 +36,30 @@ export function readPersistedAccessToken(): string | null {
   }
 }
 
-/** Loads the auth client on first use so the sign-in screen can paint without it. */
-export function getSupabase(): Promise<SupabaseClient> {
+/** Auth only. The full supabase-js client also pulls Realtime and PostgREST, which sign-in never uses. */
+export function getSupabase(): Promise<{ auth: GoTrueClient }> {
   if (!clientPromise) {
-    clientPromise = import("@supabase/supabase-js").then(({ createClient }) => {
-      const client = createClient(url || "http://localhost", anon || "anon", {
-        auth: {
-          flowType: "pkce",
-          // Callback page exchanges the code once — avoid double exchange on client init.
-          detectSessionInUrl: false,
-          persistSession: true,
-          autoRefreshToken: true,
-        },
+    clientPromise = import("@supabase/auth-js").then(({ GoTrueClient }) => {
+      const base = url || "http://localhost";
+      const key = anon || "anon";
+      let host = "localhost";
+      try {
+        host = new URL(base).hostname.split(".")[0] || "localhost";
+      } catch {
+        /* keep localhost */
+      }
+      const auth = new GoTrueClient({
+        url: new URL("auth/v1", base.endsWith("/") ? base : `${base}/`).href,
+        headers: { Authorization: `Bearer ${key}`, apikey: key },
+        storageKey: `sb-${host}-auth-token`,
+        flowType: "pkce",
+        // Callback page exchanges the code once — avoid double exchange on client init.
+        detectSessionInUrl: false,
+        persistSession: true,
+        autoRefreshToken: true,
       });
       clientReady = true;
-      return client;
+      return { auth };
     });
   }
   return clientPromise;
@@ -71,7 +80,7 @@ function authCall(prop: PropertyKey) {
 
 export const supabase = {
   get auth() {
-    return new Proxy({} as SupabaseClient["auth"], {
+    return new Proxy({} as GoTrueClient, {
       get(_target, prop) {
         return authCall(prop);
       },

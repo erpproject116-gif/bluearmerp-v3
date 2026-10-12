@@ -6,7 +6,7 @@ import { needsSignInRedirect, SessionLoading, NavigateToSignIn } from "./AuthRed
 import { signOutApp } from "./signOut";
 import { endRolePreviewSession } from "./endRolePreviewSession";
 
-export const ProtectedRoute: ParentComponent = (props) => {
+export const ProtectedRoute: ParentComponent<{ optimistic?: boolean }> = (props) => {
   const auth = useAuth();
   const navigate = useNavigate();
   const [signedInAs, setSignedInAs] = createSignal("");
@@ -22,7 +22,8 @@ export const ProtectedRoute: ParentComponent = (props) => {
   });
 
   const signOut = async () => {
-    await signOutApp("logout");
+    const ok = await signOutApp("logout");
+    if (!ok) return;
     navigate("/signin", { replace: true });
   };
 
@@ -41,9 +42,9 @@ export const ProtectedRoute: ParentComponent = (props) => {
   const networkCopy = () => auth.bootstrapMessage || apiNetworkErrorMessage();
 
   return (
-    <Show when={auth.bootstrapping} fallback={
+    <Show when={auth.bootstrapping && !props.optimistic} fallback={
       <Show
-        when={auth.me}
+        when={auth.me || props.optimistic}
         fallback={
           <Show when={needsSignInRedirect(auth)} fallback={
             <Show

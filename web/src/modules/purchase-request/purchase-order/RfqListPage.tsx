@@ -1,19 +1,20 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Index, onMount, Show } from "solid-js";
-import { A, useNavigate, useSearchParams } from "@solidjs/router";
+import { createSignal, Index, onMount, Show } from "solid-js";
+import { useNavigate, useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { CustomFieldsSection, collectCustomFieldErrors } from "../../../shared/CustomFieldsSection";
+import { listViewParam } from "../../../shared/DocumentListViewBar";
 import { LineUnitSelect } from "../../../shared/LineUnitSelect";
 import { LookupCombo, type LookupOption } from "../../../shared/LookupCombo";
 import { ModalField } from "../../../shared/ModalField";
 import { modalDismissClass } from "../../../shared/Modal";
 import { resolveInventoryItemByCode } from "../../../shared/resolveInventoryItemByCode";
 import { PURCHASE_REQUEST_ENTITY, PURCHASE_REQUEST_SETTINGS_HREF } from "../../../shared/entityTypes";
-import { inputClass } from "../../../shared/SpreadsheetGrid";
+import { inputClass, SpreadsheetGrid } from "../../../shared/SpreadsheetGrid";
 import { useFormFieldSettings } from "../../../shared/useFormFieldSettings";
+import { useTransactionListState } from "../../../shared/useListState";
 import { useToast } from "../../../shared/toast";
-import { uiLabel } from "../../../shared/branding/uiLabel";
 import { takeDocSeed } from "../../../shared/docSeed";
 
 type RfqRow = {
@@ -32,6 +33,18 @@ type RfqLineDraft = {
   unit_id: number | null;
   unit_code: string;
 };
+
+const RFQ_STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "sent", label: "Sent" },
+  { value: "closed", label: "Closed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+function rfqStatusLabel(status: string): string {
+  return RFQ_STATUS_OPTIONS.find((t) => t.value === status)?.label ?? status;
+}
 
 const emptyRfqLine = (): RfqLineDraft => ({
   item_id: null,
@@ -89,12 +102,30 @@ export default function RfqListPage() {
     }
   });
 
+  const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
+    useTransactionListState("rfq_date", 25);
+  const view = () => {
+    const v = listViewParam(searchParams.view);
+    return v === "outstanding" || v === "history" ? v : "";
+  };
+
   const list = createQuery(() => ({
-    queryKey: ["rfq-list"],
+    queryKey: ["rfq-list", view(), page(), pageSize(), q(), statusFilter(), sort(), order()],
     queryFn: async () => {
-      const res = await apiFetch<RfqRow[]>("/api/v1/purchase-order/rfq");
+      const qs = new URLSearchParams({
+        page: String(page()),
+        pageSize: String(pageSize()),
+        sort: sort(),
+        order: order(),
+      });
+      const v = view();
+      if (v) qs.set("view", v);
+      else if (statusFilter()) qs.set("status", statusFilter());
+      const search = q().trim();
+      if (search) qs.set("q", search);
+      const res = await apiFetch<RfqRow[]>(`/api/v1/purchase-order/rfq?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load");
-      return res.data ?? [];
+      return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
     },
   }));
 
@@ -154,70 +185,67 @@ export default function RfqListPage() {
 
   return (
     <div class="space-y-4">
-      <div class="flex items-center justify-between gap-2">
-        <h1 class="text-xl font-semibold text-slate-900">Request for Quotation</h1>
-        <div class="flex items-center gap-2">
-          <A
-            href={PURCHASE_REQUEST_SETTINGS_HREF.rfq}
-            class="inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-stroke text-text-secondary transition hover:erp-panel hover:text-brand-600"
-            title="Form settings"
-            aria-label="Form settings"
-          >
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </A>
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={() => setCreateOpen(true)}
-          >
-            New RFQ
-          </button>
-        </div>
-      </div>
+      <h1 class="text-xl font-semibold text-slate-900">
+        {view() === "outstanding" ? "Outstanding RFQ" : view() === "history" ? "RFQ history" : "Request for Quotation"}
+      </h1>
+      <p class="text-sm text-text-secondary">
+        {view() === "outstanding"
+          ? "Sent requests waiting on supplier quotes."
+          : view() === "history"
+            ? "Closed and cancelled requests."
+            : "Draft, sent, closed, and cancelled requests."}
+      </p>
 
-      <Show when={!list.isLoading} fallback={<p class="text-sm text-slate-500">{uiLabel("common.loading")}</p>}>
-        <table class="min-w-full overflow-hidden rounded-lg border border-slate-200 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-3 py-2 text-left">RFQ No</th>
-              <th class="px-3 py-2 text-left">Date</th>
-              <th class="px-3 py-2 text-left">Status</th>
-              <th class="px-3 py-2 text-right">Lines</th>
-              <th class="px-3 py-2 text-left">History</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={list.data ?? []}>
-              {(row) => (
-                <tr
-                  class="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
-                  onClick={() => navigate(`/app/purchase-order/rfq/${row.id}`)}
-                >
-                  <td class="px-3 py-2">{row.rfq_no}</td>
-                  <td class="px-3 py-2">{row.rfq_date}</td>
-                  <td class="px-3 py-2 capitalize">{row.status}</td>
-                  <td class="px-3 py-2 text-right">{row.line_count}</td>
-                  <td class="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                    <ActivityHistoryLink
-                      module="purchase_order"
-                      targetType="rfq_request"
-                      targetId={row.id}
-                      title={`History — ${row.rfq_no}`}
-                    />
-                  </td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-      </Show>
+      <SpreadsheetGrid
+        columns={[
+          { key: "rfq_no", header: "RFQ No", clickable: true },
+          { key: "rfq_date", header: "Date" },
+          {
+            key: "status",
+            header: "Status",
+            sortable: true,
+            render: (row) => <span>{rfqStatusLabel(row.status)}</span>,
+          },
+          { key: "line_count", header: "Lines", sortable: false },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (row) => (
+              <ActivityHistoryLink
+                module="purchase_order"
+                targetType="rfq_request"
+                targetId={row.id}
+                title={`History — ${row.rfq_no}`}
+              />
+            ),
+          },
+        ]}
+        rows={list.data?.rows ?? []}
+        loading={list.isFetching}
+        onEdit={(row) => navigate(`/app/purchase-order/rfq/${row.id}`)}
+        onNew={() => setCreateOpen(true)}
+        newLabel="New RFQ"
+        settingsHref={PURCHASE_REQUEST_SETTINGS_HREF.rfq}
+        codeKey="rfq_no"
+        nameKey="rfq_date"
+        sortKey={sort()}
+        sortOrder={order()}
+        onSort={toggleSort}
+        page={page()}
+        pageSize={pageSize()}
+        onPageSizeChange={setPageSize}
+        total={list.data?.total ?? 0}
+        onPageChange={setPage}
+        search={q()}
+        onSearchChange={setQ}
+        searchPlaceholder="Search RFQ no. or notes"
+        status={view() ? "" : statusFilter()}
+        onStatusChange={view() ? undefined : setStatusFilter}
+        statusLabel="Status"
+        statusOptions={RFQ_STATUS_OPTIONS}
+        onRefresh={invalidate}
+      />
 
       <Show when={createOpen()}>
         <div class="fixed inset-0 z-[55] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center">

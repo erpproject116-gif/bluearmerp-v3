@@ -1,22 +1,25 @@
 import { render } from "solid-js/web";
 import { registerSW } from "virtual:pwa-register";
 import "./index.css";
-import App from "./App";
+import SignInApp from "./signInApp";
 import { applyResolvedTheme } from "./shared/theme-preference";
 import { noteUpdateWaiting, promptUpdateIfWaiting, registerAcceptUpdate } from "./shell/appUpdate";
 
 applyResolvedTheme();
 
-// Signed-in routes cannot paint the shell until this chunk arrives. Start it
-// during session restore instead of after /auth/me returns. The installed app
-// opens on the production hub, so that screen is warmed the same way.
-const bootPath = window.location.pathname;
-if (bootPath.startsWith("/app")) {
-  void import("./shell/AppShell");
-  if (bootPath === "/app/production" || bootPath.startsWith("/app/production/")) {
-    void import("./modules/production/ProductionHubPage");
-  }
-}
+const LIGHT_PATHS = new Set([
+  "/",
+  "/signin",
+  "/signup",
+  "/forgot-password",
+  "/demo",
+  "/welcome",
+  "/pending-approval",
+  "/auth/login",
+  "/auth/reset-password",
+  "/auth/callback",
+  "/portal/login",
+]);
 
 function consumeResumePath() {
   const resume = sessionStorage.getItem("bluearm:resume-path");
@@ -70,12 +73,41 @@ function hideBootSplash() {
   window.setTimeout(() => bootSplash.remove(), 220);
 }
 
-render(() => <App />, document.getElementById("root")!);
+function hideBootSplashWhenPainted() {
+  const root = document.getElementById("root");
+  const started = performance.now();
+  const tick = () => {
+    if (root?.querySelector("h1, header") || performance.now() - started > 2500) {
+      hideBootSplash();
+      return;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+const bootPath = window.location.pathname;
+const lightShell = LIGHT_PATHS.has(bootPath);
+if (!lightShell && bootPath.startsWith("/app")) {
+  void import("./shell/AppShell");
+  if (bootPath === "/app/production" || bootPath.startsWith("/app/production/")) {
+    void import("./modules/production/ProductionHubPage");
+  }
+}
+
+if (lightShell) {
+  render(() => <SignInApp />, document.getElementById("root")!);
+  hideBootSplashWhenPainted();
+} else {
+  void import("./App").then((mod) => {
+    const Boot = mod.default;
+    render(() => <Boot />, document.getElementById("root")!);
+    hideBootSplashWhenPainted();
+  });
+}
 
 if (typeof requestIdleCallback === "function") {
   requestIdleCallback(() => startServiceWorker(), { timeout: 2500 });
 } else {
   window.setTimeout(startServiceWorker, 1);
 }
-
-hideBootSplash();

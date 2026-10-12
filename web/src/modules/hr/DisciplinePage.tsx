@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { apiFetch } from "../../shared/api";
+import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
+import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { useEmployees } from "../../shared/useHr";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
@@ -9,7 +10,29 @@ import { HrLayout } from "./HrLayout";
 type CaseRow = {
   id: number; case_no: string; case_type: string; status: string; subject: string;
   employee_no?: string; employee_name?: string; employee_id: number;
+  has_real_file?: boolean;
 };
+type CaseFile = { id: number; document_id: number; title: string; file_name: string };
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const tenantId = getActiveTenantId();
+  if (tenantId) headers["X-Tenant-ID"] = String(tenantId);
+  const branchId = getActiveBranchIdCurrent();
+  if (branchId) headers["X-Branch-ID"] = String(branchId);
+  return headers;
+}
+
+async function postFile(path: string, fields: Record<string, string>, file: File) {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(fields)) fd.append(key, value);
+  fd.append("file", file);
+  const res = await fetch(`${apiBase}${path}`, { method: "POST", headers: await authHeaders(), body: fd });
+  const body = (await res.json()) as { success?: boolean; message?: string };
+  return { ok: res.ok && !!body.success, message: body.message };
+}
 
 export default function DisciplinePage() {
   const toast = useToast();
@@ -19,6 +42,8 @@ export default function DisciplinePage() {
   const [caseType, setCaseType] = createSignal("nte");
   const [subject, setSubject] = createSignal("");
   const [details, setDetails] = createSignal("");
+  const [file, setFile] = createSignal<File | null>(null);
+  let fileInput: HTMLInputElement | undefined;
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
 
   const cases = createQuery(() => ({
@@ -29,7 +54,7 @@ export default function DisciplinePage() {
     queryKey: ["hr-discipline-case", selectedId()],
     enabled: !!selectedId(),
     queryFn: async () => {
-      const res = await apiFetch<{ case: CaseRow; events: { event_type: string; notes: string; created_at: string }[] }>(
+      const res = await apiFetch<{ case: CaseRow; events: { event_type: string; notes: string; created_at: string }[]; files: CaseFile[] }>(
         `/api/v1/hr/discipline/cases/${selectedId()}`,
       );
       return res.data!;
@@ -37,17 +62,29 @@ export default function DisciplinePage() {
   }));
 
   const create = async () => {
+    const chosen = file();
     if (!empId() || !subject().trim()) return toast.warning("Employee and subject required.");
-    const res = await apiFetch("/api/v1/hr/discipline/cases", {
-      method: "POST",
-      body: JSON.stringify({
-        employee_id: Number(empId()), case_type: caseType(),
-        subject: subject().trim(), details: details().trim(),
-      }),
-    });
-    if (!res.success) return toast.warning(res.message ?? "Create failed.");
+    if (!chosen) return toast.warning("Choose a file before creating the case.");
+    const posted = await postFile("/api/v1/hr/discipline/cases", {
+      employee_id: empId(),
+      case_type: caseType(),
+      subject: subject().trim(),
+      details: details().trim(),
+    }, chosen);
+    if (!posted.ok) return toast.warning(posted.message ?? "Create failed.");
     toast.success("Case created.");
-    setSubject(""); setDetails("");
+    setSubject(""); setDetails(""); setFile(null);
+    if (fileInput) fileInput.value = "";
+    void qc.invalidateQueries({ queryKey: ["hr-discipline-cases"] });
+  };
+
+  const addFile = async (chosen: File) => {
+    const id = selectedId();
+    if (!id) return;
+    const posted = await postFile(`/api/v1/hr/discipline/cases/${id}/files`, {}, chosen);
+    if (!posted.ok) return toast.warning(posted.message ?? "Upload failed.");
+    toast.success("File stored on the case.");
+    void qc.invalidateQueries({ queryKey: ["hr-discipline-case", id] });
     void qc.invalidateQueries({ queryKey: ["hr-discipline-cases"] });
   };
 
@@ -99,6 +136,9 @@ export default function DisciplinePage() {
           </Field>
           <Field label="Subject"><input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} /></Field>
           <Field label="Details"><textarea class={inputClass} rows={2} value={details()} onInput={(e) => setDetails(e.currentTarget.value)} /></Field>
+          <Field label="File">
+            <input ref={fileInput} class={inputClass} type="file" onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} />
+          </Field>
         </div>
         <button type="button" class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void create()}>Create</button>
       </section>
@@ -125,11 +165,29 @@ export default function DisciplinePage() {
             {(d) => (
               <div class="space-y-3 text-sm">
                 <p class="font-medium">{d().case.case_no} — {d().case.subject}</p>
+                <Show when={!d().case.has_real_file}>
+                  <p class="text-amber-800">Attach a stored file before Under review, Decide, or Close. A generated letter does not count.</p>
+                </Show>
                 <div class="flex flex-wrap gap-2">
                   <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("under_review")}>Under review</button>
                   <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("decide")}>Decide</button>
                   <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("close")}>Close</button>
                   <button type="button" class="rounded bg-brand-600 px-2 py-1 text-xs text-white" onClick={() => void renderLetter()}>Letter → 201</button>
+                </div>
+                <div>
+                  <p class="mb-1 font-medium">Files</p>
+                  <For each={d().files ?? []} fallback={<p class="text-text-secondary">No stored file yet.</p>}>
+                    {(f) => <p>{f.file_name || f.title}</p>}
+                  </For>
+                  <input
+                    class={`${inputClass} mt-2`}
+                    type="file"
+                    onChange={(e) => {
+                      const chosen = e.currentTarget.files?.[0];
+                      e.currentTarget.value = "";
+                      if (chosen) void addFile(chosen);
+                    }}
+                  />
                 </div>
                 <ul class="space-y-1 border-t border-stroke pt-2">
                   <For each={d().events}>{(ev) => <li><span class="font-medium">{ev.event_type}</span> · {ev.notes}</li>}</For>

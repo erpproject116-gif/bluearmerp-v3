@@ -506,14 +506,16 @@ export const appModules: AppModule[] = [
   {
     id: "hr",
     label: "HR & Payroll",
-    href: "/app/hr/employees",
+    href: "/app/hr",
     basePath: "/app/hr",
     features: [
+      { label: "Overview", href: "/app/hr", settingsHref: "/app/hr" },
       { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees/settings" },
       { label: "Attendance / DTR", href: "/app/hr/attendance", settingsHref: "/app/hr/attendance" },
       { label: "Leave", href: "/app/hr/leave", settingsHref: "/app/hr/leave" },
       { label: "Absenteeism", href: "/app/hr/absenteeism", settingsHref: "/app/hr/absenteeism" },
       { label: "Discipline", href: "/app/hr/discipline", settingsHref: "/app/hr/discipline" },
+      { label: "Reports", href: "/app/hr/reports", settingsHref: "/app/hr/reports" },
       { label: "Hire onboarding", href: "/app/hr/hire-onboarding", settingsHref: "/app/hr/hire-onboarding" },
       { label: "Evaluations", href: "/app/hr/evaluations", settingsHref: "/app/hr/evaluations" },
       { label: "Learning", href: "/app/hr/learning", settingsHref: "/app/hr/learning" },

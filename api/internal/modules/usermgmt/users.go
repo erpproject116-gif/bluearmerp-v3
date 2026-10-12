@@ -88,7 +88,7 @@ func listUsers(pool *pgxpool.Pool) http.HandlerFunc {
 		p := httputil.ParseListParams(r, "email", allowed)
 		offset := httputil.Offset(p)
 
-		where := "u.tenant_id = $1"
+		where := "u.tenant_id = $1 and coalesce(u.is_support_ghost, false) = false"
 		args := []any{tu.TenantID}
 		n := 2
 		if p.Q != "" {

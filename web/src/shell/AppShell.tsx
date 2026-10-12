@@ -42,6 +42,7 @@ import { AppBrandingMark } from "../shared/branding/AppBrandingMark";
 import { brandingLabel } from "../shared/branding/brandingStore";
 import { navFeatureLabelKey, navModuleLabelKey } from "../shared/branding/navLabels";
 import { UserAccountMenu } from "./UserAccountMenu";
+import { LeaveWorkspaceButton } from "./LeaveWorkspaceButton";
 const BusinessBranchSwitcher = lazy(() =>
   import("./BusinessBranchSwitcher").then((m) => ({ default: m.BusinessBranchSwitcher })),
 );
@@ -523,6 +524,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               </div>
             </div>
             <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <LeaveWorkspaceButton variant="header" />
               <button
                 type="button"
                 class="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-stroke px-2.5 py-1.5 text-sm text-text-secondary transition hover:bg-slate-50 hover:text-text-primary md:min-w-[7.5rem] md:px-3"

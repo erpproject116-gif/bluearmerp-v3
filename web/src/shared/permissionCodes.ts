@@ -185,6 +185,8 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/comms/settings": "comms.admin",
   "/app/pos": "pos.terminal",
   "/app/pos/manage": "pos.manage",
+  "/app/hr": "hr.employees",
+  "/app/hr/reports": "hr.employees",
   "/app/hr/employees": "hr.employees",
   "/app/hr/payroll-runs": "hr.payroll_runs",
   "/app/hr/pay-items": "hr.pay_items",

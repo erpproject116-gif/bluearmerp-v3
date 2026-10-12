@@ -127,37 +127,6 @@ export function ProductionHubPage() {
         <p class="mt-1 text-sm text-text-secondary">Pick a type to start. Stock moves only when you post.</p>
       </header>
 
-      <Show when={(dash()?.recent_orders?.length ?? 0) === 0 && !dash.loading && !dash.error}>
-        <section class="rounded-xl border border-orange-200 bg-orange-50/60 p-5">
-          <h2 class="text-sm font-semibold text-text-primary">Create a processing recipe</h2>
-          <p class="mt-2 text-sm text-text-secondary">
-            Recipe / Processing turns ingredients into finished goods. Set up a processing recipe (batch size and yield),
-            then open the 3-step wizard — Save draft is OK without a stock move; Process &amp; Post moves stock when
-            ingredients are enough.
-          </p>
-          <div class="mt-4 flex flex-wrap gap-2">
-            <A
-              href="/app/production/recipe/recipes"
-              class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700"
-            >
-              Processing recipes
-            </A>
-            <A
-              href={newRecipeOrderHref()}
-              class="rounded-lg border border-stroke bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
-            >
-              New processing order
-            </A>
-          </div>
-        </section>
-      </Show>
-
-      <Show when={dash.error}>
-        <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Could not load live metrics. You can still open Assembly, Cutting, or Recipe.
-        </p>
-      </Show>
-
       <div class="grid gap-3 sm:grid-cols-3">
         <KpiCard label="In progress" value={String(dash()?.kpi.in_progress_orders ?? "—")} hint="Started jobs" />
         <KpiCard
@@ -194,6 +163,37 @@ export function ProductionHubPage() {
           </For>
         </div>
       </section>
+
+      <Show when={(dash()?.recent_orders?.length ?? 0) === 0 && !dash.loading && !dash.error}>
+        <section class="rounded-xl border border-orange-200 bg-orange-50/60 p-5">
+          <h2 class="text-sm font-semibold text-text-primary">Create a processing recipe</h2>
+          <p class="mt-2 text-sm text-text-secondary">
+            Recipe / Processing turns ingredients into finished goods. Set up a processing recipe (batch size and yield),
+            then open the 3-step wizard — Save draft is OK without a stock move; Process &amp; Post moves stock when
+            ingredients are enough.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <A
+              href="/app/production/recipe/recipes"
+              class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700"
+            >
+              Processing recipes
+            </A>
+            <A
+              href={newRecipeOrderHref()}
+              class="rounded-lg border border-stroke bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
+            >
+              New processing order
+            </A>
+          </div>
+        </section>
+      </Show>
+
+      <Show when={dash.error}>
+        <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Could not load live metrics. You can still open Assembly, Cutting, or Recipe.
+        </p>
+      </Show>
 
       <div class="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(16rem,1fr)]">
         <section class="rounded-xl border border-stroke bg-white">

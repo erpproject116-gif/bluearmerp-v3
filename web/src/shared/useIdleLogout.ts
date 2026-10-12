@@ -85,7 +85,8 @@ export function useIdleLogout() {
     setShowWarning(false);
     const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     captureReturnTo(returnPath);
-    await signOutApp("idle_timeout");
+    const ok = await signOutApp("idle_timeout");
+    if (!ok) return;
     window.location.href = buildSignInHref({ reason: "idle", next: returnPath });
   };
 

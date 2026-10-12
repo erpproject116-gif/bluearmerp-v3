@@ -1,6 +1,7 @@
-import { type ParentComponent, For, Show } from "solid-js";
-import { A, useLocation } from "@solidjs/router";
+import { type ParentComponent, For, Show, createSignal } from "solid-js";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { useAuth } from "../../shared/auth-context";
+import { signOutApp } from "../../shared/signOut";
 
 const NAV = [
   { href: "/app/platform-command", label: "Overview", exact: true },
@@ -18,9 +19,20 @@ const NAV = [
 
 export const PlatformCommandLayout: ParentComponent = (props) => {
   const loc = useLocation();
+  const navigate = useNavigate();
   const auth = useAuth();
+  const [signingOut, setSigningOut] = createSignal(false);
   const active = (href: string, exact?: boolean) =>
     exact ? loc.pathname === href : loc.pathname === href || loc.pathname.startsWith(href + "/");
+
+  const signOut = async () => {
+    if (signingOut()) return;
+    setSigningOut(true);
+    const ok = await signOutApp("logout");
+    setSigningOut(false);
+    if (!ok) return;
+    navigate("/signin", { replace: true });
+  };
 
   return (
     <div class="min-h-screen bg-slate-50 text-slate-900">
@@ -30,9 +42,19 @@ export const PlatformCommandLayout: ParentComponent = (props) => {
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Bluearm Platform</p>
             <h1 class="text-lg font-semibold">Command Center</h1>
           </div>
-          <div class="text-right text-sm text-slate-600">
-            <p class="font-medium">{auth.me?.user.full_name}</p>
-            <p class="text-xs">{auth.me?.user.email} · {auth.me?.user.platform_role || "staff"}</p>
+          <div class="flex items-center gap-3 text-right text-sm text-slate-600">
+            <div>
+              <p class="font-medium">{auth.me?.user.full_name}</p>
+              <p class="text-xs">{auth.me?.user.email} · {auth.me?.user.platform_role || "staff"}</p>
+            </div>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              disabled={signingOut()}
+              onClick={() => void signOut()}
+            >
+              {signingOut() ? "Signing out…" : "Sign out"}
+            </button>
           </div>
         </div>
         <nav class="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2">

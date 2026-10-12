@@ -320,7 +320,6 @@ func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, er
 		return nil, err
 	}
 
-	displayName := fmt.Sprintf("Bluearm Support (%s)", email)
 	now := time.Now()
 	endsAt := now.Add(DefaultTTL)
 
@@ -361,11 +360,11 @@ func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, er
 	var ghostID int64
 	if err == nil && existingID > 0 {
 		ghostID = existingID
+		// Real membership: attach the session only. Do not rename, re-role, or change status.
 		_, err = tx.Exec(ctx, `
 			update public.users
-			set status = 'active', full_name = $2, support_session_id = $3,
-			    tenant_role = $4, updated_at = now()
-			where id = $1`, existingID, displayName, sessionID, roleCode)
+			set support_session_id = $2, updated_at = now()
+			where id = $1`, existingID, sessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -377,17 +376,17 @@ func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, er
 	} else if err == pgx.ErrNoRows {
 		err = tx.QueryRow(ctx, `
 			insert into public.users (
-			  tenant_id, auth_user_id, email, full_name, status, tenant_role, support_session_id
-			) values ($1, $2::uuid, $3, $4, 'active', $5, $6)
-			returning id`, tenantID, in.AuthUserID, email, displayName, roleCode, sessionID).Scan(&ghostID)
+			  tenant_id, auth_user_id, email, full_name, status, tenant_role, support_session_id, is_support_ghost
+			) values ($1, $2::uuid, $3, '', 'active', $4, $5, true)
+			returning id`, tenantID, in.AuthUserID, email, roleCode, sessionID).Scan(&ghostID)
 		if err != nil {
 			// Email unique conflict: try alternate email local part.
 			alt := strings.Replace(email, "@", "+support@", 1)
 			err = tx.QueryRow(ctx, `
 				insert into public.users (
-				  tenant_id, auth_user_id, email, full_name, status, tenant_role, support_session_id
-				) values ($1, $2::uuid, $3, $4, 'active', $5, $6)
-				returning id`, tenantID, in.AuthUserID, alt, displayName, roleCode, sessionID).Scan(&ghostID)
+				  tenant_id, auth_user_id, email, full_name, status, tenant_role, support_session_id, is_support_ghost
+				) values ($1, $2::uuid, $3, '', 'active', $4, $5, true)
+				returning id`, tenantID, in.AuthUserID, alt, roleCode, sessionID).Scan(&ghostID)
 			if err != nil {
 				return nil, err
 			}
@@ -449,22 +448,15 @@ func notifyOwner(ctx context.Context, pool *pgxpool.Pool, tenantID, sessionID in
 }
 
 // MutationAllowed reports whether method/path may proceed for a support session.
+// Reads are allowed. Mutations are allowed only on the support-session allowlist,
+// for both read-only and read-write sessions.
 func MutationAllowed(method, path, accessMode string) bool {
+	_ = accessMode
 	m := strings.ToUpper(method)
 	if m == httpMethodGet || m == httpMethodHead || m == httpMethodOptions {
 		return true
 	}
-	p := strings.ToLower(path)
-	if isSupportAllowlistedPath(p) {
-		return true
-	}
-	if isDestructivePath(p) {
-		return false
-	}
-	if accessMode == ModeReadOnly {
-		return false
-	}
-	return true
+	return isSupportAllowlistedPath(strings.ToLower(path))
 }
 
 const (

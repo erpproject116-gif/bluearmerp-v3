@@ -73,6 +73,14 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
     onChanged: invalidate,
   });
 
+  const generateTargets = createMemo(() => {
+    const targets = [{ label: "Purchase Order", targetEntity: "purchase_order" }];
+    if (hasPermission(auth.me, "purchase_order.rfq_create", "write")) {
+      targets.push({ label: "RFQ", targetEntity: "rfq" });
+    }
+    return targets;
+  });
+
   const list = usePurchaseRequestList(() => {
     const f = activeFilters();
     return {
@@ -306,7 +314,7 @@ export function PurchaseRequestListPageInner(props: PageOptions = {}) {
               <div class="flex flex-wrap items-end gap-2">
                 <GenerateOtherSlipsMenu
                   sourceEntity="purchase_request"
-                  targets={[{ label: "Purchase Order", targetEntity: "purchase_order" }]}
+                  targets={generateTargets()}
                   selectedIds={selectedIds}
                   onSuccess={() => invalidate()}
                 />

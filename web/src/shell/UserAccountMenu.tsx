@@ -4,6 +4,7 @@ import { useAuth, canManageBranding } from "../shared/auth-context";
 import { apiFetch } from "../shared/api";
 import { AvatarUploadButton } from "../shared/AvatarUploadButton";
 import { signOutWithPresenceClear } from "../shared/PresenceHeartbeat";
+import { LeaveWorkspaceButton } from "./LeaveWorkspaceButton";
 import { UserAvatar } from "../shared/UserAvatar";
 import { brandingLabel } from "../shared/branding/brandingStore";
 import { useShell } from "./shell-context";
@@ -73,8 +74,9 @@ export function UserAccountMenu() {
   });
 
   const signOut = async () => {
+    const ok = await signOutWithPresenceClear();
+    if (!ok) return;
     setOpen(false);
-    await signOutWithPresenceClear();
     navigate("/signin", { replace: true });
   };
 
@@ -239,6 +241,7 @@ export function UserAccountMenu() {
                     {brandingLabel("app.branding_link", "Branding")}
                   </A>
                 </Show>
+                <LeaveWorkspaceButton variant="menu" onDone={() => setOpen(false)} />
                 <button
                   type="button"
                   role="menuitem"

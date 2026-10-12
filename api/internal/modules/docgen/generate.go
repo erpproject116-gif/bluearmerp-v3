@@ -46,6 +46,10 @@ func previewGenerate(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"source_ids": err.Error()})
 			return
 		}
+		if !rfqGenerateAllowed(tu, body.TargetEntity) {
+			response.Err(w, http.StatusForbidden, "You do not have permission to create an RFQ.", "ERR_FORBIDDEN")
+			return
+		}
 		response.OK(w, map[string]any{"eligible": len(body.SourceIDs), "warnings": warnings}, "Preview.")
 	}
 }
@@ -78,6 +82,10 @@ func generateDocuments(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"source_ids": err.Error()})
 			return
 		}
+		if !rfqGenerateAllowed(tu, body.TargetEntity) {
+			response.Err(w, http.StatusForbidden, "You do not have permission to create an RFQ.", "ERR_FORBIDDEN")
+			return
+		}
 		targetIDs, err := executeGenerate(r.Context(), pool, tu, rule, body.SourceIDs)
 		if err != nil {
 			response.Validation(w, map[string]string{"generate": err.Error()})
@@ -104,7 +112,7 @@ func validateGenerate(ctx context.Context, pool *pgxpool.Pool, tenantID int64, b
 	switch pair {
 	case "quotation->sales_order", "sales_order->sales", "sales_order->delivery_receipt",
 		"sales_order->purchase_request",
-		"purchase_request->purchase_order", "goods_receipt->supplier_invoice",
+		"purchase_request->purchase_order", "purchase_request->rfq", "goods_receipt->supplier_invoice",
 		"purchase_order->supplier_invoice", "sales_order->release":
 	default:
 		return warnings, fmt.Errorf("unsupported generation pair: %s", pair)
@@ -122,6 +130,8 @@ func executeGenerate(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser
 	switch pair {
 	case "purchase_request->purchase_order":
 		return generatePOFromPR(ctx, pool, tu, sourceIDs)
+	case "purchase_request->rfq":
+		return generateRFQFromPR(ctx, pool, tu, sourceIDs)
 	case "quotation->sales_order":
 		return generateSOFromQuotation(ctx, pool, tu, sourceIDs)
 	case "sales_order->sales":
@@ -147,6 +157,25 @@ func generatePOFromPR(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUse
 			return out, fmt.Errorf("PR %d: %w", prID, err)
 		}
 		out = append(out, poID)
+	}
+	return out, nil
+}
+
+func rfqGenerateAllowed(tu auth.TenantUser, targetEntity string) bool {
+	if strings.TrimSpace(targetEntity) != "rfq" {
+		return true
+	}
+	return tu.HasPermission("purchase_order.rfq_create", auth.AccessWrite)
+}
+
+func generateRFQFromPR(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, prIDs []int64) ([]int64, error) {
+	var out []int64
+	for _, prID := range prIDs {
+		rfqID, _, err := purchaseorder.CreateRFQFromPurchaseRequest(ctx, pool, tu, prID, nil)
+		if err != nil {
+			return out, fmt.Errorf("PR %d: %w", prID, err)
+		}
+		out = append(out, rfqID)
 	}
 	return out, nil
 }
