@@ -368,22 +368,20 @@ func (s *service) createTrialTenant(ctx context.Context, a trialArgs) (int64, er
 		return 0, err
 	}
 
-	// New workspaces: post sales/purchase/OR/PV journals by default and enable hybrid inventory GL.
+	// New workspaces use the process-policy template: four auto-post journals and stock-adjustment approval on.
 	if _, err := tx.Exec(ctx, `
 		insert into public.tenant_process_policies (
 		  tenant_id,
 		  accounts_auto_post_or, accounts_auto_post_pv,
 		  accounts_auto_post_sales, accounts_auto_post_purchase,
+		  inventory_require_stock_adjustment_approval,
 		  inventory_gl_hybrid_enabled,
-		  purchase_require_gr_before_supplier_invoice
-		) values ($1, true, true, true, true, true, false)
-		on conflict (tenant_id) do update set
-		  accounts_auto_post_or = true,
-		  accounts_auto_post_pv = true,
-		  accounts_auto_post_sales = true,
-		  accounts_auto_post_purchase = true,
-		  inventory_gl_hybrid_enabled = true,
-		  updated_at = now()`, tenantID); err != nil {
+		  legacy_combined_so_release,
+		  quotation_require_attachment, sales_order_require_attachment,
+		  sales_require_attachment, purchase_order_require_attachment,
+		  supplier_invoice_require_attachment
+		) values ($1, true, true, true, true, true, false, false, false, false, false, false, false)
+		on conflict (tenant_id) do nothing`, tenantID); err != nil {
 		return 0, err
 	}
 

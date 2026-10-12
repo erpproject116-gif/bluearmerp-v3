@@ -88,7 +88,7 @@ const SECTIONS: PolicySection[] = [
       {
         key: "legacy_combined_so_release",
         label: "Legacy combined SO release (reserve + deduct together)",
-        help: "Keep on for existing tenants until delivery receipt is enabled.",
+        help: "Off in the workspace template. Turn on only if release should reserve and deduct stock together.",
       },
       {
         key: "sales_enforce_credit_limit",
