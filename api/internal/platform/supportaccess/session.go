@@ -306,6 +306,13 @@ func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, er
 		}
 		// Same tenant already open — return existing if still valid.
 		if !IsExpired(open, time.Now()) {
+			// A ghost left disabled by the previous end still blocks /me from this company.
+			_, _ = pool.Exec(ctx, `
+				update public.users
+				set status = 'active', support_session_id = $3, updated_at = now()
+				where auth_user_id = $1::uuid and tenant_id = $2
+				  and coalesce(is_support_ghost, false) = true`,
+				in.AuthUserID, tenantID, open.ID)
 			return open, nil
 		}
 		_ = EndSession(ctx, pool, open.ID, EndedByExpire)
@@ -352,27 +359,36 @@ func Start(ctx context.Context, pool *pgxpool.Pool, in StartInput) (*Session, er
 
 	var existingID int64
 	var existingName, existingStatus string
+	var existingGhost bool
 	err = tx.QueryRow(ctx, `
-		select id, full_name, status from public.users
+		select id, full_name, status, coalesce(is_support_ghost, false) from public.users
 		where auth_user_id = $1::uuid and tenant_id = $2`, in.AuthUserID, tenantID).
-		Scan(&existingID, &existingName, &existingStatus)
+		Scan(&existingID, &existingName, &existingStatus, &existingGhost)
 
 	var ghostID int64
 	if err == nil && existingID > 0 {
 		ghostID = existingID
-		// Real membership: attach the session only. Do not rename, re-role, or change status.
-		_, err = tx.Exec(ctx, `
-			update public.users
-			set support_session_id = $2, updated_at = now()
-			where id = $1`, existingID, sessionID)
+		if existingGhost {
+			// The last session turned this ghost off. Turn it back on or /me stays on the operator company.
+			_, err = tx.Exec(ctx, `
+				update public.users
+				set support_session_id = $2, status = 'active', updated_at = now()
+				where id = $1`, existingID, sessionID)
+		} else {
+			// Real membership: attach the session only. Do not rename, re-role, or change status.
+			_, err = tx.Exec(ctx, `
+				update public.users
+				set support_session_id = $2, updated_at = now()
+				where id = $1`, existingID, sessionID)
+		}
 		if err != nil {
 			return nil, err
 		}
 		_, _ = tx.Exec(ctx, `
 			update public.platform_support_sessions
-			set ghost_user_id = $2, created_ghost = false,
-			    previous_full_name = $3, previous_user_status = $4, updated_at = now()
-			where id = $1`, sessionID, ghostID, existingName, existingStatus)
+			set ghost_user_id = $2, created_ghost = $3,
+			    previous_full_name = $4, previous_user_status = $5, updated_at = now()
+			where id = $1`, sessionID, ghostID, existingGhost, existingName, existingStatus)
 	} else if err == pgx.ErrNoRows {
 		err = tx.QueryRow(ctx, `
 			insert into public.users (
