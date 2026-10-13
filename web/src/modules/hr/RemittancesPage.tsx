@@ -38,6 +38,7 @@ export default function RemittancesPage() {
   const [building, setBuilding] = createSignal(false);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [exportFormat, setExportFormat] = createSignal("sss");
+  const [buildOpen, setBuildOpen] = createSignal(false);
 
   const list = createQuery(() => ({
     queryKey: ["hr-remittances"],
@@ -78,10 +79,10 @@ export default function RemittancesPage() {
     draftKey: "build",
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
-    enabled: () => true,
     enabled: () => buildOpen(),
     localOnly: true,
     autoApply: () => false,
+  });
 
   const build = async () => {
     if (!periodId()) {
@@ -135,7 +136,6 @@ export default function RemittancesPage() {
           Creates or refreshes an agency remittance file from posted payslips for the selected period (SSS, PhilHealth,
           Pag-IBIG, or BIR withholding).
         </p>
-        <draft.DraftBanner />
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setBuildOpen(true)}>
           New remittance
         </button>
@@ -216,10 +216,10 @@ export default function RemittancesPage() {
           selectedId={selectedId()}
           onSelect={setSelectedId}
           onEdit={(batch) => setSelectedId(batch.id)}
-          onNew={() => {}}
           onNew={() => setBuildOpen(true)}
           showNew={true}
           newLabel="New remittance"
+          codeKey="agency"
           nameKey="period_label"
           page={1}
           pageSize={50}

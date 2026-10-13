@@ -28,6 +28,7 @@ export default function PayrollRunsPage() {
   const [preview, setPreview] = createSignal<PayrollPreviewResult | null>(null);
   const [selectedPeriodId, setSelectedPeriodId] = createSignal<number | null>(null);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [runOpen, setRunOpen] = createSignal(false);
   const [sharing, setSharing] = createSignal(false);
   const payslips = usePayslips(selectedPeriodId);
 
@@ -108,7 +109,6 @@ export default function PayrollRunsPage() {
           Gross pay includes base salary plus DTR premiums (OT at 125%, night diff 10%, holiday multipliers from the holiday calendar).
           Import or enter DTR in Attendance before running payroll.
         </p>
-        <div class="grid gap-3 sm:grid-cols-4">
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRunOpen(true)}>
           New payroll run
         </button>
@@ -128,6 +128,7 @@ export default function PayrollRunsPage() {
         <Field label="Period end"><input type="date" class={inputClass} value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} /></Field>
         <Field label="Label (optional)"><input class={inputClass} value={periodLabel()} onInput={(e) => setPeriodLabel(e.currentTarget.value)} /></Field>
         <div class="sm:col-span-2 lg:col-span-3">
+      <Show when={preview()}>
         {(p) => (
           <section class="mb-6 rounded-xl border border-stroke bg-slate-50 p-4">
             <h3 class="mb-2 text-sm font-semibold text-text-primary">
@@ -273,10 +274,10 @@ export default function PayrollRunsPage() {
           selectedId={selectedId()}
           onSelect={setSelectedId}
           onEdit={(row) => openPrint(row)}
-          onNew={() => {}}
           onNew={() => setRunOpen(true)}
           showNew={true}
           newLabel="New payroll run"
+          codeKey="employee_no"
           nameKey="employee_name"
           page={1}
           pageSize={200}

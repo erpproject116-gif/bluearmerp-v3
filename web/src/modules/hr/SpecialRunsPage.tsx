@@ -38,7 +38,8 @@ export default function SpecialRunsPage() {
   const [busy, setBusy] = createSignal(false);
   const [thirteenthOpen, setThirteenthOpen] = createSignal(false);
   const [finalOpen, setFinalOpen] = createSignal(false);
-  const employees = createQuery(() => ({
+
+  const previewThirteenth = async () => {
     setBusy(true);
     const res = await apiFetch<SpecialResult>("/api/v1/hr/special-runs/thirteenth/preview", {
       method: "POST",
@@ -113,7 +114,6 @@ export default function SpecialRunsPage() {
         <p class="mb-3 text-sm text-text-secondary">
           Computes (sum of BASIC payslip lines in the calendar year) ÷ 12. Preview before posting.
         </p>
-        <div class="mb-3 flex flex-wrap gap-2">
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setThirteenthOpen(true)}>
           New 13th month
         </button>
@@ -138,35 +138,35 @@ export default function SpecialRunsPage() {
           />
         </Field>
         <div class="sm:col-span-2 lg:col-span-3">
-          {(p) => (
-            <div class="overflow-x-auto text-sm">
-              <p class="mb-2 text-text-secondary">
-                {p().payslip_count} employee(s) · total {formatPeso(p().total_gross)}
-              </p>
-              <table class="min-w-full">
-                <thead>
-                  <tr class="border-b text-left text-text-secondary">
-                    <th class="py-1 pr-3">Employee</th>
-                    <th class="py-1 pr-3 text-right">YTD basic</th>
-                    <th class="py-1 text-right">13th month</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={p().employees}>
-                    {(row) => (
-                      <tr class="border-b border-stroke/50">
-                        <td class="py-1 pr-3">{row.employee_name}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.ytd_basic ?? 0)}</td>
-                        <td class="py-1 text-right tabular-nums">{formatAmount(row.amount)}</td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Show>
-      </section>
+          <Show when={preview13()}>
+            {(p) => (
+              <div class="overflow-x-auto text-sm">
+                <p class="mb-2 text-text-secondary">
+                  {p().payslip_count} employee(s) · total {formatPeso(p().total_gross)}
+                </p>
+                <table class="min-w-full">
+                  <thead>
+                    <tr class="border-b text-left text-text-secondary">
+                      <th class="py-1 pr-3">Employee</th>
+                      <th class="py-1 pr-3 text-right">YTD basic</th>
+                      <th class="py-1 text-right">13th month</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={p().employees}>
+                      {(row) => (
+                        <tr class="border-b border-stroke/50">
+                          <td class="py-1 pr-3">{row.employee_name}</td>
+                          <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.ytd_basic ?? 0)}</td>
+                          <td class="py-1 text-right tabular-nums">{formatAmount(row.amount)}</td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Show>
         </div>
       </EntityModal>
 
@@ -190,30 +190,31 @@ export default function SpecialRunsPage() {
         saveLabel="Run & post"
         saving={busy()}
       >
-          <LookupCombo
-            label="Employee"
-            value={empLabel}
-            selectedId={empId}
-            onInput={setEmpLabel}
-            onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }}
-            onClear={() => { setEmpId(null); setEmpLabel(""); }}
-            fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
-            placeholder="Search employees…"
-          />
-            <input type="date" class={inputClass} value={sepDate()} onInput={(e) => setSepDate(e.currentTarget.value)} />
-          </Field>
-          <div class="flex items-end gap-2">
+        <LookupCombo
+          label="Employee"
+          value={empLabel}
+          selectedId={empId}
+          onInput={setEmpLabel}
+          onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }}
+          onClear={() => { setEmpId(null); setEmpLabel(""); }}
+          fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
+          placeholder="Search employees…"
+        />
+        <Field label="Separation date">
+          <input type="date" class={inputClass} value={sepDate()} onInput={(e) => setSepDate(e.currentTarget.value)} />
+        </Field>
         <div class="sm:col-span-2 lg:col-span-3">
-          {(row) => (
-            <div class="rounded-lg bg-slate-50 p-3 text-sm">
-              <p class="font-medium">{row().employee_name}</p>
-              <p class="tabular-nums">Amount: {formatPeso(row().amount)}</p>
-              <p class="text-text-secondary">{row().notes}</p>
-            </div>
-          )}
-        </Show>
-      </section>
+          <Show when={finalPreview()?.employees[0]}>
+            {(row) => (
+              <div class="rounded-lg bg-slate-50 p-3 text-sm">
+                <p class="font-medium">{row().employee_name}</p>
+                <p class="tabular-nums">Amount: {formatPeso(row().amount)}</p>
+                <p class="text-text-secondary">{row().notes}</p>
+              </div>
+            )}
+          </Show>
         </div>
       </EntityModal>
+    </HrLayout>
   );
 }

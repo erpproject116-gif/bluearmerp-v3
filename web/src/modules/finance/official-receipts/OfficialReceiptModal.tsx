@@ -91,7 +91,8 @@ function applicationsFromDetail(detail?: OfficialReceiptDetail | null): Applicat
 export function OfficialReceiptModal(props: Props) {
   const toast = useToast();
   const auth = useAuth();
-  const { fields, byKey } = useFormFieldSettings(FINANCE_ENTITY.officialReceipt);
+  const { fields, byKey, activeCustomFields } = useFormFieldSettings(FINANCE_ENTITY.officialReceipt);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const [saving, setSaving] = createSignal(false);
   const [fieldErrors, setFieldErrors] = createSignal<Record<string, string | undefined>>({});
   const [showNewCustomer, setShowNewCustomer] = createSignal(false);
@@ -120,8 +121,8 @@ export function OfficialReceiptModal(props: Props) {
     reference_no: referenceNo(),
     notes: notes(),
     applications: applications(),
-  });
     custom_values: customValues(),
+  });
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
     setReceiptDate(payload.receipt_date);
@@ -132,8 +133,8 @@ export function OfficialReceiptModal(props: Props) {
     setReferenceNo(payload.reference_no);
     setNotes(payload.notes);
     setApplications(payload.applications?.length ? payload.applications : [emptyApplication()]);
-  };
     loadCustom(payload.custom_values ?? {});
+  };
 
   const draft = useDocumentDraft({
     entityType: FINANCE_ENTITY.officialReceipt,
@@ -178,8 +179,8 @@ export function OfficialReceiptModal(props: Props) {
       setReferenceNo(ed.reference_no ?? "");
       setNotes(ed.notes ?? "");
       setApplications(applicationsFromDetail(ed));
-    } else {
       loadCustom(ed.custom_values ?? {});
+    } else {
       setReceiptDate(todayISO());
       setPartnerId(null);
       setCustomerLabel("");
@@ -223,10 +224,10 @@ export function OfficialReceiptModal(props: Props) {
       reference_no: referenceNo(),
       notes: notes(),
     };
-    const validationErrors = {
     const validationErrors: Record<string, string | undefined> = {
       ...collectRequiredFieldErrors(formValues as Record<string, unknown>, buildRequiredChecks(fields())),
       ...collectCustomFieldErrors(customValues(), activeCustomFields()),
+    };
     const apps = applications()
       .filter((a) => a.sales_id && Number(a.applied_amount) > 0)
       .map((a) => ({
@@ -251,8 +252,8 @@ export function OfficialReceiptModal(props: Props) {
       reference_no: referenceNo().trim() || null,
       notes: notes().trim() || null,
       applications: apps,
-    };
       custom_values: customValues(),
+    };
     const ok = await submitEntity(
       () =>
         apiFetch(props.editing ? `/api/v1/finance/official-receipts/${props.editing.id}` : "/api/v1/finance/official-receipts", {
@@ -486,8 +487,8 @@ export function OfficialReceiptModal(props: Props) {
           </table>
         </div>
       </div>
-    </WideEntityModal>
       <CustomFieldsSection entityType={FINANCE_ENTITY.officialReceipt} values={customValues} onChange={setCustom} />
+    </WideEntityModal>
     <QuickCustomerModal
       open={showNewCustomer()}
       initialName={newCustomerName()}
