@@ -1,13 +1,14 @@
 import { createSignal, For } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
-import { useEmployees } from "../../shared/useHr";
 import { downloadDtrImportTemplate, importDtrCsv } from "../../shared/hrCsvImport";
 import { HrMappedImportModal } from "./HrMappedImportModal";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
-import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { LookupCombo } from "../../shared/LookupCombo";
+import { employeeLookupLabel, fetchEmployeeOptions } from "../../shared/useHr";
 import { HrLayout } from "./HrLayout";
 
 type Holiday = {
@@ -47,7 +48,6 @@ export default function AttendancePage() {
   const toast = useToast();
   const qc = useQueryClient();
   const year = new Date().getFullYear();
-  const emps = useEmployees(() => ({ page: 1, pageSize: 200 }));
 
   const [holDate, setHolDate] = createSignal("");
   const [holName, setHolName] = createSignal("");
@@ -55,7 +55,10 @@ export default function AttendancePage() {
   const [cutoffStart, setCutoffStart] = createSignal("");
   const [cutoffEnd, setCutoffEnd] = createSignal("");
   const [cutoffLabel, setCutoffLabel] = createSignal("");
+  const [dtrOpen, setDtrOpen] = createSignal(false);
+  const [dtrSaving, setDtrSaving] = createSignal(false);
   const [dtrEmp, setDtrEmp] = createSignal<number | null>(null);
+  const [dtrEmpLabel, setDtrEmpLabel] = createSignal("");
   const [dtrDate, setDtrDate] = createSignal(new Date().toISOString().slice(0, 10));
   const [dtrStatus, setDtrStatus] = createSignal("present");
   const [dtrHours, setDtrHours] = createSignal("8");
@@ -113,6 +116,7 @@ export default function AttendancePage() {
     draftKey: "dtr",
     getPayload: () => ({
       dtr_emp: dtrEmp(),
+      dtr_emp_label: dtrEmpLabel(),
       dtr_date: dtrDate(),
       dtr_status: dtrStatus(),
       dtr_hours: dtrHours(),
@@ -123,6 +127,7 @@ export default function AttendancePage() {
     }),
     onApply: (payload) => {
       setDtrEmp(payload.dtr_emp);
+      setDtrEmpLabel(payload.dtr_emp_label ?? "");
       setDtrDate(payload.dtr_date);
       setDtrStatus(payload.dtr_status);
       setDtrHours(payload.dtr_hours);
@@ -131,10 +136,45 @@ export default function AttendancePage() {
       setDtrReason(payload.dtr_reason ?? "");
       setDtrRemarks(payload.dtr_remarks ?? "");
     },
-    enabled: () => true,
+    enabled: () => dtrOpen(),
     localOnly: true,
-    autoApply: () => true,
+    autoApply: () => false,
+    onDiscard: () => {
+      if (!selectedDtrId()) blankDtr();
+    },
   });
+
+  const blankDtr = () => {
+    setDtrEmp(null);
+    setDtrEmpLabel("");
+    setDtrDate(new Date().toISOString().slice(0, 10));
+    setDtrStatus("present");
+    setDtrHours("8");
+    setDtrOt("0");
+    setDtrNightDiff("0");
+    setDtrReason("");
+    setDtrRemarks("");
+  };
+
+  const openNewDtr = () => {
+    setSelectedDtrId(null);
+    blankDtr();
+    setDtrOpen(true);
+  };
+
+  const openDtrRow = (row: DTR) => {
+    setSelectedDtrId(row.id);
+    setDtrEmp(row.employee_id);
+    setDtrEmpLabel(employeeLookupLabel(row.employee_no ?? "", row.employee_name ?? ""));
+    setDtrDate(row.work_date.slice(0, 10));
+    setDtrStatus(row.status);
+    setDtrHours(String(row.hours_worked));
+    setDtrOt(String(row.ot_hours));
+    setDtrNightDiff(String(row.night_diff_hours));
+    setDtrReason(row.absence_reason ?? "");
+    setDtrRemarks(row.absence_remarks ?? "");
+    setDtrOpen(true);
+  };
 
   const addHoliday = async () => {
     const res = await apiFetch("/api/v1/hr/holidays", {
@@ -177,6 +217,7 @@ export default function AttendancePage() {
       toast.warning("Select an employee.");
       return;
     }
+    setDtrSaving(true);
     const res = await apiFetch("/api/v1/hr/dtr", {
       method: "POST",
       body: JSON.stringify({
@@ -191,6 +232,7 @@ export default function AttendancePage() {
         absence_remarks: dtrRemarks().trim() || undefined,
       }),
     });
+    setDtrSaving(false);
     if (!res.success) {
       toast.warning(res.message ?? "Failed to save DTR.");
       return;
@@ -199,6 +241,7 @@ export default function AttendancePage() {
       ? `Saved (holiday: ${(res.data as { holiday_name: string }).holiday_name}).`
       : "DTR saved.");
     await dtrDraft.clearOnSave();
+    setDtrOpen(false);
     void qc.invalidateQueries({ queryKey: ["hr-dtr"] });
   };
 
@@ -330,57 +373,7 @@ export default function AttendancePage() {
         <p class="mb-3 text-sm text-text-secondary">
           Punch/import sources can fill the same table later. If the date is a holiday, status auto-tags to holiday.
         </p>
-        <dtrDraft.DraftBanner />
-        <div class="mb-3 grid gap-3 sm:grid-cols-6">
-          <div class="sm:col-span-2">
-            <Field label="Employee">
-              <select
-                class={inputClass}
-                value={dtrEmp() ?? ""}
-                onChange={(e) => setDtrEmp(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
-              >
-                <option value="">Employee…</option>
-                <For each={emps.data?.rows ?? []}>
-                  {(e) => (
-                    <option value={e.id}>
-                      {e.employee_no} — {e.full_name}
-                    </option>
-                  )}
-                </For>
-              </select>
-            </Field>
-          </div>
-          <Field label="Work date"><input type="date" class={inputClass} value={dtrDate()} onInput={(e) => setDtrDate(e.currentTarget.value)} /></Field>
-          <Field label="Status"><select class={inputClass} value={dtrStatus()} onChange={(e) => setDtrStatus(e.currentTarget.value)}>
-            <For each={["present", "absent", "leave", "rest", "awol", "holiday"]}>{(s) => <option value={s}>{s}</option>}</For>
-          </select></Field>
-          <Field label="Hours"><input class={inputClass} value={dtrHours()} onInput={(e) => setDtrHours(e.currentTarget.value)} /></Field>
-          <Field label="OT hours"><input class={inputClass} value={dtrOt()} onInput={(e) => setDtrOt(e.currentTarget.value)} /></Field>
-          <Field label="Night diff hours"><input class={inputClass} value={dtrNightDiff()} onInput={(e) => setDtrNightDiff(e.currentTarget.value)} /></Field>
-          <Field label="Absence reason"><input class={inputClass} value={dtrReason()} onInput={(e) => setDtrReason(e.currentTarget.value)} placeholder="Optional" /></Field>
-          <Field label="Remarks"><input class={inputClass} value={dtrRemarks()} onInput={(e) => setDtrRemarks(e.currentTarget.value)} placeholder="Optional" /></Field>
-        </div>
         <div class="mb-4 flex flex-wrap gap-2">
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700" onClick={() => void saveDtr()}>
-            Save DTR
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-4 py-2 text-sm disabled:opacity-50"
-            disabled={!selectedDtrId()}
-            onClick={() => {
-              const row = (dtr.data ?? []).find((r) => r.id === selectedDtrId());
-              if (!row) return;
-              setDtrEmp(row.employee_id);
-              setDtrDate(row.work_date);
-              setDtrStatus(row.status);
-              setDtrHours(String(row.hours_worked));
-              setDtrOt(String(row.ot_hours));
-              setDtrNightDiff(String(row.night_diff_hours));
-            }}
-          >
-            Load selected for edit
-          </button>
           <button
             type="button"
             class="rounded-lg border border-amber-300 px-4 py-2 text-sm text-amber-900 disabled:opacity-50"
@@ -418,25 +411,8 @@ export default function AttendancePage() {
           loading={dtr.isFetching}
           selectedId={selectedDtrId()}
           onSelect={setSelectedDtrId}
-          onEdit={(row) => {
-            setSelectedDtrId(row.id);
-            setDtrEmp(row.employee_id);
-            setDtrDate(row.work_date);
-            setDtrStatus(row.status);
-            setDtrHours(String(row.hours_worked));
-            setDtrOt(String(row.ot_hours));
-            setDtrNightDiff(String(row.night_diff_hours));
-          }}
-          onNew={() => {
-            setSelectedDtrId(null);
-            setDtrEmp(null);
-            setDtrDate(new Date().toISOString().slice(0, 10));
-            setDtrStatus("present");
-            setDtrHours("8");
-            setDtrOt("0");
-            setDtrNightDiff("0");
-            setDtrReason("");
-          }}
+          onEdit={openDtrRow}
+          onNew={openNewDtr}
           showNew={true}
           codeKey="work_date"
           nameKey="employee_name"
@@ -445,6 +421,56 @@ export default function AttendancePage() {
           total={(dtr.data ?? []).length}
         />
       </section>
+      <EntityModal
+        open={dtrOpen()}
+        title={selectedDtrId() ? "Edit DTR" : "New DTR"}
+        onClose={() => setDtrOpen(false)}
+        onSave={() => void saveDtr()}
+        saving={dtrSaving()}
+        saveLabel="Save DTR"
+      >
+        <dtrDraft.DraftBanner />
+        <LookupCombo
+          label="Employee"
+          value={dtrEmpLabel}
+          selectedId={dtrEmp}
+          onInput={setDtrEmpLabel}
+          onSelect={(o) => {
+            setDtrEmp(o.id);
+            setDtrEmpLabel(o.label);
+          }}
+          onClear={() => {
+            setDtrEmp(null);
+            setDtrEmpLabel("");
+          }}
+          fetchOptions={fetchEmployeeOptions}
+          placeholder="Search employees…"
+          required
+        />
+        <Field label="Work date">
+          <input type="date" class={inputClass} value={dtrDate()} onInput={(e) => setDtrDate(e.currentTarget.value)} />
+        </Field>
+        <Field label="Status">
+          <select class={inputClass} value={dtrStatus()} onChange={(e) => setDtrStatus(e.currentTarget.value)}>
+            <For each={["present", "absent", "leave", "rest", "awol", "holiday"]}>{(s) => <option value={s}>{s}</option>}</For>
+          </select>
+        </Field>
+        <Field label="Hours">
+          <input class={inputClass} value={dtrHours()} onInput={(e) => setDtrHours(e.currentTarget.value)} />
+        </Field>
+        <Field label="OT hours">
+          <input class={inputClass} value={dtrOt()} onInput={(e) => setDtrOt(e.currentTarget.value)} />
+        </Field>
+        <Field label="Night diff hours">
+          <input class={inputClass} value={dtrNightDiff()} onInput={(e) => setDtrNightDiff(e.currentTarget.value)} />
+        </Field>
+        <Field label="Absence reason">
+          <input class={inputClass} value={dtrReason()} onInput={(e) => setDtrReason(e.currentTarget.value)} placeholder="Optional" />
+        </Field>
+        <Field label="Remarks">
+          <input class={inputClass} value={dtrRemarks()} onInput={(e) => setDtrRemarks(e.currentTarget.value)} placeholder="Optional" />
+        </Field>
+      </EntityModal>
       <HrMappedImportModal
         open={mappedImportOpen()}
         kind="dtr"

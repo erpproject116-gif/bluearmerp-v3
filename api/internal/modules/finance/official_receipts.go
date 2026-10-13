@@ -51,6 +51,7 @@ type OfficialReceipt struct {
 	CreatedByUserID *int64               `json:"created_by_user_id,omitempty"`
 	CreatedByName   string               `json:"created_by_name,omitempty"`
 	Applications    []ReceiptApplication `json:"applications,omitempty"`
+	CustomValues    map[string]any       `json:"custom_values,omitempty"`
 }
 
 type applicationBody struct {
@@ -67,6 +68,7 @@ type receiptBody struct {
 	ReferenceNo   *string           `json:"reference_no"`
 	Notes         *string           `json:"notes"`
 	Applications  []applicationBody `json:"applications"`
+	CustomValues  map[string]any    `json:"custom_values"`
 }
 
 func registerOfficialReceiptRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -263,6 +265,7 @@ func loadOfficialReceipt(ctx context.Context, pool *pgxpool.Pool, tenantID, id i
 		return OfficialReceipt{}, err
 	}
 	rec.Applications = apps
+	rec.CustomValues = attachOfficialReceiptCustom(ctx, pool, tenantID, id)
 	return rec, nil
 }
 
@@ -502,6 +505,14 @@ func createOfficialReceiptFromBody(ctx context.Context, pool *pgxpool.Pool, tu a
 	if err := postARPaymentDiscountJournalTx(ctx, tx, tu.TenantID, tu.AppUserID, body.PartnerID, receiptDate, receiptNo, discountTotal); err != nil {
 		return OfficialReceipt{}, err.Error(), http.StatusBadRequest, "ERR_VALIDATION"
 	}
+	if errs := saveOfficialReceiptCustom(ctx, tx, tu.TenantID, id, body.CustomValues); errs != nil {
+		msg := "Invalid custom fields."
+		for _, v := range errs {
+			msg = v
+			break
+		}
+		return OfficialReceipt{}, msg, http.StatusBadRequest, "ERR_VALIDATION"
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return OfficialReceipt{}, "Failed to save.", http.StatusInternalServerError, "ERR_INTERNAL"
@@ -571,6 +582,10 @@ func updateOfficialReceipt(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := insertReceiptApplications(r.Context(), tx, tu.TenantID, id, body.Applications); err != nil {
 			respondApplicationSaveError(w, err)
+			return
+		}
+		if errs := saveOfficialReceiptCustom(r.Context(), tx, tu.TenantID, id, body.CustomValues); errs != nil {
+			response.ValidationSmart(w, errs)
 			return
 		}
 

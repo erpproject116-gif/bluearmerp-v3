@@ -17,6 +17,8 @@ import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
+import { CustomFieldsSection, collectCustomFieldErrors } from "../../../shared/CustomFieldsSection";
+import { useCustomValues } from "../../../shared/useCustomValues";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 
 export type { OfficialReceiptDetail };
@@ -119,6 +121,7 @@ export function OfficialReceiptModal(props: Props) {
     notes: notes(),
     applications: applications(),
   });
+    custom_values: customValues(),
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
     setReceiptDate(payload.receipt_date);
@@ -130,6 +133,7 @@ export function OfficialReceiptModal(props: Props) {
     setNotes(payload.notes);
     setApplications(payload.applications?.length ? payload.applications : [emptyApplication()]);
   };
+    loadCustom(payload.custom_values ?? {});
 
   const draft = useDocumentDraft({
     entityType: FINANCE_ENTITY.officialReceipt,
@@ -175,6 +179,7 @@ export function OfficialReceiptModal(props: Props) {
       setNotes(ed.notes ?? "");
       setApplications(applicationsFromDetail(ed));
     } else {
+      loadCustom(ed.custom_values ?? {});
       setReceiptDate(todayISO());
       setPartnerId(null);
       setCustomerLabel("");
@@ -183,6 +188,7 @@ export function OfficialReceiptModal(props: Props) {
       setNotes("");
       setApplications([emptyApplication()]);
       void loadPreview(todayISO());
+      loadCustom({});
     }
   };
 
@@ -218,8 +224,9 @@ export function OfficialReceiptModal(props: Props) {
       notes: notes(),
     };
     const validationErrors = {
+    const validationErrors: Record<string, string | undefined> = {
       ...collectRequiredFieldErrors(formValues as Record<string, unknown>, buildRequiredChecks(fields())),
-    };
+      ...collectCustomFieldErrors(customValues(), activeCustomFields()),
     const apps = applications()
       .filter((a) => a.sales_id && Number(a.applied_amount) > 0)
       .map((a) => ({
@@ -245,6 +252,7 @@ export function OfficialReceiptModal(props: Props) {
       notes: notes().trim() || null,
       applications: apps,
     };
+      custom_values: customValues(),
     const ok = await submitEntity(
       () =>
         apiFetch(props.editing ? `/api/v1/finance/official-receipts/${props.editing.id}` : "/api/v1/finance/official-receipts", {
@@ -479,6 +487,7 @@ export function OfficialReceiptModal(props: Props) {
         </div>
       </div>
     </WideEntityModal>
+      <CustomFieldsSection entityType={FINANCE_ENTITY.officialReceipt} values={customValues} onChange={setCustom} />
     <QuickCustomerModal
       open={showNewCustomer()}
       initialName={newCustomerName()}

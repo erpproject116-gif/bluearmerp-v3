@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
-import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import {
   createPayslipShareLink,
   previewPayroll,
@@ -71,6 +71,7 @@ export default function PayrollRunsPage() {
     toast.success(`Generated ${res.data?.payslip_count ?? 0} payslips. JE #${res.data?.journal_entry_id ?? "—"}`);
     setPreview(null);
     if (res.data?.pay_period_id) setSelectedPeriodId(res.data.pay_period_id);
+    setRunOpen(false);
     invalidate();
   };
 
@@ -108,31 +109,25 @@ export default function PayrollRunsPage() {
           Import or enter DTR in Attendance before running payroll.
         </p>
         <div class="grid gap-3 sm:grid-cols-4">
-          <Field label="Period start"><input type="date" class={inputClass} value={periodStart()} onInput={(e) => setPeriodStart(e.currentTarget.value)} /></Field>
-          <Field label="Period end"><input type="date" class={inputClass} value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} /></Field>
-          <Field label="Label (optional)"><input class={inputClass} value={periodLabel()} onInput={(e) => setPeriodLabel(e.currentTarget.value)} /></Field>
-          <div class="flex items-end gap-2">
-            <button
-              type="button"
-              class="flex-1 rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:erp-panel disabled:opacity-50"
-              disabled={previewing() || running()}
-              onClick={() => void runPreview()}
-            >
-              {previewing() ? "Previewing…" : "Preview"}
-            </button>
-            <button
-              type="button"
-              class="flex-1 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              disabled={running() || previewing()}
-              onClick={() => void run()}
-            >
-              {running() ? "Running…" : "Run payroll"}
-            </button>
-          </div>
-        </div>
+        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRunOpen(true)}>
+          New payroll run
+        </button>
       </section>
-
-      <Show when={preview()}>
+      <EntityModal
+        open={runOpen()}
+        title="New payroll run"
+        wide
+        onClose={() => setRunOpen(false)}
+        onSave={() => void run()}
+        onSecondarySave={() => void runPreview()}
+        secondarySaveLabel="Preview"
+        saveLabel="Run payroll"
+        saving={running() || previewing()}
+      >
+        <Field label="Period start"><input type="date" class={inputClass} value={periodStart()} onInput={(e) => setPeriodStart(e.currentTarget.value)} /></Field>
+        <Field label="Period end"><input type="date" class={inputClass} value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} /></Field>
+        <Field label="Label (optional)"><input class={inputClass} value={periodLabel()} onInput={(e) => setPeriodLabel(e.currentTarget.value)} /></Field>
+        <div class="sm:col-span-2 lg:col-span-3">
         {(p) => (
           <section class="mb-6 rounded-xl border border-stroke bg-slate-50 p-4">
             <h3 class="mb-2 text-sm font-semibold text-text-primary">
@@ -170,6 +165,8 @@ export default function PayrollRunsPage() {
         )}
       </Show>
 
+        </div>
+      </EntityModal>
       <section class="mb-6">
         <h2 class="mb-2 text-lg font-medium">Pay periods</h2>
         <div class="flex flex-wrap gap-2">
@@ -277,8 +274,9 @@ export default function PayrollRunsPage() {
           onSelect={setSelectedId}
           onEdit={(row) => openPrint(row)}
           onNew={() => {}}
-          showNew={false}
-          codeKey="employee_no"
+          onNew={() => setRunOpen(true)}
+          showNew={true}
+          newLabel="New payroll run"
           nameKey="employee_name"
           page={1}
           pageSize={200}

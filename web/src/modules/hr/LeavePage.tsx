@@ -2,8 +2,9 @@ import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
-import { useEmployees } from "../../shared/useHr";
-import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { fetchEmployeeOptions } from "../../shared/useHr";
+import { LookupCombo } from "../../shared/LookupCombo";
+import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 
@@ -32,8 +33,8 @@ async function authHeaders(): Promise<Record<string, string>> {
 export default function LeavePage() {
   const toast = useToast();
   const qc = useQueryClient();
-  const emps = useEmployees(() => ({ page: 1, pageSize: 200, status: "active" }));
-  const [empId, setEmpId] = createSignal("");
+  const [empId, setEmpId] = createSignal<number | null>(null);
+  const [empLabel, setEmpLabel] = createSignal("");
   const [typeId, setTypeId] = createSignal("");
   const [from, setFrom] = createSignal("");
   const [to, setTo] = createSignal("");
@@ -41,6 +42,7 @@ export default function LeavePage() {
   const [notes, setNotes] = createSignal("");
   const [file, setFile] = createSignal<File | null>(null);
   const [statusFilter, setStatusFilter] = createSignal("submitted");
+  const [requestOpen, setRequestOpen] = createSignal(false);
 
   const types = createQuery(() => ({
     queryKey: ["hr-leave-types"],
@@ -71,7 +73,7 @@ export default function LeavePage() {
     const res = await apiFetch<{ id: number }>("/api/v1/hr/leave-requests", {
       method: "POST",
       body: JSON.stringify({
-        employee_id: Number(empId()), leave_type_id: Number(typeId()),
+        employee_id: empId(), leave_type_id: Number(typeId()),
         date_from: from(), date_to: to(), reason: reason(), notes: notes(), status: "submitted",
       }),
     });
@@ -91,6 +93,7 @@ export default function LeavePage() {
     setReason("");
     setNotes("");
     setFile(null);
+    setRequestOpen(false);
     void qc.invalidateQueries({ queryKey: ["hr-leave-requests"] });
     void qc.invalidateQueries({ queryKey: ["hr-leave-balances"] });
   };
@@ -111,31 +114,40 @@ export default function LeavePage() {
         Accrue annual credit
       </button>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
-        <h2 class="mb-3 text-lg font-medium">New request</h2>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Employee">
-            <select class={inputClass} value={empId()} onChange={(e) => setEmpId(e.currentTarget.value)}>
-              <option value="">Select…</option>
-              <For each={emps.data?.rows ?? []}>{(e) => <option value={e.id}>{e.employee_no} — {e.full_name}</option>}</For>
-            </select>
-          </Field>
-          <Field label="Leave type">
-            <select class={inputClass} value={typeId()} onChange={(e) => setTypeId(e.currentTarget.value)}>
-              <option value="">Select…</option>
-              <For each={(types.data ?? []).filter((t) => t.is_active)}>
-                {(t) => <option value={t.id}>{t.code} — {t.name}</option>}
-              </For>
-            </select>
-          </Field>
-          <Field label="From"><input type="date" class={inputClass} value={from()} onInput={(e) => setFrom(e.currentTarget.value)} /></Field>
-          <Field label="To"><input type="date" class={inputClass} value={to()} onInput={(e) => setTo(e.currentTarget.value)} /></Field>
-          <Field label="Reason"><input class={inputClass} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} placeholder="Optional" /></Field>
-          <Field label="Notes"><input class={inputClass} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} placeholder="Optional" /></Field>
-          <Field label="Attachment"><input type="file" class={inputClass} onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} /></Field>
-        </div>
-        <button type="button" class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void submit()}>Submit leave</button>
-      </section>
+      <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRequestOpen(true)}>
+        New request
+      </button>
+      <EntityModal
+        open={requestOpen()}
+        title="New request"
+        onClose={() => setRequestOpen(false)}
+        onSave={() => void submit()}
+        saveLabel="Submit leave"
+      >
+        <LookupCombo
+          label="Employee"
+          value={empLabel}
+          selectedId={empId}
+          onInput={setEmpLabel}
+          onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }}
+          onClear={() => { setEmpId(null); setEmpLabel(""); }}
+          fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
+          placeholder="Search employees…"
+        />
+        <Field label="Leave type">
+          <select class={inputClass} value={typeId()} onChange={(e) => setTypeId(e.currentTarget.value)}>
+            <option value="">Select…</option>
+            <For each={(types.data ?? []).filter((t) => t.is_active)}>
+              {(t) => <option value={t.id}>{t.code} — {t.name}</option>}
+            </For>
+          </select>
+        </Field>
+        <Field label="From"><input type="date" class={inputClass} value={from()} onInput={(e) => setFrom(e.currentTarget.value)} /></Field>
+        <Field label="To"><input type="date" class={inputClass} value={to()} onInput={(e) => setTo(e.currentTarget.value)} /></Field>
+        <Field label="Reason"><input class={inputClass} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} placeholder="Optional" /></Field>
+        <Field label="Notes"><input class={inputClass} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} placeholder="Optional" /></Field>
+        <Field label="Attachment"><input type="file" class={inputClass} onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} /></Field>
+      </EntityModal>
 
       <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <div class="mb-3 flex items-center justify-between">

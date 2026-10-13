@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
@@ -12,6 +12,7 @@ type CaseRow = {
 export default function HireOnboardingPage() {
   const toast = useToast();
   const qc = useQueryClient();
+  const [caseId, setCaseId] = createSignal<number | null>(null);
 
   const cases = createQuery(() => ({
     queryKey: ["hr-hire-onboarding"],
@@ -19,10 +20,10 @@ export default function HireOnboardingPage() {
   }));
 
   const detail = createQuery(() => ({
-    queryKey: ["hr-hire-onboarding-detail", cases.data?.[0]?.id],
-    enabled: !!(cases.data?.[0]?.id),
+    queryKey: ["hr-hire-onboarding-detail", caseId()],
+    enabled: caseId() != null,
     queryFn: async () => {
-      const id = cases.data![0].id;
+      const id = caseId();
       return (await apiFetch<{ case: CaseRow; tasks: { id: number; title: string; status: string; due_date?: string; task_kind: string }[] }>(
         `/api/v1/hr/hire-onboarding/cases/${id}`,
       )).data!;
@@ -48,13 +49,18 @@ export default function HireOnboardingPage() {
         <h2 class="mb-3 text-lg font-medium">Board</h2>
         <For each={cases.data ?? []} fallback={<p class="text-sm text-text-secondary">No onboarding cases yet.</p>}>
           {(c) => (
-            <div class="mb-2 border-b border-slate-100 py-2 text-sm">
+            <button
+              type="button"
+              class="mb-2 block w-full border-b border-slate-100 py-2 text-left text-sm hover:bg-slate-50"
+              classList={{ "bg-brand-50": caseId() === c.id }}
+              onClick={() => setCaseId(c.id)}
+            >
               <p class="font-medium">{c.employee_no} — {c.employee_name}</p>
               <p class="text-text-secondary">
                 {c.status} · pending {c.pending_tasks}
                 <Show when={c.overdue_tasks > 0}> · <span class="text-amber-800">overdue {c.overdue_tasks}</span></Show>
               </p>
-            </div>
+            </button>
           )}
         </For>
       </section>

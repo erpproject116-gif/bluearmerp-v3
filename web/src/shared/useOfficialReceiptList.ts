@@ -53,6 +53,7 @@ export type OfficialReceiptDetail = {
   amount_total: number;
   created_by_name?: string;
   applications?: ReceiptApplication[];
+  custom_values?: Record<string, unknown>;
 };
 
 export function useOfficialReceiptList(params: () => OfficialReceiptListParams) {

@@ -27,7 +27,9 @@ import { UserSearchModal, type UserSearchRow } from "../purchase-request/purchas
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { requireFields } from "../../shared/handleSaveResult";
 import { useQueryClient } from "@tanstack/solid-query";
-import { apiBase, getAccessToken } from "../../shared/api";
+import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
+import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
+import { useCustomValues } from "../../shared/useCustomValues";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { QuickDepartmentModal } from "../../shared/QuickDepartmentModal";
@@ -99,7 +101,8 @@ export default function HrEmployeesPage() {
   const invalidate = useInvalidateEmployees();
   const qc = useQueryClient();
   const depts = useHrDepartments();
-  const { fields } = useFormFieldSettings(HR_ENTITY.employee);
+  const { fields, activeCustomFields } = useFormFieldSettings(HR_ENTITY.employee);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
 
   const canWriteEmployees = () => hasPermission(auth.me, "hr.employees", "write");
 
@@ -152,6 +155,7 @@ export default function HrEmployeesPage() {
     setEmergencyAddress("");
     setEmergencyPhone("");
     setPhotoFile(null);
+    loadCustom({});
   };
 
   const openNew = () => {
@@ -188,8 +192,12 @@ export default function HrEmployeesPage() {
     setEmergencyAddress(row.emergency_contact_address ?? "");
     setEmergencyPhone(row.emergency_contact_phone ?? "");
     setPhotoFile(null);
+    loadCustom(row.custom_values ?? {});
     setFormSection("employment");
     setModalOpen(true);
+    void apiFetch<Employee>(`/api/v1/hr/employees/${row.id}`).then((res) => {
+      if (res.success && res.data) loadCustom(res.data.custom_values ?? {});
+    });
   };
 
   const buildDraftPayload = () => ({
@@ -217,6 +225,7 @@ export default function HrEmployeesPage() {
     emergency_contact_name: emergencyName(),
     emergency_contact_address: emergencyAddress(),
     emergency_contact_phone: emergencyPhone(),
+    custom_values: customValues(),
   });
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
@@ -244,6 +253,7 @@ export default function HrEmployeesPage() {
     setEmergencyName(payload.emergency_contact_name);
     setEmergencyAddress(payload.emergency_contact_address);
     setEmergencyPhone(payload.emergency_contact_phone);
+    loadCustom(payload.custom_values ?? {});
   };
 
   const draft = useDocumentDraft({
@@ -281,7 +291,8 @@ export default function HrEmployeesPage() {
       tax_status: taxStatus(),
       notes: notes(),
     };
-    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()));
+    const clientError = requireFields(formValues as Record<string, unknown>, buildRequiredChecks(fields()))
+      ?? validateCustomFields(customValues(), activeCustomFields());
     if (clientError) {
       toast.warning(clientError);
       return;
@@ -316,6 +327,7 @@ export default function HrEmployeesPage() {
       emergency_contact_name: emergencyName().trim(),
       emergency_contact_address: emergencyAddress().trim(),
       emergency_contact_phone: emergencyPhone().trim(),
+      custom_values: customValues(),
     };
     const row = selected();
     const res = row ? await patchEmployee(row.id, body) : await createEmployee(body);
@@ -598,6 +610,7 @@ export default function HrEmployeesPage() {
           <Field label="Notes">
             <textarea class={inputClass} rows={3} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
           </Field>
+          <CustomFieldsSection entityType={HR_ENTITY.employee} values={customValues} onChange={setCustom} />
         </Show>
 
         <Show when={formSection() === "statutory"}>

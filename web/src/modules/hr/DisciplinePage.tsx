@@ -2,8 +2,9 @@ import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
-import { useEmployees } from "../../shared/useHr";
-import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { fetchEmployeeOptions } from "../../shared/useHr";
+import { LookupCombo } from "../../shared/LookupCombo";
+import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 
@@ -40,8 +41,8 @@ async function postFile(path: string, fields: Record<string, string>, file: File
 export default function DisciplinePage() {
   const toast = useToast();
   const qc = useQueryClient();
-  const emps = useEmployees(() => ({ page: 1, pageSize: 200, status: "active" }));
-  const [empId, setEmpId] = createSignal("");
+  const [empId, setEmpId] = createSignal<number | null>(null);
+  const [empLabel, setEmpLabel] = createSignal("");
   const [caseType, setCaseType] = createSignal("nte");
   const [subject, setSubject] = createSignal("");
   const [details, setDetails] = createSignal("");
@@ -51,6 +52,7 @@ export default function DisciplinePage() {
   const [file, setFile] = createSignal<File | null>(null);
   let fileInput: HTMLInputElement | undefined;
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const [createOpen, setCreateOpen] = createSignal(false);
 
   const payItems = createQuery(() => ({
     queryKey: ["hr-pay-item-types", "deduction"],
@@ -77,7 +79,7 @@ export default function DisciplinePage() {
     if (!empId() || !subject().trim()) return toast.warning("Employee and subject required.");
     if (!chosen) return toast.warning("Choose a file before creating the case.");
     const posted = await postFile("/api/v1/hr/discipline/cases", {
-      employee_id: empId(),
+      employee_id: String(empId() ?? ""),
       case_type: caseType(),
       subject: subject().trim(),
       details: details().trim(),
@@ -87,6 +89,7 @@ export default function DisciplinePage() {
     if (!posted.ok) return toast.warning(posted.message ?? "Create failed.");
     toast.success("Case created.");
     setSubject(""); setDetails(""); setFile(null);
+    setCreateOpen(false);
     if (fileInput) fileInput.value = "";
     void qc.invalidateQueries({ queryKey: ["hr-discipline-cases"] });
   };
@@ -128,42 +131,51 @@ export default function DisciplinePage() {
         Case timeline and letter → 201. Have PH labor counsel review wording before claiming DOLE compliance.
       </p>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
-        <h2 class="mb-3 text-lg font-medium">Open case</h2>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Employee">
-            <select class={inputClass} value={empId()} onChange={(e) => setEmpId(e.currentTarget.value)}>
-              <option value="">Select…</option>
-              <For each={emps.data?.rows ?? []}>{(e) => <option value={e.id}>{e.employee_no} — {e.full_name}</option>}</For>
-            </select>
-          </Field>
-          <Field label="Type">
-            <select class={inputClass} value={caseType()} onChange={(e) => setCaseType(e.currentTarget.value)}>
-              <option value="coaching">Coaching</option>
-              <option value="nte">NTE</option>
-              <option value="written_warning">Written warning</option>
-              <option value="final_warning">Final warning</option>
-              <option value="suspension">Suspension</option>
-              <option value="termination">Termination</option>
-            </select>
-          </Field>
-          <Field label="Subject"><input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} /></Field>
-          <Field label="Details"><textarea class={inputClass} rows={2} value={details()} onInput={(e) => setDetails(e.currentTarget.value)} /></Field>
-          <Field label="Penalty amount">
-            <input type="number" min="0" step="0.01" class={inputClass} value={penalty()} placeholder="Optional" onInput={(e) => setPenalty(e.currentTarget.value)} />
-          </Field>
-          <Field label="Authority to deduct">
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={authority()} onChange={(e) => setAuthority(e.currentTarget.checked)} />
-              Record only. Pay changes when a pay item includes it.
-            </label>
-          </Field>
-          <Field label="File">
-            <input ref={fileInput} class={inputClass} type="file" onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} />
-          </Field>
-        </div>
-        <button type="button" class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void create()}>Create</button>
-      </section>
+      <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCreateOpen(true)}>
+        New case
+      </button>
+      <EntityModal
+        open={createOpen()}
+        title="New case"
+        onClose={() => setCreateOpen(false)}
+        onSave={() => void create()}
+        saveLabel="Create"
+      >
+        <LookupCombo
+          label="Employee"
+          value={empLabel}
+          selectedId={empId}
+          onInput={setEmpLabel}
+          onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }}
+          onClear={() => { setEmpId(null); setEmpLabel(""); }}
+          fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
+          placeholder="Search employees…"
+        />
+        <Field label="Type">
+          <select class={inputClass} value={caseType()} onChange={(e) => setCaseType(e.currentTarget.value)}>
+            <option value="coaching">Coaching</option>
+            <option value="nte">NTE</option>
+            <option value="written_warning">Written warning</option>
+            <option value="final_warning">Final warning</option>
+            <option value="suspension">Suspension</option>
+            <option value="termination">Termination</option>
+          </select>
+        </Field>
+        <Field label="Subject"><input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} /></Field>
+        <Field label="Details"><textarea class={inputClass} rows={2} value={details()} onInput={(e) => setDetails(e.currentTarget.value)} /></Field>
+        <Field label="Penalty amount">
+          <input type="number" min="0" step="0.01" class={inputClass} value={penalty()} placeholder="Optional" onInput={(e) => setPenalty(e.currentTarget.value)} />
+        </Field>
+        <Field label="Authority to deduct">
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={authority()} onChange={(e) => setAuthority(e.currentTarget.checked)} />
+            Record only. Pay changes when a pay item includes it.
+          </label>
+        </Field>
+        <Field label="File (required)">
+          <input ref={fileInput} class={inputClass} type="file" onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} />
+        </Field>
+      </EntityModal>
 
       <div class="grid gap-6 lg:grid-cols-2">
         <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">

@@ -69,6 +69,7 @@ type ReportRow = {
 export default function AbsenteeismPage() {
   const toast = useToast();
   const qc = useQueryClient();
+  const [openId, setOpenId] = createSignal<number | null>(null);
   const [from, setFrom] = createSignal(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
   const [to, setTo] = createSignal(new Date().toISOString().slice(0, 10));
 
@@ -116,14 +117,18 @@ export default function AbsenteeismPage() {
         <h2 class="mb-3 text-lg font-medium">Open alerts</h2>
         <For each={alerts.data ?? []} fallback={<p class="text-sm text-text-secondary">No open alerts.</p>}>
           {(a) => (
-            <div class="mb-2 flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 py-2 text-sm">
-              <div>
+            <div class="mb-2 border-b border-slate-100 py-2 text-sm">
+              <div class="flex flex-wrap items-start justify-between gap-2">
+              <button type="button" class="text-left" onClick={() => setOpenId(openId() === a.id ? null : a.id)}>
                 <p class="font-medium">{a.employee_no} — {a.employee_name}</p>
                 <p class="text-text-secondary">{a.message}</p>
-                <AlertNotes alert={a} onSaved={() => void qc.invalidateQueries({ queryKey: ["hr-absence-alerts"] })} />
-              </div>
+              </button>
               <Show when={!a.discipline_case_id}>
                 <button type="button" class="text-xs text-amber-800" onClick={() => void createDiscipline(a)}>Create discipline draft</button>
+              </Show>
+              </div>
+              <Show when={openId() === a.id}>
+                <AlertNotes alert={a} onSaved={() => void qc.invalidateQueries({ queryKey: ["hr-absence-alerts"] })} />
               </Show>
             </div>
           )}

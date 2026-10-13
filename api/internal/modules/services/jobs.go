@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth/datascope"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -334,7 +334,13 @@ func patchJob(pool *pgxpool.Pool) http.HandlerFunc {
 		if !decodeJSON(w, r, &body) {
 			return
 		}
-		tag, err := pool.Exec(r.Context(), `
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update the job.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		tag, err := tx.Exec(r.Context(), `
 			update public.svc_jobs set
 			  subject = $3, description = $4, diagnosis = $5, priority = $6,
 			  qc_passed = coalesce($7, qc_passed),
@@ -349,6 +355,14 @@ func patchJob(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if tag.RowsAffected() == 0 {
 			conflict(w)
+			return
+		}
+		if cerrs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, entityJob, id, body.CustomValues); len(cerrs) > 0 {
+			response.Validation(w, cerrs)
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update the job.", "ERR_INTERNAL")
 			return
 		}
 		response.OK(w, map[string]any{"id": id}, "Saved.")

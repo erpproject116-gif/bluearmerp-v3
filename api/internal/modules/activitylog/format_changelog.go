@@ -331,6 +331,7 @@ func diffChanges(oldM, newM map[string]any) []string {
 		"sales_order_no": true, "sales_no": true, "reference_no": true,
 		"purchase_order_no": true, "purchase_request_no": true, "invoice_no": true,
 		"receipt_no": true, "repair_order_no": true, "registration_no": true,
+		"custom_values": true,
 	}
 	// For updates, diff only keys present in the new snapshot so partial request
 	// bodies (or slim audit payloads) do not produce false "cleared" lines.
@@ -384,6 +385,67 @@ func diffChanges(oldM, newM map[string]any) []string {
 	}
 	if linesChanged(oldM, newM) {
 		out = append(out, "Line items were updated")
+	}
+	out = append(out, diffCustomValues(oldM, newM)...)
+	return out
+}
+
+func customValueMap(m map[string]any) (map[string]any, bool) {
+	if m == nil {
+		return nil, false
+	}
+	v, ok := m["custom_values"]
+	if !ok || v == nil {
+		return nil, false
+	}
+	cm, ok := v.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	return cm, true
+}
+
+func diffCustomValues(oldM, newM map[string]any) []string {
+	newCV, hasNewMap := customValueMap(newM)
+	oldCV, _ := customValueMap(oldM)
+	if newM != nil && !hasNewMap {
+		return nil
+	}
+	keys := map[string]struct{}{}
+	if newM != nil {
+		for k := range newCV {
+			keys[k] = struct{}{}
+		}
+	} else {
+		for k := range oldCV {
+			keys[k] = struct{}{}
+		}
+	}
+	sorted := make([]string, 0, len(keys))
+	for k := range keys {
+		sorted = append(sorted, k)
+	}
+	sort.Strings(sorted)
+	var out []string
+	for _, k := range sorted {
+		oldV, hasOld := oldCV[k]
+		var newV any
+		hasNew := false
+		if newM != nil {
+			newV, hasNew = newCV[k]
+		}
+		if hasOld && hasNew && fmt.Sprint(oldV) == fmt.Sprint(newV) {
+			continue
+		}
+		lbl := labelForField(k)
+		switch {
+		case hasOld && hasNew:
+			out = append(out, fmt.Sprintf("%s changed from %s to %s", lbl, formatValue(oldV), formatValue(newV)))
+		case hasNew:
+			out = append(out, fmt.Sprintf("%s set to %s", lbl, formatValue(newV)))
+		case hasOld:
+			out = append(out, fmt.Sprintf("%s cleared (was %s)", lbl, formatValue(oldV)))
+		}
 	}
 	return out
 }

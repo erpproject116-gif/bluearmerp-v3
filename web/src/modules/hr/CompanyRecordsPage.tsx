@@ -1,7 +1,7 @@
 import { createSignal, For } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
-import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 
@@ -29,6 +29,7 @@ export default function CompanyRecordsPage() {
   const [body, setBody] = createSignal("");
   const [recordDate, setRecordDate] = createSignal("");
   const [newKind, setNewKind] = createSignal<RecordKind>("policy");
+  const [open, setOpen] = createSignal(false);
 
   const records = createQuery(() => ({
     queryKey: ["hr-company-records", kind()],
@@ -54,6 +55,7 @@ export default function CompanyRecordsPage() {
     setTitle("");
     setBody("");
     setRecordDate("");
+    setOpen(false);
     void qc.invalidateQueries({ queryKey: ["hr-company-records"] });
   };
 
@@ -61,28 +63,25 @@ export default function CompanyRecordsPage() {
     <HrLayout>
       <h1 class="mb-1 text-2xl font-semibold">Policies, announcements, and events</h1>
       <p class="mb-6 text-sm text-text-secondary">These records do not change pay.</p>
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
-        <h2 class="mb-3 text-lg font-medium">New record</h2>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <Field label="Kind">
-            <select class={inputClass} value={newKind()} onChange={(e) => setNewKind(e.currentTarget.value as RecordKind)}>
-              <For each={KINDS}>{(k) => <option value={k.value}>{k.label}</option>}</For>
-            </select>
-          </Field>
-          <Field label="Date">
-            <input type="date" class={inputClass} value={recordDate()} onInput={(e) => setRecordDate(e.currentTarget.value)} />
-          </Field>
-          <Field label="Title">
-            <input class={inputClass} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
-          </Field>
-          <Field label="Details">
-            <textarea class={inputClass} rows={2} value={body()} onInput={(e) => setBody(e.currentTarget.value)} />
-          </Field>
-        </div>
-        <button type="button" class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void save()}>
-          Save record
-        </button>
-      </section>
+      <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setOpen(true)}>
+        New record
+      </button>
+      <EntityModal open={open()} title="New record" onClose={() => setOpen(false)} onSave={() => void save()} saveLabel="Save record">
+        <Field label="Kind">
+          <select class={inputClass} value={newKind()} onChange={(e) => setNewKind(e.currentTarget.value as RecordKind)}>
+            <For each={KINDS}>{(k) => <option value={k.value}>{k.label}</option>}</For>
+          </select>
+        </Field>
+        <Field label="Date">
+          <input type="date" class={inputClass} value={recordDate()} onInput={(e) => setRecordDate(e.currentTarget.value)} />
+        </Field>
+        <Field label="Title">
+          <input class={inputClass} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
+        </Field>
+        <Field label="Details">
+          <textarea class={inputClass} rows={2} value={body()} onInput={(e) => setBody(e.currentTarget.value)} />
+        </Field>
+      </EntityModal>
       <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <div class="mb-3 flex items-center justify-between gap-3">
           <h2 class="text-lg font-medium">Records</h2>

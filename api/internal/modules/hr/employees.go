@@ -13,87 +13,91 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/documentlifecycle"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
 type Employee struct {
-	ID                      int64   `json:"id"`
-	EmployeeNo              string  `json:"employee_no"`
-	FullName                string  `json:"full_name"`
-	Department              string  `json:"department"`
-	DepartmentID            *int64  `json:"department_id,omitempty"`
-	JobTitle                string  `json:"job_title"`
-	HireDate                string  `json:"hire_date"`
-	Status                  string  `json:"status"`
-	BaseSalary              float64 `json:"base_salary"`
-	UserID                  *int64  `json:"user_id,omitempty"`
-	Email                   string  `json:"email,omitempty"`
-	Notes                   *string `json:"notes,omitempty"`
-	TIN                     string  `json:"tin,omitempty"`
-	SSSNo                   string  `json:"sss_no,omitempty"`
-	PhilHealthNo            string  `json:"philhealth_no,omitempty"`
-	PagibigNo               string  `json:"pagibig_no,omitempty"`
-	TaxStatus               string  `json:"tax_status,omitempty"`
-	BankName                string  `json:"bank_name,omitempty"`
-	BankAccountNo           string  `json:"bank_account_no,omitempty"`
-	Birthdate               string  `json:"birthdate,omitempty"`
-	NationalID              string  `json:"national_id,omitempty"`
-	EmergencyContactName    string  `json:"emergency_contact_name,omitempty"`
-	EmergencyContactAddress string  `json:"emergency_contact_address,omitempty"`
-	EmergencyContactPhone   string  `json:"emergency_contact_phone,omitempty"`
+	ID                      int64          `json:"id"`
+	EmployeeNo              string         `json:"employee_no"`
+	FullName                string         `json:"full_name"`
+	Department              string         `json:"department"`
+	DepartmentID            *int64         `json:"department_id,omitempty"`
+	JobTitle                string         `json:"job_title"`
+	HireDate                string         `json:"hire_date"`
+	Status                  string         `json:"status"`
+	BaseSalary              float64        `json:"base_salary"`
+	UserID                  *int64         `json:"user_id,omitempty"`
+	Email                   string         `json:"email,omitempty"`
+	Notes                   *string        `json:"notes,omitempty"`
+	TIN                     string         `json:"tin,omitempty"`
+	SSSNo                   string         `json:"sss_no,omitempty"`
+	PhilHealthNo            string         `json:"philhealth_no,omitempty"`
+	PagibigNo               string         `json:"pagibig_no,omitempty"`
+	TaxStatus               string         `json:"tax_status,omitempty"`
+	BankName                string         `json:"bank_name,omitempty"`
+	BankAccountNo           string         `json:"bank_account_no,omitempty"`
+	Birthdate               string         `json:"birthdate,omitempty"`
+	NationalID              string         `json:"national_id,omitempty"`
+	EmergencyContactName    string         `json:"emergency_contact_name,omitempty"`
+	EmergencyContactAddress string         `json:"emergency_contact_address,omitempty"`
+	EmergencyContactPhone   string         `json:"emergency_contact_phone,omitempty"`
+	CustomValues            map[string]any `json:"custom_values,omitempty"`
 }
 
 type employeeBody struct {
-	EmployeeNo              string  `json:"employee_no"`
-	FullName                string  `json:"full_name"`
-	Department              string  `json:"department"`
-	DepartmentID            *int64  `json:"department_id"`
-	JobTitle                string  `json:"job_title"`
-	HireDate                string  `json:"hire_date"`
-	Status                  string  `json:"status"`
-	BaseSalary              float64 `json:"base_salary"`
-	UserID                  *int64  `json:"user_id"`
-	Email                   *string `json:"email"`
-	Notes                   *string `json:"notes"`
-	TIN                     *string `json:"tin"`
-	SSSNo                   *string `json:"sss_no"`
-	PhilHealthNo            *string `json:"philhealth_no"`
-	PagibigNo               *string `json:"pagibig_no"`
-	TaxStatus               *string `json:"tax_status"`
-	BankName                *string `json:"bank_name"`
-	BankAccountNo           *string `json:"bank_account_no"`
-	Birthdate               *string `json:"birthdate"`
-	NationalID              *string `json:"national_id"`
-	EmergencyContactName    *string `json:"emergency_contact_name"`
-	EmergencyContactAddress *string `json:"emergency_contact_address"`
-	EmergencyContactPhone   *string `json:"emergency_contact_phone"`
+	EmployeeNo              string         `json:"employee_no"`
+	FullName                string         `json:"full_name"`
+	Department              string         `json:"department"`
+	DepartmentID            *int64         `json:"department_id"`
+	JobTitle                string         `json:"job_title"`
+	HireDate                string         `json:"hire_date"`
+	Status                  string         `json:"status"`
+	BaseSalary              float64        `json:"base_salary"`
+	UserID                  *int64         `json:"user_id"`
+	Email                   *string        `json:"email"`
+	Notes                   *string        `json:"notes"`
+	TIN                     *string        `json:"tin"`
+	SSSNo                   *string        `json:"sss_no"`
+	PhilHealthNo            *string        `json:"philhealth_no"`
+	PagibigNo               *string        `json:"pagibig_no"`
+	TaxStatus               *string        `json:"tax_status"`
+	BankName                *string        `json:"bank_name"`
+	BankAccountNo           *string        `json:"bank_account_no"`
+	Birthdate               *string        `json:"birthdate"`
+	NationalID              *string        `json:"national_id"`
+	EmergencyContactName    *string        `json:"emergency_contact_name"`
+	EmergencyContactAddress *string        `json:"emergency_contact_address"`
+	EmergencyContactPhone   *string        `json:"emergency_contact_phone"`
+	CustomValues            map[string]any `json:"custom_values"`
 }
 
 type employeePatch struct {
-	FullName                *string  `json:"full_name"`
-	Department              *string  `json:"department"`
-	DepartmentID            *int64   `json:"department_id"`
-	JobTitle                *string  `json:"job_title"`
-	HireDate                *string  `json:"hire_date"`
-	Status                  *string  `json:"status"`
-	BaseSalary              *float64 `json:"base_salary"`
-	UserID                  *int64   `json:"user_id"`
-	Email                   *string  `json:"email"`
-	Notes                   *string  `json:"notes"`
-	TIN                     *string  `json:"tin"`
-	SSSNo                   *string  `json:"sss_no"`
-	PhilHealthNo            *string  `json:"philhealth_no"`
-	PagibigNo               *string  `json:"pagibig_no"`
-	TaxStatus               *string  `json:"tax_status"`
-	BankName                *string  `json:"bank_name"`
-	BankAccountNo           *string  `json:"bank_account_no"`
-	Birthdate               *string  `json:"birthdate"`
-	NationalID              *string  `json:"national_id"`
-	EmergencyContactName    *string  `json:"emergency_contact_name"`
-	EmergencyContactAddress *string  `json:"emergency_contact_address"`
-	EmergencyContactPhone   *string  `json:"emergency_contact_phone"`
+	FullName                *string        `json:"full_name"`
+	Department              *string        `json:"department"`
+	DepartmentID            *int64         `json:"department_id"`
+	JobTitle                *string        `json:"job_title"`
+	HireDate                *string        `json:"hire_date"`
+	Status                  *string        `json:"status"`
+	BaseSalary              *float64       `json:"base_salary"`
+	UserID                  *int64         `json:"user_id"`
+	Email                   *string        `json:"email"`
+	Notes                   *string        `json:"notes"`
+	TIN                     *string        `json:"tin"`
+	SSSNo                   *string        `json:"sss_no"`
+	PhilHealthNo            *string        `json:"philhealth_no"`
+	PagibigNo               *string        `json:"pagibig_no"`
+	TaxStatus               *string        `json:"tax_status"`
+	BankName                *string        `json:"bank_name"`
+	BankAccountNo           *string        `json:"bank_account_no"`
+	Birthdate               *string        `json:"birthdate"`
+	NationalID              *string        `json:"national_id"`
+	EmergencyContactName    *string        `json:"emergency_contact_name"`
+	EmergencyContactAddress *string        `json:"emergency_contact_address"`
+	EmergencyContactPhone   *string        `json:"emergency_contact_phone"`
+	CustomValues            map[string]any `json:"custom_values"`
 }
 
 func registerEmployeeRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -230,8 +234,14 @@ func createEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"birthdate": "Invalid date."})
 			return
 		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create employee.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
 		var id int64
-		err = pool.QueryRow(r.Context(), `
+		err = tx.QueryRow(r.Context(), `
 			insert into public.hr_employees (
 			  tenant_id, employee_no, full_name, department, department_id, job_title, hire_date, status, base_salary, user_id, email, notes,
 			  tin, sss_no, philhealth_no, pagibig_no, tax_status, bank_name, bank_account_no,
@@ -246,6 +256,14 @@ func createEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			strPtrVal(body.EmergencyContactAddress), strPtrVal(body.EmergencyContactPhone),
 		).Scan(&id)
 		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create employee.", "ERR_INTERNAL")
+			return
+		}
+		if errs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, "hr_employee", id, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create employee.", "ERR_INTERNAL")
 			return
 		}
@@ -407,10 +425,26 @@ func patchEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, strings.TrimSpace(*body.EmergencyContactPhone))
 			n++
 		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update employee.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
 		q := fmt.Sprintf(`update public.hr_employees set %s where id = $1 and tenant_id = $2 and deleted_at is null`, strings.Join(sets, ", "))
-		tag, err := pool.Exec(r.Context(), q, args...)
+		tag, err := tx.Exec(r.Context(), q, args...)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if body.CustomValues != nil {
+			if errs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, "hr_employee", id, body.CustomValues); errs != nil {
+				response.Validation(w, errs)
+				return
+			}
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to update employee.", "ERR_INTERNAL")
 			return
 		}
 		row, _ := loadEmployee(r.Context(), pool, tu.TenantID, id)
@@ -660,7 +694,19 @@ func loadEmployee(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (
 		&row.BankName, &row.BankAccountNo,
 		&row.Birthdate, &row.NationalID, &row.EmergencyContactName, &row.EmergencyContactAddress, &row.EmergencyContactPhone)
 	row.Notes = notes
-	return row, err
+	if err != nil {
+		return row, err
+	}
+	row.CustomValues = attachEmployeeCustom(ctx, pool, tenantID, id)
+	return row, nil
+}
+
+func attachEmployeeCustom(ctx context.Context, pool *pgxpool.Pool, tenantID, entityID int64) map[string]any {
+	vals, loadErr := customfields.LoadValues(ctx, pool, tenantID, "hr_employee", entityID)
+	if loadErr != nil || len(vals) == 0 {
+		return nil
+	}
+	return vals
 }
 
 func resolveDepartmentName(ctx context.Context, pool *pgxpool.Pool, tenantID int64, departmentID *int64, fallback string) (string, error) {

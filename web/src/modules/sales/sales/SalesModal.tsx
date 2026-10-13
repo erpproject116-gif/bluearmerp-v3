@@ -366,6 +366,7 @@ export function SalesModal(props: Props) {
       sales_category: d.sales_category,
       source_sales_order_id: d.source_sales_order_id,
       lines: d.lines,
+      custom_values: d.custom_values,
     };
   };
 

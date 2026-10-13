@@ -128,23 +128,15 @@ export function InlineCustomFieldAdder(props: Props) {
               </button>
             </div>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Field label">
+              <Field label="Name">
                 <input
                   class={inputClass}
                   value={newLabel()}
                   onInput={(e) => setNewLabel(e.currentTarget.value)}
-                  placeholder="e.g. Tax ID"
+                  placeholder="e.g. Site contact"
                 />
               </Field>
-              <Field label="Field key (optional)">
-                <input
-                  class={inputClass}
-                  value={newKey()}
-                  onInput={(e) => setNewKey(e.currentTarget.value)}
-                  placeholder={slugKey(newLabel()) || "tax_id"}
-                />
-              </Field>
-              <Field label="Field type">
+              <Field label="Answer kind">
                 <select
                   class={inputClass}
                   value={newType()}

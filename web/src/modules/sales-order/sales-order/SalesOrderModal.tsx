@@ -278,6 +278,7 @@ export function SalesOrderModal(props: Props) {
     progress_status: progressStatus(),
     source_quotation_id: sourceQuotationId(),
     lines: lines(),
+    custom_values: customValues(),
   });
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {

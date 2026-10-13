@@ -44,6 +44,24 @@ func indexOf(s, sub string) int {
 	return -1
 }
 
+func TestDiffChanges_flattensCustomValues(t *testing.T) {
+	oldM := map[string]any{"custom_values": map[string]any{"site_contact": "Ana"}}
+	newM := map[string]any{"custom_values": map[string]any{"site_contact": "Bea"}}
+	details := diffChanges(oldM, newM)
+	found := false
+	for _, d := range details {
+		if d == "site contact changed from Ana to Bea" {
+			found = true
+		}
+		if containsSubstring(d, "custom values") {
+			t.Fatalf("parent map leaked: %q", d)
+		}
+	}
+	if !found {
+		t.Fatalf("missing field line: %#v", details)
+	}
+}
+
 func TestLinesChanged_detectsLineEdits(t *testing.T) {
 	oldM := map[string]any{"lines": []any{map[string]any{"line_no": float64(1), "qty": float64(1)}}}
 	newM := map[string]any{"lines": []any{map[string]any{"line_no": float64(1), "qty": float64(2)}}}

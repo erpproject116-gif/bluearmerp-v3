@@ -362,6 +362,7 @@ export function RepairOrderModal(props: Props) {
     project_label: projectLabel(),
     lines: lines(),
     parts: parts(),
+    custom_values: customValues(),
   });
 
   const draft = useDocumentDraft({

@@ -1,7 +1,7 @@
 import { createSignal, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
-import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 
@@ -26,6 +26,7 @@ export default function PayItemsPage() {
   const [name, setName] = createSignal("");
   const [itemKind, setItemKind] = createSignal("earning");
   const [saving, setSaving] = createSignal(false);
+  const [open, setOpen] = createSignal(false);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
 
   const list = createQuery(() => ({
@@ -62,6 +63,7 @@ export default function PayItemsPage() {
     toast.success("Pay item created.");
     setCode("");
     setName("");
+    setOpen(false);
     void qc.invalidateQueries({ queryKey: ["hr-pay-item-types"] });
   };
 
@@ -85,31 +87,28 @@ export default function PayItemsPage() {
           Define reusable allowances and deductions, then assign amounts on each employee. Payroll picks up active
           assignments for the pay period.
         </p>
-        <div class="grid gap-3 sm:grid-cols-4">
-          <Field label="Code">
-            <input class={inputClass} value={code()} onInput={(e) => setCode(e.currentTarget.value)} placeholder="ALLOW_RICE" />
-          </Field>
-          <Field label="Name">
-            <input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder="Rice allowance" />
-          </Field>
-          <Field label="Kind">
-            <select class={inputClass} value={itemKind()} onChange={(e) => setItemKind(e.currentTarget.value)}>
-              <option value="earning">Earning</option>
-              <option value="deduction">Deduction</option>
-            </select>
-          </Field>
-          <div class="flex items-end">
-            <button
-              type="button"
-              class="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              disabled={saving()}
-              onClick={() => void create()}
-            >
-              {saving() ? "Saving…" : "Add item"}
-            </button>
-          </div>
-        </div>
       </section>
+      <EntityModal
+        open={open()}
+        title="New pay item"
+        onClose={() => setOpen(false)}
+        onSave={() => void create()}
+        saving={saving()}
+        saveLabel="Add item"
+      >
+        <Field label="Code">
+          <input class={inputClass} value={code()} onInput={(e) => setCode(e.currentTarget.value)} placeholder="ALLOW_RICE" />
+        </Field>
+        <Field label="Name">
+          <input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder="Rice allowance" />
+        </Field>
+        <Field label="Kind">
+          <select class={inputClass} value={itemKind()} onChange={(e) => setItemKind(e.currentTarget.value)}>
+            <option value="earning">Earning</option>
+            <option value="deduction">Deduction</option>
+          </select>
+        </Field>
+      </EntityModal>
 
       <div class="mb-3 flex gap-2">
         <button
@@ -168,8 +167,9 @@ export default function PayItemsPage() {
         selectedId={selectedId()}
         onSelect={setSelectedId}
         onEdit={() => {}}
-        onNew={() => {}}
-        showNew={false}
+        onNew={() => setOpen(true)}
+        showNew={true}
+        newLabel="New pay item"
         codeKey="item_code"
         nameKey="item_name"
         page={1}

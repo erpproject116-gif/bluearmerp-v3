@@ -5,6 +5,8 @@ import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid
 import { WideEntityModal } from "../../shared/WideEntityModal";
 import { EntityFormSettingsPage } from "../../shared/EntityFormSettingsPage";
 import { LookupCombo } from "../../shared/LookupCombo";
+import { CustomFieldsSection } from "../../shared/CustomFieldsSection";
+import { useCustomValues } from "../../shared/useCustomValues";
 import { fetchLocationOptions, fetchPartnerOptions } from "../../shared/useDocumentLookups";
 import { useToast } from "../../shared/toast";
 import { hasPermission, useAuth } from "../../shared/auth-context";
@@ -35,6 +37,7 @@ export function ServiceRequestsPage() {
   const [source, setSource] = createSignal("manual");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [types, setTypes] = createSignal<{ id: number; name: string }[]>([]);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
 
   const load = async () => {
     const data = await svc<Row[]>(`/requests?q=${encodeURIComponent(q())}`);
@@ -70,7 +73,10 @@ export function ServiceRequestsPage() {
             .then(() => toast.success("Existing or new service job returned."))
             .catch((err) => toast.warning(err instanceof Error ? err.message : "Could not convert."));
         }}
-        onNew={() => setOpen(true)}
+        onNew={() => {
+          loadCustom({});
+          setOpen(true);
+        }}
         newLabel="New request"
         codeKey="request_no"
         nameKey="subject"
@@ -113,6 +119,7 @@ export function ServiceRequestsPage() {
                   partner_id: partnerId(),
                   location_id: locationId(),
                   source: source(),
+                  custom_values: customValues(),
                 }),
               });
               toast.success("Request created.");
@@ -174,6 +181,7 @@ export function ServiceRequestsPage() {
             </select>
           </Field>
         </div>
+        <CustomFieldsSection entityType="svc_request" values={customValues} onChange={setCustom} />
       </WideEntityModal>
     </>
   );
@@ -195,6 +203,7 @@ export function ServiceJobsPage() {
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
   const [tab, setTab] = createSignal("general");
+  const { customValues, setCustom, loadCustom } = useCustomValues();
 
   const load = async () => {
     setRows((await svc<Row[]>(`/jobs?q=${encodeURIComponent(q())}`)) ?? []);
@@ -232,12 +241,19 @@ export function ServiceJobsPage() {
           setEditing(row);
           setSubject(String(row.subject ?? ""));
           setTypeId(String(row.service_type_id ?? ""));
+          loadCustom((row.custom_values as Record<string, unknown> | undefined) ?? {});
           setOpen(true);
-          void svc<Row>(`/jobs/${row.id}`).then(setEditing).catch(() => undefined);
+          void svc<Row>(`/jobs/${row.id}`).then((detail) => {
+            setEditing(detail);
+            setSubject(String(detail.subject ?? ""));
+            setDescription(String(detail.description ?? ""));
+            loadCustom((detail.custom_values as Record<string, unknown> | undefined) ?? {});
+          }).catch(() => undefined);
         }}
         onNew={() => {
           setEditing(null);
           setSubject("");
+          loadCustom({});
           setOpen(true);
         }}
         newLabel="New job order"
@@ -276,6 +292,7 @@ export function ServiceJobsPage() {
                     subject: subject(),
                     description: description(),
                     row_version: editing()?.row_version,
+                    custom_values: customValues(),
                   }),
                 });
               } else {
@@ -287,6 +304,7 @@ export function ServiceJobsPage() {
                     service_type_id: Number(typeId()),
                     partner_id: partnerId(),
                     location_id: locationId(),
+                    custom_values: customValues(),
                   }),
                 });
               }
@@ -327,6 +345,7 @@ export function ServiceJobsPage() {
               <p class="text-sm text-text-secondary">Internal work does not require a customer.</p>
             </Show>
           </div>
+          <CustomFieldsSection entityType="svc_job" values={customValues} onChange={setCustom} />
         </Show>
         <Show when={tab() === "equipment"}>
           <p class="text-sm text-text-secondary">{tracking() || selectedType()?.config?.equipment_tracking ? "Link customer equipment from the Equipment register. It does not change saleable stock." : "Equipment tracking is off for this service type."}</p>
@@ -430,6 +449,7 @@ export function CustomerEquipmentPage() {
   const [partnerLabel, setPartnerLabel] = createSignal("");
   const [locationId, setLocationId] = createSignal<number | null>(null);
   const [locationLabel, setLocationLabel] = createSignal("");
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const load = async () => setRows((await svc<Row[]>("/equipment")) ?? []);
   onMount(() => {
     void load().catch((err) => toast.warning(err instanceof Error ? err.message : "Could not load equipment."));
@@ -448,7 +468,10 @@ export function CustomerEquipmentPage() {
         selectedId={null}
         onSelect={() => undefined}
         onEdit={() => undefined}
-        onNew={() => setOpen(true)}
+        onNew={() => {
+          loadCustom({});
+          setOpen(true);
+        }}
         newLabel="New equipment"
         codeKey="serial_no"
         nameKey="name"
@@ -456,7 +479,7 @@ export function CustomerEquipmentPage() {
         onRefresh={() => void load()}
       />
       <WideEntityModal open={open()} title="Customer equipment" onClose={() => setOpen(false)} onSave={() => {
-        void svc("/equipment", { method: "POST", body: JSON.stringify({ name: name(), serial_no: serial(), is_serialized: serial().trim() !== "", partner_id: partnerId(), location_id: locationId(), qty: 1 }) })
+        void svc("/equipment", { method: "POST", body: JSON.stringify({ name: name(), serial_no: serial(), is_serialized: serial().trim() !== "", partner_id: partnerId(), location_id: locationId(), qty: 1, custom_values: customValues() }) })
           .then(() => { toast.success("Equipment saved. Stock was not changed."); setOpen(false); return load(); })
           .catch((err) => toast.warning(err instanceof Error ? err.message : "Could not save."));
       }}>
@@ -466,6 +489,7 @@ export function CustomerEquipmentPage() {
           <LookupCombo label="Customer" value={partnerLabel} selectedId={partnerId} onInput={setPartnerLabel} onSelect={(o) => { setPartnerId(o.id); setPartnerLabel(o.label); }} onClear={() => { setPartnerId(null); setPartnerLabel(""); }} fetchOptions={(query) => fetchPartnerOptions(query, "customer")} />
           <LookupCombo label="Branch" value={locationLabel} selectedId={locationId} onInput={setLocationLabel} onSelect={(o) => { setLocationId(o.id); setLocationLabel(o.label); }} onClear={() => { setLocationId(null); setLocationLabel(""); }} fetchOptions={fetchLocationOptions} />
         </div>
+        <CustomFieldsSection entityType="svc_customer_equipment" values={customValues} onChange={setCustom} />
       </WideEntityModal>
     </>
   );
@@ -516,6 +540,7 @@ export function ServiceReleasePage() {
   const [equipmentId, setEquipmentId] = createSignal("");
   const [qty, setQty] = createSignal("1");
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
   const load = async () => setRows((await svc<Row[]>("/load-slips")) ?? []);
   onMount(() => {
     void load().catch((err) => toast.warning(err instanceof Error ? err.message : "Could not load slips."));
@@ -533,7 +558,10 @@ export function ServiceReleasePage() {
         selectedId={selectedId()}
         onSelect={setSelectedId}
         onEdit={(row) => { window.open(`/app/services/releases/${row.id}/print`, "_blank"); }}
-        onNew={() => setOpen(true)}
+        onNew={() => {
+          loadCustom({});
+          setOpen(true);
+        }}
         newLabel="New slip"
         codeKey="slip_no"
         nameKey="slip_type"
@@ -559,6 +587,7 @@ export function ServiceReleasePage() {
           origin_location_id: origin(),
           destination_location_id: destination(),
           items: equipmentId().trim() ? [{ equipment_id: Number(equipmentId()), qty: Number(qty()) || 1 }] : [],
+          custom_values: customValues(),
         }) })
           .then(() => { toast.success("Slip created."); setOpen(false); return load(); })
           .catch((err) => toast.warning(err instanceof Error ? err.message : "Could not save."));
@@ -579,6 +608,7 @@ export function ServiceReleasePage() {
         <Field label="Quantity">
           <input class={inputClass} value={qty()} onInput={(e) => setQty(e.currentTarget.value)} />
         </Field>
+        <CustomFieldsSection entityType="svc_load_slip" values={customValues} onChange={setCustom} />
         <p class="text-sm text-text-secondary">A serial is released whole. A quantity can be partial. This slip does not move company stock.</p>
       </WideEntityModal>
     </>

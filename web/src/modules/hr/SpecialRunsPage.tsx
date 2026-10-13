@@ -1,7 +1,8 @@
 import { createSignal, For, Show } from "solid-js";
-import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
-import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { fetchEmployeeOptions } from "../../shared/useHr";
+import { LookupCombo } from "../../shared/LookupCombo";
+import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { formatAmount, formatPeso } from "../../shared/money";
@@ -29,23 +30,15 @@ type SpecialResult = {
 export default function SpecialRunsPage() {
   const toast = useToast();
   const [year, setYear] = createSignal(new Date().getFullYear());
-  const [empId, setEmpId] = createSignal("");
+  const [empId, setEmpId] = createSignal<number | null>(null);
+  const [empLabel, setEmpLabel] = createSignal("");
   const [sepDate, setSepDate] = createSignal(new Date().toISOString().slice(0, 10));
   const [preview13, setPreview13] = createSignal<SpecialResult | null>(null);
   const [finalPreview, setFinalPreview] = createSignal<SpecialResult | null>(null);
   const [busy, setBusy] = createSignal(false);
-
+  const [thirteenthOpen, setThirteenthOpen] = createSignal(false);
+  const [finalOpen, setFinalOpen] = createSignal(false);
   const employees = createQuery(() => ({
-    queryKey: ["hr-employees-special"],
-    queryFn: async () => {
-      const res = await apiFetch<{ id: number; employee_no: string; full_name: string }[]>(
-        "/api/v1/hr/employees?page=1&pageSize=200&status=active",
-      );
-      return res.data ?? [];
-    },
-  }));
-
-  const previewThirteenth = async () => {
     setBusy(true);
     const res = await apiFetch<SpecialResult>("/api/v1/hr/special-runs/thirteenth/preview", {
       method: "POST",
@@ -121,34 +114,30 @@ export default function SpecialRunsPage() {
           Computes (sum of BASIC payslip lines in the calendar year) ÷ 12. Preview before posting.
         </p>
         <div class="mb-3 flex flex-wrap gap-2">
-          <Field label="Year">
-            <input
-              type="number"
-              class={inputClass}
-              value={year()}
-              onInput={(e) => setYear(Number(e.currentTarget.value))}
-            />
-          </Field>
-          <div class="flex items-end gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm disabled:opacity-50"
-              disabled={busy()}
-              onClick={() => void previewThirteenth()}
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-              disabled={busy()}
-              onClick={() => void runThirteenth()}
-            >
-              Run &amp; post
-            </button>
-          </div>
-        </div>
-        <Show when={preview13()}>
+        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setThirteenthOpen(true)}>
+          New 13th month
+        </button>
+      </section>
+      <EntityModal
+        open={thirteenthOpen()}
+        title="New 13th month"
+        wide
+        onClose={() => setThirteenthOpen(false)}
+        onSave={() => void runThirteenth()}
+        onSecondarySave={() => void previewThirteenth()}
+        secondarySaveLabel="Preview"
+        saveLabel="Run & post"
+        saving={busy()}
+      >
+        <Field label="Year">
+          <input
+            type="number"
+            class={inputClass}
+            value={year()}
+            onInput={(e) => setYear(Number(e.currentTarget.value))}
+          />
+        </Field>
+        <div class="sm:col-span-2 lg:col-span-3">
           {(p) => (
             <div class="overflow-x-auto text-sm">
               <p class="mb-2 text-text-secondary">
@@ -178,6 +167,8 @@ export default function SpecialRunsPage() {
           )}
         </Show>
       </section>
+        </div>
+      </EntityModal>
 
       <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="mb-1 text-lg font-medium">Final pay</h2>
@@ -185,42 +176,34 @@ export default function SpecialRunsPage() {
           Last-month pro-rate + leave cash-out (cashable balances) + pro-rated 13th.
           Posting marks the employee terminated and writes leave cash-out to the ledger.
         </p>
-        <div class="mb-3 grid gap-3 sm:grid-cols-3">
-          <Field label="Employee">
-            <select class={inputClass} value={empId()} onChange={(e) => setEmpId(e.currentTarget.value)}>
-              <option value="">Select…</option>
-              <For each={employees.data ?? []}>
-                {(e) => (
-                  <option value={e.id}>
-                    {e.employee_no} — {e.full_name}
-                  </option>
-                )}
-              </For>
-            </select>
-          </Field>
-          <Field label="Separation date">
+        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setFinalOpen(true)}>
+          New final pay
+        </button>
+      </section>
+      <EntityModal
+        open={finalOpen()}
+        title="New final pay"
+        onClose={() => setFinalOpen(false)}
+        onSave={() => void runFinal()}
+        onSecondarySave={() => void previewFinal()}
+        secondarySaveLabel="Preview"
+        saveLabel="Run & post"
+        saving={busy()}
+      >
+          <LookupCombo
+            label="Employee"
+            value={empLabel}
+            selectedId={empId}
+            onInput={setEmpLabel}
+            onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }}
+            onClear={() => { setEmpId(null); setEmpLabel(""); }}
+            fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
+            placeholder="Search employees…"
+          />
             <input type="date" class={inputClass} value={sepDate()} onInput={(e) => setSepDate(e.currentTarget.value)} />
           </Field>
           <div class="flex items-end gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm disabled:opacity-50"
-              disabled={busy()}
-              onClick={() => void previewFinal()}
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-              disabled={busy()}
-              onClick={() => void runFinal()}
-            >
-              Run &amp; post
-            </button>
-          </div>
-        </div>
-        <Show when={finalPreview()?.employees[0]}>
+        <div class="sm:col-span-2 lg:col-span-3">
           {(row) => (
             <div class="rounded-lg bg-slate-50 p-3 text-sm">
               <p class="font-medium">{row().employee_name}</p>
@@ -230,6 +213,7 @@ export default function SpecialRunsPage() {
           )}
         </Show>
       </section>
-    </HrLayout>
+        </div>
+      </EntityModal>
   );
 }

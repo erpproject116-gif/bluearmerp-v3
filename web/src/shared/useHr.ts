@@ -26,6 +26,7 @@ export type Employee = {
   emergency_contact_name?: string;
   emergency_contact_address?: string;
   emergency_contact_phone?: string;
+  custom_values?: Record<string, unknown>;
 };
 
 export type HrDepartment = {
@@ -88,6 +89,26 @@ export function useEmployees(params: () => {
       staleTime: 15_000,
     };
   });
+}
+
+export function employeeLookupLabel(employeeNo: string, fullName: string) {
+  const no = employeeNo.trim();
+  const name = fullName.trim();
+  if (no && name) return `${no} — ${name}`;
+  return name || no;
+}
+
+export async function fetchEmployeeOptions(q: string, status?: string): Promise<{ id: number; label: string }[]> {
+  const qs = new URLSearchParams({ page: "1", pageSize: "20" });
+  const query = q.trim();
+  if (query) qs.set("q", query);
+  if (status) qs.set("status", status);
+  const res = await apiFetch<Employee[]>(`/api/v1/hr/employees?${qs}`);
+  if (!res.success) return [];
+  return (res.data ?? []).map((e) => ({
+    id: e.id,
+    label: employeeLookupLabel(e.employee_no, e.full_name),
+  }));
 }
 
 export function useInvalidateEmployees() {

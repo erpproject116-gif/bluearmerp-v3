@@ -566,18 +566,10 @@ export function EntityFormSettingsPage(props: Props) {
         <div class="mt-8">
           <h3 class="mb-3 text-sm font-semibold text-text-primary">{uiLabel("form_settings.add_custom_field")}</h3>
           <div class="grid grid-cols-1 gap-3 rounded-xl border border-dashed border-brand-200 bg-brand-50/40 p-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Field label">
-              <input class={inputClass} value={newLabel()} onInput={(e) => setNewLabel(e.currentTarget.value)} placeholder="e.g. Tax ID" />
+            <Field label="Name">
+              <input class={inputClass} value={newLabel()} onInput={(e) => setNewLabel(e.currentTarget.value)} placeholder="e.g. Site contact" />
             </Field>
-            <Field label="Field key (optional)">
-              <input
-                class={inputClass}
-                value={newKey()}
-                onInput={(e) => setNewKey(e.currentTarget.value)}
-                placeholder={slugKey(newLabel()) || "tax_id"}
-              />
-            </Field>
-            <Field label="Field type">
+            <Field label="Answer kind">
               <select
                 class={inputClass}
                 value={newType()}

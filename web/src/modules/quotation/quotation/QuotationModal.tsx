@@ -309,6 +309,7 @@ export function QuotationModal(props: Props) {
     notes: notes(),
     progress_status: progressStatus(),
     lines: lines(),
+    custom_values: customValues(),
   });
 
   const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {

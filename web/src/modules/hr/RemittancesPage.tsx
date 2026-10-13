@@ -6,7 +6,7 @@ import { exportRemittanceCsv } from "../../shared/hrCsvImport";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
-import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
 import { formatAmount } from "../../shared/money";
 
@@ -79,9 +79,9 @@ export default function RemittancesPage() {
     getPayload: buildDraftPayload,
     onApply: applyDraftPayload,
     enabled: () => true,
+    enabled: () => buildOpen(),
     localOnly: true,
-    autoApply: () => true,
-  });
+    autoApply: () => false,
 
   const build = async () => {
     if (!periodId()) {
@@ -102,6 +102,7 @@ export default function RemittancesPage() {
     setSelectedId(res.data?.batch_id ?? null);
     await draft.clearOnSave();
     void qc.invalidateQueries({ queryKey: ["hr-remittances"] });
+    setBuildOpen(false);
   };
 
   const exportCsv = async (id: number) => {
@@ -135,41 +136,41 @@ export default function RemittancesPage() {
           Pag-IBIG, or BIR withholding).
         </p>
         <draft.DraftBanner />
-        <div class="grid gap-3 sm:grid-cols-4">
-          <Field label="Pay period">
-            <select
-              class={inputClass}
-              value={periodId() ?? ""}
-              onChange={(e) => setPeriodId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
-            >
-              <option value="">Select…</option>
-              <For each={periods.data ?? []}>
-                {(p) => (
-                  <option value={p.id}>
-                    {p.period_label} ({p.status})
-                  </option>
-                )}
-              </For>
-            </select>
-          </Field>
-          <Field label="Agency">
-            <select class={inputClass} value={agency()} onChange={(e) => setAgency(e.currentTarget.value)}>
-              <For each={[...AGENCIES]}>{(a) => <option value={a.id}>{a.label}</option>}</For>
-            </select>
-          </Field>
-          <div class="flex items-end sm:col-span-2">
-            <button
-              type="button"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              disabled={building()}
-              onClick={() => void build()}
-            >
-              {building() ? "Building…" : "Build batch"}
-            </button>
-          </div>
-        </div>
+        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setBuildOpen(true)}>
+          New remittance
+        </button>
       </section>
-
+      <EntityModal
+        open={buildOpen()}
+        title="New remittance"
+        onClose={() => setBuildOpen(false)}
+        onSave={() => void build()}
+        saving={building()}
+        saveLabel="Build batch"
+      >
+        <draft.DraftBanner />
+        <Field label="Pay period">
+          <select
+            class={inputClass}
+            value={periodId() ?? ""}
+            onChange={(e) => setPeriodId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+          >
+            <option value="">Select…</option>
+            <For each={periods.data ?? []}>
+              {(p) => (
+                <option value={p.id}>
+                  {p.period_label} ({p.status})
+                </option>
+              )}
+            </For>
+          </select>
+        </Field>
+        <Field label="Agency">
+          <select class={inputClass} value={agency()} onChange={(e) => setAgency(e.currentTarget.value)}>
+            <For each={[...AGENCIES]}>{(a) => <option value={a.id}>{a.label}</option>}</For>
+          </select>
+        </Field>
+      </EntityModal>
       <section class="mb-6">
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-lg font-medium">Batches</h2>
@@ -216,8 +217,9 @@ export default function RemittancesPage() {
           onSelect={setSelectedId}
           onEdit={(batch) => setSelectedId(batch.id)}
           onNew={() => {}}
-          showNew={false}
-          codeKey="agency"
+          onNew={() => setBuildOpen(true)}
+          showNew={true}
+          newLabel="New remittance"
           nameKey="period_label"
           page={1}
           pageSize={50}

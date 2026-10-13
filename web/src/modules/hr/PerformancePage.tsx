@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
-import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { Modal } from "../../shared/Modal";
 import { SignaturePad } from "../../shared/SignaturePad";
 import { useToast } from "../../shared/toast";
@@ -26,6 +26,7 @@ export default function PerformancePage() {
   const [ackId, setAckId] = createSignal<number | null>(null);
   const [signedName, setSignedName] = createSignal("");
   const [sigUrl, setSigUrl] = createSignal<string | null>(null);
+  const [cycleOpen, setCycleOpen] = createSignal(false);
 
   const cycles = createQuery(() => ({
     queryKey: ["hr-review-cycles"],
@@ -45,6 +46,7 @@ export default function PerformancePage() {
     });
     if (!res.success) return toast.warning(res.message ?? "Failed.");
     toast.success("Cycle created.");
+    setCycleOpen(false);
     setCycleId(res.data?.id ?? null);
     void qc.invalidateQueries({ queryKey: ["hr-review-cycles"] });
   };
@@ -100,15 +102,14 @@ export default function PerformancePage() {
       <h1 class="mb-1 text-2xl font-semibold">Evaluations</h1>
       <p class="mb-6 text-sm text-text-secondary">Review cycles, manager scoring, signature acknowledgment, and 201 store.</p>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
-        <h2 class="mb-3 text-lg font-medium">New cycle</h2>
-        <div class="grid gap-3 sm:grid-cols-3">
-          <Field label="Name"><input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} /></Field>
-          <Field label="Start"><input type="date" class={inputClass} value={start()} onInput={(e) => setStart(e.currentTarget.value)} /></Field>
-          <Field label="End"><input type="date" class={inputClass} value={end()} onInput={(e) => setEnd(e.currentTarget.value)} /></Field>
-        </div>
-        <button type="button" class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void createCycle()}>Create cycle</button>
-      </section>
+      <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCycleOpen(true)}>
+        New cycle
+      </button>
+      <EntityModal open={cycleOpen()} title="New cycle" onClose={() => setCycleOpen(false)} onSave={() => void createCycle()} saveLabel="Create cycle">
+        <Field label="Name"><input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} /></Field>
+        <Field label="Start"><input type="date" class={inputClass} value={start()} onInput={(e) => setStart(e.currentTarget.value)} /></Field>
+        <Field label="End"><input type="date" class={inputClass} value={end()} onInput={(e) => setEnd(e.currentTarget.value)} /></Field>
+      </EntityModal>
 
       <section class="mb-4 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Cycles</h2>

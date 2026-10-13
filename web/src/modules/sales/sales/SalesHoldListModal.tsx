@@ -31,6 +31,7 @@ export type SalesHoldPayload = {
   sales_category: string;
   source_sales_order_id: number | null;
   lines: SalesLineRow[];
+  custom_values?: Record<string, unknown>;
 };
 
 export type SalesHoldRow = {
