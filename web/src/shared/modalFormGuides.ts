@@ -248,8 +248,8 @@ export const MODAL_FORM_GUIDES: Record<string, ModalFormGuideDef> = {
     summary: "A journal entry records accounting debits and credits that are not from invoices or receipts.",
     steps: [
       "Add a short remark describing the entry.",
-      "Add lines with account, debit, and credit (totals must balance).",
-      "Save as draft, then post when ready.",
+      "Add lines with an account, a debit, and a credit. A draft may be saved while the sides differ.",
+      "Post when ready. Posting requires the totals to match.",
     ],
   },
   support_ticket: {

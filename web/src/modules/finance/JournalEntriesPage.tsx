@@ -39,6 +39,12 @@ type DimOption = { id: number; name?: string; department_name?: string; project_
 const toolbarBtn =
   "rounded-lg border border-stroke px-3 py-2 text-sm font-medium text-text-secondary transition hover:erp-panel hover:text-text-primary disabled:opacity-50";
 
+function registerSides(row: JournalEntryRow) {
+  const debit = Number(row.total_debit) || 0;
+  const credit = Number(row.total_credit) || 0;
+  return { debit, credit, balanced: Math.abs(debit - credit) < 0.005 };
+}
+
 export default function JournalEntriesPage() {
   const toast = useToast();
   const client = useQueryClient();
@@ -351,18 +357,18 @@ export default function JournalEntriesPage() {
           },
           { key: "entry_no", header: "Entry No", clickable: true },
           {
-            key: "total_debit",
-            header: "Debit",
+            key: "amount",
+            header: "Amount",
             sortable: false,
-            render: (row) => formatMoney(row.total_debit ?? 0),
-            exportValue: (row) => row.total_debit ?? 0,
-          },
-          {
-            key: "total_credit",
-            header: "Credit",
-            sortable: false,
-            render: (row) => formatMoney(row.total_credit ?? 0),
-            exportValue: (row) => row.total_credit ?? 0,
+            render: (row) => {
+              const sides = registerSides(row);
+              if (sides.balanced) return formatMoney(sides.debit);
+              return `${formatMoney(sides.debit)} debit / ${formatMoney(sides.credit)} credit`;
+            },
+            exportValue: (row) => {
+              const sides = registerSides(row);
+              return sides.balanced ? sides.debit : `${sides.debit} / ${sides.credit}`;
+            },
           },
           {
             key: "status",
