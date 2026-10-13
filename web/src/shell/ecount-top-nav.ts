@@ -44,7 +44,7 @@ export const ECOUNT_TOP_MODULES: EcountTopModule[] = [
     id: "acct1",
     label: "Ledger",
     hint: "General ledger and taxes",
-    href: "/app/finance/acct-i/journal-entries",
+    href: "/app/finance/acct-i/reports/general-ledger",
     navGroupIds: ["accounting_dept"],
   },
   {
@@ -937,7 +937,7 @@ export const HOME_SIDEBAR_AREAS: HomeSidebarArea[] = [
       {
         id: "ledger",
         label: "Ledger",
-        href: "/app/finance/acct-i/journal-entries",
+        href: "/app/finance/acct-i/reports/general-ledger",
         iconId: "sub_general_ledger",
         topId: "acct1",
         expandGroupId: "accounting_dept",

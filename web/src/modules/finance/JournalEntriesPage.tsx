@@ -1,7 +1,9 @@
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
+import { formatMoney } from "../../shared/money";
+import { toISODate } from "../../shared/calendar/dateUtils";
 import { handleSaveResult } from "../../shared/handleSaveResult";
 import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
@@ -18,6 +20,8 @@ type JournalEntryRow = {
   status: string;
   remarks?: string;
   entry_date?: string;
+  total_debit?: number;
+  total_credit?: number;
   archived_at?: string | null;
   reversed_at?: string | null;
   reversal_of_entry_id?: number | null;
@@ -43,9 +47,10 @@ export default function JournalEntriesPage() {
   const [selectedIds, setSelectedIds] = createSignal<Set<number>>(new Set());
   const [readOnly, setReadOnly] = createSignal(false);
   const { page, setPage, q, setQ, statusFilter, setStatusFilter, sort, order, toggleSort, pageSize, setPageSize } =
-    useTransactionListState("updated_at");
+    useTransactionListState("entry_date");
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editId, setEditId] = createSignal<number | null>(null);
+  const [entryDate, setEntryDate] = createSignal(toISODate(new Date()));
   const [remarks, setRemarks] = createSignal("");
   const [lines, setLines] = createSignal<JournalLine[]>([
     { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
@@ -79,21 +84,6 @@ export default function JournalEntriesPage() {
     placeholderData: (prev: { rows: JournalEntryRow[]; total: number } | undefined) => prev,
   }));
 
-  createEffect(() => {
-    const raw = searchParams.highlight ?? searchParams.openId;
-    const id = Number(Array.isArray(raw) ? raw[0] : raw);
-    if (!Number.isFinite(id) || id <= 0) return;
-    if (!list.data?.rows.some((r) => r.id === id)) return;
-    setSelectedId(id);
-    const next = { ...searchParams } as Record<string, string | undefined>;
-    delete next.highlight;
-    delete next.openId;
-    setSearchParams(next, { replace: true });
-    requestAnimationFrame(() => {
-      document.querySelector(`[data-row-id="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    });
-  });
-
   const accounts = createQuery(() => ({
     queryKey: ["finance-accounts-picker"],
     queryFn: async () => {
@@ -125,10 +115,20 @@ export default function JournalEntriesPage() {
 
   const selectedRow = () => (list.data?.rows ?? []).find((r) => r.id === selectedId()) ?? null;
   const isArchived = (row: JournalEntryRow) => Boolean(row.archived_at) || row.status === "cancelled";
+  const lineTotals = createMemo(() => {
+    let debit = 0;
+    let credit = 0;
+    for (const ln of lines()) {
+      debit += Number(ln.debit) || 0;
+      credit += Number(ln.credit) || 0;
+    }
+    return { debit, credit, difference: debit - credit };
+  });
 
   const openCreate = () => {
     setReadOnly(false);
     setEditId(null);
+    setEntryDate(toISODate(new Date()));
     setRemarks("");
     setLines([
       { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" },
@@ -158,10 +158,64 @@ export default function JournalEntriesPage() {
     while (loaded.length < 2) loaded.push({ account_code: "", debit: "", credit: "", dept_id: "", project_id: "" });
     setReadOnly(intent === "view" && locked);
     setEditId(row.id);
+    setEntryDate(res.data.entry_date?.slice(0, 10) || toISODate(new Date()));
     setRemarks(res.data.remarks ?? "");
     setLines(loaded);
     setModalOpen(true);
   };
+
+  const openTrace = async (id: number) => {
+    const res = await apiFetch<JournalEntryDetail>(`/api/v1/finance/journal-entries/${id}`);
+    if (!res.success || !res.data) {
+      toast.error(res.message ?? "Failed to load journal entry.");
+      return;
+    }
+    const row: JournalEntryRow = {
+      id: res.data.id,
+      entry_no: res.data.entry_no,
+      status: res.data.status,
+      remarks: res.data.remarks,
+      entry_date: res.data.entry_date,
+      archived_at: res.data.archived_at,
+      reversed_at: res.data.reversed_at,
+      reversal_of_entry_id: res.data.reversal_of_entry_id,
+      reversed_by_entry_id: res.data.reversed_by_entry_id,
+    };
+    setSelectedId(id);
+    const loaded = (res.data.lines ?? []).map((ln) => ({
+      account_code: ln.account_code ?? "",
+      debit: ln.debit ? String(ln.debit) : "",
+      credit: ln.credit ? String(ln.credit) : "",
+      dept_id: ln.dept_id ? String(ln.dept_id) : "",
+      project_id: ln.project_id ? String(ln.project_id) : "",
+    }));
+    while (loaded.length < 2) loaded.push({ account_code: "", debit: "", credit: "", dept_id: "", project_id: "" });
+    const locked = row.status !== "draft" || isArchived(row);
+    setReadOnly(locked);
+    setEditId(row.id);
+    setEntryDate(row.entry_date?.slice(0, 10) || toISODate(new Date()));
+    setRemarks(row.remarks ?? "");
+    setLines(loaded);
+    setModalOpen(true);
+  };
+
+  let tracedHighlight = "";
+  createEffect(() => {
+    const raw = searchParams.highlight ?? searchParams.openId;
+    const id = Number(Array.isArray(raw) ? raw[0] : raw);
+    if (!Number.isFinite(id) || id <= 0) {
+      tracedHighlight = "";
+      return;
+    }
+    const key = String(id);
+    if (tracedHighlight === key) return;
+    tracedHighlight = key;
+    const next = { ...searchParams } as Record<string, string | undefined>;
+    delete next.highlight;
+    delete next.openId;
+    setSearchParams(next, { replace: true });
+    void openTrace(id);
+  });
 
   const openEdit = async (row = selectedRow()) => {
     if (!row) {
@@ -176,8 +230,9 @@ export default function JournalEntriesPage() {
   const draft = useDocumentDraft({
     entityType: DRAFT_ENTITY.finJournalEntry,
     draftKey: "new",
-    getPayload: () => ({ remarks: remarks(), lines: lines() }),
+    getPayload: () => ({ entry_date: entryDate(), remarks: remarks(), lines: lines() }),
     onApply: (payload) => {
+      setEntryDate(payload.entry_date?.slice(0, 10) || toISODate(new Date()));
       setRemarks(payload.remarks);
       setLines(payload.lines?.length ? payload.lines : [{ account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }, { account_code: "", debit: "", credit: "", dept_id: "", project_id: "" }]);
     },
@@ -203,7 +258,7 @@ export default function JournalEntriesPage() {
     setSaving(true);
     const res = await apiFetch<JournalEntryRow>(
       id ? `/api/v1/finance/journal-entries/${id}` : "/api/v1/finance/journal-entries",
-      { method: id ? "PUT" : "POST", body: JSON.stringify({ remarks: remarks(), lines: parsed }) },
+      { method: id ? "PUT" : "POST", body: JSON.stringify({ entry_date: entryDate(), remarks: remarks(), lines: parsed }) },
     );
     setSaving(false);
     if (!handleSaveResult(res, toast, id ? "Draft journal entry updated." : "Draft journal entry created.")) return;
@@ -287,7 +342,28 @@ export default function JournalEntriesPage() {
     <div class="space-y-4">
       <SpreadsheetGrid<JournalEntryRow>
         columns={[
+          {
+            key: "entry_date",
+            header: "Date",
+            sortable: true,
+            render: (row) => row.entry_date?.slice(0, 10) || "—",
+            exportValue: (row) => row.entry_date?.slice(0, 10) ?? "",
+          },
           { key: "entry_no", header: "Entry No", clickable: true },
+          {
+            key: "total_debit",
+            header: "Debit",
+            sortable: false,
+            render: (row) => formatMoney(row.total_debit ?? 0),
+            exportValue: (row) => row.total_debit ?? 0,
+          },
+          {
+            key: "total_credit",
+            header: "Credit",
+            sortable: false,
+            render: (row) => formatMoney(row.total_credit ?? 0),
+            exportValue: (row) => row.total_credit ?? 0,
+          },
           {
             key: "status",
             header: "Status",
@@ -433,11 +509,27 @@ export default function JournalEntriesPage() {
           <draft.DraftBanner />
         </Show>
         <ModalFormGuide guideId="journal_entry" spanFull />
+        <Field label="Date">
+          <input
+            type="date"
+            class={inputClass}
+            value={entryDate()}
+            disabled={readOnly()}
+            onInput={(e) => setEntryDate(e.currentTarget.value)}
+          />
+        </Field>
         <Field label="Remarks">
           <input class={inputClass} value={remarks()} disabled={readOnly()} onInput={(e) => setRemarks(e.currentTarget.value)} />
         </Field>
         <div class="col-span-2 space-y-2">
           <p class="text-sm font-medium text-text-primary">Lines</p>
+          <div class="grid grid-cols-5 gap-2 text-xs font-medium text-text-secondary">
+            <span>Account</span>
+            <span>Dept</span>
+            <span>Project</span>
+            <span>Debit</span>
+            <span>Credit</span>
+          </div>
           <For each={lines()}>
             {(ln, i) => (
               <div class="grid grid-cols-5 gap-2">
@@ -520,6 +612,10 @@ export default function JournalEntriesPage() {
               + Add line
             </button>
           </Show>
+          <p class="text-sm text-text-secondary">
+            Debit {formatMoney(lineTotals().debit)} · Credit {formatMoney(lineTotals().credit)} · Difference{" "}
+            {formatMoney(lineTotals().difference)}
+          </p>
         </div>
       </EntityModal>
     </div>

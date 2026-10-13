@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { defaultReportDateRange, ReportPageLayout } from "../../../shared/reports/ReportPageLayout";
 import { downloadReportCsv } from "../../../shared/reports/downloadReportCsv";
@@ -5,10 +6,24 @@ import {
   generalLedgerExportUrl,
   useGeneralLedgerReport,
   type DateRangeFilters,
+  type GeneralLedgerRow,
 } from "../../../shared/reports/useModuleReports";
 import { FinanceLayout } from "../FinanceLayout";
-import { MoneyCell } from "../../../shared/MoneyCell";
 import { formatMoney } from "../../../shared/money";
+
+function ledgerTraceHref(row: GeneralLedgerRow): string {
+  const je = row.journal_entry_id ?? 0;
+  if (row.source_type === "sa_sales" && row.source_id) {
+    return `/app/sales/sales?openId=${row.source_id}`;
+  }
+  if (row.source_type === "fin_supplier_invoice" && row.source_id) {
+    return `/app/purchases/purchase-receive?openId=${row.source_id}`;
+  }
+  if (row.source_type === "official_receipt" && row.source_id) {
+    return `/app/finance/official-receipts?openId=${row.source_id}`;
+  }
+  return `/app/finance/acct-i/journal-entries?highlight=${je}`;
+}
 
 export default function GeneralLedgerReportPage() {
   const defaults = defaultReportDateRange();
@@ -103,12 +118,24 @@ export default function GeneralLedgerReportPage() {
               {(row) => (
                 <tr class="border-t border-stroke/60">
                   <td class="px-3 py-2">{row.entry_date}</td>
-                  <td class="px-3 py-2">{row.entry_no}</td>
+                  <td class="px-3 py-2">
+                    <A href={ledgerTraceHref(row)} class="text-brand-700 hover:underline">
+                      {row.entry_no}
+                    </A>
+                  </td>
                   <td class="px-3 py-2">
                     {row.account_code} — {row.account_name}
                   </td>
-                  <MoneyCell value={row.debit} />
-                  <MoneyCell value={row.credit} />
+                  <td class="px-3 py-2 text-right tabular-nums">
+                    <A href={ledgerTraceHref(row)} class="text-brand-700 hover:underline">
+                      {formatMoney(row.debit)}
+                    </A>
+                  </td>
+                  <td class="px-3 py-2 text-right tabular-nums">
+                    <A href={ledgerTraceHref(row)} class="text-brand-700 hover:underline">
+                      {formatMoney(row.credit)}
+                    </A>
+                  </td>
                   <td class="px-3 py-2">{row.party_name ?? ""}</td>
                   <td class="px-3 py-2">{row.remarks ?? ""}</td>
                 </tr>

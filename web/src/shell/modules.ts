@@ -579,8 +579,8 @@ export const appModules: AppModule[] = [
       {
         label: "Ledger",
         prefix: ACCT_I_PREFIX,
-        href: "/app/finance/acct-i/journal-entries",
-        settingsHref: "/app/finance/acct-i/journal-entries",
+        href: "/app/finance/acct-i/reports/general-ledger",
+        settingsHref: "/app/finance/acct-i/reports/general-ledger",
         featureCode: "finance.acct_i",
       },
       {

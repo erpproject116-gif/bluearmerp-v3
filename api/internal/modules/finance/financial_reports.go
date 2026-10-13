@@ -28,14 +28,18 @@ type trialBalanceRow struct {
 }
 
 type generalLedgerRow struct {
-	EntryDate   string  `json:"entry_date"`
-	EntryNo     string  `json:"entry_no"`
-	AccountCode string  `json:"account_code"`
-	AccountName string  `json:"account_name"`
-	Debit       float64 `json:"debit"`
-	Credit      float64 `json:"credit"`
-	PartyName   string  `json:"party_name,omitempty"`
-	Remarks     string  `json:"remarks,omitempty"`
+	EntryDate      string  `json:"entry_date"`
+	EntryNo        string  `json:"entry_no"`
+	AccountCode    string  `json:"account_code"`
+	AccountName    string  `json:"account_name"`
+	Debit          float64 `json:"debit"`
+	Credit         float64 `json:"credit"`
+	PartyName      string  `json:"party_name,omitempty"`
+	Remarks        string  `json:"remarks,omitempty"`
+	JournalEntryID int64   `json:"journal_entry_id"`
+	SourceType     string  `json:"source_type,omitempty"`
+	SourceID       int64   `json:"source_id,omitempty"`
+	SourceNo       string  `json:"source_no,omitempty"`
 }
 
 type trialBalanceListPayload struct {
@@ -215,7 +219,8 @@ func generalLedgerSQL(tenantID int64, dateFrom, dateTo *time.Time) (string, []an
 		select je.entry_date::text, je.entry_no,
 		  a.account_code, a.account_name,
 		  l.debit::float8, l.credit::float8,
-		  coalesce(p.company_name, ''), coalesce(l.remarks, '')
+		  coalesce(p.company_name, ''), coalesce(l.remarks, ''),
+		  je.id
 		from public.fin_journal_entry_lines l
 		join public.fin_journal_entries je on je.id = l.journal_entry_id
 		join public.fin_accounts a on a.id = l.account_id
@@ -263,14 +268,22 @@ func listGeneralLedger(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var row generalLedgerRow
 			if err := rows.Scan(&row.EntryDate, &row.EntryNo, &row.AccountCode, &row.AccountName,
-				&row.Debit, &row.Credit, &row.PartyName, &row.Remarks); err != nil {
+				&row.Debit, &row.Credit, &row.PartyName, &row.Remarks, &row.JournalEntryID); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read report.", "ERR_INTERNAL")
 				return
 			}
 			out = append(out, row)
 		}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read report.", "ERR_INTERNAL")
+			return
+		}
 		if out == nil {
 			out = []generalLedgerRow{}
+		}
+		if err := attachJournalSources(r.Context(), pool, tu.TenantID, out); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to resolve journal sources.", "ERR_INTERNAL")
+			return
 		}
 		response.OKList(w, generalLedgerListPayload{Rows: out, HasJournalData: hasData}, p.Page, p.PageSize, total)
 	}
@@ -291,19 +304,32 @@ func exportGeneralLedger(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer rows.Close()
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", `attachment; filename="general-ledger.csv"`)
-		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"Date", "Entry No", "Account", "Account Name", "Debit", "Credit", "Party", "Remarks"})
+		var out []generalLedgerRow
 		for rows.Next() {
 			var row generalLedgerRow
 			if err := rows.Scan(&row.EntryDate, &row.EntryNo, &row.AccountCode, &row.AccountName,
-				&row.Debit, &row.Credit, &row.PartyName, &row.Remarks); err != nil {
+				&row.Debit, &row.Credit, &row.PartyName, &row.Remarks, &row.JournalEntryID); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to read report.", "ERR_INTERNAL")
 				return
 			}
+			out = append(out, row)
+		}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read report.", "ERR_INTERNAL")
+			return
+		}
+		if err := attachJournalSources(r.Context(), pool, tu.TenantID, out); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to resolve journal sources.", "ERR_INTERNAL")
+			return
+		}
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", `attachment; filename="general-ledger.csv"`)
+		cw := csv.NewWriter(w)
+		_ = cw.Write([]string{"Date", "Entry No", "Account", "Account Name", "Debit", "Credit", "Party", "Remarks", "Source No"})
+		for _, row := range out {
 			_ = cw.Write([]string{
 				row.EntryDate, row.EntryNo, row.AccountCode, row.AccountName,
-				fmt.Sprintf("%.4f", row.Debit), fmt.Sprintf("%.4f", row.Credit), row.PartyName, row.Remarks,
+				fmt.Sprintf("%.4f", row.Debit), fmt.Sprintf("%.4f", row.Credit), row.PartyName, row.Remarks, row.SourceNo,
 			})
 		}
 		cw.Flush()

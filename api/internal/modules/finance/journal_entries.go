@@ -3,6 +3,7 @@ package finance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/approval"
@@ -23,12 +25,36 @@ import (
 type JournalEntry struct {
 	ID                int64   `json:"id"`
 	EntryNo           string  `json:"entry_no"`
+	EntryDate         string  `json:"entry_date,omitempty"`
 	Status            string  `json:"status"`
 	Remarks           string  `json:"remarks,omitempty"`
+	TotalDebit        float64 `json:"total_debit"`
+	TotalCredit       float64 `json:"total_credit"`
 	ArchivedAt        *string `json:"archived_at,omitempty"`
 	ReversedAt        *string `json:"reversed_at,omitempty"`
 	ReversalOfEntryID *int64  `json:"reversal_of_entry_id,omitempty"`
 	ReversedByEntryID *int64  `json:"reversed_by_entry_id,omitempty"`
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// parseEntryDate accepts YYYY-MM-DD. Empty is allowed and means the database current_date.
+func parseEntryDate(raw string) (*time.Time, string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, ""
+	}
+	if len(raw) >= 10 {
+		raw = raw[:10]
+	}
+	t, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		return nil, "Use YYYY-MM-DD."
+	}
+	return &t, ""
 }
 
 type JournalEntryLine struct {
@@ -104,7 +130,9 @@ func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
 		args = append(args, p.PageSize, offset)
 		limIdx, offIdx := len(args)-1, len(args)
 		q := fmt.Sprintf(`
-			select id, entry_no, status, coalesce(remarks, ''),
+			select id, entry_no, entry_date::text, status, coalesce(remarks, ''),
+			  (select coalesce(sum(debit),0)::float8 from public.fin_journal_entry_lines where journal_entry_id = public.fin_journal_entries.id),
+			  (select coalesce(sum(credit),0)::float8 from public.fin_journal_entry_lines where journal_entry_id = public.fin_journal_entries.id),
 			  archived_at::text, reversed_at::text, reversal_of_entry_id, reversed_by_entry_id,
 			  count(*) over()
 			from public.fin_journal_entries where %s
@@ -120,7 +148,8 @@ func listJournalEntries(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var je JournalEntry
 			if err := rows.Scan(
-				&je.ID, &je.EntryNo, &je.Status, &je.Remarks,
+				&je.ID, &je.EntryNo, &je.EntryDate, &je.Status, &je.Remarks,
+				&je.TotalDebit, &je.TotalCredit,
 				&je.ArchivedAt, &je.ReversedAt, &je.ReversalOfEntryID, &je.ReversedByEntryID,
 				&total,
 			); err != nil {
@@ -156,11 +185,11 @@ func getJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 func loadJournalEntryDetail(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (*JournalEntryDetail, error) {
 	var detail JournalEntryDetail
 	err := pool.QueryRow(ctx, `
-		select id, entry_no, status, coalesce(remarks, ''),
+		select id, entry_no, entry_date::text, status, coalesce(remarks, ''),
 		  archived_at::text, reversed_at::text, reversal_of_entry_id, reversed_by_entry_id
 		from public.fin_journal_entries
 		where id = $1 and tenant_id = $2`, id, tenantID).Scan(
-		&detail.ID, &detail.EntryNo, &detail.Status, &detail.Remarks,
+		&detail.ID, &detail.EntryNo, &detail.EntryDate, &detail.Status, &detail.Remarks,
 		&detail.ArchivedAt, &detail.ReversedAt, &detail.ReversalOfEntryID, &detail.ReversedByEntryID,
 	)
 	if err != nil {
@@ -184,6 +213,8 @@ func loadJournalEntryDetail(ctx context.Context, pool *pgxpool.Pool, tenantID, i
 			return nil, err
 		}
 		detail.Lines = append(detail.Lines, ln)
+		detail.TotalDebit += ln.Debit
+		detail.TotalCredit += ln.Credit
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -195,12 +226,22 @@ func createJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		var body struct {
-			Remarks string             `json:"remarks"`
-			Lines   []journalLineInput `json:"lines"`
+			Remarks   string             `json:"remarks"`
+			EntryDate string             `json:"entry_date"`
+			Lines     []journalLineInput `json:"lines"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Lines) < 2 {
 			response.Validation(w, map[string]string{"lines": "At least two lines required."})
 			return
+		}
+		entryDate, dateErr := parseEntryDate(body.EntryDate)
+		if dateErr != "" {
+			response.Validation(w, map[string]string{"entry_date": dateErr})
+			return
+		}
+		var dateArg any
+		if entryDate != nil {
+			dateArg = entryDate.Format("2006-01-02")
 		}
 		tx, err := pool.Begin(r.Context())
 		if err != nil {
@@ -209,13 +250,25 @@ func createJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 		var dateSeq int
-		_ = tx.QueryRow(r.Context(), `select coalesce(max(date_seq),0)+1 from public.fin_journal_entries where tenant_id=$1 and entry_date=current_date`, tu.TenantID).Scan(&dateSeq)
+		if err := tx.QueryRow(r.Context(), `
+			select coalesce(max(date_seq),0)+1
+			from public.fin_journal_entries
+			where tenant_id=$1 and entry_date = coalesce($2::date, current_date)`, tu.TenantID, dateArg).Scan(&dateSeq); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create entry.", "ERR_INTERNAL")
+			return
+		}
 		entryNo := "JE-" + strconv.Itoa(dateSeq)
 		var id int64
+		var storedDate string
 		if err := tx.QueryRow(r.Context(), `
 			insert into public.fin_journal_entries (tenant_id, entry_date, date_seq, entry_no, status, remarks, created_by_user_id)
-			values ($1, current_date, $2, $3, 'draft', $4, $5) returning id`,
-			tu.TenantID, dateSeq, entryNo, body.Remarks, tu.AppUserID).Scan(&id); err != nil {
+			values ($1, coalesce($2::date, current_date), $3, $4, 'draft', $5, $6)
+			returning id, entry_date::text`,
+			tu.TenantID, dateArg, dateSeq, entryNo, body.Remarks, tu.AppUserID).Scan(&id, &storedDate); err != nil {
+			if isUniqueViolation(err) {
+				response.Validation(w, map[string]string{"entry_no": "That entry number is already used."})
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to insert entry.", "ERR_INTERNAL")
 			return
 		}
@@ -238,7 +291,7 @@ func createJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.journal_entry.create", "fin_journal_entry", &id, nil, body)
-		response.OK(w, JournalEntry{ID: id, EntryNo: entryNo, Status: "draft", Remarks: body.Remarks}, "Created.")
+		response.OK(w, JournalEntry{ID: id, EntryNo: entryNo, EntryDate: storedDate, Status: "draft", Remarks: body.Remarks}, "Created.")
 	}
 }
 
@@ -251,12 +304,22 @@ func updateJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var body struct {
-			Remarks string             `json:"remarks"`
-			Lines   []journalLineInput `json:"lines"`
+			Remarks   string             `json:"remarks"`
+			EntryDate string             `json:"entry_date"`
+			Lines     []journalLineInput `json:"lines"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Lines) < 2 {
 			response.Validation(w, map[string]string{"lines": "At least two lines required."})
 			return
+		}
+		entryDate, dateErr := parseEntryDate(body.EntryDate)
+		if dateErr != "" {
+			response.Validation(w, map[string]string{"entry_date": dateErr})
+			return
+		}
+		var dateArg any
+		if entryDate != nil {
+			dateArg = entryDate.Format("2006-01-02")
 		}
 		before, _ := loadJournalEntryDetail(r.Context(), pool, tu.TenantID, id)
 		var status string
@@ -283,8 +346,13 @@ func updateJournalEntry(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 		if _, err := tx.Exec(r.Context(), `
-			update public.fin_journal_entries set remarks = $2, updated_at = now()
-			where id = $1 and tenant_id = $3 and status = 'draft'`, id, body.Remarks, tu.TenantID); err != nil {
+			update public.fin_journal_entries
+			set remarks = $2, entry_date = coalesce($3::date, entry_date), updated_at = now()
+			where id = $1 and tenant_id = $4 and status = 'draft'`, id, body.Remarks, dateArg, tu.TenantID); err != nil {
+			if isUniqueViolation(err) {
+				response.Validation(w, map[string]string{"entry_no": "That entry number is already used."})
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to update entry.", "ERR_INTERNAL")
 			return
 		}

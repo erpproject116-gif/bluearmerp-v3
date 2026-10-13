@@ -723,6 +723,10 @@ export type GeneralLedgerRow = {
   credit: number;
   party_name?: string;
   remarks?: string;
+  journal_entry_id?: number;
+  source_type?: string;
+  source_id?: number;
+  source_no?: string;
 };
 
 type GeneralLedgerPayload = { rows: GeneralLedgerRow[]; has_journal_data: boolean };

@@ -695,6 +695,7 @@ export function SidebarNav() {
       return pathStarts(p, [
         "/app/finance/acct-i/journal-entries",
         "/app/finance/journal-entries",
+        "/app/finance/acct-i/reports/general-ledger",
         "/app/finance/official-receipts",
       ]);
     }
