@@ -524,12 +524,14 @@ export default function JournalEntriesPage() {
             onInput={(e) => setEntryDate(e.currentTarget.value)}
           />
         </Field>
-        <Field label="Remarks">
-          <input class={inputClass} value={remarks()} disabled={readOnly()} onInput={(e) => setRemarks(e.currentTarget.value)} />
-        </Field>
-        <div class="col-span-2 space-y-2">
+        <div class="lg:col-span-2">
+          <Field label="Remarks">
+            <input class={inputClass} value={remarks()} disabled={readOnly()} onInput={(e) => setRemarks(e.currentTarget.value)} />
+          </Field>
+        </div>
+        <div class="col-span-full space-y-2">
           <p class="text-sm font-medium text-text-primary">Lines</p>
-          <div class="grid grid-cols-5 gap-2 text-xs font-medium text-text-secondary">
+          <div class="hidden gap-2 text-xs font-medium text-text-secondary sm:grid sm:grid-cols-[minmax(0,2.6fr)_minmax(8rem,1fr)_minmax(10rem,1.4fr)_6.5rem_6.5rem]">
             <span>Account</span>
             <span>Dept</span>
             <span>Project</span>
@@ -538,10 +540,14 @@ export default function JournalEntriesPage() {
           </div>
           <For each={lines()}>
             {(ln, i) => (
-              <div class="grid grid-cols-5 gap-2">
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,2.6fr)_minmax(8rem,1fr)_minmax(10rem,1.4fr)_6.5rem_6.5rem]">
                 <select
                   class={inputClass}
                   disabled={readOnly()}
+                  title={(() => {
+                    const acc = accounts.data?.find((item) => item.account_code === ln.account_code);
+                    return acc ? `${acc.account_code} - ${acc.account_name}` : "Select account";
+                  })()}
                   value={ln.account_code}
                   onChange={(e) =>
                     setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, account_code: e.currentTarget.value } : r)))
@@ -559,6 +565,10 @@ export default function JournalEntriesPage() {
                 <select
                   class={inputClass}
                   disabled={readOnly()}
+                  title={(() => {
+                    const dept = departments.data?.find((item) => String(item.id) === ln.dept_id);
+                    return dept?.department_name || dept?.name || "Dept (opt)";
+                  })()}
                   value={ln.dept_id}
                   onChange={(e) =>
                     setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, dept_id: e.currentTarget.value } : r)))
@@ -574,6 +584,10 @@ export default function JournalEntriesPage() {
                 <select
                   class={inputClass}
                   disabled={readOnly()}
+                  title={(() => {
+                    const project = projects.data?.find((item) => String(item.id) === ln.project_id);
+                    return project?.project_name || project?.name || "Project (opt)";
+                  })()}
                   value={ln.project_id}
                   onChange={(e) =>
                     setLines((rows) => rows.map((r, idx) => (idx === i() ? { ...r, project_id: e.currentTarget.value } : r)))
