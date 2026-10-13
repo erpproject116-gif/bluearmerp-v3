@@ -1,7 +1,8 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { createQuery } from "@tanstack/solid-query";
+import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { A } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
+import { BookingModal, type Resource, type Service } from "./BookingsPage";
 import {
   addDays,
   eventOnDate,
@@ -23,9 +24,23 @@ type Booking = TimedEventLike & {
   status: string;
 };
 
+function atHour(day: Date, hour: number) {
+  const start = new Date(day);
+  start.setHours(hour, 0, 0, 0);
+  return start.toISOString();
+}
+
 export default function BookingCalendarPage() {
-  const [view, setView] = createSignal<CalView>("week");
+  const qc = useQueryClient();
+  const [view, setView] = createSignal<CalView>("month");
   const [cursor, setCursor] = createSignal(new Date());
+  const [modalOpen, setModalOpen] = createSignal(false);
+  const [presetStarts, setPresetStarts] = createSignal<string | null>(null);
+
+  const openNew = (day: Date, hour: number) => {
+    setPresetStarts(atHour(day, hour));
+    setModalOpen(true);
+  };
 
   const range = createMemo(() => {
     const c = cursor();
@@ -83,6 +98,21 @@ export default function BookingCalendarPage() {
     view() === "day" ? [cursor()] : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cursor()), i)),
   );
 
+  const resources = createQuery(() => ({
+    queryKey: ["booking-resources"],
+    queryFn: async () => {
+      const res = await apiFetch<Resource[]>("/api/v1/booking/resources");
+      return res.success ? (res.data ?? []) : [];
+    },
+  }));
+  const services = createQuery(() => ({
+    queryKey: ["booking-services"],
+    queryFn: async () => {
+      const res = await apiFetch<Service[]>("/api/v1/booking/services");
+      return res.success ? (res.data ?? []) : [];
+    },
+  }));
+
   return (
     <div class="mx-auto max-w-7xl p-6">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -131,11 +161,27 @@ export default function BookingCalendarPage() {
                     const inMonth = day.getMonth() === cursor().getMonth();
                     const events = () => (list.data ?? []).filter((e) => eventOnDate(e, iso) && e.status !== "cancelled");
                     return (
-                      <div class={`min-h-[88px] border-r border-stroke p-1 last:border-0 ${inMonth ? "" : "bg-slate-50/60"}`}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        class={`min-h-[88px] cursor-pointer border-r border-stroke p-1 last:border-0 hover:bg-brand-50/50 ${inMonth ? "" : "bg-slate-50/60"}`}
+                        aria-label={`New booking on ${iso}`}
+                        onClick={() => openNew(day, 9)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openNew(day, 9);
+                          }
+                        }}
+                      >
                         <div class="text-xs font-medium text-text-secondary">{day.getDate()}</div>
                         <For each={events().slice(0, 3)}>
                           {(ev) => (
-                            <div class="mt-0.5 truncate rounded bg-brand-50 px-1 text-[10px] text-brand-800" title={ev.title}>
+                            <div
+                              class="mt-0.5 truncate rounded bg-brand-50 px-1 text-[10px] text-brand-800"
+                              title={ev.title}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {ev.booking_no} {ev.title}
                             </div>
                           )}
@@ -185,7 +231,14 @@ export default function BookingCalendarPage() {
                 return (
                   <div class="relative border-l border-stroke" style={{ height: `${24 * HOUR_H}px` }}>
                     <For each={HOURS}>
-                      {() => <div class="border-b border-stroke" style={{ height: `${HOUR_H}px` }} />}
+                      {(h) => (
+                        <div
+                          class="cursor-pointer border-b border-stroke hover:bg-brand-50/40"
+                          style={{ height: `${HOUR_H}px` }}
+                          aria-label={`New booking ${iso} ${formatHourLabel(h)}`}
+                          onClick={() => openNew(day, h)}
+                        />
+                      )}
                     </For>
                     <For each={events()}>
                       {(ev) => {
@@ -209,6 +262,20 @@ export default function BookingCalendarPage() {
           </div>
         </div>
       </Show>
+
+      <BookingModal
+        open={modalOpen()}
+        initial={null}
+        presetStarts={presetStarts()}
+        resources={resources.data ?? []}
+        services={services.data ?? []}
+        onClose={() => setModalOpen(false)}
+        onSaved={() => {
+          setModalOpen(false);
+          void qc.invalidateQueries({ queryKey: ["booking-calendar"] });
+          void qc.invalidateQueries({ queryKey: ["bookings"] });
+        }}
+      />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { useToast } from "../../shared/toast";
 import { useListState } from "../../shared/useListState";
 import { LookupCombo } from "../../shared/LookupCombo";
 
-type Booking = {
+export type Booking = {
   id: number;
   booking_no: string;
   booking_date: string;
@@ -26,8 +26,8 @@ type Booking = {
   quotation_id?: number | null;
 };
 
-type Resource = { id: number; code: string; name: string; resource_type: string; is_active: boolean };
-type Service = {
+export type Resource = { id: number; code: string; name: string; resource_type: string; is_active: boolean };
+export type Service = {
   id: number;
   code: string;
   name: string;
@@ -342,11 +342,13 @@ function SetupServicesList(props: { rows: Service[]; onSaved: () => void }) {
   );
 }
 
-function BookingModal(props: {
+export function BookingModal(props: {
   open: boolean;
   initial: Booking | null;
   resources: Resource[];
   services: Service[];
+  /** ISO time used when creating from a calendar cell. */
+  presetStarts?: string | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -376,10 +378,11 @@ function BookingModal(props: {
       setServiceId(init.service_id ?? null);
       setNotes(init.notes ?? "");
     } else {
-      const now = new Date();
-      const end = new Date(now.getTime() + 60 * 60 * 1000);
+      const start = props.presetStarts ? new Date(props.presetStarts) : new Date();
+      const when = Number.isNaN(start.getTime()) ? new Date() : start;
+      const end = new Date(when.getTime() + 60 * 60 * 1000);
       setTitle("");
-      setStarts(toLocalInput(now.toISOString()));
+      setStarts(toLocalInput(when.toISOString()));
       setEnds(toLocalInput(end.toISOString()));
       setStatus("scheduled");
       setPartnerId(null);
