@@ -45,6 +45,17 @@ func TestDocumentCompletedIsExact(t *testing.T) {
 	}
 }
 
+func TestUnfinishedRepairRemarkMatchesMigration(t *testing.T) {
+	sale := unfinishedJournalVoidRemark("Unfinished sale")
+	purchase := unfinishedJournalVoidRemark("Unfinished purchase")
+	if sale != "Unfinished sale journal reversed because the document is not completed" {
+		t.Fatalf("sale remark = %q", sale)
+	}
+	if purchase != "Unfinished purchase journal reversed because the document is not completed" {
+		t.Fatalf("purchase remark = %q", purchase)
+	}
+}
+
 func TestRepairVoidsOnlyUnfinishedInvoiceJournals(t *testing.T) {
 	if !shouldVoidUnfinishedInvoiceJournal("unconfirmed", 14) {
 		t.Fatal("unconfirmed sale journal should be reversed")

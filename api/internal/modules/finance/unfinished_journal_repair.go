@@ -12,9 +12,11 @@ import (
 )
 
 // RepairUnfinishedInvoiceJournals reverses invoice journals that were posted
-// for sales or supplier invoices that are not completed, once per tenant.
-// Official receipts and payment vouchers are not touched. A missing repair
-// table (migration not applied yet) is logged by the caller and skipped.
+// for sales or supplier invoices that are not completed, once per tenant, then
+// cancels and archives both the original and the reversal so they leave the
+// active journal list and posted reports. Official receipts and payment
+// vouchers are not touched. A missing repair table is logged by the caller
+// and skipped.
 func RepairUnfinishedInvoiceJournals(ctx context.Context, pool *pgxpool.Pool) error {
 	var ready bool
 	if err := pool.QueryRow(ctx, `select to_regclass('public.fin_unfinished_journal_repairs') is not null`).Scan(&ready); err != nil {
@@ -115,7 +117,11 @@ func voidUnfinishedInvoiceJournals(ctx context.Context, tx pgx.Tx, tenantID, use
 			continue
 		}
 		je := d.journal
-		if _, err := invoicejournal.VoidTx(ctx, tx, tenantID, userID, &je, label+" journal reversed because the document is not completed"); err != nil {
+		result, err := invoicejournal.VoidTx(ctx, tx, tenantID, userID, &je, unfinishedJournalVoidRemark(label))
+		if err != nil {
+			return err
+		}
+		if err := cancelUnfinishedRepairJournals(ctx, tx, tenantID, d.journal, result.ReversalEntryID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `
@@ -127,4 +133,23 @@ func voidUnfinishedInvoiceJournals(ctx context.Context, tx pgx.Tx, tenantID, use
 		log.Printf("unfinished invoice journal repair: tenant %d %s %d journal %d", tenantID, table, d.id, d.journal)
 	}
 	return nil
+}
+
+func unfinishedJournalVoidRemark(label string) string {
+	return label + " journal reversed because the document is not completed"
+}
+
+// cancelUnfinishedRepairJournals takes the unfinished invoice journal and its
+// reversal off the active register and off every posted report. Both stay
+// available under the Archived status.
+func cancelUnfinishedRepairJournals(ctx context.Context, tx pgx.Tx, tenantID, originalID int64, reversalID *int64) error {
+	_, err := tx.Exec(ctx, `
+		update public.fin_journal_entries
+		set status = 'cancelled',
+		    archived_at = coalesce(archived_at, now()),
+		    updated_at = now()
+		where tenant_id = $1
+		  and (id = $2 or ($3::bigint is not null and id = $3))`,
+		tenantID, originalID, reversalID)
+	return err
 }
