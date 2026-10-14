@@ -120,17 +120,6 @@ func ensureStockAdjLines(ctx context.Context, pool *pgxpool.Pool, tenantID int64
 				return map[string]string{fmt.Sprintf("lines[%d].%s", i, k): v}
 			}
 		}
-		var trackSerial, trackLot bool
-		_ = pool.QueryRow(ctx, `
-			select coalesce(track_serial, false), coalesce(track_lot, false)
-			from public.inv_items
-			where id = $1 and tenant_id = $2 and deleted_at is null`,
-			ln.ItemID, tenantID).Scan(&trackSerial, &trackLot)
-		if trackSerial || trackLot {
-			return map[string]string{
-				fmt.Sprintf("lines[%d].item_id", i): trackedItemAdjustmentMessage(trackSerial, trackLot),
-			}
-		}
 	}
 	return nil
 }

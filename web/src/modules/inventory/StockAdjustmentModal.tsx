@@ -150,7 +150,6 @@ export function StockAdjustmentModal(props: Props) {
                 item_code: item.item_code ?? line.item_code,
                 track_serial: item.track_serial === true,
                 track_lot: item.track_lot === true,
-                qty_delta: item.track_serial || item.track_lot ? "" : line.qty_delta,
               };
             }),
           );

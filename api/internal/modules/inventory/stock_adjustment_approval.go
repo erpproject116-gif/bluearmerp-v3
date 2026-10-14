@@ -117,15 +117,6 @@ func ensureItemLocation(ctx context.Context, pool *pgxpool.Pool, tenantID, itemI
 // postStockAdjustment applies balance + movement inside an open transaction.
 // Returns movement id and the on-hand qty before/after the change.
 func postStockAdjustment(ctx context.Context, tx pgx.Tx, tenantID, userID, requestID int64, itemID, locationID int64, qtyDelta float64, reason string) (movementID int64, qtyBefore, qtyAfter float64, validation map[string]string, err error) {
-	var trackSerial, trackLot bool
-	_ = tx.QueryRow(ctx, `
-		select coalesce(track_serial, false), coalesce(track_lot, false)
-		from public.inv_items
-		where id = $1 and tenant_id = $2 and deleted_at is null`,
-		itemID, tenantID).Scan(&trackSerial, &trackLot)
-	if trackSerial || trackLot {
-		return 0, 0, 0, map[string]string{"item_id": trackedItemAdjustmentMessage(trackSerial, trackLot)}, nil
-	}
 	err = tx.QueryRow(ctx, `
 		select qty_on_hand::float8
 		from public.inv_item_location_balances

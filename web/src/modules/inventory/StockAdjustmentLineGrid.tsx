@@ -6,7 +6,7 @@ import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { ModalField } from "../../shared/ModalField";
 import { inputClass } from "../../shared/SpreadsheetGrid";
 import { fieldVisible, type FormFieldSetting } from "../../shared/useFormFieldSettings";
-import { stockAdjustmentTrackingKind, trackedAdjustmentMessage } from "./stockAdjustmentRules";
+import { stockAdjustmentTrackingKind } from "./stockAdjustmentRules";
 
 export type StockAdjustmentLineRow = {
   line_no: number;
@@ -169,24 +169,22 @@ export function StockAdjustmentLineGrid(props: Props) {
                     <td class="min-w-[120px] px-2 py-2 align-top" classList={{ hidden: !show("qty_delta") }}>
                       <ModalField settings={props.settings} fieldKey="qty_delta" fallbackLabel="Quantity change" fallbackRequired bare>
                         {(m) => (
-                          <Show
-                            when={stockAdjustmentTrackingKind(line()) !== "standard"}
-                            fallback={
-                              <input
-                                type="number"
-                                step="any"
-                                class={inputClass}
-                                value={line().qty_delta}
-                                disabled={props.disabled || m.disabled}
-                                placeholder={m.placeholder}
-                                onInput={(e) => updateLine(idx, { qty_delta: e.currentTarget.value })}
-                                {...m.inputProps}
-                              />
-                            }
-                          >
-                            <div class="min-w-[260px] rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950">
-                              <p>{trackedAdjustmentMessage(stockAdjustmentTrackingKind(line()))}</p>
-                              <div class="mt-2 flex flex-wrap gap-3 font-medium">
+                          <div>
+                            <input
+                              type="number"
+                              step="any"
+                              class={inputClass}
+                              value={line().qty_delta}
+                              disabled={props.disabled || m.disabled}
+                              placeholder={m.placeholder}
+                              onInput={(e) => updateLine(idx, { qty_delta: e.currentTarget.value })}
+                              {...m.inputProps}
+                            />
+                            <Show when={stockAdjustmentTrackingKind(line()) !== "standard"}>
+                              <p class="mt-1 text-xs text-text-secondary">
+                                Serial number and lot number are optional. This save does not update them.
+                              </p>
+                              <div class="mt-1 flex flex-wrap gap-3 text-xs font-medium">
                                 <Show when={line().track_serial}>
                                   <A href={trackedListHref("serial", line())} class="underline underline-offset-2">
                                     Open Serials
@@ -198,8 +196,8 @@ export function StockAdjustmentLineGrid(props: Props) {
                                   </A>
                                 </Show>
                               </div>
-                            </div>
-                          </Show>
+                            </Show>
+                          </div>
                         )}
                       </ModalField>
                     </td>
