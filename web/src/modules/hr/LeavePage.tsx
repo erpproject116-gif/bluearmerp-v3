@@ -5,6 +5,11 @@ import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/active
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { LookupCombo } from "../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
+import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
+import { useCustomValues } from "../../shared/useCustomValues";
+import { useDocumentDraft } from "../../shared/useDocumentDraft";
+import { useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 
@@ -43,6 +48,38 @@ export default function LeavePage() {
   const [file, setFile] = createSignal<File | null>(null);
   const [statusFilter, setStatusFilter] = createSignal("submitted");
   const [requestOpen, setRequestOpen] = createSignal(false);
+  const { customValues, setCustom, loadCustom } = useCustomValues();
+  const { activeCustomFields } = useFormFieldSettings("hr_leave_request");
+
+  const buildDraftPayload = () => ({
+    employee_id: empId(),
+    employee_label: empLabel(),
+    leave_type_id: typeId(),
+    date_from: from(),
+    date_to: to(),
+    reason: reason(),
+    notes: notes(),
+    custom_values: customValues(),
+  });
+
+  const draft = useDocumentDraft({
+    entityType: "hr_leave_request",
+    draftKey: "new",
+    getPayload: buildDraftPayload,
+    onApply: (payload) => {
+      setEmpId(payload.employee_id);
+      setEmpLabel(payload.employee_label ?? "");
+      setTypeId(payload.leave_type_id ?? "");
+      setFrom(payload.date_from ?? "");
+      setTo(payload.date_to ?? "");
+      setReason(payload.reason ?? "");
+      setNotes(payload.notes ?? "");
+      loadCustom(payload.custom_values ?? {});
+    },
+    enabled: () => requestOpen(),
+    localOnly: true,
+    autoApply: () => false,
+  });
 
   const types = createQuery(() => ({
     queryKey: ["hr-leave-types"],
@@ -70,11 +107,14 @@ export default function LeavePage() {
 
   const submit = async () => {
     if (!empId() || !typeId() || !from() || !to()) return toast.warning("Employee, type, and dates required.");
+    const customError = validateCustomFields(customValues(), activeCustomFields());
+    if (customError) return toast.warning(customError);
     const res = await apiFetch<{ id: number }>("/api/v1/hr/leave-requests", {
       method: "POST",
       body: JSON.stringify({
         employee_id: empId(), leave_type_id: Number(typeId()),
         date_from: from(), date_to: to(), reason: reason(), notes: notes(), status: "submitted",
+        custom_values: customValues(),
       }),
     });
     if (!res.success || !res.data) return toast.warning(res.message ?? "Submit failed.");
@@ -90,9 +130,11 @@ export default function LeavePage() {
       if (!uploaded.ok) toast.warning("Leave was saved, but the file upload failed.");
     }
     toast.success("Leave request submitted.");
+    await draft.clearOnSave();
     setReason("");
     setNotes("");
     setFile(null);
+    loadCustom({});
     setRequestOpen(false);
     void qc.invalidateQueries({ queryKey: ["hr-leave-requests"] });
     void qc.invalidateQueries({ queryKey: ["hr-leave-balances"] });
@@ -124,6 +166,7 @@ export default function LeavePage() {
         onSave={() => void submit()}
         saveLabel="Submit leave"
       >
+        <draft.DraftBanner />
         <LookupCombo
           label="Employee"
           value={empLabel}
@@ -147,6 +190,7 @@ export default function LeavePage() {
         <Field label="Reason"><input class={inputClass} value={reason()} onInput={(e) => setReason(e.currentTarget.value)} placeholder="Optional" /></Field>
         <Field label="Notes"><input class={inputClass} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} placeholder="Optional" /></Field>
         <Field label="Attachment"><input type="file" class={inputClass} onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} /></Field>
+        <CustomFieldsSection entityType="hr_leave_request" values={customValues} onChange={setCustom} />
       </EntityModal>
 
       <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
@@ -177,6 +221,7 @@ export default function LeavePage() {
                     <td class="py-2 pr-3">{r.file_count ?? 0}</td>
                     <td class="py-2 pr-3">{r.status}</td>
                     <td class="py-2">
+                      <ActivityHistoryLink module="hr" targetType="hr_leave_request" targetId={r.id} class="mr-2 text-xs" />
                       <Show when={r.status === "submitted"}>
                         <button type="button" class="mr-2 text-xs text-brand-700" onClick={() => void act(r.id, "approve")}>Approve</button>
                         <button type="button" class="mr-2 text-xs text-amber-700" onClick={() => void act(r.id, "reject")}>Reject</button>

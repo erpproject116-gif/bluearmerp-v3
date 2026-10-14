@@ -187,6 +187,8 @@ var standardRegistry = map[string][]StandardField{
 		{FieldKey: "end_date", Label: "End date", FieldType: "date", SortOrder: 70},
 		{FieldKey: "description", Label: "Description", FieldType: "textarea", SortOrder: 80},
 	},
+	// No standard fields. Leave dates stay required in the leave API. This key only lets custom fields load.
+	"hr_leave_request": {},
 	"hr_employee": {
 		{FieldKey: "employee_no", Label: "Employee #", FieldType: "text", DefaultRequired: true, SortOrder: 10},
 		{FieldKey: "full_name", Label: "Full name", FieldType: "text", DefaultRequired: true, SortOrder: 20},

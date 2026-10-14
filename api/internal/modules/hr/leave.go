@@ -16,6 +16,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -51,22 +52,23 @@ type LeaveBalance struct {
 }
 
 type LeaveRequest struct {
-	ID           int64   `json:"id"`
-	EmployeeID   int64   `json:"employee_id"`
-	EmployeeNo   string  `json:"employee_no,omitempty"`
-	EmployeeName string  `json:"employee_name,omitempty"`
-	LeaveTypeID  int64   `json:"leave_type_id"`
-	LeaveCode    string  `json:"leave_code,omitempty"`
-	LeaveName    string  `json:"leave_name,omitempty"`
-	DateFrom     string  `json:"date_from"`
-	DateTo       string  `json:"date_to"`
-	Days         float64 `json:"days"`
-	Status       string  `json:"status"`
-	Reason       string  `json:"reason"`
-	Notes        string  `json:"notes"`
-	FileCount    int     `json:"file_count"`
-	ReviewNotes  *string `json:"review_notes,omitempty"`
-	ReviewedAt   *string `json:"reviewed_at,omitempty"`
+	ID           int64          `json:"id"`
+	EmployeeID   int64          `json:"employee_id"`
+	EmployeeNo   string         `json:"employee_no,omitempty"`
+	EmployeeName string         `json:"employee_name,omitempty"`
+	LeaveTypeID  int64          `json:"leave_type_id"`
+	LeaveCode    string         `json:"leave_code,omitempty"`
+	LeaveName    string         `json:"leave_name,omitempty"`
+	DateFrom     string         `json:"date_from"`
+	DateTo       string         `json:"date_to"`
+	Days         float64        `json:"days"`
+	Status       string         `json:"status"`
+	Reason       string         `json:"reason"`
+	Notes        string         `json:"notes"`
+	FileCount    int            `json:"file_count"`
+	ReviewNotes  *string        `json:"review_notes,omitempty"`
+	ReviewedAt   *string        `json:"reviewed_at,omitempty"`
+	CustomValues map[string]any `json:"custom_values,omitempty"`
 }
 
 func registerLeaveRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -79,6 +81,7 @@ func registerLeaveRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-balances/adjust", adjustLeaveBalance(pool))
 
 	r.With(auth.RequirePermission("hr.leave", auth.AccessRead)).Get("/leave-requests", listLeaveRequests(pool))
+	r.With(auth.RequirePermission("hr.leave", auth.AccessRead)).Get("/leave-requests/{id}", getLeaveRequest(pool))
 	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-requests", createLeaveRequest(pool))
 	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-requests/{id}/files", addLeaveRequestFile(pool))
 	r.With(auth.RequirePermission("hr.leave", auth.AccessWrite)).Post("/leave-requests/{id}/approve", approveLeaveRequest(pool))
@@ -449,6 +452,48 @@ func listLeaveRequests(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+func getLeaveRequest(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		var row LeaveRequest
+		var notes, reviewed sql.NullString
+		err = pool.QueryRow(r.Context(), `
+			select lr.id, lr.employee_id, e.employee_no, e.full_name, lr.leave_type_id, lt.code, lt.name,
+			  lr.date_from::text, lr.date_to::text, lr.days::float8, lr.status, lr.reason, lr.notes,
+			  (select count(*)::int from public.hr_leave_request_files f where f.leave_request_id = lr.id),
+			  lr.review_notes, lr.reviewed_at::text
+			from public.hr_leave_requests lr
+			join public.hr_employees e on e.id=lr.employee_id
+			join public.hr_leave_types lt on lt.id=lr.leave_type_id
+			where lr.tenant_id=$1 and lr.id=$2`, tu.TenantID, id).Scan(
+			&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.LeaveTypeID, &row.LeaveCode, &row.LeaveName,
+			&row.DateFrom, &row.DateTo, &row.Days, &row.Status, &row.Reason, &row.Notes, &row.FileCount, &notes, &reviewed,
+		)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Leave request not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if notes.Valid {
+			row.ReviewNotes = &notes.String
+		}
+		if reviewed.Valid {
+			row.ReviewedAt = &reviewed.String
+		}
+		values, err := customfields.LoadValues(r.Context(), pool, tu.TenantID, "hr_leave_request", id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load custom fields.", "ERR_INTERNAL")
+			return
+		}
+		row.CustomValues = values
+		response.OK(w, row, "OK")
+	}
+}
+
 func businessDaysInclusive(from, to time.Time) float64 {
 	if to.Before(from) {
 		return 0
@@ -467,14 +512,15 @@ func createLeaveRequest(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		var body struct {
-			EmployeeID  int64   `json:"employee_id"`
-			LeaveTypeID int64   `json:"leave_type_id"`
-			DateFrom    string  `json:"date_from"`
-			DateTo      string  `json:"date_to"`
-			Days        float64 `json:"days"`
-			Reason      string  `json:"reason"`
-			Notes       string  `json:"notes"`
-			Status      string  `json:"status"`
+			EmployeeID   int64          `json:"employee_id"`
+			LeaveTypeID  int64          `json:"leave_type_id"`
+			DateFrom     string         `json:"date_from"`
+			DateTo       string         `json:"date_to"`
+			Days         float64        `json:"days"`
+			Reason       string         `json:"reason"`
+			Notes        string         `json:"notes"`
+			Status       string         `json:"status"`
+			CustomValues map[string]any `json:"custom_values"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
@@ -548,6 +594,10 @@ func createLeaveRequest(pool *pgxpool.Pool) http.HandlerFunc {
 				  (tenant_id, employee_id, leave_type_id, balance_year, entry_kind, days, leave_request_id, notes, created_by_user_id)
 				values ($1,$2,$3,$4,'reserve',$5,$6,'Reserved on submit',$7)`,
 				tu.TenantID, body.EmployeeID, body.LeaveTypeID, year, days, id, tu.AppUserID)
+		}
+		if errs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, "hr_leave_request", id, body.CustomValues); errs != nil {
+			response.Validation(w, errs)
+			return
 		}
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")

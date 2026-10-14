@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { formatAmount } from "../../shared/money";
@@ -37,7 +37,7 @@ import { hasPermission, useAuth } from "../../shared/auth-context";
 
 const STATUS_OPTIONS = ["active", "inactive", "terminated"];
 
-async function uploadEmployeePhoto(employeeId: number, file: File): Promise<boolean> {
+async function employeeDocHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
   const token = await getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -45,6 +45,11 @@ async function uploadEmployeePhoto(employeeId: number, file: File): Promise<bool
   if (tenantId) headers["X-Tenant-ID"] = String(tenantId);
   const branchId = getActiveBranchIdCurrent();
   if (branchId) headers["X-Branch-ID"] = String(branchId);
+  return headers;
+}
+
+async function uploadEmployeePhoto(employeeId: number, file: File): Promise<boolean> {
+  const headers = await employeeDocHeaders();
   const fd = new FormData();
   fd.append("file", file);
   fd.append("doc_type", "photo");
@@ -57,6 +62,19 @@ async function uploadEmployeePhoto(employeeId: number, file: File): Promise<bool
   if (!res.ok) return false;
   const body = (await res.json()) as { success?: boolean };
   return Boolean(body.success);
+}
+
+async function loadStoredEmployeePhoto(employeeId: number): Promise<string | null> {
+  const listed = await apiFetch<{ id: number; doc_type: string; has_file?: boolean }[]>(
+    `/api/v1/hr/employees/${employeeId}/documents`,
+  );
+  const photo = (listed.data ?? []).find((doc) => doc.doc_type === "photo" && doc.has_file);
+  if (!photo) return null;
+  const res = await fetch(`${apiBase}/api/v1/hr/employees/${employeeId}/documents/${photo.id}/download`, {
+    headers: await employeeDocHeaders(),
+  });
+  if (!res.ok) return null;
+  return URL.createObjectURL(await res.blob());
 }
 
 export default function HrEmployeesPage() {
@@ -93,6 +111,10 @@ export default function HrEmployeesPage() {
   const [emergencyAddress, setEmergencyAddress] = createSignal("");
   const [emergencyPhone, setEmergencyPhone] = createSignal("");
   const [photoFile, setPhotoFile] = createSignal<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = createSignal<string | null>(null);
+  const [storedPhotoUrl, setStoredPhotoUrl] = createSignal<string | null>(null);
+  let previewObjectUrl: string | undefined;
+  let storedObjectUrl: string | undefined;
   const [saving, setSaving] = createSignal(false);
   const [importing, setImporting] = createSignal(false);
   const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
@@ -105,6 +127,49 @@ export default function HrEmployeesPage() {
   const { customValues, setCustom, loadCustom } = useCustomValues();
 
   const canWriteEmployees = () => hasPermission(auth.me, "hr.employees", "write");
+
+  createEffect(() => {
+    const open = modalOpen();
+    const file = photoFile();
+    if (previewObjectUrl) {
+      URL.revokeObjectURL(previewObjectUrl);
+      previewObjectUrl = undefined;
+    }
+    if (!open || !file) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
+    previewObjectUrl = URL.createObjectURL(file);
+    setPhotoPreviewUrl(previewObjectUrl);
+  });
+
+  createEffect(() => {
+    const open = modalOpen();
+    const id = selected()?.id;
+    if (storedObjectUrl) {
+      URL.revokeObjectURL(storedObjectUrl);
+      storedObjectUrl = undefined;
+    }
+    setStoredPhotoUrl(null);
+    if (!open || !id) return;
+    let cancelled = false;
+    void loadStoredEmployeePhoto(id).then((url) => {
+      if (cancelled || !url) {
+        if (url) URL.revokeObjectURL(url);
+        return;
+      }
+      storedObjectUrl = url;
+      setStoredPhotoUrl(url);
+    });
+    onCleanup(() => {
+      cancelled = true;
+    });
+  });
+
+  onCleanup(() => {
+    if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+    if (storedObjectUrl) URL.revokeObjectURL(storedObjectUrl);
+  });
 
   const lifecycle = useMasterLifecycle({
     apiBase: "/api/v1/hr/employees",
@@ -574,6 +639,13 @@ export default function HrEmployeesPage() {
               class={inputClass}
               onChange={(e) => setPhotoFile(e.currentTarget.files?.[0] ?? null)}
             />
+            <Show when={photoPreviewUrl() || storedPhotoUrl()}>
+              <img
+                src={photoPreviewUrl() || storedPhotoUrl() || ""}
+                alt="Employee photo"
+                class="mt-2 h-24 w-24 rounded-lg object-cover"
+              />
+            </Show>
           </Field>
           <Field label="Status">
             <select class={inputClass} value={status()} onChange={(e) => setStatus(e.currentTarget.value)}>
@@ -610,7 +682,6 @@ export default function HrEmployeesPage() {
           <Field label="Notes">
             <textarea class={inputClass} rows={3} value={notes()} onInput={(e) => setNotes(e.currentTarget.value)} />
           </Field>
-          <CustomFieldsSection entityType={HR_ENTITY.employee} values={customValues} onChange={setCustom} />
         </Show>
 
         <Show when={formSection() === "statutory"}>
@@ -644,6 +715,7 @@ export default function HrEmployeesPage() {
         <Show when={formSection() === "documents" && selected()?.id}>
           {(id) => <EmployeeExtrasPanel employeeId={id()} />}
         </Show>
+        <CustomFieldsSection entityType={HR_ENTITY.employee} values={customValues} onChange={setCustom} />
       </EntityModal>
       <UserSearchModal open={userSearchOpen()} onClose={() => setUserSearchOpen(false)} onSelect={onSelectUser} />
       <HrMappedImportModal
