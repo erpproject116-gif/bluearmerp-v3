@@ -1,4 +1,5 @@
 import { createResource, createSignal, For, Show, createEffect } from "solid-js";
+import { peekResource } from "../../../shared/peekResource";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
@@ -39,7 +40,7 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
 
   const filtered = () => {
     const needle = q().trim().toLowerCase();
-    const rows = data() ?? [];
+    const rows = peekResource(data) ?? [];
     if (!needle) return rows;
     return rows.filter(
       (r) =>
@@ -60,7 +61,7 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
   };
 
   const confirm = () => {
-    const rows = data() ?? [];
+    const rows = peekResource(data) ?? [];
     const picked = rows.filter((r) => selected().has(r.purchase_order_line_id));
     if (picked.length === 0) return;
     props.onConfirm(picked);

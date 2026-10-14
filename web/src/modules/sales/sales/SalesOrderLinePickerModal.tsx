@@ -1,5 +1,6 @@
 import { createEffect, createResource, createSignal, on } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { peekResource } from "../../../shared/peekResource";
 import {
   OpenTransactionMonitor,
   buildOpenLineQuery,
@@ -104,7 +105,7 @@ export function SalesOrderLinePickerModal(props: Props) {
     },
   );
 
-  const rows = () => (data()?.rows ?? []) as unknown as Record<string, unknown>[];
+  const rows = () => (peekResource(data)?.rows ?? []) as unknown as Record<string, unknown>[];
 
   const toggleRow = (lineId: number) => {
     setSelected((prev) => {
@@ -116,13 +117,13 @@ export function SalesOrderLinePickerModal(props: Props) {
   };
 
   const toggleAll = () => {
-    const list = data()?.rows ?? [];
+    const list = peekResource(data)?.rows ?? [];
     if (selected().size === list.length) setSelected(new Set<number>());
     else setSelected(new Set<number>(list.map((r) => r.sales_order_line_id)));
   };
 
   const confirm = () => {
-    const list = data()?.rows ?? [];
+    const list = peekResource(data)?.rows ?? [];
     const picked = list
       .filter((r) => selected().has(r.sales_order_line_id))
       .map((r) => ({ ...r, source_sales_order_line_id: r.sales_order_line_id }));
@@ -141,7 +142,7 @@ export function SalesOrderLinePickerModal(props: Props) {
       onFiltersChange={setFilters}
       loading={data.loading}
       error={data.error}
-      total={data()?.total ?? 0}
+      total={peekResource(data)?.total ?? 0}
       page={page()}
       pageSize={pageSize()} onPageSizeChange={setPageSize}
       onPageChange={setPage}

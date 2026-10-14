@@ -221,9 +221,9 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 		q := fmt.Sprintf(`
 			select pol.id, po.id, po.purchase_order_no, po.status, coalesce(po.progress_status, 'unconfirmed'),
 			  to_char(po.order_date, 'YYYY-MM-DD'),
-			  po.partner_id, coalesce(p.company_name, ''),
-			  po.tax_type_id, po.currency_id,
-			  po.location_id, coalesce(loc.location_name, ''),
+			  coalesce(po.partner_id, 0), coalesce(p.company_name, ''),
+			  coalesce(po.tax_type_id, 0), coalesce(po.currency_id, 0),
+			  coalesce(po.location_id, 0), coalesce(loc.location_name, ''),
 			  po.pic_user_id, coalesce(po.pic_name, ''),
 			  po.project_id, coalesce(proj.project_name, ''),
 			  coalesce(po.reference, ''), coalesce(po.notes, ''),
@@ -245,6 +245,7 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			left join public.inv_items i on i.id = pol.item_id
 			left join public.inv_units bu on bu.id = i.base_unit_id
 			where %s
+			  and pol.item_id is not null
 			  and (pol.qty - coalesce(pol.received_qty, 0)) > 0.0001
 			order by po.order_date desc, pol.line_no`, where)
 
@@ -279,6 +280,10 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			out = append(out, row)
+		}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read PO lines.", "ERR_INTERNAL")
+			return
 		}
 		if out == nil {
 			out = []openPOLineRow{}

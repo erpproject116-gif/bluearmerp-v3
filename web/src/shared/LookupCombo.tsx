@@ -58,6 +58,7 @@ export function LookupCombo(props: Props) {
   const [open, setOpen] = createSignal(false);
   const [options, setOptions] = createSignal<LookupOption[]>([]);
   const [loading, setLoading] = createSignal(false);
+  const [fetchError, setFetchError] = createSignal("");
   const [focused, setFocused] = createSignal(false);
   const [draft, setDraft] = createSignal("");
   const [menuPos, setMenuPos] = createSignal<MenuPos | null>(null);
@@ -74,7 +75,7 @@ export function LookupCombo(props: Props) {
     });
   const listId = () => `${aria().id}-listbox`;
 
-  const showMenu = () => open() && (options().length > 0 || loading() || !!props.onCreate);
+  const showMenu = () => open();
 
   const updateMenuPos = () => {
     const el = inputEl;
@@ -127,10 +128,15 @@ export function LookupCombo(props: Props) {
 
   const search = (q: string) => {
     clearTimeout(debounce);
+    setFetchError("");
+    setLoading(true);
     debounce = setTimeout(async () => {
-      setLoading(true);
       try {
         setOptions(await props.fetchOptions(q));
+        setFetchError("");
+      } catch (err) {
+        setOptions([]);
+        setFetchError(err instanceof Error && err.message ? err.message : "Couldn't load the list.");
       } finally {
         setLoading(false);
       }
@@ -314,6 +320,14 @@ export function LookupCombo(props: Props) {
               >
                 <Show when={loading()}>
                   <LoadingText class="px-3 py-2 text-sm text-text-secondary" as="li" />
+                </Show>
+                <Show when={fetchError()}>
+                  <li class="px-3 py-2 text-sm text-red-600" role="alert">
+                    {fetchError()}
+                  </li>
+                </Show>
+                <Show when={!loading() && !fetchError() && options().length === 0}>
+                  <li class="px-3 py-2 text-sm text-text-secondary">No matches.</li>
                 </Show>
                 <For each={options()}>
                   {(opt) => (

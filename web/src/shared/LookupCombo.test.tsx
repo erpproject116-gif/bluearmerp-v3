@@ -150,4 +150,55 @@ describe("LookupCombo", () => {
     await fireEvent.blur(input);
     expect(screen.getByText(hint)).toBeInTheDocument();
   });
+
+  it("opens the menu on focus when the search returns nothing", async () => {
+    function Harness() {
+      const [text, setText] = createSignal("");
+      const [id, setId] = createSignal<number | null>(null);
+      return (
+        <LookupCombo
+          label="Vendor"
+          value={() => text()}
+          selectedId={() => id()}
+          onInput={setText}
+          onSelect={() => {}}
+          onClear={() => setId(null)}
+          fetchOptions={async () => []}
+        />
+      );
+    }
+
+    render(() => <Harness />);
+    const input = screen.getByRole("combobox", { name: "Vendor" });
+    expect(input).toHaveAttribute("aria-expanded", "false");
+    await fireEvent.focus(input);
+    expect(input).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(screen.getByText("No matches.")).toBeInTheDocument(), { timeout: 2000 });
+  });
+
+  it("shows a failed search in the menu", async () => {
+    function Harness() {
+      const [text, setText] = createSignal("");
+      const [id, setId] = createSignal<number | null>(null);
+      return (
+        <LookupCombo
+          label="Project"
+          value={() => text()}
+          selectedId={() => id()}
+          onInput={setText}
+          onSelect={() => {}}
+          onClear={() => setId(null)}
+          fetchOptions={async () => {
+            throw new Error("Project list failed");
+          }}
+        />
+      );
+    }
+
+    render(() => <Harness />);
+    const input = screen.getByRole("combobox", { name: "Project" });
+    await fireEvent.focus(input);
+    expect(input).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(screen.getByText("Project list failed")).toBeInTheDocument(), { timeout: 2000 });
+  });
 });

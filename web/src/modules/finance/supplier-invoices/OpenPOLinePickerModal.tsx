@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createResource, createSignal, For, on } from "solid-js";
+import { peekResource } from "../../../shared/peekResource";
 import { apiFetch } from "../../../shared/api";
 import {
   OpenTransactionMonitor,
@@ -75,7 +76,7 @@ export function OpenPOLinePickerModal(props: Props) {
   );
 
   const filteredRows = createMemo(() => {
-    const list = data()?.rows ?? [];
+    const list = peekResource(data)?.rows ?? [];
     const chip = statusChip();
     if (chip === "all") return list;
     return list.filter((r) => poChip(String(r.status ?? ""), String(r.progress_status ?? "")) === chip);

@@ -1,5 +1,6 @@
 import { createEffect, createResource, createSignal, on } from "solid-js";
 import { apiFetch } from "../../../shared/api";
+import { peekResource } from "../../../shared/peekResource";
 import {
   OpenTransactionMonitor,
   buildOpenLineQuery,
@@ -62,7 +63,7 @@ export function OpenGRLinePickerModal(props: Props) {
     },
   );
 
-  const rows = () => (data()?.rows ?? []) as unknown as Record<string, unknown>[];
+  const rows = () => (peekResource(data)?.rows ?? []) as unknown as Record<string, unknown>[];
 
   const toggleRow = (id: number) => {
     setSelected((prev) => {
@@ -74,13 +75,13 @@ export function OpenGRLinePickerModal(props: Props) {
   };
 
   const toggleAll = () => {
-    const list = data()?.rows ?? [];
+    const list = peekResource(data)?.rows ?? [];
     if (selected().size === list.length) setSelected(new Set<number>());
     else setSelected(new Set(list.map((r) => r.goods_receipt_line_id)));
   };
 
   const apply = () => {
-    const list = data()?.rows ?? [];
+    const list = peekResource(data)?.rows ?? [];
     const picked = list.filter((r) => selected().has(r.goods_receipt_line_id));
     if (picked.length === 0) return;
     props.onConfirm(picked);
@@ -97,7 +98,7 @@ export function OpenGRLinePickerModal(props: Props) {
       onFiltersChange={setFilters}
       loading={data.loading}
       error={data.error}
-      total={data()?.total ?? 0}
+      total={peekResource(data)?.total ?? 0}
       page={page()}
       pageSize={pageSize()} onPageSizeChange={setPageSize}
       onPageChange={setPage}
