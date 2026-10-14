@@ -5,6 +5,12 @@ import { InlineCustomFieldAdder } from "./InlineCustomFieldAdder";
 import { useFormFieldSettings, type FormFieldSetting } from "./useFormFieldSettings";
 import { apiFetch } from "./api";
 import { useToast } from "./toast";
+import {
+  openCustomFieldFile,
+  stageCustomFieldFile,
+  uploadCustomFieldFile,
+  type CustomFieldFileValue,
+} from "./customFieldFiles";
 
 export const FIELD_TYPES = [
   { value: "text", label: "Text box" },
@@ -16,6 +22,7 @@ export const FIELD_TYPES = [
   { value: "date", label: "Date picker" },
   { value: "date_range", label: "Date range" },
   { value: "number_range", label: "Number range" },
+  { value: "file", label: "File upload" },
 ] as const;
 
 export type CustomFieldType = (typeof FIELD_TYPES)[number]["value"];
@@ -28,6 +35,8 @@ type Props = {
   entityType: string;
   values: () => Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
+  /** Saved record id. A file field uploads immediately when this is set. */
+  recordId?: () => number | null | undefined;
   /** Hide fields that match this predicate (e.g. personal birthday on Quotation). */
   excludeDef?: (def: { field_key: string; label: string }) => boolean;
 };
@@ -106,6 +115,8 @@ export function CustomFieldsSection(props: Props) {
                 </Show>
                 <CustomFieldInput
                   def={def}
+                  entityType={props.entityType}
+                  recordId={props.recordId}
                   value={() => props.values()[def.field_key]}
                   onChange={props.onChange}
                 />
@@ -121,6 +132,8 @@ export function CustomFieldsSection(props: Props) {
 
 function CustomFieldInput(props: {
   def: { field_key: string; label: string; field_type: string; options?: { choices?: string[]; placeholder?: string }; is_required: boolean };
+  entityType: string;
+  recordId?: () => number | null | undefined;
   value: () => unknown;
   onChange: (key: string, value: unknown) => void;
 }) {
@@ -128,8 +141,82 @@ function CustomFieldInput(props: {
   const placeholder = () => props.def.options?.placeholder ?? "";
   const label = () => `${props.def.label}${props.def.is_required ? " *" : ""}`;
 
+  if (props.def.field_type === "file") {
+    return (
+      <FileCustomField
+        entityType={props.entityType}
+        recordId={props.recordId}
+        fieldKey={props.def.field_key}
+        label={label()}
+        value={props.value()}
+        onChange={(value) => props.onChange(props.def.field_key, value)}
+      />
+    );
+  }
+
   return (
     <SwitchField def={props.def} label={label()} placeholder={placeholder()} value={props.value()} onChange={props.onChange} choices={choices()} />
+  );
+}
+
+function FileCustomField(props: {
+  entityType: string;
+  recordId?: () => number | null | undefined;
+  fieldKey: string;
+  label: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+}) {
+  const toast = useToast();
+  const [uploading, setUploading] = createSignal(false);
+  const meta = () =>
+    props.value && typeof props.value === "object" ? (props.value as CustomFieldFileValue) : null;
+
+  return (
+    <Field label={props.label} span="full">
+      <input
+        type="file"
+        class={inputClass}
+        disabled={uploading()}
+        onChange={(e) => {
+          const file = e.currentTarget.files?.[0] ?? null;
+          const recordId = props.recordId?.() ?? null;
+          if (!file) {
+            stageCustomFieldFile(props.entityType, props.fieldKey, null);
+            props.onChange(null);
+            return;
+          }
+          if (!recordId) {
+            stageCustomFieldFile(props.entityType, props.fieldKey, file);
+            props.onChange({ file_name: file.name, pending: true });
+            return;
+          }
+          setUploading(true);
+          void uploadCustomFieldFile(props.entityType, recordId, props.fieldKey, file).then((saved) => {
+            setUploading(false);
+            if (!saved) {
+              toast.error("File upload failed.");
+              return;
+            }
+            props.onChange(saved);
+          });
+        }}
+      />
+      <Show when={meta()?.file_name}>
+        <div class="mt-1 flex items-center gap-2 text-xs text-text-secondary">
+          <span>{uploading() ? "Uploading…" : meta()?.file_name}</span>
+          <Show when={meta()?.file_id}>
+            <button
+              type="button"
+              class="font-medium text-brand-700 hover:underline"
+              onClick={() => void openCustomFieldFile(Number(meta()?.file_id))}
+            >
+              View
+            </button>
+          </Show>
+        </div>
+      </Show>
+    </Field>
   );
 }
 

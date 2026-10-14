@@ -7,6 +7,7 @@ import { LookupCombo } from "../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
+import { flushStagedCustomFiles } from "../../shared/customFieldFiles";
 import { useCustomValues } from "../../shared/useCustomValues";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { useFormFieldSettings } from "../../shared/useFormFieldSettings";
@@ -129,6 +130,8 @@ export default function LeavePage() {
       });
       if (!uploaded.ok) toast.warning("Leave was saved, but the file upload failed.");
     }
+    const filesStored = await flushStagedCustomFiles("hr_leave_request", res.data.id);
+    if (!filesStored.ok) toast.warning("Leave was saved, but a custom field file upload failed.");
     toast.success("Leave request submitted.");
     await draft.clearOnSave();
     setReason("");

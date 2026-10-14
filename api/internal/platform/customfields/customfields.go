@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -44,8 +46,10 @@ type definitionBody struct {
 
 var allowedTypes = map[string]bool{
 	"text": true, "textarea": true, "number": true, "select": true, "radio": true,
-	"checkbox": true, "date": true, "date_range": true, "number_range": true,
+	"checkbox": true, "date": true, "date_range": true, "number_range": true, "file": true,
 }
+
+const maxCustomFieldFileBytes = 10 * 1024 * 1024
 
 // Keep in sync with formfields/registry.go standardRegistry keys.
 // Keep in sync with formfields/registry.go standardRegistry keys.
@@ -80,6 +84,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Route("/custom-fields", func(cr chi.Router) {
 		cr.Get("/", listDefinitionsHandler(pool))
 		cr.Post("/", createDefinitionHandler(pool))
+		cr.Post("/files", uploadCustomFieldFile(pool))
+		cr.Get("/files/{fileId}/download", downloadCustomFieldFile(pool))
 		cr.Patch("/{id}", updateDefinitionHandler(pool))
 		cr.Delete("/{id}", deleteDefinitionHandler(pool))
 	})
@@ -596,7 +602,102 @@ func normalizeValue(def Definition, val any) (any, error) {
 			return nil, fmt.Errorf("Must be a range object.")
 		}
 		return m, nil
+	case "file":
+		m, ok := val.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("Must be a file.")
+		}
+		name, _ := m["file_name"].(string)
+		if strings.TrimSpace(name) == "" {
+			return nil, fmt.Errorf("File name is required.")
+		}
+		return m, nil
 	default:
 		return val, nil
+	}
+}
+
+func uploadCustomFieldFile(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		if err := r.ParseMultipartForm(maxCustomFieldFileBytes + 1024); err != nil {
+			response.Validation(w, map[string]string{"file": "Invalid upload or file too large (max 10 MB)."})
+			return
+		}
+		entityType := strings.TrimSpace(r.FormValue("entity_type"))
+		fieldKey := strings.TrimSpace(r.FormValue("field_key"))
+		entityID, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("entity_id")), 10, 64)
+		if !ValidFormEntityType(entityType) || !keyPattern.MatchString(fieldKey) || err != nil || entityID <= 0 {
+			response.Validation(w, map[string]string{"file": "A saved record and a valid custom field are required."})
+			return
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			response.Validation(w, map[string]string{"file": "File is required."})
+			return
+		}
+		defer file.Close()
+		data, err := io.ReadAll(io.LimitReader(file, maxCustomFieldFileBytes+1))
+		if err != nil || int64(len(data)) > maxCustomFieldFileBytes {
+			response.Validation(w, map[string]string{"file": "File exceeds 10 MB."})
+			return
+		}
+		safeName := filepath.Base(strings.TrimSpace(header.Filename))
+		if safeName == "" || safeName == "." {
+			response.Validation(w, map[string]string{"file": "Invalid file name."})
+			return
+		}
+		mimeType := header.Header.Get("Content-Type")
+		var uploadedBy any
+		if tu.AppUserID > 0 {
+			uploadedBy = tu.AppUserID
+		}
+		var id int64
+		err = pool.QueryRow(r.Context(), `
+			insert into public.tenant_custom_field_files
+			  (tenant_id, entity_type, entity_id, field_key, file_name, mime_type, file_bytes, uploaded_by_user_id)
+			values ($1,$2,$3,$4,$5,$6,$7,$8)
+			returning id`,
+			tu.TenantID, entityType, entityID, fieldKey, safeName, mimeType, data, uploadedBy).Scan(&id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to store the file.", "ERR_INTERNAL")
+			return
+		}
+		raw, _ := json.Marshal(map[string]any{"file_id": id, "file_name": safeName})
+		_, _ = pool.Exec(r.Context(), `
+			insert into public.tenant_custom_field_values
+			  (tenant_id, entity_type, entity_id, field_key, value_json, updated_at)
+			values ($1,$2,$3,$4,$5, now())
+			on conflict (tenant_id, entity_type, entity_id, field_key)
+			do update set value_json = excluded.value_json, updated_at = now()`,
+			tu.TenantID, entityType, entityID, fieldKey, raw)
+		response.OK(w, map[string]any{"file_id": id, "file_name": safeName}, "File stored.")
+	}
+}
+
+func downloadCustomFieldFile(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := strconv.ParseInt(chi.URLParam(r, "fileId"), 10, 64)
+		if err != nil || id <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid file."})
+			return
+		}
+		var fileName, mimeType string
+		var data []byte
+		err = pool.QueryRow(r.Context(), `
+			select file_name, mime_type, file_bytes
+			from public.tenant_custom_field_files
+			where id = $1 and tenant_id = $2`, id, tu.TenantID).Scan(&fileName, &mimeType, &data)
+		if err != nil || len(data) == 0 {
+			response.Err(w, http.StatusNotFound, "File not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+		w.Header().Set("Content-Type", mimeType)
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", fileName))
+		_, _ = w.Write(data)
 	}
 }

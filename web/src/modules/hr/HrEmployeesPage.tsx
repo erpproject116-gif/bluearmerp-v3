@@ -29,6 +29,7 @@ import { requireFields } from "../../shared/handleSaveResult";
 import { useQueryClient } from "@tanstack/solid-query";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { CustomFieldsSection, validateCustomFields } from "../../shared/CustomFieldsSection";
+import { flushStagedCustomFiles } from "../../shared/customFieldFiles";
 import { useCustomValues } from "../../shared/useCustomValues";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
@@ -36,6 +37,26 @@ import { QuickDepartmentModal } from "../../shared/QuickDepartmentModal";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 
 const STATUS_OPTIONS = ["active", "inactive", "terminated"];
+
+const GOV_ID_UPLOADS = [
+  { docType: "id_national", label: "National ID" },
+  { docType: "id_philhealth", label: "PhilHealth ID" },
+  { docType: "id_sss", label: "SSS ID" },
+  { docType: "id_umid", label: "UMID" },
+  { docType: "id_drivers_license", label: "Driver's License" },
+  { docType: "id_passport", label: "Passport" },
+  { docType: "id_tin", label: "TIN ID" },
+  { docType: "id_pagibig", label: "Pag-IBIG ID" },
+  { docType: "id_prc", label: "PRC ID" },
+  { docType: "id_voter", label: "Voter's ID" },
+  { docType: "id_postal", label: "Postal ID" },
+  { docType: "id_senior", label: "Senior Citizen ID" },
+  { docType: "id_pwd", label: "PWD ID" },
+  { docType: "id_barangay", label: "Barangay ID" },
+  { docType: "id_gov", label: "Other government ID" },
+] as const;
+
+type EmployeeDoc = { id: number; doc_type: string; title: string; file_name?: string; has_file?: boolean };
 
 async function employeeDocHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
@@ -48,11 +69,11 @@ async function employeeDocHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-async function uploadEmployeePhoto(employeeId: number, file: File): Promise<boolean> {
+async function uploadEmployeeDocument(employeeId: number, docType: string, file: File): Promise<boolean> {
   const headers = await employeeDocHeaders();
   const fd = new FormData();
   fd.append("file", file);
-  fd.append("doc_type", "photo");
+  fd.append("doc_type", docType);
   fd.append("title", file.name);
   const res = await fetch(`${apiBase}/api/v1/hr/employees/${employeeId}/documents`, {
     method: "POST",
@@ -62,6 +83,10 @@ async function uploadEmployeePhoto(employeeId: number, file: File): Promise<bool
   if (!res.ok) return false;
   const body = (await res.json()) as { success?: boolean };
   return Boolean(body.success);
+}
+
+async function uploadEmployeePhoto(employeeId: number, file: File): Promise<boolean> {
+  return uploadEmployeeDocument(employeeId, "photo", file);
 }
 
 async function loadStoredEmployeePhoto(employeeId: number): Promise<string | null> {
@@ -111,6 +136,8 @@ export default function HrEmployeesPage() {
   const [emergencyAddress, setEmergencyAddress] = createSignal("");
   const [emergencyPhone, setEmergencyPhone] = createSignal("");
   const [photoFile, setPhotoFile] = createSignal<File | null>(null);
+  const [employeeDocs, setEmployeeDocs] = createSignal<EmployeeDoc[]>([]);
+  const [stagedGovIds, setStagedGovIds] = createSignal<Record<string, File>>({});
   const [photoPreviewUrl, setPhotoPreviewUrl] = createSignal<string | null>(null);
   const [storedPhotoUrl, setStoredPhotoUrl] = createSignal<string | null>(null);
   let previewObjectUrl: string | undefined;
@@ -127,6 +154,44 @@ export default function HrEmployeesPage() {
   const { customValues, setCustom, loadCustom } = useCustomValues();
 
   const canWriteEmployees = () => hasPermission(auth.me, "hr.employees", "write");
+
+  const chooseGovId = async (docType: string, file: File | null) => {
+    if (!file) {
+      setStagedGovIds((current) => {
+        const next = { ...current };
+        delete next[docType];
+        return next;
+      });
+      return;
+    }
+    const id = selected()?.id;
+    if (!id) {
+      setStagedGovIds((current) => ({ ...current, [docType]: file }));
+      return;
+    }
+    const uploaded = await uploadEmployeeDocument(id, docType, file);
+    if (!uploaded) {
+      toast.warning("Government ID upload failed.");
+      return;
+    }
+    const listed = await apiFetch<EmployeeDoc[]>(`/api/v1/hr/employees/${id}/documents`);
+    setEmployeeDocs(listed.data ?? []);
+  };
+
+  const viewEmployeeDoc = async (docId: number) => {
+    const id = selected()?.id;
+    if (!id) return;
+    const res = await fetch(`${apiBase}/api/v1/hr/employees/${id}/documents/${docId}/download`, {
+      headers: await employeeDocHeaders(),
+    });
+    if (!res.ok) {
+      toast.warning("Could not open that ID file.");
+      return;
+    }
+    const url = URL.createObjectURL(await res.blob());
+    window.open(url, "_blank", "noopener");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
 
   createEffect(() => {
     const open = modalOpen();
@@ -151,8 +216,12 @@ export default function HrEmployeesPage() {
       storedObjectUrl = undefined;
     }
     setStoredPhotoUrl(null);
+    setEmployeeDocs([]);
     if (!open || !id) return;
     let cancelled = false;
+    void apiFetch<EmployeeDoc[]>(`/api/v1/hr/employees/${id}/documents`).then((listed) => {
+      if (!cancelled) setEmployeeDocs(listed.data ?? []);
+    });
     void loadStoredEmployeePhoto(id).then((url) => {
       if (cancelled || !url) {
         if (url) URL.revokeObjectURL(url);
@@ -220,6 +289,8 @@ export default function HrEmployeesPage() {
     setEmergencyAddress("");
     setEmergencyPhone("");
     setPhotoFile(null);
+    setStagedGovIds({});
+    setEmployeeDocs([]);
     loadCustom({});
   };
 
@@ -408,6 +479,21 @@ export default function HrEmployeesPage() {
       const uploaded = await uploadEmployeePhoto(savedId, file);
       setPhotoFile(null);
       if (!uploaded) toast.warning("Employee saved, but the photo upload failed.");
+    }
+    if (savedId) {
+      const pendingIds = stagedGovIds();
+      let idFailed = false;
+      for (const item of GOV_ID_UPLOADS) {
+        const chosen = pendingIds[item.docType];
+        if (!chosen) continue;
+        const uploaded = await uploadEmployeeDocument(savedId, item.docType, chosen);
+        if (!uploaded) idFailed = true;
+      }
+      setStagedGovIds({});
+      if (idFailed) toast.warning("Employee saved, but a government ID upload failed.");
+      const filesStored = await flushStagedCustomFiles(HR_ENTITY.employee, savedId);
+      for (const [key, value] of Object.entries(filesStored.saved)) setCustom(key, value);
+      if (!filesStored.ok) toast.warning("Employee saved, but a custom field file upload failed.");
     }
     if (!row && res.data) {
       setSelected(res.data as Employee);
@@ -623,6 +709,46 @@ export default function HrEmployeesPage() {
           <Field label="National ID">
             <input class={inputClass} value={nationalId()} onInput={(e) => setNationalId(e.currentTarget.value)} />
           </Field>
+          <div class="col-span-full rounded-lg border border-dashed border-stroke p-3">
+            <h3 class="text-sm font-semibold text-text-primary">Government ID copies</h3>
+            <p class="mb-3 text-xs text-text-secondary">Optional. The ID number can be saved without a scan.</p>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <For each={GOV_ID_UPLOADS}>
+                {(item) => {
+                  const stored = () => employeeDocs().find((doc) => doc.doc_type === item.docType && doc.has_file);
+                  const staged = () => stagedGovIds()[item.docType];
+                  return (
+                    <label class="block">
+                      <span class="mb-1 block text-sm font-medium text-text-primary">{item.label}</span>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        class={inputClass}
+                        onChange={(e) => void chooseGovId(item.docType, e.currentTarget.files?.[0] ?? null)}
+                      />
+                      <Show when={staged() || stored()}>
+                        <span class="mt-1 flex items-center gap-2 text-xs text-text-secondary">
+                          <span>{staged()?.name || stored()?.file_name || stored()?.title}</span>
+                          <Show when={stored()}>
+                            <button
+                              type="button"
+                              class="font-medium text-brand-700 hover:underline"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                void viewEmployeeDoc(stored()!.id);
+                              }}
+                            >
+                              View
+                            </button>
+                          </Show>
+                        </span>
+                      </Show>
+                    </label>
+                  );
+                }}
+              </For>
+            </div>
+          </div>
           <Field label="Emergency contact">
             <input class={inputClass} value={emergencyName()} onInput={(e) => setEmergencyName(e.currentTarget.value)} />
           </Field>
@@ -715,7 +841,12 @@ export default function HrEmployeesPage() {
         <Show when={formSection() === "documents" && selected()?.id}>
           {(id) => <EmployeeExtrasPanel employeeId={id()} />}
         </Show>
-        <CustomFieldsSection entityType={HR_ENTITY.employee} values={customValues} onChange={setCustom} />
+        <CustomFieldsSection
+          entityType={HR_ENTITY.employee}
+          recordId={() => selected()?.id}
+          values={customValues}
+          onChange={setCustom}
+        />
       </EntityModal>
       <UserSearchModal open={userSearchOpen()} onClose={() => setUserSearchOpen(false)} onSelect={onSelectUser} />
       <HrMappedImportModal

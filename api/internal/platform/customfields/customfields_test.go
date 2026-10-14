@@ -20,6 +20,21 @@ func TestNormalizeFieldKey(t *testing.T) {
 	}
 }
 
+func TestNormalizeFileValue(t *testing.T) {
+	def := Definition{FieldType: "file"}
+	got, err := normalizeValue(def, map[string]any{"file_name": "national-id.pdf", "file_id": float64(4)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, ok := got.(map[string]any)
+	if !ok || m["file_name"] != "national-id.pdf" {
+		t.Fatalf("got %#v", got)
+	}
+	if _, err := normalizeValue(def, "not-a-file"); err == nil {
+		t.Fatal("expected a file object")
+	}
+}
+
 func TestIsPersonalBirthdayField(t *testing.T) {
 	cases := []struct {
 		key, label string
