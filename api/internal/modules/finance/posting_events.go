@@ -52,7 +52,7 @@ func buildORPostingEvent(tenantID, receiptID int64, lines []journalLineBody) led
 	return ev
 }
 
-func buildPVPostingEvent(tenantID, paymentID, partnerID int64, amountTotal, withholdingTotal float64, paymentMethod, ewtPayableCode string) ledger.PostingEvent {
+func buildPVPostingEvent(tenantID, paymentID, partnerID int64, amountTotal, withholdingTotal float64, paymentMethod, debitAccount, ewtPayableCode string) ledger.PostingEvent {
 	creditAcct := "1020"
 	switch strings.TrimSpace(paymentMethod) {
 	case "bank_transfer":
@@ -63,13 +63,14 @@ func buildPVPostingEvent(tenantID, paymentID, partnerID int64, amountTotal, with
 	if strings.TrimSpace(ewtPayableCode) == "" {
 		ewtPayableCode = "2040"
 	}
+	debitAccount = payableDebitCode(debitAccount, "")
 	partner := partnerID
 	netPay := amountTotal - withholdingTotal
 	if netPay < 0 {
 		netPay = 0
 	}
 	lines := []ledger.PostingLine{
-		{AccountCode: "2611", Debit: amountTotal, PartyID: &partner},
+		{AccountCode: debitAccount, Debit: amountTotal, PartyID: &partner},
 		{AccountCode: creditAcct, Credit: netPay, PartyID: &partner},
 	}
 	if withholdingTotal > 0.0001 {

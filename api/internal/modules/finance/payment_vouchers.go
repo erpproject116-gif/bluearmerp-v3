@@ -332,13 +332,17 @@ func validatePaymentApplications(ctx context.Context, pool *pgxpool.Pool, tenant
 	for i, app := range apps {
 		key := fmt.Sprintf("applications[%d]", i)
 		var invPartnerID int64
+		var progress string
 		err := pool.QueryRow(ctx, `
-			select partner_id from public.fin_supplier_invoices
+			select partner_id, coalesce(progress_status, '') from public.fin_supplier_invoices
 			where id = $1 and tenant_id = $2 and deleted_at is null`,
-			app.SupplierInvoiceID, tenantID).Scan(&invPartnerID)
+			app.SupplierInvoiceID, tenantID).Scan(&invPartnerID, &progress)
 		if err != nil {
 			errs[key+".supplier_invoice_id"] = "Supplier invoice not found."
 			continue
+		}
+		if !documentCompleted(progress) {
+			errs[key+".supplier_invoice_id"] = errPurchaseNotCompleted.Error()
 		}
 		if invPartnerID != partnerID {
 			errs[key+".supplier_invoice_id"] = "Invoice vendor does not match payment vendor."
@@ -359,6 +363,15 @@ func validatePaymentApplications(ctx context.Context, pool *pgxpool.Pool, tenant
 	}
 	if err := requireDiscountAccountConfigured(ctx, pool, tenantID, "ap", discountTotal); err != nil {
 		errs["discount_amount"] = err.Error()
+	}
+	if len(errs) == 0 && len(apps) > 0 {
+		ids := make([]int64, len(apps))
+		for i, app := range apps {
+			ids[i] = app.SupplierInvoiceID
+		}
+		if _, err := sharedSupplierPayableCode(ctx, pool, tenantID, ids); err != nil {
+			errs["applications"] = err.Error()
+		}
 	}
 	if len(errs) > 0 {
 		return errs
@@ -386,11 +399,15 @@ func lockAndCheckPaymentApplications(ctx context.Context, tx pgx.Tx, tenantID, p
 	excludeID := paymentID
 	for _, app := range ordered {
 		var locked float64
+		var progress string
 		if err := tx.QueryRow(ctx, `
-			select grand_total::float8 from public.fin_supplier_invoices
+			select grand_total::float8, coalesce(progress_status, '') from public.fin_supplier_invoices
 			where id = $1 and tenant_id = $2 and deleted_at is null
-			for update`, app.SupplierInvoiceID, tenantID).Scan(&locked); err != nil {
+			for update`, app.SupplierInvoiceID, tenantID).Scan(&locked, &progress); err != nil {
 			return err
+		}
+		if !documentCompleted(progress) {
+			return overAppliedError{message: errPurchaseNotCompleted.Error()}
 		}
 		outstanding, err := supplierInvoiceOutstandingQ(ctx, tx, tenantID, app.SupplierInvoiceID, &excludeID)
 		if err != nil {
@@ -535,7 +552,15 @@ func createPaymentVoucherFromBody(ctx context.Context, pool *pgxpool.Pool, tu au
 		return PaymentVoucher{}, err.Error(), http.StatusBadRequest, "ERR_VALIDATION"
 	}
 
-	ev := withEntryDate(buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod, mustEWTPayableCode(ctx, tx, tu.TenantID)), paymentDate)
+	invoiceIDs := make([]int64, len(body.Applications))
+	for i, app := range body.Applications {
+		invoiceIDs[i] = app.SupplierInvoiceID
+	}
+	debitAccount, err := sharedSupplierPayableCode(ctx, tx, tu.TenantID, invoiceIDs)
+	if err != nil {
+		return PaymentVoucher{}, err.Error(), http.StatusBadRequest, "ERR_VALIDATION"
+	}
+	ev := withEntryDate(buildPVPostingEvent(tu.TenantID, id, body.PartnerID, amountTotal, whtTotal, body.PaymentMethod, debitAccount, mustEWTPayableCode(ctx, tx, tu.TenantID)), paymentDate)
 	deferredApproval, _, err := ensureAmountApproval(ctx, tx, tu, "payment_voucher", id, amountTotal)
 	if err != nil {
 		return PaymentVoucher{}, "Failed to check approval policy.", http.StatusInternalServerError, "ERR_INTERNAL"

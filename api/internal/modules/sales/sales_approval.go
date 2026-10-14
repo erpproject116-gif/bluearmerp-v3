@@ -247,6 +247,11 @@ func applySaleApprovalTransition(ctx context.Context, pool *pgxpool.Pool, tu aut
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("sales not found")
 	}
+	if toStatus == "completed" {
+		if err := syncSalesInvoiceJournalFromDefaultsTx(ctx, tx, tu.TenantID, tu.AppUserID, id); err != nil {
+			return err
+		}
+	}
 
 	if action == "submit" {
 		var label string

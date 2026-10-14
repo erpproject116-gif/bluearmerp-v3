@@ -96,6 +96,10 @@ func main() {
 	}
 	defer pool.Close()
 
+	if err := finance.RepairUnfinishedInvoiceJournals(ctx, pool); err != nil {
+		log.Printf("unfinished invoice journal repair: %v", err)
+	}
+
 	audit.Configure(cfg)
 	audit.StartWorker(pool, cfg)
 

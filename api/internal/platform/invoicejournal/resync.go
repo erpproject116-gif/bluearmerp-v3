@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,11 +32,7 @@ func Resync(
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := VoidTx(ctx, tx, tenantID, userID, existingJEID, voidRemark); err != nil {
-		return 0, err
-	}
-	// Always create a new entry — Sync leaves posted/cancelled IDs untouched.
-	jeID, err := SyncTx(ctx, tx, tenantID, userID, entryDate, remarks, nil, lines, autoPost)
+	jeID, err := ResyncTx(ctx, tx, tenantID, userID, entryDate, remarks, existingJEID, lines, autoPost, voidRemark)
 	if err != nil {
 		return 0, err
 	}
@@ -43,4 +40,23 @@ func Resync(
 		return 0, err
 	}
 	return jeID, nil
+}
+
+// ResyncTx is Resync inside the caller's transaction.
+func ResyncTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID, userID int64,
+	entryDate time.Time,
+	remarks string,
+	existingJEID *int64,
+	lines []Line,
+	autoPost bool,
+	voidRemark string,
+) (int64, error) {
+	if _, err := VoidTx(ctx, tx, tenantID, userID, existingJEID, voidRemark); err != nil {
+		return 0, err
+	}
+	// Always create a new entry — Sync leaves posted/cancelled IDs untouched.
+	return SyncTx(ctx, tx, tenantID, userID, entryDate, remarks, nil, lines, autoPost)
 }

@@ -16,7 +16,7 @@ func sumDebitsCredits(lines []ledger.PostingLine) (debit, credit float64) {
 }
 
 func TestBuildPVPostingEventBalancesWithWithholding(t *testing.T) {
-	ev := buildPVPostingEvent(1, 42, 7, 1000, 20, "bank_transfer", "2040")
+	ev := buildPVPostingEvent(1, 42, 7, 1000, 20, "bank_transfer", "2010", "2040")
 	if ev.SourceType != "payment_voucher" || ev.SourceID != 42 {
 		t.Fatalf("unexpected source: %s-%d", ev.SourceType, ev.SourceID)
 	}
@@ -37,6 +37,14 @@ func TestBuildPVPostingEventBalancesWithWithholding(t *testing.T) {
 	if creditAcct != "1023" {
 		t.Fatalf("bank_transfer should credit 1023, got %s", creditAcct)
 	}
+	for _, ln := range ev.Lines {
+		if ln.Debit > 0 && ln.AccountCode != "2010" {
+			t.Fatalf("completed purchase payment debit = %s, want payable 2010", ln.AccountCode)
+		}
+		if ln.AccountCode == "2611" {
+			t.Fatal("payment must not debit 2611")
+		}
+	}
 	if math.Abs(whtCredit-20) > 0.0001 {
 		t.Fatalf("withholding credit = %.4f, want 20", whtCredit)
 	}
@@ -45,7 +53,7 @@ func TestBuildPVPostingEventBalancesWithWithholding(t *testing.T) {
 func TestBuildPVPostingEventCreditAccountByMethod(t *testing.T) {
 	cases := map[string]string{"cash": "1020", "check": "1029", "bank_transfer": "1023"}
 	for method, want := range cases {
-		ev := buildPVPostingEvent(1, 1, 7, 500, 0, method, "2040")
+		ev := buildPVPostingEvent(1, 1, 7, 500, 0, method, "2010", "2040")
 		var got string
 		for _, ln := range ev.Lines {
 			if ln.Credit > 0 {
@@ -62,7 +70,7 @@ func TestBuildORPostingEventSkipsInvalidLines(t *testing.T) {
 	partner := int64(9)
 	ev := buildORPostingEvent(1, 5, []journalLineBody{
 		{DepositAccountCode: "1020", GLAccountCode: "1130", Amount: 100, Fees: 10, PartnerID: &partner},
-		{DepositAccountCode: "", GLAccountCode: "1130", Amount: 100},  // missing deposit account
+		{DepositAccountCode: "", GLAccountCode: "1130", Amount: 100},   // missing deposit account
 		{DepositAccountCode: "1020", GLAccountCode: "1130", Amount: 0}, // zero amount
 	})
 	// One valid line with fees expands to 4 posting lines (amount pair + fees pair).

@@ -20,37 +20,37 @@ import (
 )
 
 type ReceiptJournalLine struct {
-	ID                  int64    `json:"id,omitempty"`
-	LineNo              int      `json:"line_no"`
-	BankAccountID       *int64   `json:"bank_account_id,omitempty"`
-	DepositAccountCode  string   `json:"deposit_account_code"`
-	DepositAccountName  string   `json:"deposit_account_name"`
-	GLAccountCode       string   `json:"gl_account_code"`
-	GLAccountName       string   `json:"gl_account_name"`
-	PartnerID           *int64   `json:"partner_id,omitempty"`
-	PartnerCode         string   `json:"partner_code"`
-	PartnerName         string   `json:"partner_name"`
-	Amount              float64  `json:"amount"`
-	Fees                float64  `json:"fees"`
-	Remark              *string  `json:"remark,omitempty"`
+	ID                 int64   `json:"id,omitempty"`
+	LineNo             int     `json:"line_no"`
+	BankAccountID      *int64  `json:"bank_account_id,omitempty"`
+	DepositAccountCode string  `json:"deposit_account_code"`
+	DepositAccountName string  `json:"deposit_account_name"`
+	GLAccountCode      string  `json:"gl_account_code"`
+	GLAccountName      string  `json:"gl_account_name"`
+	PartnerID          *int64  `json:"partner_id,omitempty"`
+	PartnerCode        string  `json:"partner_code"`
+	PartnerName        string  `json:"partner_name"`
+	Amount             float64 `json:"amount"`
+	Fees               float64 `json:"fees"`
+	Remark             *string `json:"remark,omitempty"`
 }
 
 type OfficialReceiptJournal struct {
 	OfficialReceipt
-	AccountingSlipNo  string               `json:"accounting_slip_no"`
-	CommentDetails    *string              `json:"comment_details,omitempty"`
-	Remark            *string              `json:"remark,omitempty"`
-	LocationID        *int64               `json:"location_id,omitempty"`
-	LocationName      string               `json:"location_name,omitempty"`
-	DepartmentID      *int64               `json:"department_id,omitempty"`
-	DepartmentName    string               `json:"department_name,omitempty"`
-	ProjectID         *int64               `json:"project_id,omitempty"`
-	ProjectName       *string              `json:"project_name,omitempty"`
-	PicUserID         *int64               `json:"pic_user_id,omitempty"`
-	PicName           string               `json:"pic_name,omitempty"`
-	UpdatedByUserID   *int64               `json:"updated_by_user_id,omitempty"`
-	UpdatedByName     string               `json:"updated_by_name,omitempty"`
-	JournalLines      []ReceiptJournalLine `json:"journal_lines,omitempty"`
+	AccountingSlipNo string               `json:"accounting_slip_no"`
+	CommentDetails   *string              `json:"comment_details,omitempty"`
+	Remark           *string              `json:"remark,omitempty"`
+	LocationID       *int64               `json:"location_id,omitempty"`
+	LocationName     string               `json:"location_name,omitempty"`
+	DepartmentID     *int64               `json:"department_id,omitempty"`
+	DepartmentName   string               `json:"department_name,omitempty"`
+	ProjectID        *int64               `json:"project_id,omitempty"`
+	ProjectName      *string              `json:"project_name,omitempty"`
+	PicUserID        *int64               `json:"pic_user_id,omitempty"`
+	PicName          string               `json:"pic_name,omitempty"`
+	UpdatedByUserID  *int64               `json:"updated_by_user_id,omitempty"`
+	UpdatedByName    string               `json:"updated_by_name,omitempty"`
+	JournalLines     []ReceiptJournalLine `json:"journal_lines,omitempty"`
 }
 
 type journalLineBody struct {
@@ -289,6 +289,20 @@ func saveReceiptJournal(pool *pgxpool.Pool) http.HandlerFunc {
 		if _, err := tx.Exec(r.Context(), `delete from public.fin_receipt_journal_lines where official_receipt_id = $1`, id); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update journal lines.", "ERR_INTERNAL")
 			return
+		}
+		if len(body.Applications) > 0 {
+			salesIDs := make([]int64, len(body.Applications))
+			for i, app := range body.Applications {
+				salesIDs[i] = app.SalesID
+			}
+			creditCode, err := sharedSaleReceivableCode(r.Context(), tx, tu.TenantID, salesIDs)
+			if err != nil {
+				response.Validation(w, map[string]string{"applications": err.Error()})
+				return
+			}
+			for i := range body.JournalLines {
+				body.JournalLines[i].GLAccountCode = creditCode
+			}
 		}
 		for _, ln := range body.JournalLines {
 			if err := insertJournalLine(r.Context(), tx, id, ln); err != nil {

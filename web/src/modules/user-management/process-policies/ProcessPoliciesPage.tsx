@@ -182,22 +182,22 @@ const SECTIONS: PolicySection[] = [
       {
         key: "accounts_auto_post_or",
         label: "Auto-post official receipts to journal",
-        help: "When on, payment receipts create posted journal entries (requires chart of accounts).",
+        help: "When on, the journal posts when the official receipt is applied to a Completed sale.",
       },
       {
         key: "accounts_auto_post_pv",
         label: "Auto-post payment vouchers to journal",
-        help: "When on, supplier payment vouchers create posted journal entries.",
+        help: "When on, the journal posts when the payment is applied to a Completed purchase.",
       },
       {
         key: "accounts_auto_post_sales",
         label: "Auto-post sales invoice journal",
-        help: "When on, saving a sale (or the Invoice tab) posts the A/R journal when Sales + A/R defaults are mapped.",
+        help: "When on, the journal posts when the sale is Completed.",
       },
       {
         key: "accounts_auto_post_purchase",
         label: "Auto-post purchase invoice journal",
-        help: "When on, saving the purchase Invoice tab posts the A/P journal entry immediately.",
+        help: "When on, the journal posts when the purchase is Completed.",
       },
       {
         key: "inventory_gl_hybrid_enabled",

@@ -219,6 +219,11 @@ func applySupplierInvoiceApprovalTransition(ctx context.Context, pool *pgxpool.P
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("purchase not found")
 	}
+	if toStatus == "completed" {
+		if err := syncPurchaseInvoiceJournalAfterBill(ctx, tx, tu.TenantID, tu.AppUserID, id); err != nil {
+			return err
+		}
+	}
 
 	if action == "submit" {
 		var label string

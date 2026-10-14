@@ -1153,16 +1153,16 @@ func createSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
-			return
-		}
-
-		if confirmingBillProgress(progress) {
-			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), pool, tu.TenantID, tu.AppUserID, id); err != nil {
+		if progress == "completed" {
+			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
 				response.ValidationSmart(w, map[string]string{"invoice": err.Error()})
 				return
 			}
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+			return
 		}
 
 		// Load Slip → Save: copy originating PO attachments (from PO lines and/or GR → PO).
@@ -1527,16 +1527,16 @@ func updateSupplierInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
-			return
-		}
-
-		if confirmingBillProgress(progress) {
-			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), pool, tu.TenantID, tu.AppUserID, id); err != nil {
+		if progress == "completed" {
+			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
 				response.ValidationSmart(w, map[string]string{"invoice": err.Error()})
 				return
 			}
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+			return
 		}
 
 		// If Load Slip added PO/GR lines and this Purchase still has no files, copy from PO.
@@ -1695,16 +1695,15 @@ func patchSupplierInvoiceProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Supplier invoice not found.", "ERR_NOT_FOUND")
 			return
 		}
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
-			return
-		}
-
-		if newlyConfirming {
-			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), pool, tu.TenantID, tu.AppUserID, id); err != nil {
+		if status == "completed" {
+			if err := syncPurchaseInvoiceJournalAfterBill(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
 				response.ValidationSmart(w, map[string]string{"invoice": err.Error()})
 				return
 			}
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+			return
 		}
 
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "finance.supplier_invoice.progress_status", "fin_supplier_invoice", &id, before.ProgressStatus, body)

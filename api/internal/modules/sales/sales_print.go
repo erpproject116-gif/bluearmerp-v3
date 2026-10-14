@@ -228,6 +228,12 @@ func patchSalesProgressStatus(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 		}
+		if status == "completed" {
+			if err := syncSalesInvoiceJournalFromDefaultsTx(r.Context(), tx, tu.TenantID, tu.AppUserID, id); err != nil {
+				response.Validation(w, map[string]string{"invoice": err.Error()})
+				return
+			}
+		}
 
 		if err := tx.Commit(r.Context()); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to update.", "ERR_INTERNAL")

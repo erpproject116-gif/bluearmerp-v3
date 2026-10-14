@@ -90,7 +90,16 @@ func postPaymentVoucherJournal(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		whtTotal := sumPVWithholdingTax(pv.WithholdingLines)
 		paymentDate, _ := parseDate(pv.PaymentDate)
-		ev := withEntryDate(buildPVPostingEvent(tu.TenantID, id, pv.PartnerID, pv.AmountTotal, whtTotal, pv.PaymentMethod, mustEWTPayableCode(r.Context(), tx, tu.TenantID)), paymentDate)
+		invoiceIDs := make([]int64, len(pv.Applications))
+		for i, app := range pv.Applications {
+			invoiceIDs[i] = app.SupplierInvoiceID
+		}
+		debitAccount, err := sharedSupplierPayableCode(r.Context(), tx, tu.TenantID, invoiceIDs)
+		if err != nil {
+			response.Validation(w, map[string]string{"applications": err.Error()})
+			return
+		}
+		ev := withEntryDate(buildPVPostingEvent(tu.TenantID, id, pv.PartnerID, pv.AmountTotal, whtTotal, pv.PaymentMethod, debitAccount, mustEWTPayableCode(r.Context(), tx, tu.TenantID)), paymentDate)
 		if _, err := postWithJournalPoster(r.Context(), tx, tu.TenantID, ev); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to post journal entry.", "ERR_INTERNAL")
 			return

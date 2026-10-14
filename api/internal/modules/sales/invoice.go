@@ -133,14 +133,19 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 		var orderDate time.Time
 		var partnerID int64
 		var subtotal, taxTotal, grandTotal float64
-		var salesNo string
+		var salesNo, progress string
 		var existingJE *int64
 		err = pool.QueryRow(r.Context(), `
-			select order_date, partner_id, subtotal::float8, tax_total::float8, grand_total::float8, sales_no, invoice_journal_entry_id
+			select order_date, partner_id, subtotal::float8, tax_total::float8, grand_total::float8, sales_no,
+			  coalesce(progress_status, 'unconfirmed'), invoice_journal_entry_id
 			from public.sa_sales where id = $1 and tenant_id = $2 and deleted_at is null`,
-			id, tu.TenantID).Scan(&orderDate, &partnerID, &subtotal, &taxTotal, &grandTotal, &salesNo, &existingJE)
+			id, tu.TenantID).Scan(&orderDate, &partnerID, &subtotal, &taxTotal, &grandTotal, &salesNo, &progress, &existingJE)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Sale not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if progress != "completed" {
+			response.Validation(w, map[string]string{"progress_status": "Complete the sale before posting the invoice journal."})
 			return
 		}
 
@@ -179,9 +184,12 @@ func putSalesInvoice(pool *pgxpool.Pool) http.HandlerFunc {
 			{AccountID: body.SalesAccountID, Credit: subtotal, Remark: "Sales - " + salesNo},
 		}
 		if taxTotal > 0 {
-			if taxAcct, e := invoicejournal.ResolveAccountID(r.Context(), pool, tu.TenantID, salesTaxPayableCode); e == nil {
-				lines = append(lines, invoicejournal.Line{AccountID: taxAcct, Credit: taxTotal, Remark: "Output VAT - " + salesNo})
+			taxAcct, e := invoicejournal.ResolveAccountID(r.Context(), pool, tu.TenantID, salesTaxPayableCode)
+			if e != nil {
+				response.Validation(w, map[string]string{"tax": "Map the output VAT account before completing a sale that has tax."})
+				return
 			}
+			lines = append(lines, invoicejournal.Line{AccountID: taxAcct, Credit: taxTotal, Remark: "Output VAT - " + salesNo})
 		}
 
 		autoPost := readAutoPost(r.Context(), pool, tu.TenantID, "accounts_auto_post_sales")

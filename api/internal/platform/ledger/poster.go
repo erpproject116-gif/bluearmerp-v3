@@ -3,6 +3,8 @@ package ledger
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -21,13 +23,13 @@ type PostingLine struct {
 
 // PostingEvent is emitted after sub-ledger documents post.
 type PostingEvent struct {
-	TenantID   int64         `json:"tenant_id"`
-	SourceType string        `json:"source_type"`
-	SourceID   int64         `json:"source_id"`
+	TenantID   int64  `json:"tenant_id"`
+	SourceType string `json:"source_type"`
+	SourceID   int64  `json:"source_id"`
 	// EntryDate is the document date for the journal entry (OR receipt date, PV
 	// payment date, etc.). When nil/zero, Post falls back to UTC today.
-	EntryDate *time.Time     `json:"entry_date,omitempty"`
-	Lines     []PostingLine  `json:"lines"`
+	EntryDate *time.Time    `json:"entry_date,omitempty"`
+	Lines     []PostingLine `json:"lines"`
 }
 
 // Poster writes posting events (audit log now; journal when enabled).
@@ -77,6 +79,14 @@ func (jp JournalPoster) Post(ctx context.Context, tx pgx.Tx, ev PostingEvent) er
 	}
 	if len(ev.Lines) == 0 {
 		return nil
+	}
+	var debit, credit float64
+	for _, ln := range ev.Lines {
+		debit += ln.Debit
+		credit += ln.Credit
+	}
+	if math.Abs(debit-credit) > 0.0001 {
+		return fmt.Errorf("journal entry is not balanced")
 	}
 	status := "posted"
 	if jp.RequireJEApproval {

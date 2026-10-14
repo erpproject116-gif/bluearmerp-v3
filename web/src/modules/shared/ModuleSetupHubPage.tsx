@@ -110,19 +110,19 @@ const FIELD_META: Record<string, { label: string; help: string }> = {
   },
   accounts_auto_post_or: {
     label: "Auto-post official receipts to journal",
-    help: "On = customer payments create journal entries automatically.",
+    help: "On = the journal posts when the official receipt is applied to a Completed sale.",
   },
   accounts_auto_post_pv: {
     label: "Auto-post payment vouchers to journal",
-    help: "On = supplier payments create journal entries automatically.",
+    help: "On = the journal posts when the payment is applied to a Completed purchase.",
   },
   accounts_auto_post_sales: {
     label: "Auto-post sales invoices to journal",
-    help: "On = sales invoices post A/R journal entries when saved on the Invoice tab.",
+    help: "On = the journal posts when the sale is Completed.",
   },
   accounts_auto_post_purchase: {
     label: "Auto-post purchase invoices to journal",
-    help: "On = purchase invoices post A/P journal entries when saved on the Invoice tab.",
+    help: "On = the journal posts when the purchase is Completed.",
   },
   inventory_gl_hybrid_enabled: {
     label: "Hybrid inventory GL (qty-tracked items)",

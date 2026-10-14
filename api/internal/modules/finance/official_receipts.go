@@ -353,13 +353,17 @@ func validateApplications(ctx context.Context, pool *pgxpool.Pool, tenantID, par
 		key := fmt.Sprintf("applications[%d]", i)
 		var salePartnerID int64
 		var grandTotal float64
+		var progress string
 		err := pool.QueryRow(ctx, `
-			select partner_id, grand_total::float8 from public.sa_sales
+			select partner_id, grand_total::float8, coalesce(progress_status, '') from public.sa_sales
 			where id = $1 and tenant_id = $2 and deleted_at is null`,
-			app.SalesID, tenantID).Scan(&salePartnerID, &grandTotal)
+			app.SalesID, tenantID).Scan(&salePartnerID, &grandTotal, &progress)
 		if err != nil {
 			errs[key+".sales_id"] = "Sales not found."
 			continue
+		}
+		if !documentCompleted(progress) {
+			errs[key+".sales_id"] = errSaleNotCompleted.Error()
 		}
 		if salePartnerID != partnerID {
 			errs[key+".sales_id"] = "Sales customer does not match receipt customer."
@@ -380,6 +384,15 @@ func validateApplications(ctx context.Context, pool *pgxpool.Pool, tenantID, par
 	}
 	if err := requireDiscountAccountConfigured(ctx, pool, tenantID, "ar", discountTotal); err != nil {
 		errs["discount_amount"] = err.Error()
+	}
+	if len(errs) == 0 && len(apps) > 0 {
+		ids := make([]int64, len(apps))
+		for i, app := range apps {
+			ids[i] = app.SalesID
+		}
+		if _, err := sharedSaleReceivableCode(ctx, pool, tenantID, ids); err != nil {
+			errs["applications"] = err.Error()
+		}
 	}
 	if len(errs) > 0 {
 		return errs
@@ -634,11 +647,15 @@ func lockAndCheckReceiptApplications(ctx context.Context, tx pgx.Tx, tenantID, r
 	excludeID := receiptID
 	for _, app := range ordered {
 		var locked float64
+		var progress string
 		if err := tx.QueryRow(ctx, `
-			select grand_total::float8 from public.sa_sales
+			select grand_total::float8, coalesce(progress_status, '') from public.sa_sales
 			where id = $1 and tenant_id = $2 and deleted_at is null
-			for update`, app.SalesID, tenantID).Scan(&locked); err != nil {
+			for update`, app.SalesID, tenantID).Scan(&locked, &progress); err != nil {
 			return err
+		}
+		if !documentCompleted(progress) {
+			return overAppliedError{message: errSaleNotCompleted.Error()}
 		}
 		outstanding, err := saleOutstandingAmountQ(ctx, tx, tenantID, app.SalesID, &excludeID)
 		if err != nil {

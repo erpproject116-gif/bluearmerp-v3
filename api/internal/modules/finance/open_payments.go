@@ -20,22 +20,22 @@ import (
 
 // OpenReceivable is an open AR document for the New Receivable Payment worklist.
 type OpenReceivable struct {
-	SalesID         int64   `json:"sales_id"`
-	SalesNo         string  `json:"sales_no"`
-	DateNoDisplay   string  `json:"date_no_display"`
-	OccurrenceDate  string  `json:"occurrence_date"`
-	DueDate         *string `json:"due_date,omitempty"`
-	Balance         float64 `json:"balance"`
-	PartnerID       int64   `json:"partner_id"`
-	PartnerCode     string  `json:"partner_code"`
-	PartnerName     string  `json:"partner_name"`
-	CurrencyID      int64   `json:"currency_id,omitempty"`
-	CurrencyCode    string  `json:"currency_code,omitempty"`
-	AccountName     string  `json:"account_name"`
-	LocationName    string  `json:"location_name,omitempty"`
-	ProjectName     *string `json:"project_name,omitempty"`
-	DepartmentName  *string `json:"department_name,omitempty"`
-	Remark          string  `json:"remark,omitempty"`
+	SalesID        int64   `json:"sales_id"`
+	SalesNo        string  `json:"sales_no"`
+	DateNoDisplay  string  `json:"date_no_display"`
+	OccurrenceDate string  `json:"occurrence_date"`
+	DueDate        *string `json:"due_date,omitempty"`
+	Balance        float64 `json:"balance"`
+	PartnerID      int64   `json:"partner_id"`
+	PartnerCode    string  `json:"partner_code"`
+	PartnerName    string  `json:"partner_name"`
+	CurrencyID     int64   `json:"currency_id,omitempty"`
+	CurrencyCode   string  `json:"currency_code,omitempty"`
+	AccountName    string  `json:"account_name"`
+	LocationName   string  `json:"location_name,omitempty"`
+	ProjectName    *string `json:"project_name,omitempty"`
+	DepartmentName *string `json:"department_name,omitempty"`
+	Remark         string  `json:"remark,omitempty"`
 }
 
 // OpenPayable is an open AP document for the New Payable Payment worklist.
@@ -71,15 +71,15 @@ type openPaymentApplyApp struct {
 }
 
 type openReceivableApplyBody struct {
-	PaymentDate   string                 `json:"payment_date"`
-	PaymentMethod string                 `json:"payment_method"`
-	BankAccountID *int64                 `json:"bank_account_id"`
-	ReferenceNo   *string                `json:"reference_no"`
-	Notes         *string                `json:"notes"`
-	Remark        *string                `json:"remark"`
-	CurrencyID    *int64                 `json:"currency_id"`
-	Applications  []openPaymentApplyApp  `json:"applications"`
-	AllowMultiPartner bool               `json:"allow_multi_partner"`
+	PaymentDate       string                `json:"payment_date"`
+	PaymentMethod     string                `json:"payment_method"`
+	BankAccountID     *int64                `json:"bank_account_id"`
+	ReferenceNo       *string               `json:"reference_no"`
+	Notes             *string               `json:"notes"`
+	Remark            *string               `json:"remark"`
+	CurrencyID        *int64                `json:"currency_id"`
+	Applications      []openPaymentApplyApp `json:"applications"`
+	AllowMultiPartner bool                  `json:"allow_multi_partner"`
 }
 
 type openPayableApplyBody struct {
@@ -176,7 +176,7 @@ func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
 			%s
 			where s.tenant_id = $1 and s.deleted_at is null
 			  and s.partner_id is not null
-			  and coalesce(s.progress_status, 'unconfirmed') <> 'e_approval'
+			  and s.progress_status = 'completed'
 			  and (s.grand_total - coalesce(recv.received, 0)) > 0.0001`,
 			saleAppliedOpenLateral(excludeParam))
 
@@ -221,7 +221,7 @@ func listOpenReceivables(pool *pgxpool.Pool) http.HandlerFunc {
 		orderCol := "s.order_date"
 		if col, ok := map[string]string{
 			"occurrence_date": "s.order_date",
-			"s.order_date":     "s.order_date",
+			"s.order_date":    "s.order_date",
 			"due_date":        "s.due_date",
 			"s.due_date":      "s.due_date",
 			"balance":         "balance",
@@ -298,6 +298,7 @@ func listOpenPayables(pool *pgxpool.Pool) http.HandlerFunc {
 		argN := 2
 		siWhere := `si.tenant_id = $1 and si.deleted_at is null
 			  and si.partner_id is not null
+			  and si.progress_status = 'completed'
 			  and (si.grand_total - coalesce(paid.paid, 0)) > 0.0001`
 		exWhere := `e.tenant_id = $1 and e.deleted_at is null and e.payment_status = 'unpaid'
 			  and e.partner_id is not null and (e.amount + e.tax_amount) > 0.0001`

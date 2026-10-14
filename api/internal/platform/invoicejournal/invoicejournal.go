@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -73,9 +74,22 @@ func Sync(ctx context.Context, pool *pgxpool.Pool, tenantID, userID int64, entry
 }
 
 // SyncTx is like Sync but participates in the caller's transaction.
+// LinesBalanced reports whether debit and credit totals match within 0.0001.
+func LinesBalanced(lines []Line) bool {
+	var debit, credit float64
+	for _, ln := range lines {
+		debit += ln.Debit
+		credit += ln.Credit
+	}
+	return math.Abs(debit-credit) <= 0.0001
+}
+
 func SyncTx(ctx context.Context, tx pgx.Tx, tenantID, userID int64, entryDate time.Time, remarks string, existingJEID *int64, lines []Line, autoPost bool) (int64, error) {
 	if len(lines) < 2 {
 		return 0, errors.New("journal entry needs at least two lines")
+	}
+	if !LinesBalanced(lines) {
+		return 0, errors.New("journal entry is not balanced")
 	}
 
 	var jeID int64
