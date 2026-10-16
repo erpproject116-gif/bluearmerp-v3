@@ -16,6 +16,7 @@ import { mergeFormErrors } from "../../../shared/formValidation";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { oneSlipDocument } from "../../../shared/slipDocument";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ModuleIcon } from "../../../shell/ModuleIcon";
@@ -736,6 +737,10 @@ export function SalesModal(props: Props) {
 
   const applySalesOrderLines = async (picked: PickedSalesOrderLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.sales_order_id))) {
+      toast.error("Select one sales order.");
+      return;
+    }
     const first = picked[0];
     if (first.order_date) {
       setOrderDate(first.order_date);
@@ -812,6 +817,10 @@ export function SalesModal(props: Props) {
 
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.quotation_id))) {
+      toast.error("Select one quotation.");
+      return;
+    }
     const first = picked[0];
     setSourceSalesOrderId(null);
     if (first.order_date) {
@@ -881,6 +890,10 @@ export function SalesModal(props: Props) {
 
   const applyShippingLines = async (picked: PickedShippingSlipLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.shipping_order_id))) {
+      toast.error("Select one shipping order.");
+      return;
+    }
     const first = picked[0];
     setPartnerId(first.partner_id);
     setCustomerLabel(first.customer_name);
@@ -960,6 +973,10 @@ export function SalesModal(props: Props) {
   };
 
   const applyMappedPrLines = async (picked: PickedPurchaseRequestLine[]) => {
+    if (!oneSlipDocument(picked.map((row) => row.purchase_request_id))) {
+      toast.error("Select one purchase request.");
+      return;
+    }
     await mapBuyingLinesOntoSale(
       picked.map((r) => ({
         item_id: r.item_id,
@@ -973,10 +990,18 @@ export function SalesModal(props: Props) {
   };
 
   const applyMappedPoLines = async (picked: OpenPOLine[]) => {
+    if (!oneSlipDocument(picked.map((row) => row.purchase_order_id))) {
+      toast.error("Select one purchase order.");
+      return;
+    }
     await mapBuyingLinesOntoSale(picked);
   };
 
   const applyMappedGrLines = async (picked: OpenGRLine[]) => {
+    if (!oneSlipDocument(picked.map((row) => row.goods_receipt_id))) {
+      toast.error("Select one purchase receive.");
+      return;
+    }
     await mapBuyingLinesOntoSale(
       picked.map((r) => ({
         item_id: r.item_id,

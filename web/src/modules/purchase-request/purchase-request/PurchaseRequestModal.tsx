@@ -16,6 +16,7 @@ import { collectDocumentLookupErrors } from "../../../shared/documentFormValidat
 import { mergeFormErrors } from "../../../shared/formValidation";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { oneSlipDocument } from "../../../shared/slipDocument";
 import { coalesceSpecDescription } from "../../../shared/itemLineSpecDescription";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
@@ -293,6 +294,10 @@ export function PurchaseRequestModal(props: Props) {
 
   const applySalesOrderLines = async (picked: PickedSalesOrderLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.sales_order_id))) {
+      toast.error("Select one sales order.");
+      return;
+    }
     const first = picked[0];
     setTaxTypeId(first.tax_type_id);
     setCurrencyId(first.currency_id);
@@ -326,6 +331,10 @@ export function PurchaseRequestModal(props: Props) {
 
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.quotation_id))) {
+      toast.error("Select one quotation.");
+      return;
+    }
     const first = picked[0];
     setTaxTypeId(first.tax_type_id);
     setCurrencyId(first.currency_id);
@@ -354,6 +363,10 @@ export function PurchaseRequestModal(props: Props) {
 
   const mapPoOntoPurchaseRequest = async (picked: OpenPOLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.purchase_order_id))) {
+      toast.error("Select one purchase order.");
+      return;
+    }
     const meta = taxTypes().find((t) => t.id === taxTypeId());
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const mapped = picked.map((row, i) => ({

@@ -1,6 +1,9 @@
 import { createEffect, createResource, createSignal, on } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { peekResource } from "../../../shared/peekResource";
+import { SlipNestedLines } from "../../../shared/SlipNestedLines";
+import { checkedDocumentLines, slipLineSummary } from "../../../shared/slipDocument";
+import { useToast } from "../../../shared/toast";
 import {
   OpenTransactionMonitor,
   buildOpenLineQuery,
@@ -43,6 +46,19 @@ export type PickedQuotationLine = OpenQuotationLineRow & {
   source_quotation_line_id: number;
 };
 
+export type OpenQuotationDocument = {
+  quotation_id: number;
+  order_date?: string;
+  date_no_display: string;
+  reference_no: string;
+  progress_status?: string;
+  customer_name: string;
+  open_line_count: number;
+  source_line_count: number;
+  skipped_no_item_count: number;
+  lines: OpenQuotationLineRow[];
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -54,6 +70,7 @@ type Props = {
 const [pageSize, setPageSize] = createSignal(20);
 
 export function QuotationLinePickerModal(props: Props) {
+  const toast = useToast();
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
     q: "",
     dateFrom: "",
@@ -65,6 +82,7 @@ export function QuotationLinePickerModal(props: Props) {
   });
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set<number>());
+  const [unchecked, setUnchecked] = createSignal<Set<number>>(new Set<number>());
 
   createEffect(
     on(
@@ -72,6 +90,7 @@ export function QuotationLinePickerModal(props: Props) {
       (open) => {
         if (!open) return;
         setSelected(new Set<number>());
+        setUnchecked(new Set<number>());
         setPage(1);
         setFilters({
           q: "",
@@ -92,7 +111,7 @@ export function QuotationLinePickerModal(props: Props) {
     () => (props.open ? { filters: filters(), page: page() } : null),
     async (p) => {
       const qs = buildOpenLineQuery({ page: p!.page, pageSize: pageSize(), filters: p!.filters });
-      const res = await apiFetch<OpenQuotationLineRow[]>(
+      const res = await apiFetch<OpenQuotationDocument[]>(
         `/api/v1/sales-order/sales-orders/quotation-lines/open?${qs}`,
       );
       if (!res.success) throw new Error(res.message ?? "Failed to load quotation lines");
@@ -100,47 +119,85 @@ export function QuotationLinePickerModal(props: Props) {
     },
   );
 
-  const rows = () => (peekResource(data)?.rows ?? []) as unknown as Record<string, unknown>[];
+  const docs = () => peekResource(data)?.rows ?? [];
+  const rows = () => docs() as unknown as Record<string, unknown>[];
 
-  const toggleRow = (lineId: number) => {
+  const toggleRow = (docId: number) => {
+    const doc = docs().find((d) => d.quotation_id === docId);
+    setUnchecked((prev) => {
+      const next = new Set<number>(prev);
+      for (const line of doc?.lines ?? []) next.delete(line.quotation_line_id);
+      return next;
+    });
     setSelected((prev) => {
+      const next = new Set<number>(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  };
+
+  const toggleLine = (docId: number, lineId: number) => {
+    const doc = docs().find((d) => d.quotation_id === docId);
+    const ids = (doc?.lines ?? []).map((line) => line.quotation_line_id);
+    setUnchecked((prev) => {
       const next = new Set<number>(prev);
       if (next.has(lineId)) next.delete(lineId);
       else next.add(lineId);
+      const anyChecked = ids.some((id) => !next.has(id));
+      setSelected((selectedIds) => {
+        const nextDocs = new Set<number>(selectedIds);
+        if (anyChecked) nextDocs.add(docId);
+        else nextDocs.delete(docId);
+        return nextDocs;
+      });
       return next;
     });
   };
 
   const toggleAll = () => {
-    const list = peekResource(data)?.rows ?? [];
+    const list = docs();
     if (selected().size === list.length) setSelected(new Set<number>());
-    else setSelected(new Set<number>(list.map((r) => r.quotation_line_id)));
+    else setSelected(new Set<number>(list.map((r) => r.quotation_id)));
+    setUnchecked(new Set<number>());
   };
 
   const confirm = () => {
-    const list = peekResource(data)?.rows ?? [];
-    const picked = list
-      .filter((r) => selected().has(r.quotation_line_id))
+    const pickedDoc = checkedDocumentLines(
+      docs().map((doc) => ({
+        id: doc.quotation_id,
+        skipped_no_item_count: doc.skipped_no_item_count,
+        lines: doc.lines,
+      })),
+      selected(),
+      unchecked(),
+      (line) => line.quotation_line_id,
+    );
+    if (!pickedDoc) {
+      toast.error("Select one quotation.");
+      return;
+    }
+    const picked = pickedDoc.lines
       .map((r) => {
         const lineId = Number(r.quotation_line_id);
-        return {
-          ...r,
-          quotation_line_id: lineId,
-          source_quotation_line_id: lineId,
-        };
+        return { ...r, quotation_line_id: lineId, source_quotation_line_id: lineId };
       })
       .filter((r) => r.source_quotation_line_id > 0);
     if (picked.length === 0) return;
+    if (pickedDoc.skipped > 0) {
+      toast.warning(`${pickedDoc.skipped} line(s) have no inventory item and were not loaded.`);
+    }
     props.onConfirm(picked);
     props.onClose();
     setSelected(new Set<number>());
+    setUnchecked(new Set<number>());
   };
 
   return (
     <OpenTransactionMonitor
       open={props.open}
       onClose={props.onClose}
-      title="Load Slip — Quotation (open lines)"
+      title="Load Slip — Quotation"
       filters={filters()}
       onFiltersChange={setFilters}
       loading={data.loading}
@@ -150,7 +207,7 @@ export function QuotationLinePickerModal(props: Props) {
       pageSize={pageSize()} onPageSizeChange={setPageSize}
       onPageChange={setPage}
       rows={rows()}
-      rowKey={(row) => Number(row.quotation_line_id)}
+      rowKey={(row) => Number(row.quotation_id)}
       selected={selected()}
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
@@ -165,11 +222,28 @@ export function QuotationLinePickerModal(props: Props) {
           cell: (r) => openSlipDocStatusLabel(String(r.progress_status ?? "")),
         },
         { key: "customer", header: "Customer", cell: (r) => String(r.customer_name ?? "") },
-        { key: "item", header: "Item", cell: (r) => `${r.item_code ?? ""} ${r.item_name ?? ""}` },
-        { key: "bal", header: "Balance", class: "text-right", cell: (r) => Number(r.balance_qty ?? 0) },
-        { key: "uom", header: "UoM", cell: (r) => String(r.unit_code ?? "") },
-        { key: "price", header: "Unit price", class: "text-right", cell: (r) => Number(r.unit_vat_inc ?? 0) },
+        {
+          key: "lines",
+          header: "Lines",
+          cell: (r) =>
+            slipLineSummary(
+              Number(r.open_line_count ?? 0),
+              Number(r.source_line_count ?? 0),
+              Number(r.skipped_no_item_count ?? 0),
+            ),
+        },
       ]}
+      renderDetail={(row) => (
+        <SlipNestedLines
+          unchecked={unchecked()}
+          onToggle={(lineId) => toggleLine(Number(row.quotation_id), lineId)}
+          lines={((row.lines as OpenQuotationLineRow[] | undefined) ?? []).map((line) => ({
+            id: line.quotation_line_id,
+            label: `${line.item_code ?? ""} ${line.item_name ?? ""}`.trim(),
+            qty: String(line.balance_qty ?? 0),
+          }))}
+        />
+      )}
     />
   );
 }

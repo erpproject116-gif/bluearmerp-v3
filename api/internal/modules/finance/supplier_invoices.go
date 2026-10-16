@@ -185,9 +185,25 @@ type openPOLineRow struct {
 	ReceivedQty            float64 `json:"received_qty"`
 }
 
+type openPODocument struct {
+	PurchaseOrderID    int64           `json:"purchase_order_id"`
+	PurchaseOrderNo    string          `json:"purchase_order_no"`
+	Status             string          `json:"status"`
+	ProgressStatus     string          `json:"progress_status"`
+	OrderDate          string          `json:"order_date,omitempty"`
+	PartnerName        string          `json:"partner_name"`
+	OpenLineCount      int             `json:"open_line_count"`
+	SourceLineCount    int             `json:"source_line_count"`
+	SkippedNoItemCount int             `json:"skipped_no_item_count"`
+	Lines              []openPOLineRow `json:"lines"`
+}
+
 func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "order_date", map[string]string{"order_date": "po.order_date"})
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 		// Load Slip → Purchase Order: open receive residual (qty − received).
 		// Cancelled POs stay excluded. No partner/date filter unless the client sends one.
 		where := `po.tenant_id = $1 and po.deleted_at is null
@@ -218,6 +234,27 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 		f.PartnerID = nil
 		where, args, argN = f.Apply(where, args, argN, "", "po.order_date", "po.purchase_order_no")
 
+		openWhere := where + `
+			  and pol.item_id is not null
+			  and (pol.qty - coalesce(pol.received_qty, 0)) > 0.0001`
+		fromWhere := fmt.Sprintf(`
+			from public.po_purchase_order_lines pol
+			join public.po_purchase_orders po on po.id = pol.purchase_order_id
+			left join public.inv_partners p on p.id = po.partner_id
+			left join public.inv_locations loc on loc.id = po.location_id
+			left join public.inv_projects proj on proj.id = po.project_id
+			left join public.inv_items i on i.id = pol.item_id
+			left join public.inv_units bu on bu.id = i.base_unit_id
+			where %s`, openWhere)
+		docIDs, total, err := openlines.QueryDocumentPage(r.Context(), pool, fromWhere, "po.id", "po.order_date", args, pageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list open PO lines.", "ERR_INTERNAL")
+			return
+		}
+		if len(docIDs) == 0 {
+			response.OKList(w, []openPODocument{}, p.Page, pageSize, total)
+			return
+		}
 		q := fmt.Sprintf(`
 			select pol.id, po.id, po.purchase_order_no, po.status, coalesce(po.progress_status, 'unconfirmed'),
 			  to_char(po.order_date, 'YYYY-MM-DD'),
@@ -237,26 +274,17 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  coalesce(i.track_serial, false), coalesce(i.serial_policy, 'required'),
 			  coalesce(i.track_lot, false), coalesce(i.lot_policy, 'required'),
 			  coalesce(pol.warranty_duration_months, i.warranty_duration_months)
-			from public.po_purchase_order_lines pol
-			join public.po_purchase_orders po on po.id = pol.purchase_order_id
-			left join public.inv_partners p on p.id = po.partner_id
-			left join public.inv_locations loc on loc.id = po.location_id
-			left join public.inv_projects proj on proj.id = po.project_id
-			left join public.inv_items i on i.id = pol.item_id
-			left join public.inv_units bu on bu.id = i.base_unit_id
-			where %s
-			  and pol.item_id is not null
-			  and (pol.qty - coalesce(pol.received_qty, 0)) > 0.0001
-			order by po.order_date desc, pol.line_no`, where)
-
-		rows, err := pool.Query(r.Context(), q, args...)
+			%s
+			  and po.id = any($%d)
+			order by po.order_date desc, po.id desc, pol.line_no`, fromWhere, argN)
+		rows, err := pool.Query(r.Context(), q, append(append([]any{}, args...), docIDs)...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list open PO lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
 
-		var out []openPOLineRow
+		var lines []openPOLineRow
 		for rows.Next() {
 			var row openPOLineRow
 			if err := rows.Scan(
@@ -279,16 +307,41 @@ func listOpenPOLines(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to read PO lines.", "ERR_INTERNAL")
 				return
 			}
-			out = append(out, row)
+			lines = append(lines, row)
 		}
 		if err := rows.Err(); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to read PO lines.", "ERR_INTERNAL")
 			return
 		}
-		if out == nil {
-			out = []openPOLineRow{}
+		counts, err := openlines.LoadSourceCounts(r.Context(), pool, `
+			select purchase_order_id, count(*)::int, count(*) filter (where item_id is null)::int
+			from public.po_purchase_order_lines
+			where purchase_order_id = any($1)
+			group by purchase_order_id`, docIDs)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list open PO lines.", "ERR_INTERNAL")
+			return
 		}
-		response.OK(w, out, "OK")
+		grouped := openlines.AssembleDocuments(docIDs, lines, func(row openPOLineRow) int64 { return row.PurchaseOrderID }, counts, func(row openPOLineRow) bool {
+			return row.ItemID == 0
+		})
+		out := make([]openPODocument, 0, len(grouped))
+		for _, doc := range grouped {
+			first := doc.Lines[0]
+			out = append(out, openPODocument{
+				PurchaseOrderID:    doc.ID,
+				PurchaseOrderNo:    first.PurchaseOrderNo,
+				Status:             first.Status,
+				ProgressStatus:     first.ProgressStatus,
+				OrderDate:          first.OrderDate,
+				PartnerName:        first.PartnerName,
+				OpenLineCount:      doc.OpenLineCount,
+				SourceLineCount:    doc.SourceLineCount,
+				SkippedNoItemCount: doc.SkippedNoItemCount,
+				Lines:              doc.Lines,
+			})
+		}
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }
 
@@ -316,9 +369,23 @@ type openSupplierQuotationInvoiceLineRow struct {
 	LotPolicy               string  `json:"lot_policy,omitempty"`
 }
 
+type openSupplierQuotationInvoiceDocument struct {
+	SupplierQuotationID int64                                 `json:"supplier_quotation_id"`
+	QuoteNo             string                                `json:"quote_no"`
+	QuoteStatus         string                                `json:"quote_status"`
+	PartnerName         string                                `json:"partner_name,omitempty"`
+	OpenLineCount       int                                   `json:"open_line_count"`
+	SourceLineCount     int                                   `json:"source_line_count"`
+	SkippedNoItemCount  int                                   `json:"skipped_no_item_count"`
+	Lines               []openSupplierQuotationInvoiceLineRow `json:"lines"`
+}
+
 func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "quote_date", map[string]string{"quote_date": "sq.quote_date"})
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 		where := `po.tenant_id = $1 and po.deleted_at is null
 			and po.status in ('draft', 'confirmed', 'partially_received', 'received')
 			and pol.supplier_quotation_line_id is not null`
@@ -330,6 +397,24 @@ func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc 
 			argN++
 		}
 
+		openWhere := where + `
+			  and (pol.qty - coalesce(pol.billed_qty, 0)) > 0.0001`
+		fromWhere := fmt.Sprintf(`
+			from public.po_purchase_order_lines pol
+			join public.po_purchase_orders po on po.id = pol.purchase_order_id
+			join public.rfq_supplier_quotation_lines ln on ln.id = pol.supplier_quotation_line_id
+			join public.rfq_supplier_quotations sq on sq.id = ln.supplier_quotation_id
+			left join public.inv_items i on i.id = pol.item_id
+			where %s`, openWhere)
+		docIDs, total, err := openlines.QueryDocumentPage(r.Context(), pool, fromWhere, "sq.id", "sq.quote_date", args, pageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list open supplier quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		if len(docIDs) == 0 {
+			response.OKList(w, []openSupplierQuotationInvoiceDocument{}, p.Page, pageSize, total)
+			return
+		}
 		q := fmt.Sprintf(`
 			select pol.id, po.id, po.purchase_order_no, po.status,
 			  sq.id, ln.id, sq.quote_no, sq.status, sq.rfq_id,
@@ -339,23 +424,17 @@ func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc 
 			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8,
 			  coalesce(i.track_serial, false), coalesce(i.serial_policy, 'required'),
 			  coalesce(i.track_lot, false), coalesce(i.lot_policy, 'required')
-			from public.po_purchase_order_lines pol
-			join public.po_purchase_orders po on po.id = pol.purchase_order_id
-			join public.rfq_supplier_quotation_lines ln on ln.id = pol.supplier_quotation_line_id
-			join public.rfq_supplier_quotations sq on sq.id = ln.supplier_quotation_id
-			left join public.inv_items i on i.id = pol.item_id
-			where %s
-			  and (pol.qty - coalesce(pol.billed_qty, 0)) > 0.0001
-			order by sq.quote_date desc, po.order_date desc, pol.line_no`, where)
-
-		rows, err := pool.Query(r.Context(), q, args...)
+			%s
+			  and sq.id = any($%d)
+			order by sq.quote_date desc, sq.id desc, po.order_date desc, pol.line_no`, fromWhere, argN)
+		rows, err := pool.Query(r.Context(), q, append(append([]any{}, args...), docIDs)...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list open supplier quotation lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
 
-		var out []openSupplierQuotationInvoiceLineRow
+		var lines []openSupplierQuotationInvoiceLineRow
 		for rows.Next() {
 			var row openSupplierQuotationInvoiceLineRow
 			if err := rows.Scan(
@@ -369,12 +448,40 @@ func listOpenSupplierQuotationInvoiceLines(pool *pgxpool.Pool) http.HandlerFunc 
 				response.Err(w, http.StatusInternalServerError, "Failed to read supplier quotation lines.", "ERR_INTERNAL")
 				return
 			}
-			out = append(out, row)
+			lines = append(lines, row)
 		}
-		if out == nil {
-			out = []openSupplierQuotationInvoiceLineRow{}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read supplier quotation lines.", "ERR_INTERNAL")
+			return
 		}
-		response.OK(w, out, "OK")
+		counts, err := openlines.LoadSourceCounts(r.Context(), pool, `
+			select ln.supplier_quotation_id, count(*)::int,
+			  count(*) filter (where coalesce(ln.item_id, rl.item_id) is null)::int
+			from public.rfq_supplier_quotation_lines ln
+			left join public.rfq_request_lines rl on rl.id = ln.rfq_request_line_id
+			where ln.supplier_quotation_id = any($1)
+			group by ln.supplier_quotation_id`, docIDs)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list open supplier quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		grouped := openlines.AssembleDocuments(docIDs, lines, func(row openSupplierQuotationInvoiceLineRow) int64 { return row.SupplierQuotationID }, counts, func(row openSupplierQuotationInvoiceLineRow) bool {
+			return row.ItemID == 0
+		})
+		out := make([]openSupplierQuotationInvoiceDocument, 0, len(grouped))
+		for _, doc := range grouped {
+			first := doc.Lines[0]
+			out = append(out, openSupplierQuotationInvoiceDocument{
+				SupplierQuotationID: doc.ID,
+				QuoteNo:             first.QuoteNo,
+				QuoteStatus:         first.QuoteStatus,
+				OpenLineCount:       doc.OpenLineCount,
+				SourceLineCount:     doc.SourceLineCount,
+				SkippedNoItemCount:  doc.SkippedNoItemCount,
+				Lines:               doc.Lines,
+			})
+		}
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }
 
@@ -398,6 +505,16 @@ type openGRLineRow struct {
 	BaseUnitCode        string  `json:"base_unit_code,omitempty"`
 	UnitNonVat          float64 `json:"unit_non_vat"`
 	UnitVatInc          float64 `json:"unit_vat_inc"`
+}
+
+type openGRDocument struct {
+	GoodsReceiptID     int64           `json:"goods_receipt_id"`
+	PurchaseOrderNo    string          `json:"purchase_order_no"`
+	PartnerName        string          `json:"partner_name"`
+	OpenLineCount      int             `json:"open_line_count"`
+	SourceLineCount    int             `json:"source_line_count"`
+	SkippedNoItemCount int             `json:"skipped_no_item_count"`
+	Lines              []openGRLineRow `json:"lines"`
 }
 
 func registerSupplierInvoiceRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -459,6 +576,9 @@ func previewSupplierInvoiceSequences(pool *pgxpool.Pool) http.HandlerFunc {
 func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
+		p := httputil.ParseListParams(r, "receipt_date", map[string]string{"receipt_date": "gr.receipt_date"})
+		pageSize := openlines.PageSize(r, p.PageSize)
+		offset := (p.Page - 1) * pageSize
 		where := "gr.tenant_id = $1 and gr.status = 'posted'"
 		args := []any{tu.TenantID}
 		argN := 2
@@ -485,16 +605,9 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 
-		q := fmt.Sprintf(`
-			select grl.id, gr.id, pol.id, po.id, po.purchase_order_no,
-			  po.partner_id, coalesce(p.company_name, ''),
-			  pol.item_id, pol.item_code, pol.item_name,
-			  grl.received_qty::float8,
-			  coalesce(sl.billed, 0)::float8,
-			  (grl.received_qty - coalesce(sl.billed, 0))::float8,
-			  pol.unit_id, coalesce(pol.unit_code, ''),
-			  i.base_unit_id, coalesce(bu.code, ''),
-			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8
+		openWhere := where + `
+			  and (grl.received_qty - coalesce(sl.billed, 0)) > 0.0001`
+		fromWhere := fmt.Sprintf(`
 			from public.gr_goods_receipt_lines grl
 			join public.gr_goods_receipts gr on gr.id = grl.goods_receipt_id
 			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
@@ -508,18 +621,37 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  where slip_type = 'supplier_invoice'
 			  group by goods_receipt_line_id
 			) sl on sl.goods_receipt_line_id = grl.id
-			where %s
-			  and (grl.received_qty - coalesce(sl.billed, 0)) > 0.0001
-			order by gr.receipt_date desc, grl.line_no`, where)
-
-		rows, err := pool.Query(r.Context(), q, args...)
+			where %s`, openWhere)
+		docIDs, total, err := openlines.QueryDocumentPage(r.Context(), pool, fromWhere, "gr.id", "gr.receipt_date", args, pageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list open GR lines.", "ERR_INTERNAL")
+			return
+		}
+		if len(docIDs) == 0 {
+			response.OKList(w, []openGRDocument{}, p.Page, pageSize, total)
+			return
+		}
+		q := fmt.Sprintf(`
+			select grl.id, gr.id, pol.id, po.id, po.purchase_order_no,
+			  po.partner_id, coalesce(p.company_name, ''),
+			  pol.item_id, pol.item_code, pol.item_name,
+			  grl.received_qty::float8,
+			  coalesce(sl.billed, 0)::float8,
+			  (grl.received_qty - coalesce(sl.billed, 0))::float8,
+			  pol.unit_id, coalesce(pol.unit_code, ''),
+			  i.base_unit_id, coalesce(bu.code, ''),
+			  pol.unit_non_vat::float8, pol.unit_vat_inc::float8
+			%s
+			  and gr.id = any($%d)
+			order by gr.receipt_date desc, gr.id desc, grl.line_no`, fromWhere, argN)
+		rows, err := pool.Query(r.Context(), q, append(append([]any{}, args...), docIDs)...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list open GR lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
 
-		var out []openGRLineRow
+		var lines []openGRLineRow
 		for rows.Next() {
 			var row openGRLineRow
 			if err := rows.Scan(
@@ -533,12 +665,39 @@ func listOpenGRLines(pool *pgxpool.Pool) http.HandlerFunc {
 				response.Err(w, http.StatusInternalServerError, "Failed to read GR lines.", "ERR_INTERNAL")
 				return
 			}
-			out = append(out, row)
+			lines = append(lines, row)
 		}
-		if out == nil {
-			out = []openGRLineRow{}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read GR lines.", "ERR_INTERNAL")
+			return
 		}
-		response.OK(w, out, "OK")
+		counts, err := openlines.LoadSourceCounts(r.Context(), pool, `
+			select grl.goods_receipt_id, count(*)::int, count(*) filter (where pol.item_id is null)::int
+			from public.gr_goods_receipt_lines grl
+			join public.po_purchase_order_lines pol on pol.id = grl.purchase_order_line_id
+			where grl.goods_receipt_id = any($1)
+			group by grl.goods_receipt_id`, docIDs)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list open GR lines.", "ERR_INTERNAL")
+			return
+		}
+		grouped := openlines.AssembleDocuments(docIDs, lines, func(row openGRLineRow) int64 { return row.GoodsReceiptID }, counts, func(row openGRLineRow) bool {
+			return row.ItemID == 0
+		})
+		out := make([]openGRDocument, 0, len(grouped))
+		for _, doc := range grouped {
+			first := doc.Lines[0]
+			out = append(out, openGRDocument{
+				GoodsReceiptID:     doc.ID,
+				PurchaseOrderNo:    first.PurchaseOrderNo,
+				PartnerName:        first.PartnerName,
+				OpenLineCount:      doc.OpenLineCount,
+				SourceLineCount:    doc.SourceLineCount,
+				SkippedNoItemCount: doc.SkippedNoItemCount,
+				Lines:              doc.Lines,
+			})
+		}
+		response.OKList(w, out, p.Page, pageSize, total)
 	}
 }
 

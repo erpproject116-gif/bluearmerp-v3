@@ -137,24 +137,24 @@ const MAP_HINT = "Map item/qty (does not consume the other side’s residual led
 
 /** Shared Selling sources — usable from buying docs as map/copy. */
 export const SELLING_LOAD_SLIP_SOURCES: LoadSlipOption[] = [
-  { id: "so", label: "Sales Order", group: "Selling", hint: "Open SO lines" },
-  { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines" },
-  { id: "shipping", label: "Shipping Order", group: "Selling", hint: "SO lines linked to a shipping order" },
+  { id: "so", label: "Sales Order", group: "Selling", hint: "One sales order and its remaining lines" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: "One quotation and its remaining lines" },
+  { id: "shipping", label: "Shipping Order", group: "Selling", hint: "One shipping order and its remaining lines" },
 ];
 
 /** Shared Buying sources — usable from selling docs as map/copy. */
 export const BUYING_LOAD_SLIP_SOURCES: LoadSlipOption[] = [
-  { id: "pr", label: "Purchase Request", group: "Buying", hint: "Open PR lines with balance qty" },
-  { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines with residual qty" },
-  { id: "gr", label: "Purchase Receive", group: "Buying", hint: "Posted receive lines not yet billed" },
-  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "Accepted vendor quotes / PO lines from RFQ" },
+  { id: "pr", label: "Purchase Request", group: "Buying", hint: "One purchase request and its remaining lines" },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: "One purchase order and its remaining lines" },
+  { id: "gr", label: "Purchase Receive", group: "Buying", hint: "One posted purchase receive and its unbilled lines" },
+  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "One supplier quotation and its remaining lines" },
 ];
 
 /** New Sale / sales invoice — Selling fulfill + Buying map. */
 export const SALES_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "so", label: "Sales Order", group: "Selling", hint: "Confirmed SO lines still open to invoice" },
-  { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines (populate invoice)" },
-  { id: "shipping", label: "Shipping Order", group: "Selling", hint: "SO lines linked to a shipping order" },
+  { id: "so", label: "Sales Order", group: "Selling", hint: "One confirmed sales order and its remaining lines" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: "One quotation and its remaining lines" },
+  { id: "shipping", label: "Shipping Order", group: "Selling", hint: "One shipping order and its remaining lines" },
   { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
   { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
   { id: "gr", label: "Purchase Receive", group: "Buying", hint: MAP_HINT },
@@ -162,14 +162,14 @@ export const SALES_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
 
 /** New Sales Order — Quotation fulfill + Buying map. */
 export const SALES_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "quotation", label: "Quotation", group: "Selling", hint: "Open quotation lines with balance qty" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: "One quotation and its remaining lines" },
   { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
   { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
 ];
 
 /** New Quotation — prior quote / import + Buying map. */
 export const QUOTATION_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "quotation", label: "Prior Quotation", group: "Selling", hint: "Copy open lines from another quotation" },
+  { id: "quotation", label: "Prior Quotation", group: "Selling", hint: "Copy one quotation and its remaining lines" },
   { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
   { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
   { id: "rfq", label: "RFQ (PDF / images)", group: "Import", hint: "Extract line items from vendor RFQ files" },
@@ -177,31 +177,31 @@ export const QUOTATION_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
 
 /** New Purchase Request — Selling demand + Buying map. */
 export const PURCHASE_REQUEST_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "so", label: "Sales Order", group: "Selling", hint: "Customer demand lines still open on SO" },
-  { id: "quotation", label: "Quotation", group: "Selling", hint: "Quoted demand not yet purchased" },
+  { id: "so", label: "Sales Order", group: "Selling", hint: "One sales order and its remaining lines" },
+  { id: "quotation", label: "Quotation", group: "Selling", hint: "One quotation and its remaining lines" },
   { id: "po", label: "Purchase Order", group: "Buying", hint: MAP_HINT },
 ];
 
 /** New Purchase Order — Buying fulfill + Selling map. */
 export const PURCHASE_ORDER_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "pr", label: "Purchase Request", group: "Buying", hint: "Open PR lines with balance qty" },
-  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "Accepted vendor quotes not yet on a PO" },
+  { id: "pr", label: "Purchase Request", group: "Buying", hint: "One purchase request and its remaining lines" },
+  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "One supplier quotation and its remaining lines" },
   { id: "so", label: "Sales Order", group: "Selling", hint: MAP_HINT },
   { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },
 ];
 
 /** New Bill / supplier invoice — Buying fulfill + Selling map. */
 export const PURCHASE_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "po", label: "Purchase Order", group: "Buying", hint: "Open PO lines — preferred; confirm Bill posts stock + serials" },
-  { id: "gr", label: "Purchase Receive", group: "Buying", hint: "Legacy unbilled receive lines (bill-only)" },
-  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "PO lines sourced from accepted vendor quotes" },
+  { id: "po", label: "Purchase Order", group: "Buying", hint: "One purchase order and its remaining lines. Confirm Bill posts stock and serials." },
+  { id: "gr", label: "Purchase Receive", group: "Buying", hint: "One posted purchase receive and its unbilled lines" },
+  { id: "rfq", label: "Supplier Quotation (RFQ)", group: "Buying", hint: "One supplier quotation and its remaining lines" },
   { id: "so", label: "Sales Order", group: "Selling", hint: MAP_HINT },
   { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },
 ];
 
 /** Inventory After-Sales repair order. */
 export const REPAIR_LOAD_SLIP_OPTIONS: LoadSlipOption[] = [
-  { id: "so", label: "Sales Order", group: "Selling", hint: "Copy item lines from an open sales order" },
+  { id: "so", label: "Sales Order", group: "Selling", hint: "One sales order and its remaining lines" },
   { id: "quotation", label: "Quotation", group: "Selling", hint: MAP_HINT },
   { id: "pr", label: "Purchase Request", group: "Buying", hint: MAP_HINT },
 ];

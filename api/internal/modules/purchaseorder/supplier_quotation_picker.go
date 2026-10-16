@@ -38,6 +38,18 @@ type openSupplierQuotationSlipLine struct {
 	UnitPrice               float64 `json:"unit_price"`
 }
 
+type openSupplierQuotationSlipDocument struct {
+	SupplierQuotationID int64                           `json:"supplier_quotation_id"`
+	QuoteNo             string                          `json:"quote_no"`
+	QuoteDate           string                          `json:"quote_date"`
+	Status              string                          `json:"status"`
+	PartnerName         string                          `json:"partner_name"`
+	OpenLineCount       int                             `json:"open_line_count"`
+	SourceLineCount     int                             `json:"source_line_count"`
+	SkippedNoItemCount  int                             `json:"skipped_no_item_count"`
+	Lines               []openSupplierQuotationSlipLine `json:"lines"`
+}
+
 func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -72,18 +84,7 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			argN++
 		}
 
-		q := fmt.Sprintf(`
-			select sq.id, ln.id, sq.rfq_id, ln.rfq_request_line_id,
-			  sq.quote_no, sq.quote_date, sq.status, sq.partner_id, p.company_name,
-			  pr.tax_type_id, pr.currency_id, pr.location_id, coalesce(l.location_name, ''),
-			  coalesce(pr.pic_name, ''),
-			  coalesce(ln.item_id, rl.item_id),
-			  coalesce(rl.item_code, ''), coalesce(rl.item_name, ''),
-			  ln.qty::float8,
-			  (ln.qty - coalesce(ord.ordered, 0))::float8,
-			  coalesce(ln.unit_id, rl.unit_id), coalesce(ln.unit_code, rl.unit_code),
-			  ln.unit_price::float8,
-			  count(*) over()
+		fromWhere := fmt.Sprintf(`
 			from public.rfq_supplier_quotation_lines ln
 			join public.rfq_supplier_quotations sq on sq.id = ln.supplier_quotation_id
 			join public.inv_partners p on p.id = sq.partner_id
@@ -99,20 +100,38 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			    and po.deleted_at is null and po.status <> 'cancelled'
 			  group by pol.supplier_quotation_line_id
 			) ord on ord.supplier_quotation_line_id = ln.id
-			where %s
-			order by sq.quote_date desc, ln.line_no asc
-			limit $%d offset $%d`, where, argN, argN+1)
-		args = append(args, pageSize, offset)
-
-		rows, err := pool.Query(r.Context(), q, args...)
+			where %s`, where)
+		docIDs, total, err := openlines.QueryDocumentPage(r.Context(), pool, fromWhere, "sq.id", "sq.quote_date", args, pageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list supplier quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		if len(docIDs) == 0 {
+			response.OKList(w, []openSupplierQuotationSlipDocument{}, p.Page, pageSize, total)
+			return
+		}
+		lineSQL := fmt.Sprintf(`
+			select sq.id, ln.id, sq.rfq_id, ln.rfq_request_line_id,
+			  sq.quote_no, sq.quote_date, sq.status, sq.partner_id, p.company_name,
+			  pr.tax_type_id, pr.currency_id, pr.location_id, coalesce(l.location_name, ''),
+			  coalesce(pr.pic_name, ''),
+			  coalesce(ln.item_id, rl.item_id),
+			  coalesce(rl.item_code, ''), coalesce(rl.item_name, ''),
+			  ln.qty::float8,
+			  (ln.qty - coalesce(ord.ordered, 0))::float8,
+			  coalesce(ln.unit_id, rl.unit_id), coalesce(ln.unit_code, rl.unit_code),
+			  ln.unit_price::float8
+			%s
+			  and sq.id = any($%d)
+			order by sq.quote_date desc, sq.id desc, ln.line_no asc`, fromWhere, argN)
+		rows, err := pool.Query(r.Context(), lineSQL, append(append([]any{}, args...), docIDs)...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list supplier quotation lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
 
-		out := []openSupplierQuotationSlipLine{}
-		var total int64
+		var lines []openSupplierQuotationSlipLine
 		for rows.Next() {
 			var row openSupplierQuotationSlipLine
 			var quoteDate time.Time
@@ -121,13 +140,46 @@ func listOpenSupplierQuotationSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.QuoteNo, &quoteDate, &row.Status, &row.PartnerID, &row.PartnerName,
 				&row.TaxTypeID, &row.CurrencyID, &row.LocationID, &row.LocationName, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName,
-				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitPrice, &total,
+				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitPrice,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read supplier quotation lines.", "ERR_INTERNAL")
 				return
 			}
 			row.QuoteDate = quoteDate.Format("2006-01-02")
-			out = append(out, row)
+			lines = append(lines, row)
+		}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read supplier quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		counts, err := openlines.LoadSourceCounts(r.Context(), pool, `
+			select ln.supplier_quotation_id, count(*)::int,
+			  count(*) filter (where coalesce(ln.item_id, rl.item_id) is null)::int
+			from public.rfq_supplier_quotation_lines ln
+			left join public.rfq_request_lines rl on rl.id = ln.rfq_request_line_id
+			where ln.supplier_quotation_id = any($1)
+			group by ln.supplier_quotation_id`, docIDs)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list supplier quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		grouped := openlines.AssembleDocuments(docIDs, lines, func(row openSupplierQuotationSlipLine) int64 { return row.SupplierQuotationID }, counts, func(row openSupplierQuotationSlipLine) bool {
+			return row.ItemID == nil
+		})
+		out := make([]openSupplierQuotationSlipDocument, 0, len(grouped))
+		for _, doc := range grouped {
+			first := doc.Lines[0]
+			out = append(out, openSupplierQuotationSlipDocument{
+				SupplierQuotationID: doc.ID,
+				QuoteNo:             first.QuoteNo,
+				QuoteDate:           first.QuoteDate,
+				Status:              first.Status,
+				PartnerName:         first.PartnerName,
+				OpenLineCount:       doc.OpenLineCount,
+				SourceLineCount:     doc.SourceLineCount,
+				SkippedNoItemCount:  doc.SkippedNoItemCount,
+				Lines:               doc.Lines,
+			})
 		}
 		response.OKList(w, out, p.Page, pageSize, total)
 	}

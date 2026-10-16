@@ -16,6 +16,7 @@ import { mergeFormErrors } from "../../../shared/formValidation";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { oneSlipDocument } from "../../../shared/slipDocument";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import {
   CustomFieldsSection,
@@ -360,6 +361,10 @@ export function QuotationModal(props: Props) {
 
   const applyPriorQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.quotation_id))) {
+      toast.error("Select one quotation.");
+      return;
+    }
     const first = picked[0];
     setPartnerId(first.partner_id);
     setCustomerLabel(first.customer_name);

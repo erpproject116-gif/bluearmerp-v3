@@ -29,41 +29,54 @@ func salesUsesDeliveryBalance(p processpolicy.Policy) bool {
 }
 
 type openSalesOrderLineRow struct {
-	SalesOrderID           int64   `json:"sales_order_id"`
-	SalesOrderLineID       int64   `json:"sales_order_line_id"`
-	DateNoDisplay          string  `json:"date_no_display"`
-	OrderDate              string  `json:"order_date"`
-	SalesOrderNo           string  `json:"sales_order_no"`
-	ProgressStatus         string  `json:"progress_status"`
-	CustomerName           string  `json:"customer_name"`
-	LocationID             int64   `json:"location_id"`
-	LocationName           string  `json:"location_name"`
-	PartnerID              int64   `json:"partner_id"`
-	TaxTypeID              int64   `json:"tax_type_id"`
-	CurrencyID             int64   `json:"currency_id"`
-	PicName                string  `json:"pic_name"`
-	ProjectID              *int64  `json:"project_id,omitempty"`
-	ProjectName            string  `json:"project_name"`
-	DueDate                *string `json:"due_date,omitempty"`
-	PaymentTerms           string  `json:"payment_terms"`
-	Notes                  string  `json:"notes"`
-	DeliveryRemarks        string  `json:"delivery_remarks"`
-	Reference              string  `json:"reference"`
-	SourceQuotationID      *int64  `json:"source_quotation_id,omitempty"`
-	SourceQuotationLineID  *int64  `json:"source_quotation_line_id,omitempty"`
-	QuotationID            *int64  `json:"quotation_id,omitempty"`
-	ItemID                 *int64  `json:"item_id,omitempty"`
-	ItemCode               string  `json:"item_code"`
-	ItemName               string  `json:"item_name"`
-	Description            *string `json:"description,omitempty"`
-	ReleasedQty            float64 `json:"released_qty"`
-	DeliveredQty           float64 `json:"delivered_qty"`
-	BalanceQty             float64 `json:"balance_qty"`
-	UnitID                 *int64  `json:"unit_id,omitempty"`
-	UnitCode               *string `json:"unit_code,omitempty"`
-	UnitVatInc             float64 `json:"unit_vat_inc"`
-	Remark                 *string `json:"remark,omitempty"`
-	TrackSerial            bool    `json:"track_serial,omitempty"`
+	SalesOrderID          int64   `json:"sales_order_id"`
+	SalesOrderLineID      int64   `json:"sales_order_line_id"`
+	DateNoDisplay         string  `json:"date_no_display"`
+	OrderDate             string  `json:"order_date"`
+	SalesOrderNo          string  `json:"sales_order_no"`
+	ProgressStatus        string  `json:"progress_status"`
+	CustomerName          string  `json:"customer_name"`
+	LocationID            int64   `json:"location_id"`
+	LocationName          string  `json:"location_name"`
+	PartnerID             int64   `json:"partner_id"`
+	TaxTypeID             int64   `json:"tax_type_id"`
+	CurrencyID            int64   `json:"currency_id"`
+	PicName               string  `json:"pic_name"`
+	ProjectID             *int64  `json:"project_id,omitempty"`
+	ProjectName           string  `json:"project_name"`
+	DueDate               *string `json:"due_date,omitempty"`
+	PaymentTerms          string  `json:"payment_terms"`
+	Notes                 string  `json:"notes"`
+	DeliveryRemarks       string  `json:"delivery_remarks"`
+	Reference             string  `json:"reference"`
+	SourceQuotationID     *int64  `json:"source_quotation_id,omitempty"`
+	SourceQuotationLineID *int64  `json:"source_quotation_line_id,omitempty"`
+	QuotationID           *int64  `json:"quotation_id,omitempty"`
+	ItemID                *int64  `json:"item_id,omitempty"`
+	ItemCode              string  `json:"item_code"`
+	ItemName              string  `json:"item_name"`
+	Description           *string `json:"description,omitempty"`
+	ReleasedQty           float64 `json:"released_qty"`
+	DeliveredQty          float64 `json:"delivered_qty"`
+	BalanceQty            float64 `json:"balance_qty"`
+	UnitID                *int64  `json:"unit_id,omitempty"`
+	UnitCode              *string `json:"unit_code,omitempty"`
+	UnitVatInc            float64 `json:"unit_vat_inc"`
+	Remark                *string `json:"remark,omitempty"`
+	TrackSerial           bool    `json:"track_serial,omitempty"`
+}
+
+type openSalesOrderDocument struct {
+	SalesOrderID       int64                   `json:"sales_order_id"`
+	DateNoDisplay      string                  `json:"date_no_display"`
+	OrderDate          string                  `json:"order_date"`
+	SalesOrderNo       string                  `json:"sales_order_no"`
+	ProgressStatus     string                  `json:"progress_status"`
+	CustomerName       string                  `json:"customer_name"`
+	OpenLineCount      int                     `json:"open_line_count"`
+	SourceLineCount    int                     `json:"source_line_count"`
+	SkippedNoItemCount int                     `json:"skipped_no_item_count"`
+	Lines              []openSalesOrderLineRow `json:"lines"`
 }
 
 func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
@@ -109,23 +122,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		where += dsScope
 
-		q := fmt.Sprintf(`
-			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no, so.progress_status,
-			  p.company_name, so.location_id, l.location_name, so.partner_id,
-			  so.tax_type_id, so.currency_id, so.pic_name,
-			  so.project_id, coalesce(so.project_name, ''),
-			  so.due_date,
-			  coalesce(so.payment_terms, ''), coalesce(so.notes, ''), coalesce(so.delivery_remarks, ''),
-			  coalesce(so.reference, ''),
-			  so.source_quotation_id, ln.source_quotation_line_id, ql.quotation_id,
-			  ln.item_id, ln.item_code, ln.item_name, ln.description,
-			  coalesce(rel.released, 0)::float8,
-			  coalesce(dr.delivered, 0)::float8,
-			  (ln.qty - coalesce(slip.sold, 0))::float8,
-			  ln.unit_id, ln.unit_code,
-			  ln.unit_vat_inc::float8, ln.remark,
-			  coalesce(i.track_serial, false),
-			  count(*) over()
+		fromWhere := fmt.Sprintf(`
 			from public.so_sales_orders so
 			join public.inv_partners p on p.id = so.partner_id
 			join public.inv_locations l on l.id = so.location_id
@@ -149,20 +146,43 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  where slip_type = 'sales'
 			  group by sales_order_line_id
 			) slip on slip.sales_order_line_id = ln.id
-			where %s
-			order by so.order_date desc, ln.line_no asc
-			limit $%d offset $%d`, where, argN, argN+1)
-		args = append(args, pageSize, offset)
-
-		rows, err := pool.Query(r.Context(), q, args...)
+			where %s`, where)
+		docIDs, total, err := openlines.QueryDocumentPage(r.Context(), pool, fromWhere, "so.id", "so.order_date", args, pageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list sales order lines.", "ERR_INTERNAL")
+			return
+		}
+		if len(docIDs) == 0 {
+			response.OKList(w, []openSalesOrderDocument{}, p.Page, pageSize, total)
+			return
+		}
+		lineSQL := fmt.Sprintf(`
+			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no, so.progress_status,
+			  p.company_name, so.location_id, l.location_name, so.partner_id,
+			  so.tax_type_id, so.currency_id, so.pic_name,
+			  so.project_id, coalesce(so.project_name, ''),
+			  so.due_date,
+			  coalesce(so.payment_terms, ''), coalesce(so.notes, ''), coalesce(so.delivery_remarks, ''),
+			  coalesce(so.reference, ''),
+			  so.source_quotation_id, ln.source_quotation_line_id, ql.quotation_id,
+			  ln.item_id, ln.item_code, ln.item_name, ln.description,
+			  coalesce(rel.released, 0)::float8,
+			  coalesce(dr.delivered, 0)::float8,
+			  (ln.qty - coalesce(slip.sold, 0))::float8,
+			  ln.unit_id, ln.unit_code,
+			  ln.unit_vat_inc::float8, ln.remark,
+			  coalesce(i.track_serial, false)
+			%s
+			  and so.id = any($%d)
+			order by so.order_date desc, so.id desc, ln.line_no asc`, fromWhere, argN)
+		rows, err := pool.Query(r.Context(), lineSQL, append(append([]any{}, args...), docIDs)...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list sales order lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
 
-		var out []openSalesOrderLineRow
-		var total int64
+		var lines []openSalesOrderLineRow
 		for rows.Next() {
 			var row openSalesOrderLineRow
 			var orderDate time.Time
@@ -178,7 +198,7 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
 				&row.ReleasedQty, &row.DeliveredQty, &row.BalanceQty,
 				&row.UnitID, &row.UnitCode,
-				&row.UnitVatInc, &row.Remark, &row.TrackSerial, &total,
+				&row.UnitVatInc, &row.Remark, &row.TrackSerial,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
 				return
@@ -186,10 +206,39 @@ func listOpenSalesOrderLines(pool *pgxpool.Pool) http.HandlerFunc {
 			row.OrderDate = dateToStr(orderDate)
 			row.DueDate = datePtrToStr(dueDate)
 			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
-			out = append(out, row)
+			lines = append(lines, row)
 		}
-		if out == nil {
-			out = []openSalesOrderLineRow{}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
+			return
+		}
+		counts, err := openlines.LoadSourceCounts(r.Context(), pool, `
+			select sales_order_id, count(*)::int, count(*) filter (where item_id is null)::int
+			from public.so_sales_order_lines
+			where sales_order_id = any($1)
+			group by sales_order_id`, docIDs)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list sales order lines.", "ERR_INTERNAL")
+			return
+		}
+		grouped := openlines.AssembleDocuments(docIDs, lines, func(row openSalesOrderLineRow) int64 { return row.SalesOrderID }, counts, func(row openSalesOrderLineRow) bool {
+			return row.ItemID == nil
+		})
+		out := make([]openSalesOrderDocument, 0, len(grouped))
+		for _, doc := range grouped {
+			first := doc.Lines[0]
+			out = append(out, openSalesOrderDocument{
+				SalesOrderID:       doc.ID,
+				DateNoDisplay:      first.DateNoDisplay,
+				OrderDate:          first.OrderDate,
+				SalesOrderNo:       first.SalesOrderNo,
+				ProgressStatus:     first.ProgressStatus,
+				CustomerName:       first.CustomerName,
+				OpenLineCount:      doc.OpenLineCount,
+				SourceLineCount:    doc.SourceLineCount,
+				SkippedNoItemCount: doc.SkippedNoItemCount,
+				Lines:              doc.Lines,
+			})
 		}
 		response.OKList(w, out, p.Page, pageSize, total)
 	}

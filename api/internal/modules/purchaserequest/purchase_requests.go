@@ -1098,6 +1098,18 @@ type openSalesOrderSlipLine struct {
 	PlannedSerialNos []string `json:"planned_serial_nos,omitempty"`
 }
 
+type openSalesOrderSlipDocument struct {
+	SalesOrderID       int64                    `json:"sales_order_id"`
+	DateNoDisplay      string                   `json:"date_no_display"`
+	ReferenceNo        string                   `json:"reference_no"`
+	ProgressStatus     string                   `json:"progress_status"`
+	CustomerName       string                   `json:"customer_name"`
+	OpenLineCount      int                      `json:"open_line_count"`
+	SourceLineCount    int                      `json:"source_line_count"`
+	SkippedNoItemCount int                      `json:"skipped_no_item_count"`
+	Lines              []openSalesOrderSlipLine `json:"lines"`
+}
+
 // listOpenSalesOrderSlipLines lists residual lines across all Sales Orders for the
 // PR "Load Slip" picker. Residual is derived from PR lines that already reference a
 // SO line (source_sales_order_line_id), never from the SO slip ledger, so procurement
@@ -1138,17 +1150,7 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		where += dsScope
 
-		q := fmt.Sprintf(`
-			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no, so.progress_status,
-			  pt.company_name, so.location_id, l.location_name, so.partner_id,
-			  so.tax_type_id, so.currency_id, so.pic_name,
-			  ln.item_id, ln.item_code, ln.item_name, ln.description,
-			  ln.qty::float8,
-			  (ln.qty - coalesce(req.requested, 0))::float8,
-			  ln.unit_vat_inc::float8, ln.remark,
-			  coalesce(i.track_serial, false),
-			  coalesce(ln.planned_serial_nos, '{}'),
-			  count(*) over()
+		fromWhere := fmt.Sprintf(`
 			from public.so_sales_orders so
 			join public.inv_partners pt on pt.id = so.partner_id
 			join public.inv_locations l on l.id = so.location_id
@@ -1160,20 +1162,37 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  where source_sales_order_line_id is not null
 			  group by source_sales_order_line_id
 			) req on req.source_sales_order_line_id = ln.id
-			where %s
-			order by so.order_date desc, ln.line_no asc
-			limit $%d offset $%d`, where, argN, argN+1)
-		args = append(args, pageSize, offset)
-
-		rows, err := pool.Query(r.Context(), q, args...)
+			where %s`, where)
+		docIDs, total, err := openlines.QueryDocumentPage(r.Context(), pool, fromWhere, "so.id", "so.order_date", args, pageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list sales order lines.", "ERR_INTERNAL")
+			return
+		}
+		if len(docIDs) == 0 {
+			response.OKList(w, []openSalesOrderSlipDocument{}, p.Page, pageSize, total)
+			return
+		}
+		lineSQL := fmt.Sprintf(`
+			select so.id, ln.id, so.order_date, so.date_seq, so.sales_order_no, so.progress_status,
+			  pt.company_name, so.location_id, l.location_name, so.partner_id,
+			  so.tax_type_id, so.currency_id, so.pic_name,
+			  ln.item_id, ln.item_code, ln.item_name, ln.description,
+			  ln.qty::float8,
+			  (ln.qty - coalesce(req.requested, 0))::float8,
+			  ln.unit_vat_inc::float8, ln.remark,
+			  coalesce(i.track_serial, false),
+			  coalesce(ln.planned_serial_nos, '{}')
+			%s
+			  and so.id = any($%d)
+			order by so.order_date desc, so.id desc, ln.line_no asc`, fromWhere, argN)
+		rows, err := pool.Query(r.Context(), lineSQL, append(append([]any{}, args...), docIDs)...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list sales order lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
 
-		out := []openSalesOrderSlipLine{}
-		var total int64
+		var lines []openSalesOrderSlipLine
 		for rows.Next() {
 			var row openSalesOrderSlipLine
 			var orderDate time.Time
@@ -1183,13 +1202,44 @@ func listOpenSalesOrderSlipLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
-				&row.Qty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &row.TrackSerial, &row.PlannedSerialNos, &total,
+				&row.Qty, &row.BalanceQty, &row.UnitVatInc, &row.Remark, &row.TrackSerial, &row.PlannedSerialNos,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
 				return
 			}
 			row.DateNoDisplay = formatDateNoDisplay(orderDate, dateSeq)
-			out = append(out, row)
+			lines = append(lines, row)
+		}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read sales order lines.", "ERR_INTERNAL")
+			return
+		}
+		counts, err := openlines.LoadSourceCounts(r.Context(), pool, `
+			select sales_order_id, count(*)::int, count(*) filter (where item_id is null)::int
+			from public.so_sales_order_lines
+			where sales_order_id = any($1)
+			group by sales_order_id`, docIDs)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list sales order lines.", "ERR_INTERNAL")
+			return
+		}
+		grouped := openlines.AssembleDocuments(docIDs, lines, func(row openSalesOrderSlipLine) int64 { return row.SalesOrderID }, counts, func(row openSalesOrderSlipLine) bool {
+			return row.ItemID == nil
+		})
+		out := make([]openSalesOrderSlipDocument, 0, len(grouped))
+		for _, doc := range grouped {
+			first := doc.Lines[0]
+			out = append(out, openSalesOrderSlipDocument{
+				SalesOrderID:       doc.ID,
+				DateNoDisplay:      first.DateNoDisplay,
+				ReferenceNo:        first.ReferenceNo,
+				ProgressStatus:     first.ProgressStatus,
+				CustomerName:       first.CustomerName,
+				OpenLineCount:      doc.OpenLineCount,
+				SourceLineCount:    doc.SourceLineCount,
+				SkippedNoItemCount: doc.SkippedNoItemCount,
+				Lines:              doc.Lines,
+			})
 		}
 		response.OKList(w, out, p.Page, pageSize, total)
 	}

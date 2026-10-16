@@ -18,34 +18,47 @@ import (
 )
 
 type openQuotationLineRow struct {
-	QuotationID           int64   `json:"quotation_id"`
-	QuotationLineID       int64   `json:"quotation_line_id"`
-	OrderDate             string  `json:"order_date"`
-	DateNoDisplay         string  `json:"date_no_display"`
-	ReferenceNo           string  `json:"reference_no"`
-	ProgressStatus        string  `json:"progress_status"`
-	CustomerName          string  `json:"customer_name"`
-	LocationID            int64   `json:"location_id"`
-	LocationName          string  `json:"location_name"`
-	PartnerID             int64   `json:"partner_id"`
-	TaxTypeID             int64   `json:"tax_type_id"`
-	CurrencyID            int64   `json:"currency_id"`
-	PicName               string  `json:"pic_name"`
-	ProjectID             *int64  `json:"project_id,omitempty"`
-	ProjectName           string  `json:"project_name"`
-	ValidUntil            *string `json:"valid_until,omitempty"`
-	PaymentTerms          string  `json:"payment_terms"`
-	Notes                 string  `json:"notes"`
-	ItemID                *int64  `json:"item_id,omitempty"`
-	ItemCode              string  `json:"item_code"`
-	ItemName              string  `json:"item_name"`
-	Description           *string `json:"description,omitempty"`
-	Qty                   float64 `json:"qty"`
-	BalanceQty            float64 `json:"balance_qty"`
-	UnitID                *int64  `json:"unit_id,omitempty"`
-	UnitCode              string  `json:"unit_code,omitempty"`
-	UnitVatInc            float64 `json:"unit_vat_inc"`
-	Remark                *string `json:"remark,omitempty"`
+	QuotationID     int64   `json:"quotation_id"`
+	QuotationLineID int64   `json:"quotation_line_id"`
+	OrderDate       string  `json:"order_date"`
+	DateNoDisplay   string  `json:"date_no_display"`
+	ReferenceNo     string  `json:"reference_no"`
+	ProgressStatus  string  `json:"progress_status"`
+	CustomerName    string  `json:"customer_name"`
+	LocationID      int64   `json:"location_id"`
+	LocationName    string  `json:"location_name"`
+	PartnerID       int64   `json:"partner_id"`
+	TaxTypeID       int64   `json:"tax_type_id"`
+	CurrencyID      int64   `json:"currency_id"`
+	PicName         string  `json:"pic_name"`
+	ProjectID       *int64  `json:"project_id,omitempty"`
+	ProjectName     string  `json:"project_name"`
+	ValidUntil      *string `json:"valid_until,omitempty"`
+	PaymentTerms    string  `json:"payment_terms"`
+	Notes           string  `json:"notes"`
+	ItemID          *int64  `json:"item_id,omitempty"`
+	ItemCode        string  `json:"item_code"`
+	ItemName        string  `json:"item_name"`
+	Description     *string `json:"description,omitempty"`
+	Qty             float64 `json:"qty"`
+	BalanceQty      float64 `json:"balance_qty"`
+	UnitID          *int64  `json:"unit_id,omitempty"`
+	UnitCode        string  `json:"unit_code,omitempty"`
+	UnitVatInc      float64 `json:"unit_vat_inc"`
+	Remark          *string `json:"remark,omitempty"`
+}
+
+type openQuotationDocument struct {
+	QuotationID        int64                  `json:"quotation_id"`
+	OrderDate          string                 `json:"order_date"`
+	DateNoDisplay      string                 `json:"date_no_display"`
+	ReferenceNo        string                 `json:"reference_no"`
+	ProgressStatus     string                 `json:"progress_status"`
+	CustomerName       string                 `json:"customer_name"`
+	OpenLineCount      int                    `json:"open_line_count"`
+	SourceLineCount    int                    `json:"source_line_count"`
+	SkippedNoItemCount int                    `json:"skipped_no_item_count"`
+	Lines              []openQuotationLineRow `json:"lines"`
 }
 
 func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
@@ -93,7 +106,28 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		where += dsScope
 
-		q := fmt.Sprintf(`
+		fromWhere := fmt.Sprintf(`
+			from public.quo_quotations q
+			join public.inv_partners p on p.id = q.partner_id
+			join public.inv_locations l on l.id = q.location_id
+			join public.quo_quotation_lines ln on ln.quotation_id = q.id
+			left join (
+			  select quotation_line_id, sum(qty) as qty_fulfilled
+			  from public.quo_quotation_slip_lines
+			  group by quotation_line_id
+			) slip on slip.quotation_line_id = ln.id
+			where %s`, where)
+		docIDs, total, err := openlines.QueryDocumentPage(r.Context(), pool, fromWhere, "q.id", "q.order_date", args, pageSize, offset)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		if len(docIDs) == 0 {
+			response.OKList(w, []openQuotationDocument{}, p.Page, pageSize, total)
+			return
+		}
+
+		lineSQL := fmt.Sprintf(`
 			select q.id, ln.id, q.order_date, q.date_seq, q.reference_no, q.progress_status,
 			  p.company_name, q.location_id, l.location_name, q.partner_id,
 			  q.tax_type_id, q.currency_id, q.pic_name,
@@ -104,31 +138,18 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			  ln.qty::float8,
 			  (ln.qty - coalesce(slip.qty_fulfilled, 0))::float8,
 			  ln.unit_id, coalesce(ln.unit_code, ''),
-			  ln.unit_vat_inc::float8, ln.remark,
-			  count(*) over()
-			from public.quo_quotations q
-			join public.inv_partners p on p.id = q.partner_id
-			join public.inv_locations l on l.id = q.location_id
-			join public.quo_quotation_lines ln on ln.quotation_id = q.id
-			left join (
-			  select quotation_line_id, sum(qty) as qty_fulfilled
-			  from public.quo_quotation_slip_lines
-			  group by quotation_line_id
-			) slip on slip.quotation_line_id = ln.id
-			where %s
-			order by q.order_date desc, ln.line_no asc
-			limit $%d offset $%d`, where, argN, argN+1)
-		args = append(args, pageSize, offset)
-
-		rows, err := pool.Query(r.Context(), q, args...)
+			  ln.unit_vat_inc::float8, ln.remark
+			%s
+			  and q.id = any($%d)
+			order by q.order_date desc, q.id desc, ln.line_no asc`, fromWhere, argN)
+		rows, err := pool.Query(r.Context(), lineSQL, append(append([]any{}, args...), docIDs)...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to list quotation lines.", "ERR_INTERNAL")
 			return
 		}
 		defer rows.Close()
 
-		var out []openQuotationLineRow
-		var total int64
+		var lines []openQuotationLineRow
 		for rows.Next() {
 			var row openQuotationLineRow
 			var orderDate time.Time
@@ -140,7 +161,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
 				&row.ProjectID, &row.ProjectName, &validUntil, &row.PaymentTerms, &row.Notes,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
-				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitVatInc, &row.Remark, &total,
+				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitVatInc, &row.Remark,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read quotation lines.", "ERR_INTERNAL")
 				return
@@ -151,10 +172,42 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 				s := validUntil.Format("2006-01-02")
 				row.ValidUntil = &s
 			}
-			out = append(out, row)
+			lines = append(lines, row)
 		}
-		if out == nil {
-			out = []openQuotationLineRow{}
+		if err := rows.Err(); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		counts, err := openlines.LoadSourceCounts(r.Context(), pool, `
+			select quotation_id, count(*)::int, count(*) filter (where item_id is null)::int
+			from public.quo_quotation_lines
+			where quotation_id = any($1)
+			group by quotation_id`, docIDs)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to list quotation lines.", "ERR_INTERNAL")
+			return
+		}
+		grouped := openlines.AssembleDocuments(docIDs, lines, func(row openQuotationLineRow) int64 { return row.QuotationID }, counts, func(row openQuotationLineRow) bool {
+			return row.ItemID == nil
+		})
+		out := make([]openQuotationDocument, 0, len(grouped))
+		for _, doc := range grouped {
+			first := doc.Lines[0]
+			if doc.Lines == nil {
+				doc.Lines = []openQuotationLineRow{}
+			}
+			out = append(out, openQuotationDocument{
+				QuotationID:        doc.ID,
+				OrderDate:          first.OrderDate,
+				DateNoDisplay:      first.DateNoDisplay,
+				ReferenceNo:        first.ReferenceNo,
+				ProgressStatus:     first.ProgressStatus,
+				CustomerName:       first.CustomerName,
+				OpenLineCount:      doc.OpenLineCount,
+				SourceLineCount:    doc.SourceLineCount,
+				SkippedNoItemCount: doc.SkippedNoItemCount,
+				Lines:              doc.Lines,
+			})
 		}
 		response.OKList(w, out, p.Page, pageSize, total)
 	}

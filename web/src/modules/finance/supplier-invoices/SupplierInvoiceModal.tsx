@@ -12,6 +12,7 @@ import { buildRequiredChecks, useFormFieldSettings } from "../../../shared/useFo
 import { PURCHASES_ENTITY } from "../../../shared/entityTypes";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { oneSlipDocument } from "../../../shared/slipDocument";
 import { useAuth, hasPermission } from "../../../shared/auth-context";
 import { WideEntityModal } from "../../../shared/WideEntityModal";
 import { ModalFormGuide } from "../../../shared/ModalFormGuide";
@@ -440,6 +441,10 @@ export function SupplierInvoiceModal(props: Props) {
 
   const applyGRLines = async (picked: OpenGRLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.goods_receipt_id))) {
+      toast.error("Select one purchase receive.");
+      return;
+    }
     const meta = taxTypes().find((t) => t.id === taxTypeId());
     const basis = meta ? defaultInputBasis(meta.tax_mode) : "vat_inc_unit";
     const start = lines().length;
@@ -549,6 +554,10 @@ export function SupplierInvoiceModal(props: Props) {
 
   const applyPOLines = async (picked: OpenPOLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.purchase_order_id))) {
+      toast.error("Select one purchase order.");
+      return;
+    }
     const first = picked[0];
     if (first.order_date) {
       setInvoiceDate(first.order_date);
@@ -639,6 +648,14 @@ export function SupplierInvoiceModal(props: Props) {
   };
 
   const applySupplierQuotationLines = async (picked: OpenSupplierQuotationInvoiceLine[]) => {
+    if (!oneSlipDocument(picked.map((row) => row.supplier_quotation_id))) {
+      toast.error("Select one supplier quotation.");
+      return;
+    }
+    if (!oneSlipDocument(picked.map((row) => row.purchase_order_id))) {
+      toast.error("That supplier quotation is on more than one purchase order. Load one purchase order instead.");
+      return;
+    }
     await applyPOLines(picked);
   };
 

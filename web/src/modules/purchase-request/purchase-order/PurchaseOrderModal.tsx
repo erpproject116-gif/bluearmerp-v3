@@ -16,6 +16,7 @@ import { CustomFieldsSection } from "../../../shared/CustomFieldsSection";
 import { PURCHASE_REQUEST_ENTITY } from "../../../shared/entityTypes";
 import { useCustomValues } from "../../../shared/useCustomValues";
 import { useToast } from "../../../shared/toast";
+import { oneSlipDocument } from "../../../shared/slipDocument";
 import { useAuth, hasPermission } from "../../../shared/auth-context";
 import { coalesceSpecDescription } from "../../../shared/itemLineSpecDescription";
 import { formatRateSummary, formatTaxTypeLabel, defaultInputBasis } from "../../../shared/taxcalc";
@@ -448,6 +449,10 @@ export function PurchaseOrderModal(props: Props) {
 
   const applyPurchaseRequestLines = async (picked: PickedPurchaseRequestLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.purchase_request_id))) {
+      toast.error("Select one purchase request.");
+      return;
+    }
     const first = picked[0];
     setTaxTypeId(first.tax_type_id);
     setCurrencyId(first.currency_id);
@@ -489,6 +494,10 @@ export function PurchaseOrderModal(props: Props) {
 
   const applySupplierQuotationLines = async (picked: PickedSupplierQuotationLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.supplier_quotation_id))) {
+      toast.error("Select one supplier quotation.");
+      return;
+    }
     const first = picked[0];
     if (first.tax_type_id) setTaxTypeId(first.tax_type_id);
     if (first.currency_id) setCurrencyId(first.currency_id);

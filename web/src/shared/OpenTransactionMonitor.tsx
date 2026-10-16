@@ -75,6 +75,8 @@ type Props = {
   emptyHint?: string;
   /** Optional chips / filters under the title. */
   toolbar?: JSX.Element;
+  /** Extra row under a document. Omitted callers render the table exactly as before. */
+  renderDetail?: (row: Record<string, unknown>) => JSX.Element | null | undefined;
 };
 
 /** Open-transaction Load Slip monitor: search, date range, doc no, multi-select. */
@@ -262,20 +264,30 @@ export function OpenTransactionMonitor(props: Props) {
                   <For each={props.rows}>
                     {(row) => {
                       const id = props.rowKey(row);
+                      const detail = () => props.renderDetail?.(row);
                       return (
-                        <tr class="border-b border-stroke/60 hover:bg-brand-50/40">
-                          <td class="py-1.5 pr-2">
-                            <input
-                              type="checkbox"
-                              checked={props.selected.has(id)}
-                              onChange={() => props.onToggleRow(id)}
-                              aria-label={`Select line ${id}`}
-                            />
-                          </td>
-                          <For each={props.columns}>
-                            {(col) => <td class={`py-1.5 pr-3 ${col.class ?? ""}`}>{col.cell(row)}</td>}
-                          </For>
-                        </tr>
+                        <>
+                          <tr class="border-b border-stroke/60 hover:bg-brand-50/40">
+                            <td class="py-1.5 pr-2">
+                              <input
+                                type="checkbox"
+                                checked={props.selected.has(id)}
+                                onChange={() => props.onToggleRow(id)}
+                                aria-label={`Select line ${id}`}
+                              />
+                            </td>
+                            <For each={props.columns}>
+                              {(col) => <td class={`py-1.5 pr-3 ${col.class ?? ""}`}>{col.cell(row)}</td>}
+                            </For>
+                          </tr>
+                          <Show when={detail()}>
+                            <tr class="border-b border-stroke/60 bg-slate-50">
+                              <td colspan={props.columns.length + 1} class="px-8 py-2">
+                                {detail()}
+                              </td>
+                            </tr>
+                          </Show>
+                        </>
                       );
                     }}
                   </For>

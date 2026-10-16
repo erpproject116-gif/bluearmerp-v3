@@ -15,6 +15,7 @@ import { mergeFormErrors } from "../../../shared/formValidation";
 import { CoaSetupReminder } from "../../../shared/CoaSetupReminder";
 import { useDocumentDraft } from "../../../shared/useDocumentDraft";
 import { useToast } from "../../../shared/toast";
+import { oneSlipDocument } from "../../../shared/slipDocument";
 import { useAuth, hasPermission } from "../../../shared/auth-context";
 import { isTenantModuleEnabled } from "../../../shared/moduleAccess";
 import { buildRequiredChecksForSave, useFormFieldSettings } from "../../../shared/useFormFieldSettings";
@@ -501,6 +502,10 @@ export function SalesOrderModal(props: Props) {
 
   const applyQuotationLines = async (picked: PickedQuotationLine[]) => {
     if (picked.length === 0) return;
+    if (!oneSlipDocument(picked.map((row) => row.quotation_id))) {
+      toast.error("Select one quotation.");
+      return;
+    }
     const first = picked[0];
     if (first.order_date) {
       setOrderDate(first.order_date);

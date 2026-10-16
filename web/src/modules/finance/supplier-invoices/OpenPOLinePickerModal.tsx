@@ -8,6 +8,9 @@ import {
 } from "../../../shared/OpenTransactionMonitor";
 import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
 import type { OpenPOLine } from "../../../shared/useSupplierInvoiceList";
+import { SlipNestedLines } from "../../../shared/SlipNestedLines";
+import { checkedDocumentLines, slipLineSummary } from "../../../shared/slipDocument";
+import { useToast } from "../../../shared/toast";
 
 type Props = {
   open: boolean;
@@ -23,6 +26,19 @@ type StatusChip = "all" | "in_progress" | "finished";
 
 const [pageSize, setPageSize] = createSignal(20);
 
+type OpenPODocument = {
+  purchase_order_id: number;
+  purchase_order_no: string;
+  status: string;
+  progress_status: string;
+  order_date?: string;
+  partner_name: string;
+  open_line_count: number;
+  source_line_count: number;
+  skipped_no_item_count: number;
+  lines: OpenPOLine[];
+};
+
 function poChip(status: string, progress: string): StatusChip {
   const s = (status || "").toLowerCase();
   if (s === "received") return "finished";
@@ -31,6 +47,7 @@ function poChip(status: string, progress: string): StatusChip {
 }
 
 export function OpenPOLinePickerModal(props: Props) {
+  const toast = useToast();
   const [filters, setFilters] = createSignal<OpenMonitorFilters>({
     q: "",
     dateFrom: "",
@@ -42,6 +59,7 @@ export function OpenPOLinePickerModal(props: Props) {
   });
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal(new Set<number>());
+  const [unchecked, setUnchecked] = createSignal(new Set<number>());
   const [statusChip, setStatusChip] = createSignal<StatusChip>("all");
 
   createEffect(
@@ -50,6 +68,7 @@ export function OpenPOLinePickerModal(props: Props) {
       (open) => {
         if (!open) return;
         setSelected(new Set<number>());
+        setUnchecked(new Set<number>());
         setPage(1);
         setStatusChip("all");
         setFilters({
@@ -69,7 +88,7 @@ export function OpenPOLinePickerModal(props: Props) {
     () => (props.open ? { filters: filters(), page: page() } : null),
     async (p) => {
       const qs = buildOpenLineQuery({ page: p!.page, pageSize: pageSize(), filters: p!.filters });
-      const res = await apiFetch<OpenPOLine[]>(`/api/v1/finance/supplier-invoices/open-po-lines?${qs}`);
+      const res = await apiFetch<OpenPODocument[]>(`/api/v1/finance/supplier-invoices/open-po-lines?${qs}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load purchase order lines");
       return { rows: res.data ?? [], total: res.meta?.total ?? (res.data?.length ?? 0) };
     },
@@ -84,11 +103,35 @@ export function OpenPOLinePickerModal(props: Props) {
 
   const rows = () => filteredRows() as unknown as Record<string, unknown>[];
 
-  const toggleRow = (id: number) => {
+  const toggleRow = (docId: number) => {
+    const doc = filteredRows().find((d) => d.purchase_order_id === docId);
+    setUnchecked((prev) => {
+      const next = new Set(prev);
+      for (const line of doc?.lines ?? []) next.delete(line.purchase_order_line_id);
+      return next;
+    });
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  };
+
+  const toggleLine = (docId: number, lineId: number) => {
+    const doc = filteredRows().find((d) => d.purchase_order_id === docId);
+    const ids = (doc?.lines ?? []).map((line) => line.purchase_order_line_id);
+    setUnchecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) next.delete(lineId);
+      else next.add(lineId);
+      const anyChecked = ids.some((id) => !next.has(id));
+      setSelected((selectedIds) => {
+        const nextDocs = new Set(selectedIds);
+        if (anyChecked) nextDocs.add(docId);
+        else nextDocs.delete(docId);
+        return nextDocs;
+      });
       return next;
     });
   };
@@ -96,16 +139,32 @@ export function OpenPOLinePickerModal(props: Props) {
   const toggleAll = () => {
     const list = filteredRows();
     if (selected().size === list.length) setSelected(new Set<number>());
-    else setSelected(new Set(list.map((r) => r.purchase_order_line_id)));
+    else setSelected(new Set(list.map((r) => r.purchase_order_id)));
+    setUnchecked(new Set<number>());
   };
 
   const apply = () => {
-    const list = filteredRows();
-    const picked = list.filter((r) => selected().has(r.purchase_order_line_id));
-    if (picked.length === 0) return;
-    props.onConfirm(picked);
+    const pickedDoc = checkedDocumentLines(
+      filteredRows().map((doc) => ({
+        id: doc.purchase_order_id,
+        skipped_no_item_count: doc.skipped_no_item_count,
+        lines: doc.lines,
+      })),
+      selected(),
+      unchecked(),
+      (line) => line.purchase_order_line_id,
+    );
+    if (!pickedDoc) {
+      toast.error("Select one purchase order.");
+      return;
+    }
+    if (pickedDoc.skipped > 0) {
+      toast.warning(`${pickedDoc.skipped} line(s) have no inventory item and were not loaded.`);
+    }
+    props.onConfirm(pickedDoc.lines);
     props.onClose();
     setSelected(new Set<number>());
+    setUnchecked(new Set<number>());
   };
 
   const chips: { id: StatusChip; label: string }[] = [
@@ -116,19 +175,19 @@ export function OpenPOLinePickerModal(props: Props) {
 
   return (
     <OpenTransactionMonitor
-      title={props.mapOnly ? "Map from Purchase Order — open lines" : "Load Slip (from Purchase Order) — open lines"}
+      title={props.mapOnly ? "Map from Purchase Order" : "Load Slip — Purchase Order"}
       open={props.open}
       onClose={props.onClose}
       filters={filters()}
       onFiltersChange={setFilters}
       loading={data.loading}
       error={data.error}
-      total={filteredRows().length}
+      total={peekResource(data)?.total ?? 0}
       page={page()}
       pageSize={pageSize()} onPageSizeChange={setPageSize}
       onPageChange={setPage}
       rows={rows()}
-      rowKey={(row) => Number(row.purchase_order_line_id)}
+      rowKey={(row) => Number(row.purchase_order_id)}
       selected={selected()}
       onToggleRow={toggleRow}
       onToggleAll={toggleAll}
@@ -144,6 +203,7 @@ export function OpenPOLinePickerModal(props: Props) {
                 onClick={() => {
                   setStatusChip(c.id);
                   setSelected(new Set<number>());
+                  setUnchecked(new Set<number>());
                 }}
               >
                 {c.label}
@@ -180,29 +240,23 @@ export function OpenPOLinePickerModal(props: Props) {
           cell: (r) => String(r.partner_name ?? ""),
         },
         {
-          key: "item",
-          header: "Item",
-          cell: (r) => `${r.item_code ?? ""} — ${r.item_name ?? ""}`,
-        },
-        {
-          key: "ordered",
-          header: "Ordered",
-          class: "text-right",
-          cell: (r) => Number(r.ordered_qty ?? 0),
-        },
-        {
-          key: "balance",
-          header: "To receive",
-          class: "text-right",
-          cell: (r) => Number(r.balance_qty ?? 0),
-        },
-        {
-          key: "unit",
-          header: "Unit (VAT inc.)",
-          class: "text-right",
-          cell: (r) => Number(r.unit_vat_inc ?? 0),
+          key: "lines",
+          header: "Lines",
+          cell: (r) =>
+            slipLineSummary(Number(r.open_line_count ?? 0), Number(r.source_line_count ?? 0), Number(r.skipped_no_item_count ?? 0)),
         },
       ]}
+      renderDetail={(row) => (
+        <SlipNestedLines
+          unchecked={unchecked()}
+          onToggle={(lineId) => toggleLine(Number(row.purchase_order_id), lineId)}
+          lines={((row.lines as OpenPOLine[] | undefined) ?? []).map((line) => ({
+            id: line.purchase_order_line_id,
+            label: `${line.item_code ?? ""} ${line.item_name ?? ""}`.trim(),
+            qty: String(line.balance_qty ?? 0),
+          }))}
+        />
+      )}
       onApply={apply}
       applyLabel={props.mapOnly ? "Map selected lines" : undefined}
       emptyHint="No open Purchase Order lines left to receive. Fully received POs won’t appear here — use Load Slip → Bill if you only need to invoice a prior GR. Clear filters and try All."
