@@ -18,34 +18,40 @@ import (
 )
 
 type openQuotationLineRow struct {
-	QuotationID     int64   `json:"quotation_id"`
-	QuotationLineID int64   `json:"quotation_line_id"`
-	OrderDate       string  `json:"order_date"`
-	DateNoDisplay   string  `json:"date_no_display"`
-	ReferenceNo     string  `json:"reference_no"`
-	ProgressStatus  string  `json:"progress_status"`
-	CustomerName    string  `json:"customer_name"`
-	LocationID      int64   `json:"location_id"`
-	LocationName    string  `json:"location_name"`
-	PartnerID       int64   `json:"partner_id"`
-	TaxTypeID       int64   `json:"tax_type_id"`
-	CurrencyID      int64   `json:"currency_id"`
-	PicName         string  `json:"pic_name"`
-	ProjectID       *int64  `json:"project_id,omitempty"`
-	ProjectName     string  `json:"project_name"`
-	ValidUntil      *string `json:"valid_until,omitempty"`
-	PaymentTerms    string  `json:"payment_terms"`
-	Notes           string  `json:"notes"`
-	ItemID          *int64  `json:"item_id,omitempty"`
-	ItemCode        string  `json:"item_code"`
-	ItemName        string  `json:"item_name"`
-	Description     *string `json:"description,omitempty"`
-	Qty             float64 `json:"qty"`
-	BalanceQty      float64 `json:"balance_qty"`
-	UnitID          *int64  `json:"unit_id,omitempty"`
-	UnitCode        string  `json:"unit_code,omitempty"`
-	UnitVatInc      float64 `json:"unit_vat_inc"`
-	Remark          *string `json:"remark,omitempty"`
+	QuotationID      int64    `json:"quotation_id"`
+	QuotationLineID  int64    `json:"quotation_line_id"`
+	OrderDate        string   `json:"order_date"`
+	DateNoDisplay    string   `json:"date_no_display"`
+	ReferenceNo      string   `json:"reference_no"`
+	ProgressStatus   string   `json:"progress_status"`
+	CustomerName     string   `json:"customer_name"`
+	LocationID       int64    `json:"location_id"`
+	LocationName     string   `json:"location_name"`
+	PartnerID        int64    `json:"partner_id"`
+	TaxTypeID        int64    `json:"tax_type_id"`
+	CurrencyID       int64    `json:"currency_id"`
+	PicUserID        *int64   `json:"pic_user_id,omitempty"`
+	PicName          string   `json:"pic_name"`
+	ProjectID        *int64   `json:"project_id,omitempty"`
+	ProjectName      string   `json:"project_name"`
+	ValidUntil       *string  `json:"valid_until,omitempty"`
+	ValidityText     string   `json:"quotation_validity_text,omitempty"`
+	PaymentTerms     string   `json:"payment_terms"`
+	NoteForPicOnly   string   `json:"note_for_pic_only,omitempty"`
+	Notes            string   `json:"notes"`
+	ItemID           *int64   `json:"item_id,omitempty"`
+	ItemCode         string   `json:"item_code"`
+	ItemName         string   `json:"item_name"`
+	Description      *string  `json:"description,omitempty"`
+	Qty              float64  `json:"qty"`
+	BalanceQty       float64  `json:"balance_qty"`
+	UnitID           *int64   `json:"unit_id,omitempty"`
+	UnitCode         string   `json:"unit_code,omitempty"`
+	UnitVatInc       float64  `json:"unit_vat_inc"`
+	Remark           *string  `json:"remark,omitempty"`
+	PlannedSerialNos []string `json:"planned_serial_nos,omitempty"`
+	TrackSerial      bool     `json:"track_serial,omitempty"`
+	SerialPolicy     string   `json:"serial_policy,omitempty"`
 }
 
 type openQuotationDocument struct {
@@ -111,6 +117,7 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.inv_partners p on p.id = q.partner_id
 			join public.inv_locations l on l.id = q.location_id
 			join public.quo_quotation_lines ln on ln.quotation_id = q.id
+			left join public.inv_items i on i.id = ln.item_id
 			left join (
 			  select quotation_line_id, sum(qty) as qty_fulfilled
 			  from public.quo_quotation_slip_lines
@@ -130,15 +137,18 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 		lineSQL := fmt.Sprintf(`
 			select q.id, ln.id, q.order_date, q.date_seq, q.reference_no, q.progress_status,
 			  p.company_name, q.location_id, l.location_name, q.partner_id,
-			  q.tax_type_id, q.currency_id, q.pic_name,
+			  q.tax_type_id, q.currency_id, q.pic_user_id, q.pic_name,
 			  q.project_id, coalesce(q.project_name, ''),
 			  q.valid_until,
-			  coalesce(q.payment_terms, ''), coalesce(q.notes, ''),
+			  coalesce(q.quotation_validity_text, ''),
+			  coalesce(q.payment_terms, ''), coalesce(q.note_for_pic_only, ''), coalesce(q.notes, ''),
 			  ln.item_id, ln.item_code, ln.item_name, ln.description,
 			  ln.qty::float8,
 			  (ln.qty - coalesce(slip.qty_fulfilled, 0))::float8,
 			  ln.unit_id, coalesce(ln.unit_code, ''),
-			  ln.unit_vat_inc::float8, ln.remark
+			  ln.unit_vat_inc::float8, ln.remark,
+			  coalesce(ln.planned_serial_nos, '{}'),
+			  coalesce(i.track_serial, false), coalesce(i.serial_policy, 'required')
 			%s
 			  and q.id = any($%d)
 			order by q.order_date desc, q.id desc, ln.line_no asc`, fromWhere, argN)
@@ -158,10 +168,11 @@ func listOpenQuotationLines(pool *pgxpool.Pool) http.HandlerFunc {
 			if err := rows.Scan(
 				&row.QuotationID, &row.QuotationLineID, &orderDate, &dateSeq, &row.ReferenceNo, &row.ProgressStatus,
 				&row.CustomerName, &row.LocationID, &row.LocationName, &row.PartnerID,
-				&row.TaxTypeID, &row.CurrencyID, &row.PicName,
-				&row.ProjectID, &row.ProjectName, &validUntil, &row.PaymentTerms, &row.Notes,
+				&row.TaxTypeID, &row.CurrencyID, &row.PicUserID, &row.PicName,
+				&row.ProjectID, &row.ProjectName, &validUntil, &row.ValidityText, &row.PaymentTerms, &row.NoteForPicOnly, &row.Notes,
 				&row.ItemID, &row.ItemCode, &row.ItemName, &row.Description,
 				&row.Qty, &row.BalanceQty, &row.UnitID, &row.UnitCode, &row.UnitVatInc, &row.Remark,
+				&row.PlannedSerialNos, &row.TrackSerial, &row.SerialPolicy,
 			); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read quotation lines.", "ERR_INTERNAL")
 				return

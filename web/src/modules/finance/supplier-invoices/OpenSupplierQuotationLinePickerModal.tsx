@@ -4,7 +4,7 @@ import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
 import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
-import { SlipNestedLines } from "../../../shared/SlipNestedLines";
+import { SlipLinesToggle, SlipNestedLines, toggleSlipLineSet } from "../../../shared/SlipNestedLines";
 import { checkedDocumentLines, slipLineSummary } from "../../../shared/slipDocument";
 import { useToast } from "../../../shared/toast";
 import type { OpenSupplierQuotationInvoiceLine } from "../../../shared/useSupplierInvoiceList";
@@ -42,6 +42,7 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
   const [unchecked, setUnchecked] = createSignal<Set<number>>(new Set());
+  const [openLines, setOpenLines] = createSignal<Set<number>>(new Set());
 
   createEffect(() => {
     if (!props.open) {
@@ -49,6 +50,7 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
       setPage(1);
       setSelected(new Set<number>());
       setUnchecked(new Set<number>());
+      setOpenLines(new Set<number>());
     }
   });
 
@@ -183,11 +185,17 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
                     <>
                       <tr class="border-t border-stroke/60">
                         <td class="py-2 pr-2">
-                          <input
-                            type="checkbox"
-                            checked={selected().has(row.supplier_quotation_id)}
-                            onChange={() => toggleRow(row.supplier_quotation_id)}
-                          />
+                          <div class="flex items-center gap-1">
+                            <SlipLinesToggle
+                              open={openLines().has(row.supplier_quotation_id)}
+                              onToggle={() => setOpenLines((prev) => toggleSlipLineSet(prev, row.supplier_quotation_id))}
+                            />
+                            <input
+                              type="checkbox"
+                              checked={selected().has(row.supplier_quotation_id)}
+                              onChange={() => toggleRow(row.supplier_quotation_id)}
+                            />
+                          </div>
                         </td>
                         <td class="py-2 pr-2">{row.quote_no}</td>
                         <td class="py-2 pr-2">{openSlipDocStatusLabel(row.quote_status)}</td>
@@ -195,6 +203,7 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
                           {slipLineSummary(row.open_line_count, row.source_line_count, row.skipped_no_item_count)}
                         </td>
                       </tr>
+                      <Show when={openLines().has(row.supplier_quotation_id)}>
                       <tr class="border-t border-stroke/40 bg-slate-50">
                         <td colspan={4} class="px-8 py-2">
                           <SlipNestedLines
@@ -208,6 +217,7 @@ export function OpenSupplierQuotationLinePickerModal(props: Props) {
                           />
                         </td>
                       </tr>
+                      </Show>
                     </>
                   )}
                 </For>

@@ -517,10 +517,14 @@ export function SalesOrderModal(props: Props) {
     setLocationLabel(first.location_name);
     setTaxTypeId(first.tax_type_id);
     setCurrencyId(first.currency_id);
+    setPicUserId(first.pic_user_id ?? null);
     setPicName(first.pic_name);
     setSourceQuotationId(first.quotation_id);
+    setReference(first.reference_no ?? "");
     setPaymentTerms(first.payment_terms ?? "");
-    setNotes(first.notes ?? "");
+    const quotationNotes = first.notes?.trim() ?? "";
+    const picNote = first.note_for_pic_only?.trim() ?? "";
+    setNotes([quotationNotes, picNote && picNote !== quotationNotes ? picNote : ""].filter(Boolean).join("\n"));
     setDueDate(first.valid_until ?? "");
     if (first.project_id) {
       setProjectId(first.project_id);
@@ -551,6 +555,9 @@ export function SalesOrderModal(props: Props) {
       unit_price: String(row.unit_vat_inc),
       remark: row.remark ?? "",
       source_quotation_line_id: Number(row.quotation_line_id || row.source_quotation_line_id) || null,
+      planned_serial_nos: row.planned_serial_nos ?? [],
+      track_serial: Boolean(row.track_serial),
+      serial_policy: row.serial_policy || "required",
     }));
     if (meta && first.tax_type_id) {
       const recalc = await recalculateSalesOrderLines(newLines, first.tax_type_id, meta);

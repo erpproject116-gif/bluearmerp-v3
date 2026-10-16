@@ -24,11 +24,14 @@ export type OpenQuotationLineRow = {
   partner_id: number;
   tax_type_id: number;
   currency_id: number;
+  pic_user_id?: number | null;
   pic_name: string;
   project_id?: number | null;
   project_name?: string;
   valid_until?: string | null;
+  quotation_validity_text?: string;
   payment_terms?: string;
+  note_for_pic_only?: string;
   notes?: string;
   item_id?: number | null;
   item_code: string;
@@ -40,6 +43,9 @@ export type OpenQuotationLineRow = {
   unit_code?: string | null;
   unit_vat_inc: number;
   remark?: string | null;
+  planned_serial_nos?: string[];
+  track_serial?: boolean;
+  serial_policy?: string;
 };
 
 export type PickedQuotationLine = OpenQuotationLineRow & {

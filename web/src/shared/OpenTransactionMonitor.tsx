@@ -1,5 +1,6 @@
 import { PageSizeSelect } from "./pageSize";
-import { For, Show, createSignal, onCleanup, type JSX } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup, type JSX } from "solid-js";
+import { SlipLinesToggle } from "./SlipNestedLines";
 import { inputClass } from "./SpreadsheetGrid";
 import { modalDismissClass } from "./Modal";
 import { LoadingText } from "./LoadingText";
@@ -90,6 +91,18 @@ export function OpenTransactionMonitor(props: Props) {
   // Show remounts on open, so drafts start empty — parents also clear filters on open.
   const [draftQ, setDraftQ] = createSignal("");
   const [draftDocNo, setDraftDocNo] = createSignal("");
+  const [openLines, setOpenLines] = createSignal<Set<number>>(new Set());
+  createEffect(() => {
+    if (!props.open) setOpenLines(new Set<number>());
+  });
+  const toggleLines = (id: number) => {
+    setOpenLines((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   let qTimer: ReturnType<typeof setTimeout> | undefined;
   let docTimer: ReturnType<typeof setTimeout> | undefined;
   onCleanup(() => {
@@ -247,7 +260,7 @@ export function OpenTransactionMonitor(props: Props) {
               <table class="erp-grid min-w-full text-sm">
                 <thead>
                   <tr class="border-b border-stroke text-left text-xs uppercase text-text-secondary">
-                    <th class="w-10 py-2 pr-2">
+                    <th class="w-16 py-2 pr-2">
                       <input
                         type="checkbox"
                         checked={props.selected.size > 0 && props.selected.size === props.rows.length}
@@ -269,18 +282,23 @@ export function OpenTransactionMonitor(props: Props) {
                         <>
                           <tr class="border-b border-stroke/60 hover:bg-brand-50/40">
                             <td class="py-1.5 pr-2">
-                              <input
-                                type="checkbox"
-                                checked={props.selected.has(id)}
-                                onChange={() => props.onToggleRow(id)}
-                                aria-label={`Select line ${id}`}
-                              />
+                              <div class="flex items-center gap-1">
+                                <Show when={props.renderDetail}>
+                                  <SlipLinesToggle open={openLines().has(id)} onToggle={() => toggleLines(id)} />
+                                </Show>
+                                <input
+                                  type="checkbox"
+                                  checked={props.selected.has(id)}
+                                  onChange={() => props.onToggleRow(id)}
+                                  aria-label={`Select line ${id}`}
+                                />
+                              </div>
                             </td>
                             <For each={props.columns}>
                               {(col) => <td class={`py-1.5 pr-3 ${col.class ?? ""}`}>{col.cell(row)}</td>}
                             </For>
                           </tr>
-                          <Show when={detail()}>
+                          <Show when={openLines().has(id) && detail()}>
                             <tr class="border-b border-stroke/60 bg-slate-50">
                               <td colspan={props.columns.length + 1} class="px-8 py-2">
                                 {detail()}

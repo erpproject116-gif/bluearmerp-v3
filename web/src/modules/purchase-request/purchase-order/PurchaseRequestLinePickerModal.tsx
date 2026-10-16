@@ -1,11 +1,11 @@
-import { createResource, createSignal, For, Show } from "solid-js";
+import { createEffect, createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../../shared/api";
 import { inputClass } from "../../../shared/SpreadsheetGrid";
 import { modalDismissClass } from "../../../shared/Modal";
 import { formatMoney } from "../../../shared/money";
 import { LoadingText } from "../../../shared/LoadingText";
 import { openSlipDocStatusLabel } from "../../../shared/openSlipDocStatusLabel";
-import { SlipNestedLines } from "../../../shared/SlipNestedLines";
+import { SlipLinesToggle, SlipNestedLines } from "../../../shared/SlipNestedLines";
 import { checkedDocumentLines, slipLineSummary } from "../../../shared/slipDocument";
 import { useToast } from "../../../shared/toast";
 
@@ -77,6 +77,10 @@ export function PurchaseRequestLinePickerModal(props: Props) {
   const [page, setPage] = createSignal(1);
   const [selected, setSelected] = createSignal<Set<number>>(new Set());
   const [unchecked, setUnchecked] = createSignal<Set<number>>(new Set());
+  const [openLines, setOpenLines] = createSignal<Set<number>>(new Set());
+  createEffect(() => {
+    if (!props.open) setOpenLines(new Set<number>());
+  });
   const [pageSize] = createSignal(20);
 
   const [data] = createResource(
@@ -213,11 +217,24 @@ export function PurchaseRequestLinePickerModal(props: Props) {
                           <>
                             <tr class="border-b border-stroke/60 hover:bg-brand-50">
                               <td class="py-2 pr-2">
-                                <input
-                                  type="checkbox"
-                                  checked={selected().has(row.purchase_request_id)}
-                                  onChange={() => toggleRow(row.purchase_request_id)}
-                                />
+                                <div class="flex items-center gap-1">
+                                  <SlipLinesToggle
+                                    open={openLines().has(row.purchase_request_id)}
+                                    onToggle={() =>
+                                      setOpenLines((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(row.purchase_request_id)) next.delete(row.purchase_request_id);
+                                        else next.add(row.purchase_request_id);
+                                        return next;
+                                      })
+                                    }
+                                  />
+                                  <input
+                                    type="checkbox"
+                                    checked={selected().has(row.purchase_request_id)}
+                                    onChange={() => toggleRow(row.purchase_request_id)}
+                                  />
+                                </div>
                               </td>
                               <td class="py-2 pr-4">{row.date_no_display}</td>
                               <td class="py-2 pr-4">{row.reference_no}</td>
@@ -227,6 +244,7 @@ export function PurchaseRequestLinePickerModal(props: Props) {
                                 {slipLineSummary(row.open_line_count, row.source_line_count, row.skipped_no_item_count)}
                               </td>
                             </tr>
+                            <Show when={openLines().has(row.purchase_request_id)}>
                             <tr class="border-b border-stroke/60 bg-slate-50">
                               <td colspan={6} class="px-8 py-2">
                                 <SlipNestedLines
@@ -240,6 +258,7 @@ export function PurchaseRequestLinePickerModal(props: Props) {
                                 />
                               </td>
                             </tr>
+                            </Show>
                           </>
                         )}
                       </For>
