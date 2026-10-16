@@ -14,6 +14,23 @@ func TestShouldWriteBell(t *testing.T) {
 		"quotation.send_email",
 		"operations.work.progress",
 		"inventory.build",
+		"quotation.create",
+		"sales_order.create",
+		"sales_order.create_from_quotation",
+		"sales.create",
+		"sales.create_from_sales_order",
+		"purchase_request.create",
+		"purchase_request.create_from_sales_order",
+		"purchase_order.rfq_create",
+		"purchase_order.rfq_create_from_pr",
+		"purchase_order.create",
+		"purchase_order.create_from_pr",
+		"purchase_order.create_from_supplier_quotation",
+		"goods_receipt.create",
+		"finance.supplier_invoice.create",
+		"finance.supplier_invoice.create_from_gr",
+		"manufacturing.work_order_create",
+		"manufacturing.work_order_create_from_sales_order",
 	}
 	for _, code := range allow {
 		if !shouldWriteBell(code) {
@@ -21,8 +38,9 @@ func TestShouldWriteBell(t *testing.T) {
 		}
 	}
 	deny := []string{
-		"sales.create",
 		"sales.update",
+		"purchase.create",
+		"inventory.adjustment.create",
 		"sales.delete",
 		"sales.restore",
 		"sales.list",

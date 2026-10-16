@@ -18,6 +18,8 @@ import { useToast } from "./toast";
 
 type Props = {
   enabled: boolean;
+  /** Non-CRM jobs only receive source=handoff and have no inbox link. */
+  handoffOnly?: boolean;
 };
 
 function severityKind(severity: CrmNotification["severity"]): StatusIconKind {
@@ -50,7 +52,10 @@ export function CrmNotificationBell(props: Props) {
   const toast = useToast();
   const invalidate = useInvalidateCrmNotifications();
 
-  const preview = useCrmNotificationFeed(() => props.enabled);
+  const preview = useCrmNotificationFeed(
+    () => props.enabled,
+    () => (props.handoffOnly ? "handoff" : ""),
+  );
 
   /** Red pill: actionable unread (alerts / chat / support / warnings), not activity noise. */
   const badge = () => preview.data?.badgeCount ?? 0;
@@ -166,13 +171,15 @@ export function CrmNotificationBell(props: Props) {
                     {markingAll() ? "…" : "Mark all read"}
                   </button>
                 </Show>
-                <A
-                  href="/app/crm/notifications"
-                  class="text-xs font-medium text-brand-600 hover:underline"
-                  onClick={() => setOpen(false)}
-                >
-                  View all
-                </A>
+                <Show when={!props.handoffOnly}>
+                  <A
+                    href="/app/crm/notifications"
+                    class="text-xs font-medium text-brand-600 hover:underline"
+                    onClick={() => setOpen(false)}
+                  >
+                    View all
+                  </A>
+                </Show>
               </div>
             </div>
             <div class="max-h-96 overflow-y-auto">
@@ -182,7 +189,7 @@ export function CrmNotificationBell(props: Props) {
               <Show when={!preview.isFetching && visibleRows().length === 0}>
                 <div class="px-4 py-6 text-center text-sm text-text-secondary">
                   <p>No items needing attention.</p>
-                  <Show when={unread() > 0}>
+                  <Show when={!props.handoffOnly && unread() > 0}>
                     <p class="mt-2">
                       <A
                         href="/app/crm/notifications?unread=1"
@@ -223,7 +230,7 @@ export function CrmNotificationBell(props: Props) {
                 )}
               </For>
             </div>
-            <Show when={unread() > visibleRows().length && visibleRows().length > 0}>
+            <Show when={!props.handoffOnly && unread() > visibleRows().length && visibleRows().length > 0}>
               <div class="border-t border-stroke px-4 py-2 text-center">
                 <A
                   href="/app/crm/notifications?unread=1"

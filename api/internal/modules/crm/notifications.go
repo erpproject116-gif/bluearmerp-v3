@@ -50,11 +50,13 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 			where += " and n.read_at is null"
 		}
 		src := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("source")))
+		sourceFiltered := false
 		switch src {
-		case "activity", "rule", "support", "system", "chat":
+		case "activity", "rule", "support", "system", "chat", "handoff":
 			where += fmt.Sprintf(" and n.source = $%d", n)
 			args = append(args, src)
 			n++
+			sourceFiltered = true
 		default:
 			// Inbox default: hide routine activity info (bell still surfaces warnings/critical).
 			if strings.TrimSpace(r.URL.Query().Get("exclude_activity_info")) != "false" {
@@ -103,23 +105,34 @@ func listNotifications(pool *pgxpool.Pool) http.HandlerFunc {
 			out = []Notification{}
 		}
 		var unreadTotal int64
-		_ = pool.QueryRow(r.Context(), `
-			select count(*) from public.crm_notifications
-			where tenant_id = $1 and read_at is null
-			  and (user_id is null or user_id = $2)
-			  and (actor_user_id is null or actor_user_id <> $2)`, tu.TenantID, tu.AppUserID).Scan(&unreadTotal)
-		// Shell bell badge: skip routine activity "info" noise so the red pill matches
-		// alerts / chat / support / warnings instead of a static 99+ activity dump.
 		var badgeCount int64
-		_ = pool.QueryRow(r.Context(), `
-			select count(*) from public.crm_notifications
-			where tenant_id = $1 and read_at is null
-			  and (user_id is null or user_id = $2)
-			  and (actor_user_id is null or actor_user_id <> $2)
-			  and (
-			    coalesce(source, 'activity') <> 'activity'
-			    or severity in ('warning', 'critical')
-			  )`, tu.TenantID, tu.AppUserID).Scan(&badgeCount)
+		if sourceFiltered {
+			countSQL := `
+				select count(*) from public.crm_notifications
+				where tenant_id = $1 and read_at is null
+				  and (user_id is null or user_id = $2)
+				  and (actor_user_id is null or actor_user_id <> $2)
+				  and coalesce(source, 'activity') = $3`
+			_ = pool.QueryRow(r.Context(), countSQL, tu.TenantID, tu.AppUserID, src).Scan(&unreadTotal)
+			badgeCount = unreadTotal
+		} else {
+			_ = pool.QueryRow(r.Context(), `
+				select count(*) from public.crm_notifications
+				where tenant_id = $1 and read_at is null
+				  and (user_id is null or user_id = $2)
+				  and (actor_user_id is null or actor_user_id <> $2)`, tu.TenantID, tu.AppUserID).Scan(&unreadTotal)
+			// Shell bell badge: skip routine activity "info" noise so the red pill matches
+			// alerts / chat / support / warnings instead of a static 99+ activity dump.
+			_ = pool.QueryRow(r.Context(), `
+				select count(*) from public.crm_notifications
+				where tenant_id = $1 and read_at is null
+				  and (user_id is null or user_id = $2)
+				  and (actor_user_id is null or actor_user_id <> $2)
+				  and (
+				    coalesce(source, 'activity') <> 'activity'
+				    or severity in ('warning', 'critical')
+				  )`, tu.TenantID, tu.AppUserID).Scan(&badgeCount)
+		}
 		response.OKListWithMetaAndBadge(w, out, p.Page, p.PageSize, total, &unreadTotal, &badgeCount)
 	}
 }

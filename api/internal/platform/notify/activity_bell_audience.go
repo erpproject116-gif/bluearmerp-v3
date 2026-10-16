@@ -13,7 +13,10 @@ import (
 //
 // Epic 9 (all-hands meetings): intentional tenant-wide broadcasts must use a dedicated
 // insert path — not this helper — so meeting rows are not treated as activity noise.
-func activityBellAudienceUserIDs(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string) []int64 {
+func activityBellAudienceUserIDs(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64) []int64 {
+	if isHandoffAction(actionCode) {
+		return handoffAudienceUserIDs(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID)
+	}
 	perms := activityBellAudiencePermissions(actionCode, targetType)
 	includeOwner := activityBellNotifyOwner(actionCode, targetType)
 	if len(perms) == 0 && !includeOwner {

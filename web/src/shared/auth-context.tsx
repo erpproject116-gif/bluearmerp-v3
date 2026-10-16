@@ -211,6 +211,29 @@ export function canViewCrmNotifications(me: MeData | null | undefined): boolean 
   return true;
 }
 
+const HANDOFF_BELL_PERMISSIONS = [
+  "quotation",
+  "quotation.quotations",
+  "sales_order",
+  "sales_order.sales_orders",
+  "sales",
+  "sales.sales",
+  "purchase_request.purchase_requests",
+  "purchase_order.rfq",
+  "purchase_order.purchase_orders",
+  "purchase_order.purchase_orders_from_quote",
+  "purchase_order.goods_receipts",
+  "purchases.purchases",
+  "purchases.purchases_new",
+  "manufacturing.work_orders",
+] as const;
+
+/** Bell for new-document handoffs when the user can read a document job but not CRM. */
+export function canViewHandoffNotifications(me: MeData | null | undefined): boolean {
+  if (!me) return false;
+  return HANDOFF_BELL_PERMISSIONS.some((code) => hasPermission(me, code, "read"));
+}
+
 export function canManageCrmRules(me: MeData | null | undefined): boolean {
   if (!me) return false;
   const u = me.user;

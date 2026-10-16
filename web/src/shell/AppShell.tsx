@@ -1,7 +1,7 @@
 import type { ParentComponent } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import { Show, Suspense, createEffect, createSignal, For, lazy, onCleanup, onMount } from "solid-js";
-import { useAuth, canViewCrmNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
+import { useAuth, canViewCrmNotifications, canViewHandoffNotifications, canViewCrmAnalytics, canManageCrmRules, hasPermission } from "../shared/auth-context";
 import { moduleDisplayLabel } from "../shared/moduleAccess";
 import { permissionCodeForHref } from "../shared/permissionCodes";
 import { CrmNotificationBell } from "../shared/CrmNotificationBell";
@@ -551,10 +551,14 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
               </Show>
               <PresenceAvatars compact={shell.viewport.isNarrow() || shell.viewport.isStandalone()} />
               <CrmNotificationPoller
-                enabled={canViewCrmNotifications(auth.me)}
+                enabled={canViewCrmNotifications(auth.me) || canViewHandoffNotifications(auth.me)}
+                handoffOnly={!canViewCrmNotifications(auth.me) && canViewHandoffNotifications(auth.me)}
                 userId={auth.me?.user?.id ?? null}
               />
-              <CrmNotificationBell enabled={canViewCrmNotifications(auth.me)} />
+              <CrmNotificationBell
+                enabled={canViewCrmNotifications(auth.me) || canViewHandoffNotifications(auth.me)}
+                handoffOnly={!canViewCrmNotifications(auth.me) && canViewHandoffNotifications(auth.me)}
+              />
               <Show when={guideOn() && !shell.viewport.isStandalone()}>
                 <Suspense>
                   <WorkflowGuideHeaderControl />

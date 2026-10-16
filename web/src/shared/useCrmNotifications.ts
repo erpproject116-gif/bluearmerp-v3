@@ -2,7 +2,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "./api";
 import { queryErrorFromApi, shouldRetryQuery } from "./queryRetry";
 
-export type CrmNotificationSource = "activity" | "rule" | "support" | "system" | "chat";
+export type CrmNotificationSource = "activity" | "rule" | "support" | "system" | "chat" | "handoff";
 
 export type CrmNotification = {
   id: number;
@@ -71,11 +71,12 @@ const SHELL_FEED_PAGE_SIZE = 15;
  * dropdown) and the toast poller call this with identical params so TanStack
  * dedupes them into a single ~90s request instead of two.
  */
-export function useCrmNotificationFeed(enabled: () => boolean) {
+export function useCrmNotificationFeed(enabled: () => boolean, source?: () => CrmNotificationSource | "") {
   return useCrmNotifications(() => ({
     page: 1,
     pageSize: SHELL_FEED_PAGE_SIZE,
     enabled: enabled(),
+    source: source?.() ?? "",
   }));
 }
 

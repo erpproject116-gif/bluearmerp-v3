@@ -154,6 +154,8 @@ export function crmNotificationSourceLabel(source?: CrmNotificationSource | stri
       return "System";
     case "chat":
       return "Chat";
+    case "handoff":
+      return "New document";
     case "activity":
     default:
       return "Activity";

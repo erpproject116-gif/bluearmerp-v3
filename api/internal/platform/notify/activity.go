@@ -26,7 +26,17 @@ func FromAudit(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID in
 	title, body := describeAction(actionCode, targetType, targetID)
 	body = enrichTrailBody(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, body, oldJSON, newJSON)
 	if writeBell {
-		writeActivityBellRows(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, title, body)
+		bellTitle := title
+		source := "activity"
+		if isHandoffAction(actionCode) {
+			source = "handoff"
+			ref := lookupDocRef(ctx, pool, tenantID, targetType, targetID)
+			if doc := loadHandoffDoc(ctx, pool, tenantID, targetType, targetID); doc.Loaded && doc.Ref != "" {
+				ref = doc.Ref
+			}
+			bellTitle = handoffTitle(actionCode, ref)
+		}
+		writeActivityBellRows(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID, bellTitle, body, source)
 	}
 	if queueDigest {
 		QueueChangeAlert(ctx, pool, tenantID, actorUserID, actionCode, title, body, targetType, targetID)
@@ -39,10 +49,14 @@ func shouldQueueDigest(actionCode string) bool {
 }
 
 // shouldWriteBell is the narrow gate for in-app bell rows — high-value verbs only.
-// Generic create/update/delete/restore never write to the bell.
+// Generic create/update/delete/restore never write to the bell, except the
+// new-document handoff allow-list.
 func shouldWriteBell(actionCode string) bool {
 	if actionCode == "" {
 		return false
+	}
+	if isHandoffAction(actionCode) {
+		return true
 	}
 	if strings.Contains(actionCode, ".attachment.") {
 		return false
@@ -106,7 +120,7 @@ func hasNotifyModulePrefix(actionCode string) bool {
 	return false
 }
 
-func writeActivityBellRows(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, title, body string) {
+func writeActivityBellRows(ctx context.Context, pool *pgxpool.Pool, tenantID, actorUserID int64, actionCode, targetType string, targetID *int64, title, body, source string) {
 	baseDedupe := activityBellDedupeKey(actionCode, targetType, targetID, time.Now().UTC())
 	var entityID any
 	if targetID != nil {
@@ -116,7 +130,7 @@ func writeActivityBellRows(ctx context.Context, pool *pgxpool.Pool, tenantID, ac
 	if actorUserID > 0 {
 		actor = actorUserID
 	}
-	recipients := activityBellAudienceUserIDs(ctx, pool, tenantID, actorUserID, actionCode, targetType)
+	recipients := activityBellAudienceUserIDs(ctx, pool, tenantID, actorUserID, actionCode, targetType, targetID)
 	if len(recipients) == 0 {
 		return
 	}
@@ -125,9 +139,9 @@ func writeActivityBellRows(ctx context.Context, pool *pgxpool.Pool, tenantID, ac
 		_, _ = pool.Exec(ctx, `
 			insert into public.crm_notifications
 			  (tenant_id, user_id, rule_id, severity, title, body, entity_type, entity_id, dedupe_key, actor_user_id, source)
-			values ($1, $2, null, 'info', $3, $4, $5, $6, $7, $8, 'activity')
+			values ($1, $2, null, 'info', $3, $4, $5, $6, $7, $8, $9)
 			on conflict (tenant_id, dedupe_key) do nothing`,
-			tenantID, userID, title, body, nullIfEmpty(targetType), entityID, dedupe, actor)
+			tenantID, userID, title, body, nullIfEmpty(targetType), entityID, dedupe, actor, source)
 	}
 }
 
@@ -257,6 +271,18 @@ func lookupDocRef(ctx context.Context, pool *pgxpool.Pool, tenantID int64, targe
 		err = pool.QueryRow(ctx, `
 			select coalesce(nullif(trim(purchase_request_no), ''), id::text)
 			from public.pr_purchase_requests where id = $1 and tenant_id = $2`, id, tenantID).Scan(&ref)
+	case "rfq_request":
+		err = pool.QueryRow(ctx, `
+			select coalesce(nullif(trim(rfq_no), ''), id::text)
+			from public.rfq_requests where id = $1 and tenant_id = $2`, id, tenantID).Scan(&ref)
+	case "gr_goods_receipt":
+		err = pool.QueryRow(ctx, `
+			select coalesce(nullif(trim(reference), ''), id::text)
+			from public.gr_goods_receipts where id = $1 and tenant_id = $2`, id, tenantID).Scan(&ref)
+	case "mfg_work_order":
+		err = pool.QueryRow(ctx, `
+			select coalesce(nullif(trim(work_order_no), ''), id::text)
+			from public.mfg_work_orders where id = $1 and tenant_id = $2`, id, tenantID).Scan(&ref)
 	default:
 		return ""
 	}
