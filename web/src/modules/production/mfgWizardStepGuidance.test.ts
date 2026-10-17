@@ -31,6 +31,6 @@ describe("cuttingStepGuidance", () => {
       wasteLines: [],
       reasons: [],
     });
-    expect(g.waste).toContain("waste reason");
+    expect(g.waste).toContain("waste type");
   });
 });

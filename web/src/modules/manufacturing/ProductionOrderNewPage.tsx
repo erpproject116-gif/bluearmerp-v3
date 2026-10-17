@@ -228,7 +228,7 @@ function NewCuttingOrderWizard() {
       { bom_id: bomId(), qty_to_produce: qty() },
       [
         { key: "bom_id", label: "Cutting template" },
-        { key: "qty_to_produce", label: "Input quantity" },
+        { key: "qty_to_produce", label: "How much of the whole to cut" },
       ],
     );
     if (Object.keys(errs).length > 0) {
@@ -507,21 +507,34 @@ function NewCuttingOrderWizard() {
               }}
               fetchOptions={searchCuttingBoms}
             />
-            <Field label="Input quantity" required>
-              <input
-                class={inputClass}
-                type="number"
-                min="0.0001"
-                step="any"
-                value={qty()}
-                onInput={(e) => setQty(e.currentTarget.value)}
-                aria-label="Input quantity"
-              />
+            <Field
+              label={
+                needs()?.input_line?.component_name?.trim()
+                  ? `How much of ${needs()!.input_line!.component_name.trim()} to cut`
+                  : "How much of the whole to cut"
+              }
+              required
+              description="This is how much of the whole you will cut. The cuts on the next step come from the cut list."
+            >
+              <div class="flex items-center gap-2">
+                <input
+                  class={inputClass}
+                  type="number"
+                  min="0.0001"
+                  step="any"
+                  value={qty()}
+                  onInput={(e) => setQty(e.currentTarget.value)}
+                  aria-label="How much of the whole to cut"
+                />
+                <Show when={needs()?.input_line?.stock_unit_code?.trim()}>
+                  <span class="text-sm text-text-secondary">{needs()!.input_line!.stock_unit_code}</span>
+                </Show>
+              </div>
             </Field>
             <LookupCombo
               label="Warehouse"
               required
-              description="Where the whole is taken from and cut pieces are received."
+              description="The whole is taken from here. The cuts go back here."
               value={locationLabel}
               selectedId={locationId}
               onInput={setLocationLabel}
@@ -541,8 +554,8 @@ function NewCuttingOrderWizard() {
             </Field>
           </div>
           <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 text-sm text-emerald-950">
-            <p class="font-medium">Stock does not move yet</p>
-            <p class="mt-1 text-xs">Draft only plans the cut. The whole leaves stock and cuts arrive when Post Production succeeds.</p>
+            <p class="font-medium">Nothing is taken from the shelf yet</p>
+            <p class="mt-1 text-xs">This only plans the cut. The shelf changes when you finish this cut.</p>
           </div>
         </section>
         <div class="flex justify-end">
@@ -557,7 +570,7 @@ function NewCuttingOrderWizard() {
               setStep(2);
             }}
           >
-            Enter actual results →
+            Enter the cut weights
           </button>
         </div>
       </Show>
@@ -568,7 +581,7 @@ function NewCuttingOrderWizard() {
             {(input) => (
               <p class="mb-3 text-sm">
                 Raw material: <strong>{input().component_name}</strong> — need {formatCuttingQty(input().stock_to_issue)}{" "}
-                {input().stock_unit_code}, on hand {formatCuttingQty(input().qty_on_hand)}
+                {input().stock_unit_code}, on the shelf {formatCuttingQty(input().qty_on_hand)} {input().stock_unit_code}
                 <Show when={hasInputShortage()}>
                   <span class="ml-2 text-red-700">(short)</span>
                 </Show>
@@ -589,11 +602,10 @@ function NewCuttingOrderWizard() {
           <table class="min-w-full text-left text-sm">
             <thead class="bg-slate-50 text-xs text-text-secondary">
               <tr>
-                <th class="px-3 py-2">Output</th>
-                <th class="px-3 py-2">Class</th>
-                <th class="px-3 py-2">Expected</th>
-                <th class="px-3 py-2">Actual</th>
-                <th class="px-3 py-2">Difference</th>
+                <th class="px-3 py-2">Cut</th>
+                <th class="px-3 py-2">Should be</th>
+                <th class="px-3 py-2">Weight you got</th>
+                <th class="px-3 py-2">Over or short</th>
               </tr>
             </thead>
             <tbody>
@@ -606,27 +618,34 @@ function NewCuttingOrderWizard() {
                       <td class="px-3 py-2">
                         <span class="font-medium">{ln.component_name}</span>
                         <span class="block text-xs text-text-secondary">{ln.component_code}</span>
+                        <span class="block text-xs text-text-secondary">
+                          {normalizeOutputClassification(ln.output_classification)}
+                        </span>
                       </td>
-                      <td class="px-3 py-2 text-xs">{normalizeOutputClassification(ln.output_classification)}</td>
                       <td class="px-3 py-2 tabular-nums">
                         {formatCuttingQty(ln.stock_to_issue)} {ln.stock_unit_code}
                       </td>
                       <td class="px-3 py-2">
-                        <input
-                          class={`${inputClass} w-28`}
-                          type="text"
-                          inputMode="decimal"
-                          value={actualByItem()[ln.component_item_id] ?? ""}
-                          onInput={(e) =>
-                            setActualByItem({
-                              ...actualByItem(),
-                              [ln.component_item_id]: sanitizeQtyInput(e.currentTarget.value),
-                            })
-                          }
-                          aria-label={`Actual qty for ${ln.component_name}`}
-                        />
+                        <div class="flex items-center gap-2">
+                          <input
+                            class={`${inputClass} w-28`}
+                            type="text"
+                            inputMode="decimal"
+                            value={actualByItem()[ln.component_item_id] ?? ""}
+                            onInput={(e) =>
+                              setActualByItem({
+                                ...actualByItem(),
+                                [ln.component_item_id]: sanitizeQtyInput(e.currentTarget.value),
+                              })
+                            }
+                            aria-label={`Weight you got for ${ln.component_name}`}
+                          />
+                          <span class="text-xs text-text-secondary">{ln.stock_unit_code}</span>
+                        </div>
                       </td>
-                      <td class="px-3 py-2 tabular-nums">{formatCuttingQty(difference())}</td>
+                      <td class="px-3 py-2 tabular-nums">
+                        {formatCuttingQty(difference())} {ln.stock_unit_code}
+                      </td>
                     </tr>
                   );
                 }}
@@ -634,19 +653,24 @@ function NewCuttingOrderWizard() {
             </tbody>
           </table>
           <div class="mt-4 grid gap-3 md:grid-cols-2">
-            <Field label="Extra waste qty">
-              <input
-                class={inputClass}
-                type="text"
-                inputMode="decimal"
-                value={wasteQtyDisplay()}
-                onInput={(e) => setWasteQtyOverride(sanitizeQtyInput(e.currentTarget.value))}
-                aria-label="Extra waste quantity"
-              />
+            <Field label="Not in the cuts above">
+              <div class="flex items-center gap-2">
+                <input
+                  class={inputClass}
+                  type="text"
+                  inputMode="decimal"
+                  value={wasteQtyDisplay()}
+                  onInput={(e) => setWasteQtyOverride(sanitizeQtyInput(e.currentTarget.value))}
+                  aria-label="Not in the cuts above"
+                />
+                <Show when={needs()?.input_line?.stock_unit_code}>
+                  <span class="text-sm text-text-secondary">{needs()!.input_line!.stock_unit_code}</span>
+                </Show>
+              </div>
               <p class="mt-1 text-[11px] text-text-secondary">
-                Auto: max(0, input − sellable actuals − expected waste-class). Override if needed
+                What is left after the cuts. Change it if the scale shows something else.
                 <Show when={wasteQtyOverride() !== null}>
-                  {" · "}
+                  {" "}
                   <button
                     type="button"
                     class="font-medium text-brand-700 hover:underline"
@@ -657,12 +681,12 @@ function NewCuttingOrderWizard() {
                 </Show>
               </p>
             </Field>
-            <Field label="Waste reason (required for extra / excess / abnormal)">
+            <Field label="Waste type">
               <select
                 class={inputClass}
                 value={wasteReasonId() ?? ""}
                 onChange={(e) => setWasteReasonId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
-                aria-label="Waste reason"
+                aria-label="Waste type"
               >
                 <option value="">— Select —</option>
                 <For each={reasons()}>
@@ -677,7 +701,7 @@ function NewCuttingOrderWizard() {
             </Field>
           </div>
           <div class="mt-4">
-            <Field label="Waste notes">
+            <Field label="Note, if you need one">
               <RichTextEditor
                 value={wasteNotes()}
                 onChange={setWasteNotes}

@@ -61,12 +61,15 @@ export function cuttingStepGuidance(
       opts.reasons.find((r) => r.id === (w.waste_reason_id ?? opts.wasteReasonId ?? undefined))?.is_abnormal ?? false;
     const msg = validateWasteLine(w.qty, w.expected_qty, w.waste_reason_id ?? opts.wasteReasonId, isAbnormal);
     if (msg) {
-      out.waste = msg;
+      out.waste =
+        msg === "Abnormal or excess waste requires a waste reason."
+          ? "Pick a waste type when something is not in the cuts above."
+          : msg;
       break;
     }
   }
   if (!out.waste && step >= 2 && opts.wasteQty > 0 && !opts.wasteReasonId) {
-    out.waste = "Pick a waste reason when you enter extra waste qty.";
+    out.waste = "Pick a waste type when something is not in the cuts above.";
   }
   return out;
 }

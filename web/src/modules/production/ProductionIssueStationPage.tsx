@@ -55,6 +55,12 @@ type MaterialNeeds = {
   lines: NeedLine[];
 };
 
+function formatTrimmedQty(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  const rounded = Math.round(n * 1e6) / 1e6;
+  return String(parseFloat(rounded.toFixed(6)));
+}
+
 async function fetchReleasedWorkOrders(q: string): Promise<LookupOption[]> {
   const qs = new URLSearchParams({ page: "1", pageSize: "20", status: "released", sort: "order_date", order: "desc" });
   if (q) qs.set("q", q);
@@ -113,6 +119,7 @@ export default function ProductionIssueStationPage() {
   const [busy, setBusy] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
   const [prefilled, setPrefilled] = createSignal(false);
+  const [anotherBatch, setAnotherBatch] = createSignal(false);
 
   const activeComponent = () => context()?.components.find((c) => c.component_item_id === activeComponentId());
 
@@ -126,6 +133,9 @@ export default function ProductionIssueStationPage() {
     return need;
   };
 
+  const assemblyPartUnit = (itemId: number) =>
+    needs()?.lines.find((ln) => ln.component_item_id === itemId)?.stock_unit_code?.trim() ?? "";
+
   /** Cue on the materials list: which rows still need the operator to enter a serial or lot. */
   const rowActionHint = (comp: ScanComponent | undefined): { label: string; needsAction: boolean } => {
     if (!comp) return { label: "—", needsAction: false };
@@ -136,6 +146,10 @@ export default function ProductionIssueStationPage() {
     }
     if (comp.track_lot) {
       const need = remainingLotNeed(comp);
+      if (mode() === "disassembly" || mode() === "assembly") {
+        if (need > 0.0001) return { label: "Choose a batch", needsAction: true };
+        return { label: "Batch chosen", needsAction: false };
+      }
       if (need > 0.0001) return { label: "Enter lot", needsAction: true };
       return { label: "Lot done", needsAction: false };
     }
@@ -189,6 +203,7 @@ export default function ProductionIssueStationPage() {
     setLotBatchId(null);
     setLotNo("");
     setLotQty("1");
+    setAnotherBatch(false);
     if (!firstNeed) {
       mfgWarn(null, "Nothing left to take — go back and Finish build.");
     }
@@ -364,18 +379,30 @@ export default function ProductionIssueStationPage() {
                     <div class="mt-3 space-y-2">
                       <p class="text-xs text-text-secondary">
                         {mode() === "disassembly"
-                          ? "Take this whole from stock, then enter its lot in the panel below. The cuts are what you will get later."
-                          : "Tap a row to select it, then enter the serial (or lot) in the panel below."}
+                          ? "Follow What to do. The cuts are listed below."
+                          : mode() === "assembly"
+                            ? "Follow What to do on each part."
+                            : "Tap a row to select it, then enter the serial (or lot) in the panel below."}
                       </p>
                       <div class="overflow-x-auto rounded border border-stroke">
                         <table class="min-w-full text-left text-xs">
                           <thead class="bg-slate-50 text-text-secondary">
                             <tr>
-                              <th class="px-2 py-1.5">{mode() === "disassembly" ? "Whole to take" : "Component"}</th>
-                              <th class="px-2 py-1.5">To issue</th>
-                              <th class="px-2 py-1.5">On hand</th>
-                              <th class="px-2 py-1.5">Staged</th>
-                              <th class="px-2 py-1.5">Your next step</th>
+                              <th class="px-2 py-1.5">
+                                {mode() === "disassembly" ? "Whole" : mode() === "assembly" ? "Part" : "Component"}
+                              </th>
+                              <th class="px-2 py-1.5">
+                                {mode() === "disassembly" ? "To cut" : mode() === "assembly" ? "To use" : "To issue"}
+                              </th>
+                              <th class="px-2 py-1.5">
+                                {mode() === "disassembly" ? "On the shelf" : mode() === "assembly" ? "On the shelf" : "On hand"}
+                              </th>
+                              <th class="px-2 py-1.5">
+                                {mode() === "disassembly" ? "Set aside" : mode() === "assembly" ? "Set aside" : "Staged"}
+                              </th>
+                              <th class="px-2 py-1.5">
+                                {mode() === "disassembly" ? "What to do" : mode() === "assembly" ? "What to do" : "Your next step"}
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -406,6 +433,7 @@ export default function ProductionIssueStationPage() {
                                   setLotBatchId(null);
                                   setLotNo("");
                                   setLotQty("1");
+                                  setAnotherBatch(false);
                                 };
                                 return (
                                   <tr
@@ -437,21 +465,26 @@ export default function ProductionIssueStationPage() {
                                           Serial required
                                         </span>
                                       </Show>
-                                      <Show when={hint.needsAction && staged?.track_lot && !staged?.track_serial}>
+                                      <Show when={hint.needsAction && staged?.track_lot && !staged?.track_serial && mode() !== "disassembly" && mode() !== "assembly"}>
                                         <span class="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
                                           Lot required
                                         </span>
                                       </Show>
                                     </td>
                                     <td class="px-2 py-2">
-                                      {ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}
+                                      {mode() === "assembly" ? formatTrimmedQty(ln.stock_to_issue) : ln.stock_to_issue.toFixed(4)}{" "}
+                                      {ln.stock_unit_code}
                                     </td>
-                                    <td class="px-2 py-2">{ln.qty_on_hand.toFixed(4)}</td>
+                                    <td class="px-2 py-2">
+                                      {mode() === "assembly" ? formatTrimmedQty(ln.qty_on_hand) : ln.qty_on_hand.toFixed(4)}
+                                    </td>
                                     <td class="px-2 py-2">
                                       {staged?.track_serial
                                         ? `${staged.issued_serials} serial(s)`
                                         : staged?.track_lot
-                                          ? `${staged.issued_lot_qty.toFixed(4)} lot qty`
+                                          ? mode() === "assembly"
+                                            ? `${formatTrimmedQty(staged.issued_lot_qty)}${ln.stock_unit_code ? ` ${ln.stock_unit_code}` : ""}`
+                                            : `${staged.issued_lot_qty.toFixed(4)} lot qty`
                                           : "—"}
                                     </td>
                                     <td class="px-2 py-2">
@@ -468,7 +501,9 @@ export default function ProductionIssueStationPage() {
                                               : "border-amber-300 bg-white text-amber-950 shadow-sm"
                                           }`}
                                         >
-                                          {selected ? "Selected — enter below" : hint.label}
+                                          {selected && mode() !== "disassembly" && mode() !== "assembly"
+                                            ? "Selected — enter below"
+                                            : hint.label}
                                           <Show when={!selected}>
                                             <span aria-hidden="true">→</span>
                                           </Show>
@@ -553,64 +588,236 @@ export default function ProductionIssueStationPage() {
                       </button>
                     </Show>
                     <Show when={comp().track_lot && !comp().track_serial}>
-                      <p class="mt-1 text-xs text-text-secondary">
-                        Need {remainingLotNeed(comp()).toFixed(4)} more. Pick a free lot batch (or paste lot lines), then
-                        Stage.
-                      </p>
-                      <div class="mt-3 space-y-4">
-                        <Field label="Pick lot batch (free qty only)">
-                          <LotLineCell
-                            itemId={comp().component_item_id}
-                            locationId={context()?.location_id}
-                            lotBatchId={lotBatchId()}
-                            lotNo={lotNo()}
-                            freeOnly
-                            emptyLabel="Choose lot"
-                            onChange={(id, no, qtyAvailable) => {
-                              setLotBatchId(id);
-                              setLotNo(no);
-                              if (qtyAvailable != null && Number.isFinite(qtyAvailable) && qtyAvailable > 0) {
-                                const need = remainingLotNeed(comp());
-                                const take = Math.min(qtyAvailable, need > 0 ? need : qtyAvailable);
-                                setLotQty(String(take));
-                              }
-                            }}
-                          />
-                        </Field>
-                        <Field label="Qty">
-                          <input
-                            class={inputClass}
-                            type="text"
-                            inputMode="decimal"
-                            value={lotQty()}
-                            onInput={(e) => setLotQty(e.currentTarget.value)}
-                          />
-                        </Field>
-                        <button
-                          type="button"
-                          class="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
-                          disabled={busy() || !lotBatchId()}
-                          onClick={() => void issueSingleLot()}
-                        >
-                          Stage lot
-                        </button>
-                        <Field label="Or paste lots (lot no. tab qty per line)">
-                          <textarea
-                            class={inputClass}
-                            rows={4}
-                            value={lotPaste()}
-                            onInput={(e) => setLotPaste(e.currentTarget.value)}
-                          />
-                        </Field>
-                        <button
-                          type="button"
-                          class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium disabled:opacity-50"
-                          disabled={busy()}
-                          onClick={() => void issueLotsFromPaste()}
-                        >
-                          Stage pasted lots
-                        </button>
-                      </div>
+                      <Show
+                        when={mode() === "disassembly"}
+                        fallback={
+                          <Show
+                            when={mode() === "assembly"}
+                            fallback={
+                          <>
+                            <p class="mt-1 text-xs text-text-secondary">
+                              Need {remainingLotNeed(comp()).toFixed(4)} more. Pick a free lot batch (or paste lot lines), then
+                              Stage.
+                            </p>
+                            <div class="mt-3 space-y-4">
+                              <Field label="Pick lot batch (free qty only)">
+                                <LotLineCell
+                                  itemId={comp().component_item_id}
+                                  locationId={context()?.location_id}
+                                  lotBatchId={lotBatchId()}
+                                  lotNo={lotNo()}
+                                  freeOnly
+                                  emptyLabel="Choose lot"
+                                  onChange={(id, no, qtyAvailable) => {
+                                    setLotBatchId(id);
+                                    setLotNo(no);
+                                    if (qtyAvailable != null && Number.isFinite(qtyAvailable) && qtyAvailable > 0) {
+                                      const need = remainingLotNeed(comp());
+                                      const take = Math.min(qtyAvailable, need > 0 ? need : qtyAvailable);
+                                      setLotQty(String(take));
+                                    }
+                                  }}
+                                />
+                              </Field>
+                              <Field label="Qty">
+                                <input
+                                  class={inputClass}
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={lotQty()}
+                                  onInput={(e) => setLotQty(e.currentTarget.value)}
+                                />
+                              </Field>
+                              <button
+                                type="button"
+                                class="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                                disabled={busy() || !lotBatchId()}
+                                onClick={() => void issueSingleLot()}
+                              >
+                                Stage lot
+                              </button>
+                              <Field label="Or paste lots (lot no. tab qty per line)">
+                                <textarea
+                                  class={inputClass}
+                                  rows={4}
+                                  value={lotPaste()}
+                                  onInput={(e) => setLotPaste(e.currentTarget.value)}
+                                />
+                              </Field>
+                              <button
+                                type="button"
+                                class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium disabled:opacity-50"
+                                disabled={busy()}
+                                onClick={() => void issueLotsFromPaste()}
+                              >
+                                Stage pasted lots
+                              </button>
+                            </div>
+                          </>
+                            }
+                          >
+                            <Show when={remainingLotNeed(comp()) <= 0.0001 && !anotherBatch()}>
+                              <p class="mt-1 text-sm text-text-secondary">Batch chosen</p>
+                            </Show>
+                            <Show when={remainingLotNeed(comp()) > 0.0001 || anotherBatch()}>
+                              <p class="mt-1 text-xs text-text-secondary">
+                                Still to choose: {formatTrimmedQty(remainingLotNeed(comp()))}
+                                {assemblyPartUnit(comp().component_item_id)
+                                  ? ` ${assemblyPartUnit(comp().component_item_id)}`
+                                  : ""}
+                                . Choose the batch.
+                              </p>
+                              <div class="mt-3 space-y-4">
+                                <Field label="Choose the batch">
+                                  <LotLineCell
+                                    itemId={comp().component_item_id}
+                                    locationId={context()?.location_id}
+                                    lotBatchId={lotBatchId()}
+                                    lotNo={lotNo()}
+                                    freeOnly
+                                    emptyLabel="Choose a batch"
+                                    onChange={(id, no, qtyAvailable) => {
+                                      setLotBatchId(id);
+                                      setLotNo(no);
+                                      if (qtyAvailable != null && Number.isFinite(qtyAvailable) && qtyAvailable > 0) {
+                                        const need = remainingLotNeed(comp());
+                                        const take = Math.min(qtyAvailable, need > 0 ? need : qtyAvailable);
+                                        setLotQty(String(take));
+                                      }
+                                    }}
+                                  />
+                                </Field>
+                                <Field label="Qty">
+                                  <input
+                                    class={inputClass}
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={lotQty()}
+                                    onInput={(e) => setLotQty(e.currentTarget.value)}
+                                  />
+                                </Field>
+                                <button
+                                  type="button"
+                                  class="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                                  disabled={busy() || !lotBatchId()}
+                                  onClick={() => void issueSingleLot()}
+                                >
+                                  Use this batch
+                                </button>
+                              </div>
+                            </Show>
+                            <Show when={!anotherBatch()}>
+                              <button
+                                type="button"
+                                class="mt-3 text-sm font-medium text-brand-700 hover:underline"
+                                onClick={() => setAnotherBatch(true)}
+                              >
+                                Use another batch
+                              </button>
+                            </Show>
+                            <Show when={anotherBatch()}>
+                              <div class="mt-3 space-y-4">
+                                <Field label="Paste more batches (batch number, then a tab, then the quantity, one per line)">
+                                  <textarea
+                                    class={inputClass}
+                                    rows={4}
+                                    value={lotPaste()}
+                                    onInput={(e) => setLotPaste(e.currentTarget.value)}
+                                  />
+                                </Field>
+                                <button
+                                  type="button"
+                                  class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium disabled:opacity-50"
+                                  disabled={busy()}
+                                  onClick={() => void issueLotsFromPaste()}
+                                >
+                                  Use these batches
+                                </button>
+                              </div>
+                            </Show>
+                          </Show>
+                        }
+                      >
+                        <Show when={remainingLotNeed(comp()) <= 0.0001 && !anotherBatch()}>
+                          <p class="mt-1 text-sm text-text-secondary">Batch chosen</p>
+                        </Show>
+                        <Show when={remainingLotNeed(comp()) > 0.0001 || anotherBatch()}>
+                          <p class="mt-1 text-xs text-text-secondary">
+                            Still to choose: {formatTrimmedQty(remainingLotNeed(comp()))}
+                            {needs()?.input_line?.stock_unit_code
+                              ? ` ${needs()!.input_line!.stock_unit_code}`
+                              : ""}
+                            . Choose the batch.
+                          </p>
+                          <div class="mt-3 space-y-4">
+                            <Field label="Choose the batch">
+                              <LotLineCell
+                                itemId={comp().component_item_id}
+                                locationId={context()?.location_id}
+                                lotBatchId={lotBatchId()}
+                                lotNo={lotNo()}
+                                freeOnly
+                                emptyLabel="Choose a batch"
+                                onChange={(id, no, qtyAvailable) => {
+                                  setLotBatchId(id);
+                                  setLotNo(no);
+                                  if (qtyAvailable != null && Number.isFinite(qtyAvailable) && qtyAvailable > 0) {
+                                    const need = remainingLotNeed(comp());
+                                    const take = Math.min(qtyAvailable, need > 0 ? need : qtyAvailable);
+                                    setLotQty(String(take));
+                                  }
+                                }}
+                              />
+                            </Field>
+                            <Field label="Qty">
+                              <input
+                                class={inputClass}
+                                type="text"
+                                inputMode="decimal"
+                                value={lotQty()}
+                                onInput={(e) => setLotQty(e.currentTarget.value)}
+                              />
+                            </Field>
+                            <button
+                              type="button"
+                              class="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                              disabled={busy() || !lotBatchId()}
+                              onClick={() => void issueSingleLot()}
+                            >
+                              Use this batch
+                            </button>
+                          </div>
+                        </Show>
+                        <Show when={!anotherBatch()}>
+                          <button
+                            type="button"
+                            class="mt-3 text-sm font-medium text-brand-700 hover:underline"
+                            onClick={() => setAnotherBatch(true)}
+                          >
+                            Use another batch
+                          </button>
+                        </Show>
+                        <Show when={anotherBatch()}>
+                          <div class="mt-3 space-y-4">
+                            <Field label="Paste more batches (batch number, then a tab, then the quantity, one per line)">
+                              <textarea
+                                class={inputClass}
+                                rows={4}
+                                value={lotPaste()}
+                                onInput={(e) => setLotPaste(e.currentTarget.value)}
+                              />
+                            </Field>
+                            <button
+                              type="button"
+                              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium disabled:opacity-50"
+                              disabled={busy()}
+                              onClick={() => void issueLotsFromPaste()}
+                            >
+                              Use these batches
+                            </button>
+                          </div>
+                        </Show>
+                      </Show>
                     </Show>
                     <Show when={!comp().track_serial && !comp().track_lot}>
                       <p class="mt-2 text-sm text-text-secondary">This component is not serial- or lot-tracked.</p>
