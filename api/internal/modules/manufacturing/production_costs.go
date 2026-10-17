@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
@@ -138,6 +139,14 @@ type rowQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
+type execQuerier interface {
+	rowQuerier
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
+
+const productionCostAccountCode = "5555"
+const productionCostAccountName = "Production Cost"
+
 // costPostingPayload is what the Record in books dialog reads and receives back.
 // Account ids are the stored choice, or the mapped Inventory / COGS defaults when
 // nothing has been chosen yet. Labels use the same "[code] name" shape as the
@@ -173,9 +182,9 @@ func (p costPostingPayload) conversionAmount() float64 {
 	return p.Costs.Labor + p.Costs.Overhead + p.Costs.Other
 }
 
-// loadCostPosting reads the posting row for a job. Missing account columns fall
-// back to the tenant's mapped defaults so the dialog opens pre-filled.
-func loadCostPosting(ctx context.Context, q rowQuerier, tenantID, workOrderID int64) (costPostingPayload, error) {
+// loadCostPosting reads the posting row for a job. An unset expense account
+// opens on 5555 Production Cost.
+func loadCostPosting(ctx context.Context, q execQuerier, tenantID, workOrderID int64) (costPostingPayload, error) {
 	var p costPostingPayload
 	err := q.QueryRow(ctx, fmt.Sprintf(`
 		select wo.id, wo.work_order_no, wo.order_date::text,
@@ -203,12 +212,12 @@ func loadCostPosting(ctx context.Context, q rowQuerier, tenantID, workOrderID in
 	}
 	p.Lines = manufacturingJournalPreview(p.Costs)
 
-	if p.conversionAmount() > 0.0001 {
-		if p.DebitAccountID == nil {
-			p.DebitAccountID = defaultAccountID(ctx, q, tenantID, financedefaults.RoleCOGS)
-		}
-		// Do not default credit to RoleCOGS — identical debit/credit posts a net-zero journal.
-		// Leave credit unset so the operator picks a production cost absorption account.
+	productionCostID, err := ensureProductionCostAccount(ctx, q, tenantID)
+	if err != nil {
+		return p, err
+	}
+	if p.conversionAmount() > 0.0001 && p.DebitAccountID == nil {
+		p.DebitAccountID = productionCostID
 	}
 	p.DebitAccountLabel = accountLabel(ctx, q, tenantID, p.DebitAccountID)
 	p.CreditMaterialAccountLabel = accountLabel(ctx, q, tenantID, p.CreditMaterialAccountID)
@@ -216,12 +225,60 @@ func loadCostPosting(ctx context.Context, q rowQuerier, tenantID, workOrderID in
 	return p, nil
 }
 
-func defaultAccountID(ctx context.Context, q rowQuerier, tenantID int64, role financedefaults.Role) *int64 {
-	id, err := financedefaults.ResolveByRole(ctx, q, tenantID, role)
-	if err != nil || id <= 0 {
-		return nil
+// ensureProductionCostAccount returns expense account 5555, creating it when missing.
+func ensureProductionCostAccount(ctx context.Context, q execQuerier, tenantID int64) (*int64, error) {
+	id, ok, err := productionCostAccountID(ctx, q, tenantID)
+	if err != nil || ok {
+		if !ok {
+			return nil, err
+		}
+		return &id, nil
 	}
-	return &id
+	if _, err := q.Exec(ctx, `
+		insert into public.fin_accounts (
+		  tenant_id, account_code, account_name, account_type, is_group, is_system, is_active, sort_order, parent_id
+		)
+		select $1, $2, $3, 'expense', false, true, true, 5555, parent.id
+		from (select 1) seed
+		left join public.fin_accounts parent
+		  on parent.tenant_id = $1 and parent.account_code = '5095' and parent.deleted_at is null
+		where not exists (
+		  select 1 from public.fin_accounts existing
+		  where existing.tenant_id = $1 and existing.account_code = $2
+		)`, tenantID, productionCostAccountCode, productionCostAccountName); err != nil {
+		return nil, err
+	}
+	if _, err := q.Exec(ctx, `
+		update public.fin_accounts
+		set deleted_at = null, is_active = true, is_group = false, account_type = 'expense', account_name = $3
+		where tenant_id = $1 and account_code = $2 and deleted_at is not null`,
+		tenantID, productionCostAccountCode, productionCostAccountName); err != nil {
+		return nil, err
+	}
+	id, ok, err = productionCostAccountID(ctx, q, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, nil
+	}
+	return &id, nil
+}
+
+func productionCostAccountID(ctx context.Context, q rowQuerier, tenantID int64) (int64, bool, error) {
+	var id int64
+	err := q.QueryRow(ctx, `
+		select id from public.fin_accounts
+		where tenant_id = $1 and account_code = $2 and deleted_at is null
+		  and account_type = 'expense' and is_group = false and is_active = true`,
+		tenantID, productionCostAccountCode).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return id, true, nil
 }
 
 func accountLabel(ctx context.Context, q rowQuerier, tenantID int64, id *int64) string {
