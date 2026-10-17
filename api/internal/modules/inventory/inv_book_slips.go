@@ -122,21 +122,25 @@ func invBookSlipsSQL(tenantID, itemID int64, dateFrom, dateTo time.Time, locatio
 	}
 	q := fmt.Sprintf(`
 		with period as (
-		  select sm.id, sm.created_at, sm.tenant_id, sm.item_id, sm.location_id,
+		  select sm.id, (`+invBookBookedAtSQL+`) as created_at, sm.tenant_id, sm.item_id, sm.location_id,
 		    sm.qty_delta::float8 as qty_delta,
 		    sm.movement_type, sm.ref_type, sm.ref_id,
 		    %s as remark
 		  from public.inv_stock_movements sm
+		  `+invBookJobJoinSQL+`
 		  where sm.tenant_id = $1 and sm.item_id = $2
-		    and sm.created_at >= $3::date
-		    and sm.created_at < ($4::date + interval '1 day')
+		    and (`+invBookBookedAtSQL+`) >= $3::date
+		    and (`+invBookBookedAtSQL+`) < ($4::date + interval '1 day')
+		    `+invBookJobVisibleSQL+`
 		    %s
 		),
 		opening as (
 		  select coalesce(sum(sm.qty_delta), 0)::float8 as open_qty
 		  from public.inv_stock_movements sm
+		  `+invBookJobJoinSQL+`
 		  where sm.tenant_id = $1 and sm.item_id = $2
-		    and sm.created_at < $3::date
+		    and (`+invBookBookedAtSQL+`) < $3::date
+		    `+invBookJobVisibleSQL+`
 		    %s
 		)
 		select p.id, p.created_at::text,
@@ -197,20 +201,10 @@ func listInvBookSlips(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		openArgs := []any{tu.TenantID, *itemID, dateFrom.Format("2006-01-02")}
-		openSQL := `
-			select coalesce(i.item_code,''), coalesce(i.item_name,''),
-			  coalesce((
-			    select sum(sm.qty_delta)::float8
-			    from public.inv_stock_movements sm
-			    where sm.tenant_id = $1 and sm.item_id = $2 and sm.created_at < $3::date`
+		openSQL := invBookSlipOpeningSQL(locationID)
 		if locationID != nil {
-			openSQL += ` and sm.location_id = $4`
 			openArgs = append(openArgs, *locationID)
 		}
-		openSQL += `
-			  ), 0)
-			from public.inv_items i
-			where i.id = $2 and i.tenant_id = $1`
 		var openingQty float64
 		var itemCode, itemName string
 		if err := pool.QueryRow(r.Context(), openSQL, openArgs...).Scan(&itemCode, &itemName, &openingQty); err != nil {

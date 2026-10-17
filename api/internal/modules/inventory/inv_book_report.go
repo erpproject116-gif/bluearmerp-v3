@@ -54,15 +54,17 @@ func invBookSQL(tenantID int64, dateFrom, dateTo time.Time, itemID *int64, q, ds
 		),
 		movements as (
 		  select sm.item_id, sm.location_id,
-		    coalesce(sum(case when sm.created_at < (select d_from from bounds) then sm.qty_delta else 0 end), 0)::float8 as opening_qty,
-		    coalesce(sum(case when sm.created_at >= (select d_from from bounds)
-		      and sm.created_at < ((select d_to from bounds) + interval '1 day')
+		    coalesce(sum(case when (` + invBookBookedAtSQL + `) < (select d_from from bounds) then sm.qty_delta else 0 end), 0)::float8 as opening_qty,
+		    coalesce(sum(case when (` + invBookBookedAtSQL + `) >= (select d_from from bounds)
+		      and (` + invBookBookedAtSQL + `) < ((select d_to from bounds) + interval '1 day')
 		      and sm.qty_delta > 0 then sm.qty_delta else 0 end), 0)::float8 as receipt_qty,
-		    coalesce(sum(case when sm.created_at >= (select d_from from bounds)
-		      and sm.created_at < ((select d_to from bounds) + interval '1 day')
+		    coalesce(sum(case when (` + invBookBookedAtSQL + `) >= (select d_from from bounds)
+		      and (` + invBookBookedAtSQL + `) < ((select d_to from bounds) + interval '1 day')
 		      and sm.qty_delta < 0 then -sm.qty_delta else 0 end), 0)::float8 as issue_qty
 		  from public.inv_stock_movements sm
+		  ` + invBookJobJoinSQL + `
 		  where sm.tenant_id = $1
+		  ` + invBookJobVisibleSQL + `
 		  group by sm.item_id, sm.location_id
 		)
 		select i.id as item_id, i.item_code, i.item_name, l.id as location_id, l.location_name,
