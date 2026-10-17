@@ -390,7 +390,7 @@ export default function ProductionIssueStationPage() {
                             : "Tap a row to select it, then enter the serial (or lot) in the panel below."}
                       </p>
                       <div class="overflow-x-auto rounded border border-stroke">
-                        <table class={mode() === "disassembly" ? "min-w-full text-left text-sm" : "min-w-full text-left text-xs"}>
+                        <table class={mode() === "disassembly" || mode() === "assembly" ? "min-w-full text-left text-sm" : "min-w-full text-left text-xs"}>
                           <thead class="bg-slate-50 text-text-secondary">
                             <tr>
                               <th class="px-2 py-1.5">
