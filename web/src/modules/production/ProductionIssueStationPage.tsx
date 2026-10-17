@@ -12,6 +12,7 @@ import { ProductionLayout } from "./ProductionLayout";
 import { jobsHref, parseMfgMode } from "./mfgProductionMode";
 import { mfgSuccess, mfgWarn } from "./mfgToast";
 import { RecordHistoryButton } from "../../shared/RecordHistoryButton";
+import { Modal } from "../../shared/Modal";
 
 type WorkOrderOption = {
   id: number;
@@ -120,6 +121,7 @@ export default function ProductionIssueStationPage() {
   const [loading, setLoading] = createSignal(false);
   const [prefilled, setPrefilled] = createSignal(false);
   const [anotherBatch, setAnotherBatch] = createSignal(false);
+  const [batchModalOpen, setBatchModalOpen] = createSignal(false);
 
   const activeComponent = () => context()?.components.find((c) => c.component_item_id === activeComponentId());
 
@@ -204,6 +206,7 @@ export default function ProductionIssueStationPage() {
     setLotNo("");
     setLotQty("1");
     setAnotherBatch(false);
+    setBatchModalOpen(false);
     if (!firstNeed) {
       mfgWarn(null, "Nothing left to take — go back and Finish build.");
     }
@@ -287,6 +290,7 @@ export default function ProductionIssueStationPage() {
       } else {
         mfgSuccess("Taken from stock. Next: Record parts (or Finish).");
         setLotPaste("");
+        if (mode() === "disassembly" || mode() === "assembly") setBatchModalOpen(false);
         await refreshContext();
       }
     } catch (e) {
@@ -319,6 +323,7 @@ export default function ProductionIssueStationPage() {
     setLotBatchId(null);
     setLotNo("");
     setLotQty("1");
+    if (mode() === "disassembly" || mode() === "assembly") setBatchModalOpen(false);
     await refreshContext();
   };
 
@@ -385,7 +390,7 @@ export default function ProductionIssueStationPage() {
                             : "Tap a row to select it, then enter the serial (or lot) in the panel below."}
                       </p>
                       <div class="overflow-x-auto rounded border border-stroke">
-                        <table class="min-w-full text-left text-xs">
+                        <table class={mode() === "disassembly" ? "min-w-full text-left text-sm" : "min-w-full text-left text-xs"}>
                           <thead class="bg-slate-50 text-text-secondary">
                             <tr>
                               <th class="px-2 py-1.5">
@@ -434,7 +439,17 @@ export default function ProductionIssueStationPage() {
                                   setLotNo("");
                                   setLotQty("1");
                                   setAnotherBatch(false);
+                                  setBatchModalOpen(false);
                                 };
+                                const openBatchModal = (e: Event) => {
+                                  e.stopPropagation();
+                                  selectRow();
+                                  setBatchModalOpen(true);
+                                };
+                                const batchRow =
+                                  (mode() === "disassembly" || mode() === "assembly") &&
+                                  !!staged?.track_lot &&
+                                  !staged?.track_serial;
                                 return (
                                   <tr
                                     role="button"
@@ -472,28 +487,40 @@ export default function ProductionIssueStationPage() {
                                       </Show>
                                     </td>
                                     <td class="px-2 py-2">
-                                      {mode() === "assembly" ? formatTrimmedQty(ln.stock_to_issue) : ln.stock_to_issue.toFixed(4)}{" "}
+                                      {mode() === "assembly" || mode() === "disassembly"
+                                        ? formatTrimmedQty(ln.stock_to_issue)
+                                        : ln.stock_to_issue.toFixed(4)}{" "}
                                       {ln.stock_unit_code}
                                     </td>
                                     <td class="px-2 py-2">
-                                      {mode() === "assembly" ? formatTrimmedQty(ln.qty_on_hand) : ln.qty_on_hand.toFixed(4)}
+                                      {mode() === "assembly" || mode() === "disassembly"
+                                        ? formatTrimmedQty(ln.qty_on_hand)
+                                        : ln.qty_on_hand.toFixed(4)}
                                     </td>
                                     <td class="px-2 py-2">
                                       {staged?.track_serial
                                         ? `${staged.issued_serials} serial(s)`
                                         : staged?.track_lot
-                                          ? mode() === "assembly"
+                                          ? mode() === "assembly" || mode() === "disassembly"
                                             ? `${formatTrimmedQty(staged.issued_lot_qty)}${ln.stock_unit_code ? ` ${ln.stock_unit_code}` : ""}`
                                             : `${staged.issued_lot_qty.toFixed(4)} lot qty`
                                           : "—"}
                                     </td>
                                     <td class="px-2 py-2">
-                                      <Show
-                                        when={hint.needsAction}
-                                        fallback={
-                                          <span class="text-text-secondary">{hint.label}</span>
-                                        }
-                                      >
+                                      {batchRow ? (
+                                        <button
+                                          type="button"
+                                          class={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-sm font-semibold ${
+                                            hint.needsAction
+                                              ? "border-amber-300 bg-white text-amber-950 shadow-sm"
+                                              : "border-stroke bg-white text-text-secondary"
+                                          }`}
+                                          onClick={openBatchModal}
+                                        >
+                                          {hint.label}
+                                          <span aria-hidden="true">→</span>
+                                        </button>
+                                      ) : hint.needsAction ? (
                                         <span
                                           class={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${
                                             selected
@@ -504,11 +531,11 @@ export default function ProductionIssueStationPage() {
                                           {selected && mode() !== "disassembly" && mode() !== "assembly"
                                             ? "Selected — enter below"
                                             : hint.label}
-                                          <Show when={!selected}>
-                                            <span aria-hidden="true">→</span>
-                                          </Show>
+                                          {!selected ? <span aria-hidden="true">→</span> : null}
                                         </span>
-                                      </Show>
+                                      ) : (
+                                        <span class="text-text-secondary">{hint.label}</span>
+                                      )}
                                     </td>
                                   </tr>
                                 );
@@ -524,7 +551,7 @@ export default function ProductionIssueStationPage() {
                             These pieces go into stock when you record them on Record parts, or when you finish the job.
                           </p>
                           <div class="overflow-x-auto rounded border border-stroke">
-                            <table class="min-w-full text-left text-xs">
+                            <table class="min-w-full text-left text-sm">
                               <thead class="bg-slate-50 text-text-secondary">
                                 <tr>
                                   <th class="px-2 py-1.5">Cut</th>
@@ -541,9 +568,9 @@ export default function ProductionIssueStationPage() {
                                         <span class="text-text-secondary"> — {ln.component_name}</span>
                                       </td>
                                       <td class="px-2 py-2">
-                                        {ln.stock_to_issue.toFixed(4)} {ln.stock_unit_code}
+                                        {formatTrimmedQty(ln.stock_to_issue)} {ln.stock_unit_code}
                                       </td>
-                                      <td class="px-2 py-2">{ln.qty_on_hand.toFixed(4)}</td>
+                                      <td class="px-2 py-2">{formatTrimmedQty(ln.qty_on_hand)}</td>
                                     </tr>
                                   )}
                                 </For>
@@ -559,6 +586,7 @@ export default function ProductionIssueStationPage() {
 
               <Show when={activeComponent()}>
                 {(comp) => (
+                  <Show when={!((mode() === "disassembly" || mode() === "assembly") && comp().track_lot && !comp().track_serial)}>
                   <section class="rounded-xl border border-stroke bg-white p-5 shadow-sm">
                     <h3 class="font-medium text-text-primary">
                       Issue: {comp().component_code} — {comp().component_name}
@@ -587,13 +615,7 @@ export default function ProductionIssueStationPage() {
                         Stage serials
                       </button>
                     </Show>
-                    <Show when={comp().track_lot && !comp().track_serial}>
-                      <Show
-                        when={mode() === "disassembly"}
-                        fallback={
-                          <Show
-                            when={mode() === "assembly"}
-                            fallback={
+                    <Show when={comp().track_lot && !comp().track_serial && mode() !== "disassembly" && mode() !== "assembly"}>
                           <>
                             <p class="mt-1 text-xs text-text-secondary">
                               Need {remainingLotNeed(comp()).toFixed(4)} more. Pick a free lot batch (or paste lot lines), then
@@ -654,19 +676,36 @@ export default function ProductionIssueStationPage() {
                               </button>
                             </div>
                           </>
-                            }
-                          >
-                            <Show when={remainingLotNeed(comp()) <= 0.0001 && !anotherBatch()}>
-                              <p class="mt-1 text-sm text-text-secondary">Batch chosen</p>
-                            </Show>
-                            <Show when={remainingLotNeed(comp()) > 0.0001 || anotherBatch()}>
-                              <p class="mt-1 text-xs text-text-secondary">
-                                Still to choose: {formatTrimmedQty(remainingLotNeed(comp()))}
-                                {assemblyPartUnit(comp().component_item_id)
-                                  ? ` ${assemblyPartUnit(comp().component_item_id)}`
-                                  : ""}
-                                . Choose the batch.
-                              </p>
+                    </Show>
+                    <Show when={!comp().track_serial && !comp().track_lot}>
+                      <p class="mt-2 text-sm text-text-secondary">This component is not serial- or lot-tracked.</p>
+                    </Show>
+                  </section>
+                  </Show>
+                )}
+              </Show>
+              <Show when={activeComponent()}>
+                {(comp) => (
+                  <Modal
+                    open={batchModalOpen() && (mode() === "disassembly" || mode() === "assembly") && comp().track_lot && !comp().track_serial}
+                    title={comp().component_name}
+                    onClose={() => setBatchModalOpen(false)}
+                  >
+                    <Show when={remainingLotNeed(comp()) <= 0.0001 && !anotherBatch()}>
+                      <p class="mt-1 text-sm text-text-secondary">Batch chosen</p>
+                    </Show>
+                    <Show when={remainingLotNeed(comp()) > 0.0001 || anotherBatch()}>
+                      <p class="mt-1 text-xs text-text-secondary">
+                        Still to choose: {formatTrimmedQty(remainingLotNeed(comp()))}
+                        {mode() === "assembly"
+                          ? assemblyPartUnit(comp().component_item_id)
+                            ? ` ${assemblyPartUnit(comp().component_item_id)}`
+                            : ""
+                          : needs()?.input_line?.stock_unit_code
+                            ? ` ${needs()!.input_line!.stock_unit_code}`
+                            : ""}
+                        . Choose the batch.
+                      </p>
                               <div class="mt-3 space-y-4">
                                 <Field label="Choose the batch">
                                   <LotLineCell
@@ -735,94 +774,7 @@ export default function ProductionIssueStationPage() {
                                 </button>
                               </div>
                             </Show>
-                          </Show>
-                        }
-                      >
-                        <Show when={remainingLotNeed(comp()) <= 0.0001 && !anotherBatch()}>
-                          <p class="mt-1 text-sm text-text-secondary">Batch chosen</p>
-                        </Show>
-                        <Show when={remainingLotNeed(comp()) > 0.0001 || anotherBatch()}>
-                          <p class="mt-1 text-xs text-text-secondary">
-                            Still to choose: {formatTrimmedQty(remainingLotNeed(comp()))}
-                            {needs()?.input_line?.stock_unit_code
-                              ? ` ${needs()!.input_line!.stock_unit_code}`
-                              : ""}
-                            . Choose the batch.
-                          </p>
-                          <div class="mt-3 space-y-4">
-                            <Field label="Choose the batch">
-                              <LotLineCell
-                                itemId={comp().component_item_id}
-                                locationId={context()?.location_id}
-                                lotBatchId={lotBatchId()}
-                                lotNo={lotNo()}
-                                freeOnly
-                                emptyLabel="Choose a batch"
-                                onChange={(id, no, qtyAvailable) => {
-                                  setLotBatchId(id);
-                                  setLotNo(no);
-                                  if (qtyAvailable != null && Number.isFinite(qtyAvailable) && qtyAvailable > 0) {
-                                    const need = remainingLotNeed(comp());
-                                    const take = Math.min(qtyAvailable, need > 0 ? need : qtyAvailable);
-                                    setLotQty(String(take));
-                                  }
-                                }}
-                              />
-                            </Field>
-                            <Field label="Qty">
-                              <input
-                                class={inputClass}
-                                type="text"
-                                inputMode="decimal"
-                                value={lotQty()}
-                                onInput={(e) => setLotQty(e.currentTarget.value)}
-                              />
-                            </Field>
-                            <button
-                              type="button"
-                              class="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
-                              disabled={busy() || !lotBatchId()}
-                              onClick={() => void issueSingleLot()}
-                            >
-                              Use this batch
-                            </button>
-                          </div>
-                        </Show>
-                        <Show when={!anotherBatch()}>
-                          <button
-                            type="button"
-                            class="mt-3 text-sm font-medium text-brand-700 hover:underline"
-                            onClick={() => setAnotherBatch(true)}
-                          >
-                            Use another batch
-                          </button>
-                        </Show>
-                        <Show when={anotherBatch()}>
-                          <div class="mt-3 space-y-4">
-                            <Field label="Paste more batches (batch number, then a tab, then the quantity, one per line)">
-                              <textarea
-                                class={inputClass}
-                                rows={4}
-                                value={lotPaste()}
-                                onInput={(e) => setLotPaste(e.currentTarget.value)}
-                              />
-                            </Field>
-                            <button
-                              type="button"
-                              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium disabled:opacity-50"
-                              disabled={busy()}
-                              onClick={() => void issueLotsFromPaste()}
-                            >
-                              Use these batches
-                            </button>
-                          </div>
-                        </Show>
-                      </Show>
-                    </Show>
-                    <Show when={!comp().track_serial && !comp().track_lot}>
-                      <p class="mt-2 text-sm text-text-secondary">This component is not serial- or lot-tracked.</p>
-                    </Show>
-                  </section>
+                  </Modal>
                 )}
               </Show>
             </>
