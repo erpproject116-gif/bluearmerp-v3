@@ -7,6 +7,13 @@ import { FormErrorSummary } from "../../shared/FormErrorSummary";
 import type { MfgMode } from "../production/mfgProductionMode";
 import { jobsHref, MFG_COPY } from "../production/mfgProductionMode";
 import { friendlyMfgMessage, mfgSuccess, mfgWarn } from "../production/mfgToast";
+import {
+  cuttingFinishCompleteFields,
+  cuttingFinishStorageKey,
+  readCuttingFinishCarry,
+  type CuttingFinishWaste,
+  type CuttingFinishWeigh,
+} from "./cuttingFinishCarry";
 
 type MaterialNeedLine = {
   component_item_id: number;
@@ -279,10 +286,21 @@ export function CompleteWorkOrderModal(props: {
       setDidRelease(true);
     }
 
-    const body: { actual_input_qty?: number; qty_produced?: number } = {};
+    const body: {
+      actual_input_qty?: number;
+      qty_produced?: number;
+      waste_lines?: CuttingFinishWaste[];
+      output_weighs?: CuttingFinishWeigh[];
+    } = {};
     if (actualInputQty != null) {
       body.actual_input_qty = actualInputQty;
       if (isAssembly()) body.qty_produced = actualInputQty;
+    }
+    if (effectiveMode() === "disassembly") {
+      const carry = readCuttingFinishCarry(sessionStorage.getItem(cuttingFinishStorageKey(wo.id)), wo.id);
+      const extra = cuttingFinishCompleteFields(carry, stagedCutTotal());
+      if (extra.waste_lines) body.waste_lines = extra.waste_lines;
+      if (extra.output_weighs) body.output_weighs = extra.output_weighs;
     }
     const res = await apiFetch(`/api/v1/manufacturing/work-orders/${wo.id}/complete`, {
       method: "POST",
@@ -306,6 +324,7 @@ export function CompleteWorkOrderModal(props: {
       );
       return;
     }
+    if (effectiveMode() === "disassembly") sessionStorage.removeItem(cuttingFinishStorageKey(wo.id));
     mfgSuccess(isAssembly() ? "Build finished. Stock is updated." : "Job finished. Stock is updated.");
     props.onCompleted();
     props.onClose();

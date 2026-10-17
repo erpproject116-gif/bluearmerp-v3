@@ -24,6 +24,7 @@ import NewAssemblyOrderWizard from "./NewAssemblyOrderWizard";
 import NewRecipeOrderWizard from "./NewRecipeOrderWizard";
 import { searchBomsForOrderType } from "./mfgBomLookup";
 import { buildManufacturingCostInput, totalManufacturingConversionCost } from "./manufacturingCostInput";
+import { cuttingFinishStorageKey } from "./cuttingFinishCarry";
 
 /** Display/seed qty without float garbage (e.g. 0.30000000000000004). */
 function formatCuttingQty(n: number | null | undefined): string {
@@ -394,6 +395,14 @@ function NewCuttingOrderWizard() {
     }
     if (inputTracked()) {
       setPosting(false);
+      sessionStorage.setItem(
+        cuttingFinishStorageKey(id),
+        JSON.stringify({
+          work_order_id: id,
+          output_weighs: buildOutputWeighs(),
+          waste_lines: wasteLines,
+        }),
+      );
       const next = `/app/production/issue-station?woId=${id}&mode=disassembly`;
       mfgStationHandoff("disassembly_issue", next);
       navigate(next);
