@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { fetchAccountOptions } from "../../shared/accounts";
 import type { FormErrors } from "../../shared/formValidation";
@@ -8,8 +8,6 @@ import { Modal } from "../../shared/Modal";
 import { formatMoney } from "../../shared/money";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
-
-type PreviewLine = { label: string; debit: number; credit: number };
 
 type CostPostingPayload = {
   work_order_id: number;
@@ -22,13 +20,8 @@ type CostPostingPayload = {
     other_cost: number;
     total_cost: number;
   };
-  lines: PreviewLine[];
   debit_account_id: number | null;
   debit_account_label: string;
-  credit_material_account_id: number | null;
-  credit_material_account_label: string;
-  credit_conversion_account_id: number | null;
-  credit_conversion_account_label: string;
   remark: string;
   journal_entry_id: number | null;
   journal_status: string | null;
@@ -42,12 +35,9 @@ type Props = {
   onSaved: () => void;
 };
 
-const LINE_PRODUCTION_EXPENSE = "Production expense";
-
 /**
- * Record a completed job's production cost in the books:
- * Dr production expense / Cr production cost absorption, both expense accounts,
- * for labor + overhead + other. Material cost stays on the job.
+ * Record labor, overhead, and other cost on one expense account.
+ * The matching amount is taken from cash. Material cost stays on the job.
  */
 export function RecordCostsModal(props: Props) {
   const toast = useToast();
@@ -59,8 +49,6 @@ export function RecordCostsModal(props: Props) {
 
   const [debitLabel, setDebitLabel] = createSignal("");
   const [debitId, setDebitId] = createSignal<number | null>(null);
-  const [conversionLabel, setConversionLabel] = createSignal("");
-  const [conversionId, setConversionId] = createSignal<number | null>(null);
   const [remark, setRemark] = createSignal("");
 
   const conversionAmount = () => {
@@ -70,11 +58,6 @@ export function RecordCostsModal(props: Props) {
   };
   const needsConversion = () => conversionAmount() > 0.0001;
   const isDraft = () => payload()?.journal_status === "draft";
-
-  const accountLabelFor = (line: PreviewLine): string => {
-    if (line.label === LINE_PRODUCTION_EXPENSE) return debitLabel();
-    return conversionLabel();
-  };
 
   const load = async (id: number) => {
     setLoading(true);
@@ -91,8 +74,6 @@ export function RecordCostsModal(props: Props) {
     setPayload(p);
     setDebitId(p.debit_account_id);
     setDebitLabel(p.debit_account_label);
-    setConversionId(p.credit_conversion_account_id);
-    setConversionLabel(p.credit_conversion_account_label);
     setRemark(p.remark ?? "");
   };
 
@@ -101,24 +82,11 @@ export function RecordCostsModal(props: Props) {
     void load(props.workOrderId);
   });
 
-  const canSave = () =>
-    Boolean(payload()) &&
-    !saving() &&
-    needsConversion() &&
-    Boolean(debitId()) &&
-    Boolean(conversionId()) &&
-    debitId() !== conversionId();
+  const canSave = () => Boolean(payload()) && !saving() && needsConversion() && Boolean(debitId());
 
   const handleSave = async () => {
     const id = props.workOrderId;
-    if (!id || !canSave()) {
-      if (debitId() != null && conversionId() != null && debitId() === conversionId()) {
-        setFieldErrors({
-          credit_conversion_account_id: "Choose a different account from production expense. Same account posts zero.",
-        });
-      }
-      return;
-    }
+    if (!id || !canSave()) return;
     setSaving(true);
     setFieldErrors({});
     let res;
@@ -129,7 +97,6 @@ export function RecordCostsModal(props: Props) {
           method: "PUT",
           body: JSON.stringify({
             debit_account_id: debitId(),
-            credit_conversion_account_id: conversionId(),
             remark: remark().trim(),
           }),
         },
@@ -169,84 +136,57 @@ export function RecordCostsModal(props: Props) {
             </div>
 
             <p class="text-sm text-text-secondary">
-              Record labor, overhead, and other cost as an expense. Material cost stays on the job and is not booked
-              again. Stock and the job stay as they are. Debit and credit must be different accounts — the same account
-              on both sides posts zero.
+              Record labor, overhead, and other cost as production cost. Material cost stays on the job. Stock and the
+              job stay as they are. The amount is taken from cash.
             </p>
 
             <Show when={!needsConversion()}>
               <p class="text-sm text-text-secondary">This job has no production cost to record.</p>
             </Show>
 
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Show when={needsConversion()}>
-                <LookupCombo
-                  label="Production expense (debit)"
-                  value={debitLabel}
-                  selectedId={debitId}
-                  onInput={setDebitLabel}
-                  onSelect={(o) => {
-                    setDebitId(o.id);
-                    setDebitLabel(o.label);
-                  }}
-                  onClear={() => {
-                    setDebitId(null);
-                    setDebitLabel("");
-                  }}
-                  fetchOptions={(q) => fetchAccountOptions(q, "expense")}
-                  placeholder="Search expense account…"
-                  error={fieldErrors().debit_account_id}
-                  required
-                />
-                <LookupCombo
-                  label="Production cost absorption (credit)"
-                  value={conversionLabel}
-                  selectedId={conversionId}
-                  onInput={setConversionLabel}
-                  onSelect={(o) => {
-                    setConversionId(o.id);
-                    setConversionLabel(o.label);
-                  }}
-                  onClear={() => {
-                    setConversionId(null);
-                    setConversionLabel("");
-                  }}
-                  fetchOptions={(q) => fetchAccountOptions(q, "expense")}
-                  placeholder="Search expense account…"
-                  error={fieldErrors().credit_conversion_account_id}
-                  required
-                />
-              </Show>
-              <Field label="Remark">
-                <input class={inputClass} value={remark()} onInput={(e) => setRemark(e.currentTarget.value)} />
-              </Field>
-            </div>
+            <Show when={needsConversion()}>
+              <LookupCombo
+                label="Chart of account"
+                value={debitLabel}
+                selectedId={debitId}
+                onInput={setDebitLabel}
+                onSelect={(o) => {
+                  setDebitId(o.id);
+                  setDebitLabel(o.label);
+                }}
+                onClear={() => {
+                  setDebitId(null);
+                  setDebitLabel("");
+                }}
+                fetchOptions={(q) => fetchAccountOptions(q, "expense")}
+                placeholder="Search expense account…"
+                error={fieldErrors().debit_account_id}
+                required
+              />
+            </Show>
+            <Field label="Remark">
+              <input class={inputClass} value={remark()} onInput={(e) => setRemark(e.currentTarget.value)} />
+            </Field>
 
             <table class="erp-grid min-w-full text-left text-sm">
               <thead class="bg-brand-50 text-xs font-semibold uppercase text-brand-700">
                 <tr>
                   <th class="px-3 py-2">Line</th>
-                  <th class="px-3 py-2">Account</th>
-                  <th class="px-3 py-2 text-right">Debit</th>
-                  <th class="px-3 py-2 text-right">Credit</th>
+                  <th class="px-3 py-2">Chart of account</th>
+                  <th class="px-3 py-2 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                <For each={p().lines}>
-                  {(line) => (
-                    <tr class="border-t border-stroke/60">
-                      <td class="px-3 py-2">{line.label}</td>
-                      <td class="px-3 py-2 text-text-secondary">{accountLabelFor(line) || "—"}</td>
-                      <td class="px-3 py-2 text-right">{line.debit > 0 ? formatMoney(line.debit) : ""}</td>
-                      <td class="px-3 py-2 text-right">{line.credit > 0 ? formatMoney(line.credit) : ""}</td>
-                    </tr>
-                  )}
-                </For>
+                <tr class="border-t border-stroke/60">
+                  <td class="px-3 py-2">Production cost</td>
+                  <td class="px-3 py-2 text-text-secondary">{debitLabel() || "—"}</td>
+                  <td class="px-3 py-2 text-right">{formatMoney(conversionAmount())}</td>
+                </tr>
               </tbody>
             </table>
 
-            <Show when={fieldErrors().journal || fieldErrors().cost}>
-              <p class="text-sm text-red-600">{fieldErrors().journal ?? fieldErrors().cost}</p>
+            <Show when={fieldErrors().journal || fieldErrors().cost || fieldErrors().cash}>
+              <p class="text-sm text-red-600">{fieldErrors().journal ?? fieldErrors().cost ?? fieldErrors().cash}</p>
             </Show>
             <Show when={isDraft()}>
               <p class="text-xs text-text-secondary">This updates the existing draft journal entry.</p>

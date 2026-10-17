@@ -188,6 +188,18 @@ const (
 	costLineProductionCredit  = "Production cost absorption"
 )
 
+// productionCostCashLines records labor, overhead, and other cost:
+// debit the chosen expense account, credit cash. Material is not included.
+func productionCostCashLines(amount float64, expenseAccountID, cashAccountID int64) []invoicejournal.Line {
+	if amount <= 0.0001 || expenseAccountID <= 0 || cashAccountID <= 0 {
+		return nil
+	}
+	return []invoicejournal.Line{
+		{AccountID: expenseAccountID, Debit: amount, Remark: "Production cost"},
+		{AccountID: cashAccountID, Credit: amount, Remark: "Cash"},
+	}
+}
+
 // costPostingAccounts are the expense legs of a completion entry:
 // Dr production expense, Cr production cost absorption, both for labor+overhead+other.
 type costPostingAccounts struct {

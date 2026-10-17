@@ -77,6 +77,22 @@ func TestBuildCostPostingLinesUsesSelectedAccounts(t *testing.T) {
 	}
 }
 
+func TestProductionCostCashLines(t *testing.T) {
+	lines := productionCostCashLines(600, 5010, 1020)
+	if len(lines) != 2 {
+		t.Fatalf("lines=%d want 2", len(lines))
+	}
+	if lines[0].AccountID != 5010 || lines[0].Debit != 600 || lines[0].Remark != "Production cost" {
+		t.Fatalf("unexpected expense line: %+v", lines[0])
+	}
+	if lines[1].AccountID != 1020 || lines[1].Credit != 600 || lines[1].Remark != "Cash" {
+		t.Fatalf("unexpected cash line: %+v", lines[1])
+	}
+	if got := productionCostCashLines(0, 5010, 1020); len(got) != 0 {
+		t.Fatalf("zero amount should not book, got %+v", got)
+	}
+}
+
 func TestSameCostPostingAccounts(t *testing.T) {
 	if !sameCostPostingAccounts(5010, 5010) {
 		t.Fatal("identical ids should be rejected")

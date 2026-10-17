@@ -268,6 +268,19 @@ func validateCostAccount(ctx context.Context, q rowQuerier, tenantID, id int64, 
 	return nil
 }
 
+// resolveProductionCashAccount is the hidden cash side of Record in books.
+// Crediting it reduces cash. The operator does not pick it on this screen.
+func resolveProductionCashAccount(ctx context.Context, q rowQuerier, tenantID int64) (int64, error) {
+	id, err := financedefaults.ResolveByRole(ctx, q, tenantID, financedefaults.RoleCash)
+	if err != nil || id <= 0 {
+		return 0, errors.New("Set the cash account in Finance defaults before recording this cost.")
+	}
+	if err := validateCostAccount(ctx, q, tenantID, id, "asset"); err != nil {
+		return 0, errors.New("The cash account in Finance defaults must be an active asset account.")
+	}
+	return id, nil
+}
+
 // sameCostPostingAccounts is true when debit and credit would net to zero on one account.
 func sameCostPostingAccounts(debit, credit int64) bool {
 	return debit > 0 && credit > 0 && debit == credit
@@ -345,17 +358,10 @@ func putCostPosting(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := validateCostAccount(r.Context(), tx, tu.TenantID, body.DebitAccountID, "expense"); err != nil {
 			errs["debit_account_id"] = err.Error()
 		}
-		conversionID := int64(0)
-		if body.CreditConversionAccountID != nil {
-			conversionID = *body.CreditConversionAccountID
+		cashID, cashErr := resolveProductionCashAccount(r.Context(), tx, tu.TenantID)
+		if cashErr != nil {
+			errs["cash"] = cashErr.Error()
 		}
-		if err := validateCostAccount(r.Context(), tx, tu.TenantID, conversionID, "expense"); err != nil {
-			errs["credit_conversion_account_id"] = err.Error()
-		}
-		if sameCostPostingAccounts(body.DebitAccountID, conversionID) {
-			errs["credit_conversion_account_id"] = "Choose a different account from production expense. Same account posts zero."
-		}
-		accts := costPostingAccounts{Debit: body.DebitAccountID, CreditConversion: conversionID}
 		if len(errs) > 0 {
 			response.Validation(w, errs)
 			return
@@ -384,17 +390,13 @@ func putCostPosting(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		journalID, err := invoicejournal.SyncTx(
 			r.Context(), tx, tu.TenantID, tu.AppUserID, entryDate, remarks, existingJE,
-			buildCostPostingLines(current.Costs, accts), autoPost,
+			productionCostCashLines(current.conversionAmount(), body.DebitAccountID, cashID), autoPost,
 		)
 		if err != nil {
 			response.Validation(w, map[string]string{"journal": err.Error()})
 			return
 		}
 
-		var conversionArg any
-		if accts.CreditConversion > 0 {
-			conversionArg = accts.CreditConversion
-		}
 		if _, err := tx.Exec(r.Context(), `
 			update public.mfg_work_order_cost_postings
 			set journal_entry_id = $3,
@@ -405,7 +407,7 @@ func putCostPosting(pool *pgxpool.Pool) http.HandlerFunc {
 			  accounts_set_by_user_id = $7,
 			  accounts_set_at = now()
 			where tenant_id = $1 and work_order_id = $2`,
-			tu.TenantID, workOrderID, journalID, accts.Debit, conversionArg,
+			tu.TenantID, workOrderID, journalID, body.DebitAccountID, cashID,
 			body.Remark, tu.AppUserID); err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to record in the books.", "ERR_INTERNAL")
 			return
