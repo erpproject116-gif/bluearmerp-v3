@@ -241,6 +241,10 @@ export const HrEmployeesSettingsPage = lazy(() => import("../modules/hr/HrEmploy
 export const PayrollRunsPage = lazy(() => import("../modules/hr/PayrollRunsPage"));
 export const RemittancesPage = lazy(() => import("../modules/hr/RemittancesPage"));
 export const AttendancePage = lazy(() => import("../modules/hr/AttendancePage"));
+export const AttendanceOverviewPage = lazy(() => import("../modules/hr/AttendanceOverviewPage"));
+export const AttendanceSetupPage = lazy(() => import("../modules/hr/AttendanceSetupPage"));
+export const AttendanceEntryPage = lazy(() => import("../modules/hr/AttendanceEntryPage"));
+export const AttendanceEmployeeDtrPage = lazy(() => import("../modules/hr/AttendanceEmployeeDtrPage"));
 export const LeavePage = lazy(() => import("../modules/hr/LeavePage"));
 export const CompanyRecordsPage = lazy(() => import("../modules/hr/CompanyRecordsPage"));
 export const AbsenteeismPage = lazy(() => import("../modules/hr/AbsenteeismPage"));

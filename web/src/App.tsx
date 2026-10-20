@@ -242,6 +242,10 @@ import {
   PayrollRunsPage,
   RemittancesPage,
   AttendancePage,
+  AttendanceOverviewPage,
+  AttendanceSetupPage,
+  AttendanceEntryPage,
+  AttendanceEmployeeDtrPage,
   LeavePage,
   CompanyRecordsPage,
   AbsenteeismPage,
@@ -1041,6 +1045,18 @@ export default function App() {
           <Route path="/hr/ess" component={EssSelfServicePage} />
           <Route path="/hr/remittances" component={() => (
             <HrRoute><RemittancesPage /></HrRoute>
+          )} />
+          <Route path="/hr/attendance/overview" component={() => (
+            <HrRoute><AttendanceOverviewPage /></HrRoute>
+          )} />
+          <Route path="/hr/attendance/setup" component={() => (
+            <HrRoute><AttendanceSetupPage /></HrRoute>
+          )} />
+          <Route path="/hr/attendance/entry" component={() => (
+            <HrRoute><AttendanceEntryPage /></HrRoute>
+          )} />
+          <Route path="/hr/attendance/employees/:employeeId" component={() => (
+            <HrRoute><AttendanceEmployeeDtrPage /></HrRoute>
           )} />
           <Route path="/hr/attendance" component={() => (
             <HrRoute><AttendancePage /></HrRoute>

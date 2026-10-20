@@ -66,6 +66,7 @@ func registerAttendanceRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/dtr", listDTR(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/dtr/month-overview", listDTRMonthOverview(pool))
+	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/dtr/employee-month", getDTREmployeeMonth(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/dtr", upsertDTR(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Delete("/dtr/{id}", deleteDTR(pool))
 	registerAttendanceCSVRoutes(r, pool)

@@ -27,3 +27,12 @@ func TestIsShortDay(t *testing.T) {
 		t.Fatal("absent is not a short day")
 	}
 }
+
+func TestDtrStatusLetter(t *testing.T) {
+	if dtrStatusLetter("present") != "P" || dtrStatusLetter("awol") != "W" {
+		t.Fatal("unexpected status letters")
+	}
+	if dtrStatusLetter("unknown") != "" {
+		t.Fatal("unknown status should be blank")
+	}
+}
