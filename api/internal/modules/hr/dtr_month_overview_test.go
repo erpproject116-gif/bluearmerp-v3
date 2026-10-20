@@ -36,3 +36,22 @@ func TestDtrStatusLetter(t *testing.T) {
 		t.Fatal("unknown status should be blank")
 	}
 }
+
+func TestMonthOverviewDayAppendUsesIndex(t *testing.T) {
+	// Regression: pointers into a growing slice lose day cells; index map must keep them.
+	out := []DTRMonthOverviewRow{}
+	idxByID := map[int64]int{}
+	for id := int64(1); id <= 40; id++ {
+		idxByID[id] = len(out)
+		out = append(out, DTRMonthOverviewRow{EmployeeID: id, Days: []DTRMonthDayCell{}})
+	}
+	for id := int64(1); id <= 40; id++ {
+		i := idxByID[id]
+		out[i].Days = append(out[i].Days, DTRMonthDayCell{Day: 1, Status: "present", HoursWorked: 8})
+	}
+	for id := int64(1); id <= 40; id++ {
+		if len(out[idxByID[id]].Days) != 1 {
+			t.Fatalf("employee %d lost day cells", id)
+		}
+	}
+}

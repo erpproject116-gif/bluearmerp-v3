@@ -31,7 +31,7 @@ export type DTR = {
   absence_remarks?: string;
 };
 
-export type MonthDayCell = { day: number; status: string };
+export type MonthDayCell = { day: number; status: string; hours_worked?: number };
 
 export type MonthOverviewRow = {
   employee_id: number;
@@ -102,20 +102,27 @@ export function dtrStatusLetter(status: string): string {
   }
 }
 
-export function dtrStatusCellClass(status: string): string {
-  switch (status) {
-    case "present":
-      return "bg-emerald-50 text-emerald-800";
-    case "absent":
-    case "awol":
-      return "bg-rose-50 text-rose-800";
-    case "leave":
-      return "bg-sky-50 text-sky-800";
-    case "holiday":
-      return "bg-amber-50 text-amber-900";
-    case "rest":
-      return "bg-slate-100 text-slate-600";
-    default:
-      return "text-text-secondary";
+/** Duty cell colors: green full day (≥8h), orange half-day, red absent/AWOL. */
+export function dtrDutyCellClass(status: string, hoursWorked = 0): string {
+  if (status === "absent" || status === "awol") {
+    return "bg-red-500 text-white";
   }
+  if (status === "present") {
+    if (hoursWorked >= 8) return "bg-emerald-500 text-white";
+    return "bg-orange-400 text-white";
+  }
+  switch (status) {
+    case "leave":
+      return "bg-sky-100 text-sky-900";
+    case "holiday":
+      return "bg-violet-100 text-violet-900";
+    case "rest":
+      return "bg-slate-200 text-slate-700";
+    default:
+      return "bg-transparent text-text-secondary";
+  }
+}
+
+export function dtrStatusCellClass(status: string, hoursWorked = 0): string {
+  return dtrDutyCellClass(status, hoursWorked);
 }

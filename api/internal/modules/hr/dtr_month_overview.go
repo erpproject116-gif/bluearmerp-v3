@@ -13,8 +13,9 @@ import (
 
 // DTRMonthDayCell is one calendar day status for the overview grid.
 type DTRMonthDayCell struct {
-	Day    int    `json:"day"`
-	Status string `json:"status"`
+	Day         int     `json:"day"`
+	Status      string  `json:"status"`
+	HoursWorked float64 `json:"hours_worked"`
 }
 
 // DTRMonthOverviewRow is one active employee’s DTR totals for a calendar month.
@@ -133,7 +134,8 @@ func listDTRMonthOverview(pool *pgxpool.Pool) http.HandlerFunc {
 		defer rows.Close()
 
 		out := []DTRMonthOverviewRow{}
-		byID := map[int64]*DTRMonthOverviewRow{}
+		// Index map — not pointers into out — so append reallocation cannot drop day cells.
+		idxByID := map[int64]int{}
 		for rows.Next() {
 			var row DTRMonthOverviewRow
 			if err := rows.Scan(
@@ -146,12 +148,12 @@ func listDTRMonthOverview(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			row.Days = []DTRMonthDayCell{}
+			idxByID[row.EmployeeID] = len(out)
 			out = append(out, row)
-			byID[row.EmployeeID] = &out[len(out)-1]
 		}
 
 		dayRows, err := pool.Query(r.Context(), `
-			select d.employee_id, d.work_date::text, d.status
+			select d.employee_id, d.work_date::text, d.status, d.hours_worked::float8
 			from public.hr_dtr_entries d
 			join public.hr_employees e on e.id = d.employee_id and e.tenant_id = d.tenant_id
 			where d.tenant_id = $1 and d.work_date between $2::date and $3::date
@@ -165,11 +167,12 @@ func listDTRMonthOverview(pool *pgxpool.Pool) http.HandlerFunc {
 		for dayRows.Next() {
 			var empID int64
 			var workDate, status string
-			if err := dayRows.Scan(&empID, &workDate, &status); err != nil {
+			var hours float64
+			if err := dayRows.Scan(&empID, &workDate, &status, &hours); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read month days.", "ERR_INTERNAL")
 				return
 			}
-			row, exists := byID[empID]
+			i, exists := idxByID[empID]
 			if !exists {
 				continue
 			}
@@ -177,7 +180,7 @@ func listDTRMonthOverview(pool *pgxpool.Pool) http.HandlerFunc {
 			if err != nil {
 				continue
 			}
-			row.Days = append(row.Days, DTRMonthDayCell{Day: t.Day(), Status: status})
+			out[i].Days = append(out[i].Days, DTRMonthDayCell{Day: t.Day(), Status: status, HoursWorked: hours})
 		}
 
 		response.OK(w, map[string]any{
