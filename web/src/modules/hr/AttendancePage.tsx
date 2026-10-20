@@ -1,4 +1,4 @@
-import { createSignal, For } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { downloadDtrImportTemplate, importDtrCsv } from "../../shared/hrCsvImport";
@@ -44,6 +44,40 @@ type DTR = {
   absence_remarks?: string;
 };
 
+type MonthOverviewRow = {
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  department: string;
+  present_days: number;
+  absent_days: number;
+  awol_days: number;
+  leave_days: number;
+  holiday_days: number;
+  rest_days: number;
+  short_days: number;
+  ot_hours_sum: number;
+  night_diff_hours_sum: number;
+  hours_worked_sum: number;
+};
+
+function currentYearMonth(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthBounds(ym: string): { year: number; month: number; from: string; to: string } | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(ym.trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  if (!(month >= 1 && month <= 12)) return null;
+  const from = `${year}-${String(month).padStart(2, "0")}-01`;
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const to = `${year}-${String(month).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+  return { year, month, from, to };
+}
+
 export default function AttendancePage() {
   const toast = useToast();
   const qc = useQueryClient();
@@ -69,6 +103,11 @@ export default function AttendancePage() {
   const [selectedDtrId, setSelectedDtrId] = createSignal<number | null>(null);
   const [importingDtr, setImportingDtr] = createSignal(false);
   const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
+  const [overviewMonth, setOverviewMonth] = createSignal(currentYearMonth());
+  const [detailEmployeeId, setDetailEmployeeId] = createSignal<number | null>(null);
+  const [detailEmployeeLabel, setDetailEmployeeLabel] = createSignal("");
+
+  const overviewBounds = () => monthBounds(overviewMonth());
 
   const holidays = createQuery(() => ({
     queryKey: ["hr-holidays", year],
@@ -96,6 +135,46 @@ export default function AttendancePage() {
       return res.data ?? [];
     },
   }));
+
+  const monthOverview = createQuery(() => {
+    const b = overviewBounds();
+    return {
+      queryKey: ["hr-dtr-month-overview", b?.year, b?.month],
+      enabled: Boolean(b),
+      queryFn: async () => {
+        if (!b) return [] as MonthOverviewRow[];
+        const res = await apiFetch<{ rows: MonthOverviewRow[] }>(
+          `/api/v1/hr/dtr/month-overview?year=${b.year}&month=${b.month}`,
+          {},
+          { silent: true },
+        );
+        if (!res.success) throw new Error(res.message ?? "Failed to load month overview");
+        return res.data?.rows ?? [];
+      },
+    };
+  });
+
+  const monthDetail = createQuery(() => {
+    const b = overviewBounds();
+    const empId = detailEmployeeId();
+    return {
+      queryKey: ["hr-dtr-month-detail", empId, b?.from, b?.to],
+      enabled: Boolean(b && empId),
+      queryFn: async () => {
+        if (!b || !empId) return [] as DTR[];
+        const qs = new URLSearchParams({
+          page: "1",
+          pageSize: "100",
+          from: b.from,
+          to: b.to,
+          employee_id: String(empId),
+        });
+        const res = await apiFetch<DTR[]>(`/api/v1/hr/dtr?${qs}`, {}, { silent: true });
+        if (!res.success) throw new Error(res.message ?? "Failed to load day lines");
+        return res.data ?? [];
+      },
+    };
+  });
 
   const holidayDraft = useDocumentDraft({
     entityType: DRAFT_ENTITY.hrAttendance,
@@ -335,6 +414,146 @@ export default function AttendancePage() {
           </ul>
         </section>
       </div>
+
+      <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+        <div class="mb-2 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-medium">Month overview</h2>
+            <p class="mt-1 text-sm text-text-secondary">
+              All active employees for one month. Short day means present with under 8 hours. Tap a row for that
+              person’s day lines.
+            </p>
+          </div>
+          <Field label="Month">
+            <input
+              type="month"
+              class={inputClass}
+              value={overviewMonth()}
+              onInput={(e) => {
+                setOverviewMonth(e.currentTarget.value);
+                setDetailEmployeeId(null);
+                setDetailEmployeeLabel("");
+              }}
+            />
+          </Field>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-stroke text-xs font-semibold uppercase text-text-secondary">
+                <th class="py-2 pr-3">Employee</th>
+                <th class="py-2 pr-3">Dept</th>
+                <th class="py-2 pr-2 text-right">Present</th>
+                <th class="py-2 pr-2 text-right">Absent</th>
+                <th class="py-2 pr-2 text-right">AWOL</th>
+                <th class="py-2 pr-2 text-right">Leave</th>
+                <th class="py-2 pr-2 text-right">Holiday</th>
+                <th class="py-2 pr-2 text-right">Rest</th>
+                <th class="py-2 pr-2 text-right">Short day</th>
+                <th class="py-2 pr-2 text-right">OT hours</th>
+                <th class="py-2 pr-2 text-right">Night diff</th>
+                <th class="py-2 text-right">Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              <Show
+                when={(monthOverview.data ?? []).length > 0}
+                fallback={
+                  <tr>
+                    <td colSpan={12} class="py-3 text-text-secondary">
+                      {monthOverview.isFetching ? "Loading…" : "No active employees."}
+                    </td>
+                  </tr>
+                }
+              >
+                <For each={monthOverview.data ?? []}>
+                  {(row) => (
+                    <tr
+                      class={`cursor-pointer border-b border-slate-100 hover:bg-slate-50 ${
+                        detailEmployeeId() === row.employee_id ? "bg-brand-50" : ""
+                      }`}
+                      onClick={() => {
+                        if (detailEmployeeId() === row.employee_id) {
+                          setDetailEmployeeId(null);
+                          setDetailEmployeeLabel("");
+                          return;
+                        }
+                        setDetailEmployeeId(row.employee_id);
+                        setDetailEmployeeLabel(`${row.employee_no} — ${row.employee_name}`);
+                      }}
+                    >
+                      <td class="py-2 pr-3">
+                        {row.employee_no} — {row.employee_name}
+                      </td>
+                      <td class="py-2 pr-3">{row.department || "—"}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.present_days}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.absent_days}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.awol_days}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.leave_days}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.holiday_days}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.rest_days}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.short_days}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.ot_hours_sum}</td>
+                      <td class="py-2 pr-2 text-right tabular-nums">{row.night_diff_hours_sum}</td>
+                      <td class="py-2 text-right tabular-nums">{row.hours_worked_sum}</td>
+                    </tr>
+                  )}
+                </For>
+              </Show>
+            </tbody>
+          </table>
+        </div>
+        <Show when={detailEmployeeId()}>
+          <div class="mt-4 rounded-lg border border-stroke bg-slate-50 p-3">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold">Day lines — {detailEmployeeLabel()}</h3>
+              <button
+                type="button"
+                class="text-xs text-text-secondary hover:text-text-primary"
+                onClick={() => {
+                  setDetailEmployeeId(null);
+                  setDetailEmployeeLabel("");
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <table class="min-w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-stroke text-xs text-text-secondary">
+                  <th class="py-1 pr-3">Date</th>
+                  <th class="py-1 pr-3">Status</th>
+                  <th class="py-1 pr-3 text-right">Hours</th>
+                  <th class="py-1 pr-3 text-right">OT</th>
+                  <th class="py-1 text-right">Night diff</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For
+                  each={monthDetail.data ?? []}
+                  fallback={
+                    <tr>
+                      <td colSpan={5} class="py-2 text-text-secondary">
+                        {monthDetail.isFetching ? "Loading…" : "No DTR rows this month."}
+                      </td>
+                    </tr>
+                  }
+                >
+                  {(d) => (
+                    <tr class="border-b border-slate-100">
+                      <td class="py-1 pr-3">{d.work_date}</td>
+                      <td class="py-1 pr-3">{d.status}</td>
+                      <td class="py-1 pr-3 text-right tabular-nums">{d.hours_worked}</td>
+                      <td class="py-1 pr-3 text-right tabular-nums">{d.ot_hours}</td>
+                      <td class="py-1 text-right tabular-nums">{d.night_diff_hours}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </Show>
+      </section>
 
       <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
