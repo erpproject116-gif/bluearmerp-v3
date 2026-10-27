@@ -95,14 +95,14 @@ export default function LotAdjustmentPage() {
       (incoming) => {
         if (untrack(editableRows).some((r) => r.dirty)) return;
         setEditableRows(initEditable(incoming ?? []));
-        setSelectedIds(new Set());
+        setSelectedIds(new Set<number>());
       },
     ),
   );
 
   const keepRowsForReload = () => {
     setEditableRows((rows) => rows.map((r) => ({ ...r, dirty: false })));
-    setSelectedIds(new Set());
+    setSelectedIds(new Set<number>());
   };
 
   createEffect(() => {
