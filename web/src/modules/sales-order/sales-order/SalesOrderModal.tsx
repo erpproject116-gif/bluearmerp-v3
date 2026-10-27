@@ -31,6 +31,7 @@ import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { openSalesOrderPrint } from "./salesOrderPrint";
 import { AttachmentsField } from "../../../shared/AttachmentsField";
 import {
   downloadAttachment,
@@ -813,6 +814,13 @@ export function SalesOrderModal(props: Props) {
               shareEntityType="so_sales_order"
               shareLabel={salesOrderNo() || "Sales order"}
             />
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => openSalesOrderPrint(effectiveEditing()!.id)}
+            >
+              Print
+            </button>
             <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
               History
             </button>

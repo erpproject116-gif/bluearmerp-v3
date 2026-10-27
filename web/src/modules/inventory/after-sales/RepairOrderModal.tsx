@@ -5,6 +5,7 @@ import { apiFetch } from "../../../shared/api";
 import { invalidateRecordHistory } from "../../../shared/invalidateRecordHistory";
 import { RecordHistoryButton } from "../../../shared/RecordHistoryButton";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
+import { openRepairOrderPrint } from "./repairOrderPrint";
 import { CustomFieldsSection, validateCustomFields } from "../../../shared/CustomFieldsSection";
 import { EditableLineGrid, emptyLine, type RepairLineRow } from "../../../shared/EditableLineGrid";
 import { RepairPartGrid, type PartLineRow } from "./RepairPartGrid";
@@ -580,12 +581,28 @@ export function RepairOrderModal(props: Props) {
       saving={saving()}
       headerActions={
         effectiveEditing() ? (
-          <RecordHistoryButton
-            variant="button"
-            targetType="inv_repair_order"
-            targetId={effectiveEditing()?.id}
-            title={`History — ${effectiveEditing()?.repair_order_no ?? "Repair Order"}`}
-          />
+          <>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => openRepairOrderPrint(effectiveEditing()!.id, "receipt")}
+            >
+              Receipt
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => openRepairOrderPrint(effectiveEditing()!.id, "warranty")}
+            >
+              Warranty
+            </button>
+            <RecordHistoryButton
+              variant="button"
+              targetType="inv_repair_order"
+              targetId={effectiveEditing()?.id}
+              title={`History — ${effectiveEditing()?.repair_order_no ?? "Repair Order"}`}
+            />
+          </>
         ) : undefined
       }
     >

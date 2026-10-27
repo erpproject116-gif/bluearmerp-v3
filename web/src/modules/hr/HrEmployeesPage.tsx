@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
 import { formatAmount } from "../../shared/money";
 import {
@@ -585,6 +586,19 @@ export default function HrEmployeesPage() {
             key: "base_salary",
             header: "Base salary",
             render: (r) => <span>{formatAmount(r.base_salary)}</span>,
+          },
+          {
+            key: "history",
+            header: "History",
+            sortable: false,
+            render: (r) => (
+              <ActivityHistoryLink
+                module="hr"
+                targetType="hr_employee"
+                targetId={r.id}
+                title={`History — ${r.employee_no || r.full_name}`}
+              />
+            ),
           },
         ]}
         rows={list.data?.rows ?? []}

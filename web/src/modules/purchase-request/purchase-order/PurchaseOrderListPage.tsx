@@ -21,6 +21,7 @@ import { PurchaseOrderModal } from "./PurchaseOrderModal";
 import { PurchaseRequestLayout } from "../PurchaseRequestLayout";
 import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import { formatMoney } from "../purchase-request/purchaseRequestPrint";
+import { openPurchaseOrderPrint } from "./purchaseOrderPrint";
 import { DOC_PROGRESS_STATUS_TABS, docProgressStatusLabel } from "../../../shared/docProgressStatusTabs";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
@@ -536,6 +537,23 @@ export default function PurchaseOrderListPage() {
                   Confirm
                 </button>
               </Show>
+            ),
+          },
+          {
+            key: "print",
+            header: "Print",
+            sortable: false,
+            render: (r) => (
+              <button
+                type="button"
+                class="text-brand-600 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPurchaseOrderPrint(r.id);
+                }}
+              >
+                Print
+              </button>
             ),
           },
           {

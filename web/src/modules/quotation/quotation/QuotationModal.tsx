@@ -36,7 +36,7 @@ import { SendEmailModal } from "../../comms/SendEmailModal";
 import { ShareToChatModal } from "../../comms/ShareToChatModal";
 import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
 import { EmailHistoryPanel } from "../../comms/EmailHistoryPanel";
-import { fetchQuotationPrint } from "./quotationPrint";
+import { fetchQuotationPrint, openQuotationPrint } from "./quotationPrint";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useProcessPolicy, policyRequiresAttachment, validateAttachmentBeforeConfirm, toastAttachmentRequired } from "../../../shared/useProcessPolicy";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
@@ -805,6 +805,13 @@ export function QuotationModal(props: Props) {
                 Share to chat
               </button>
             </Show>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => openQuotationPrint(effectiveEditing()!.id)}
+            >
+              Print
+            </button>
             <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
               History
             </button>

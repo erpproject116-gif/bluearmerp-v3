@@ -42,6 +42,7 @@ import { useProcessPolicy, policyRequiresAttachment, isConfirmingProgress } from
 import { LoadSlipMenu, PURCHASE_ORDER_LOAD_SLIP_OPTIONS, filterLoadSlipOptions } from "../../../shared/LoadSlipMenu";
 import { DocumentEmailToolbar } from "../../comms/DocumentEmailToolbar";
 import { buildDocumentEmailSubject, buildDocumentEmailBody, firstLineItemName } from "../../comms/documentEmailSubject";
+import { openPurchaseOrderPrint } from "./purchaseOrderPrint";
 import { QuickCustomerModal } from "../../../shared/QuickCustomerModal";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
 import { QuickTaxTypeModal } from "../../../shared/QuickTaxTypeModal";
@@ -745,6 +746,13 @@ export function PurchaseOrderModal(props: Props) {
             shareEntityType="po_purchase_order"
             shareLabel={po()?.purchase_order_no || "Purchase order"}
           />
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+            onClick={() => openPurchaseOrderPrint(effectivePoId()!)}
+          >
+            Print
+          </button>
           <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
             History
           </button>

@@ -16,6 +16,7 @@ import { useFormFieldSettings } from "../../../shared/useFormFieldSettings";
 import { useTransactionListState } from "../../../shared/useListState";
 import { useToast } from "../../../shared/toast";
 import { takeDocSeed } from "../../../shared/docSeed";
+import { openRfqPrint } from "./rfqPrint";
 
 type RfqRow = {
   id: number;
@@ -208,6 +209,23 @@ export default function RfqListPage() {
             render: (row) => <span>{rfqStatusLabel(row.status)}</span>,
           },
           { key: "line_count", header: "Lines", sortable: false },
+          {
+            key: "print",
+            header: "Print",
+            sortable: false,
+            render: (row) => (
+              <button
+                type="button"
+                class="text-brand-600 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openRfqPrint(row.id);
+                }}
+              >
+                Print
+              </button>
+            ),
+          },
           {
             key: "history",
             header: "History",

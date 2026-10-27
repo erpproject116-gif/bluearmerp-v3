@@ -1,5 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import {
   createPayslipShareLink,
   previewPayroll,
@@ -268,6 +269,19 @@ export default function PayrollRunsPage() {
             { key: "deductions", header: "Deductions", render: (r: Payslip) => <span>{formatAmount(r.deductions)}</span> },
             { key: "net_pay", header: "Net", render: (r: Payslip) => <span>{formatAmount(r.net_pay)}</span> },
             { key: "status", header: "Status" },
+            {
+              key: "history",
+              header: "History",
+              sortable: false,
+              render: (r: Payslip) => (
+                <ActivityHistoryLink
+                  module="hr"
+                  targetType="hr_payslip"
+                  targetId={r.id}
+                  title={`History — ${r.employee_no || r.employee_name}`}
+                />
+              ),
+            },
           ]}
           rows={payslips.data ?? []}
           loading={payslips.isFetching}

@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { DateInput } from "../../../shared/DateInput";
 import { CollapsibleFilterPanel } from "../../../shared/CollapsibleFilterPanel";
 import { Field, SpreadsheetGrid, inputClass } from "../../../shared/SpreadsheetGrid";
+import { ActivityHistoryLink } from "../../../shared/ActivityHistoryLink";
 import {
   useInvalidateSerialLotLists,
   useSerialEventList,
@@ -171,6 +172,19 @@ export default function SerialMovementsListPage() {
             { key: "to_location_name", header: "To", render: (r) => r.to_location_name ?? "—" },
             { key: "created_by_name", header: "By", render: (r) => r.created_by_name || "—" },
             { key: "notes", header: "Notes", render: (r) => r.notes ?? "—" },
+            {
+              key: "history",
+              header: "History",
+              sortable: false,
+              render: (r) => (
+                <ActivityHistoryLink
+                  module="serial-lot"
+                  targetType="inv_serial_unit"
+                  targetId={r.serial_unit_id}
+                  title={`History — ${r.serial_no}`}
+                />
+              ),
+            },
           ]}
           rows={list.data?.rows ?? []}
           loading={list.isFetching}

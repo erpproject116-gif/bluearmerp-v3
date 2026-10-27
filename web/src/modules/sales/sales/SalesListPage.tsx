@@ -21,6 +21,7 @@ import { SalesLayout } from "../SalesLayout";
 import { ProgressStatusMenu } from "./ProgressStatusMenu";
 import { SalesModal, type SalesDetail } from "./SalesModal";
 import { formatMoney, openSalesPrint } from "./salesPrint";
+import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
 import type { SalesTemplateCode } from "./SalesLineGrid";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useDocumentLifecycle } from "../../../shared/documentLifecycle";
@@ -262,6 +263,23 @@ export function SalesListPageInner(props: PageOptions = {}) {
                 }}
               >
                 Print
+              </button>
+            ),
+          },
+          {
+            key: "invoice_print",
+            header: "Invoice",
+            sortable: false,
+            render: (r) => (
+              <button
+                type="button"
+                class="text-brand-600 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openSalesInvoicePrint(r.id);
+                }}
+              >
+                Invoice
               </button>
             ),
           },

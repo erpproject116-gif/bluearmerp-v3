@@ -25,6 +25,7 @@ import { ModalFormGuide } from "../../../shared/ModalFormGuide";
 import { LifecycleReadOnlyShell } from "../../../shared/documentLifecycle";
 import { ChangeLogPanel } from "../../../shared/ChangeLogPanel";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
+import { openPurchaseRequestPrint } from "./purchaseRequestPrint";
 import { defaultInputBasis, formatRateSummary, formatTaxTypeLabel } from "../../../shared/taxcalc";
 import { fetchLocationOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { QuickLocationModal } from "../../../shared/QuickLocationModal";
@@ -611,6 +612,13 @@ export function PurchaseRequestModal(props: Props) {
       saving={saving()}
       headerActions={
         <Show when={props.editing}>
+          <button
+            type="button"
+            class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+            onClick={() => openPurchaseRequestPrint(props.editing!.id)}
+          >
+            Print
+          </button>
           <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>
             History
           </button>

@@ -36,6 +36,7 @@ import { mapCustomValuesToEntity, mergeCustomValues } from "../../../shared/mapC
 import { fetchLocationOptions, fetchPartnerOptions, useActiveCurrencies, useActiveTaxTypes } from "../../../shared/useDocumentLookups";
 import { InvoicePanel } from "../../../shared/InvoicePanel";
 import { openSalesInvoicePrint } from "../../../shared/invoiceDocumentPrint";
+import { openSalesPrint } from "./salesPrint";
 import { tryAutoSaveSalesInvoice } from "../../../shared/invoiceApi";
 import { formatMoney } from "../../../shared/money";
 import { HistoryLogModal } from "../../../shared/HistoryLogModal";
@@ -1208,6 +1209,13 @@ export function SalesModal(props: Props) {
               shareEntityType="sa_sales"
               shareLabel={salesNo() || "Sales invoice"}
             />
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
+              onClick={() => openSalesPrint(effectiveEditing()!.id)}
+            >
+              Print
+            </button>
             <button
               type="button"
               class="rounded-lg border border-stroke px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-slate-50"
