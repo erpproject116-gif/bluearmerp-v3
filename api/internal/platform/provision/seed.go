@@ -52,6 +52,19 @@ func SeedTenantDefaults(ctx context.Context, db sqlExecer, tenantID int64) error
 		return fmt.Errorf("store_admin permissions: %w", err)
 	}
 
+	// Manufacturing release/complete use RequireSubmit; keep store_admin able to run full production flows.
+	if _, err := db.Exec(ctx, `
+		update public.tenant_role_permissions
+		set can_submit = true
+		where tenant_id = $1
+		  and role_code = 'store_admin'
+		  and permission_code in (
+		    'manufacturing.work_orders_release',
+		    'manufacturing.work_orders_complete'
+		  )`, tenantID); err != nil {
+		return fmt.Errorf("store_admin manufacturing submit: %w", err)
+	}
+
 	if _, err := db.Exec(ctx, `
 		insert into public.tenant_role_permissions (tenant_id, role_code, permission_code, access_level)
 		select $1, 'member', pr.permission_code,

@@ -92,7 +92,7 @@ export default function StockWorkspacePage() {
             . You type the lot number. Quantity can be more than one. The same item, lot number, and location add
             onto that lot. A sale takes some off. Expiry sits on the lot.{" "}
             <A href="/app/inventory/serial-lot/lot-adjustment" class="font-medium text-brand-700 hover:underline">
-              Qty fix (lots)
+              Lot Adjustment
             </A>{" "}
             changes how many are on that lot.
           </p>

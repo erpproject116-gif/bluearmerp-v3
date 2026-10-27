@@ -105,7 +105,7 @@ export const lotNavLinks: SerialLotNavLink[] = [
     headerPriority: "primary",
   },
   {
-    label: "Qty fix (lots)",
+    label: "Lot Adjustment",
     href: "/app/inventory/serial-lot/lot-adjustment",
     permissionCode: "inventory.serial_adjustment",
     headerPriority: "primary",
