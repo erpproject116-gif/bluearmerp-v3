@@ -36,12 +36,27 @@ func TestClassifyIntent(t *testing.T) {
 		{"compare pricing WIDGET", "ops"},
 		{"recommend items laptop", "ops"},
 		{"show my notifications", "ops"},
+		{"upcoming bookings this week", "ops"},
 		{"pc build for gaming", "action"},
 	}
 	for _, c := range cases {
 		if got := classifyIntent(c.q); got != c.want {
 			t.Fatalf("classifyIntent(%q)=%q want %q", c.q, got, c.want)
 		}
+	}
+}
+
+func TestToolsForQueryIncludesUpcomingBookings(t *testing.T) {
+	got := toolsForQuery("show upcoming bookings", nil)
+	found := false
+	for _, t0 := range got {
+		if t0.Name == "list_upcoming_bookings" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected list_upcoming_bookings in %#v", got)
 	}
 }
 

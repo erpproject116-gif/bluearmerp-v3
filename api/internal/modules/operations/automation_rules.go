@@ -301,11 +301,17 @@ func validateAutomationRuleBody(body automationRuleBody) map[string]string {
 }
 
 var allowedTriggers = map[string]bool{
-	"work_item.created":            true,
-	"work_item.column_changed":     true,
-	"work_item.status_changed":     true,
-	"work_item.quotation_created":  true,
-	"workspace.created":            true,
+	"work_item.created":           true,
+	"work_item.column_changed":    true,
+	"work_item.status_changed":    true,
+	"work_item.quotation_created": true,
+	"workspace.created":           true,
+	// CRM / booking (tenant-wide; emit without workspace_id — see events.go)
+	"booking.created":           true,
+	"booking.status_changed":    true,
+	"crm.follow_up.created":     true,
+	"crm.follow_up.updated":     true,
+	"crm.follow_up.stage_changed": true,
 }
 
 var allowedActions = map[string]bool{

@@ -61,7 +61,7 @@ Linking a quotation also sets `wm_work_items.quotation_id` when empty.
 
 ## Automation engine
 
-`EmitERPEvent` evaluates active `wm_automation_rules` for the workspace (and tenant-wide rules with null workspace).
+`EmitERPEvent` evaluates active `wm_automation_rules` for the workspace (and tenant-wide rules with null workspace). Events **without** `workspace_id` (CRM follow-up, booking) match **tenant-wide rules only** (`workspace_id is null`).
 
 | Trigger | When |
 |---------|------|
@@ -69,14 +69,20 @@ Linking a quotation also sets `wm_work_items.quotation_id` when empty.
 | `work_item.column_changed` | Column move (drag or edit) |
 | `work_item.status_changed` | Status patch |
 | `work_item.quotation_created` | Create quotation from item |
+| `workspace.created` | New operations workspace |
+| `booking.created` | New booking |
+| `booking.status_changed` | Booking status transition |
+| `crm.follow_up.created` | New CRM follow-up task |
+| `crm.follow_up.updated` | CRM follow-up patch |
+| `crm.follow_up.stage_changed` | CRM follow-up stage patch |
 
 | Action | Behavior |
 |--------|----------|
 | `notify` / `log` | Activity Log entry (`operations.automation.*`) |
-| `set_status` | Updates work item status |
-| `set_priority` | Updates work item priority |
+| `set_status` | Updates work item status (no-op without `work_item_id`) |
+| `set_priority` | Updates work item priority (no-op without `work_item_id`) |
 
-Optional `trigger_config` filters: `column_id`, `column_key` / `to_column_key`, `status`.
+Optional `trigger_config` filters: `column_id`, `column_key` / `to_column_key`, `status` (also usable for booking/CRM stage via payload `status`).
 
 ## Board configuration
 

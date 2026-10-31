@@ -20,6 +20,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		cr.Post("/actions/approve", postApproveAction(pool))
 		cr.Post("/actions/deny", postDenyAction(pool))
 		registerSessionRoutes(cr, pool)
+		registerOpenAICompatRoutes(cr, pool)
 	})
 }
 
@@ -37,6 +38,7 @@ func getConfig() http.HandlerFunc {
 				"list_overdue_ar",
 				"find_stock",
 				"crm_follow_ups",
+				"list_upcoming_bookings",
 				"lookup_entities",
 				"smart_notifications",
 				"recommend_items",

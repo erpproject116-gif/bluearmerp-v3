@@ -15,6 +15,8 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/notify"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbound"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -191,7 +193,45 @@ func insertNotification(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	inserted := tag.RowsAffected() > 0
+	if inserted {
+		outbound.Emit(ctx, pool, tenantID, "crm.alert.created", map[string]any{
+			"rule_id": ruleID, "severity": severity, "title": title, "body": body,
+			"entity_type": entityType, "entity_id": entityID, "dedupe_key": dedupeKey,
+		})
+		maybeEmailCRMAlert(ctx, pool, tenantID, severity, title, body)
+	}
+	return inserted, nil
+}
+
+// maybeEmailCRMAlert emails business owners when mail is configured (B-MAIL).
+// Failures are logged only; in-app notification already succeeded.
+func maybeEmailCRMAlert(ctx context.Context, pool *pgxpool.Pool, tenantID int64, severity, title, body string) {
+	if !outbox.MailConfigured() {
+		return
+	}
+	emails, err := notify.BusinessOwnerEmails(ctx, pool, tenantID)
+	if err != nil || len(emails) == 0 {
+		return
+	}
+	subject := fmt.Sprintf("[Bluearm CRM] %s", strings.TrimSpace(title))
+	if subject == "[Bluearm CRM] " {
+		subject = "[Bluearm CRM] Alert"
+	}
+	html := fmt.Sprintf(
+		`<p><strong>%s</strong> (%s)</p><p>%s</p><p style="color:#64748b;font-size:12px">In-app: CRM → Notifications</p>`,
+		htmlEscape(title), htmlEscape(severity), htmlEscape(body),
+	)
+	if err := outbox.DeliverHTMLToMany(emails, subject, html, body); err != nil {
+		log.Printf("crm alert email: tenant=%d err=%v", tenantID, err)
+	}
+}
+
+func htmlEscape(s string) string {
+	replacer := strings.NewReplacer(
+		`&`, "&amp;", `<`, "&lt;", `>`, "&gt;", `"`, "&quot;",
+	)
+	return replacer.Replace(s)
 }
 
 func evalWarrantyFollowUp(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rule alertRule, today time.Time) (int, int, error) {

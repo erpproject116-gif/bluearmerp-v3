@@ -192,6 +192,23 @@ export default function MigrationCenterPage() {
         <p class="mt-2 text-xs text-text-secondary">
           Mapping Center (document-generation rules) is a different tool. CSV/XLSX column mapping lives only here.
         </p>
+        <div class="mt-3 rounded-lg border border-dashed border-stroke bg-slate-50 px-3 py-2 text-xs text-text-secondary">
+          <p class="font-medium text-text-primary">Go-live reconcile checklist (Lane A)</p>
+          <ul class="mt-1 list-disc space-y-0.5 pl-4">
+            <li>Always use Preview before Import; fix row errors until Preview is clean.</li>
+            <li>Partner/item match rate: review unmatched codes (free-text lines are a warning, not success).</li>
+            <li>Opening stock: warehouse count vs import; serial/lot items are skipped here — receive via Serial &amp; Lot.</li>
+            <li>Open AR/AP: totals vs legacy aging for remaining unpaid only (no paid history).</li>
+            <li>Re-import the same open <code class="rounded bg-white px-1">source_doc_no</code> skips duplicates — it does not update.</li>
+            <li>
+              Files/PDFs/images: use Attachment vault API{" "}
+              <code class="rounded bg-white px-1">POST /api/v1/migration/attachments/import</code> (multipart{" "}
+              <code class="rounded bg-white px-1">files</code> + optional manifest CSV). List orphans via{" "}
+              <code class="rounded bg-white px-1">GET /api/v1/migration/attachments?orphans=1</code>. Requires migration{" "}
+              <code class="rounded bg-white px-1">334</code>.
+            </li>
+          </ul>
+        </div>
       </section>
 
       <section class="space-y-3">

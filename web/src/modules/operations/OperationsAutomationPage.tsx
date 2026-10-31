@@ -184,6 +184,12 @@ export default function OperationsAutomationPage() {
             <option value="work_item.column_changed">Column changed</option>
             <option value="work_item.status_changed">Status changed</option>
             <option value="work_item.quotation_created">Quotation created</option>
+            <option value="workspace.created">Workspace created</option>
+            <option value="booking.created">Booking created</option>
+            <option value="booking.status_changed">Booking status changed</option>
+            <option value="crm.follow_up.created">CRM follow-up created</option>
+            <option value="crm.follow_up.updated">CRM follow-up updated</option>
+            <option value="crm.follow_up.stage_changed">CRM follow-up stage changed</option>
           </select>
         </Field>
         <Field label="Action type">

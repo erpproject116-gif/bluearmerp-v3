@@ -23,7 +23,7 @@ var (
 
 func cacheableTool(name string) bool {
 	switch name {
-	case "get_financial_health", "smart_notifications", "lookup_entities", "list_overdue_ar", "crm_follow_ups":
+	case "get_financial_health", "smart_notifications", "lookup_entities", "list_overdue_ar", "crm_follow_ups", "list_upcoming_bookings":
 		return true
 	default:
 		return false

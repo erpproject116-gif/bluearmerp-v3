@@ -89,6 +89,8 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/open-rfq/preview-mapped", previewOpenRFQMapped(pool))
 		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/in-transit/import-mapped", importInTransitMapped(pool))
 		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/in-transit/preview-mapped", previewInTransitMapped(pool))
+		mr.Get("/attachments", listAttachmentVault(pool))
+		mr.With(auth.RequirePermission("migration.center", auth.AccessWrite)).Post("/attachments/import", importAttachmentVault(pool))
 	})
 }
 

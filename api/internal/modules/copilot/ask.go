@@ -81,6 +81,7 @@ func classifyIntent(query string) string {
 		"balance", "aging", "kpi", "dashboard",
 		"notification", "alert", "recommend", "recommendation", "compare price", "price compare",
 		"pricing", "suggest item", "item search",
+		"booking", "bookings", "appointment", "appointments", "upcoming booking",
 	}
 	for _, h := range opsHints {
 		if strings.Contains(q, h) {
@@ -157,6 +158,10 @@ func toolsForQuery(query string, entities []EntityRef) []struct {
 	}
 	if strings.Contains(q, "follow") || strings.Contains(q, "crm") {
 		add("crm_follow_ups", nil)
+	}
+	if strings.Contains(q, "booking") || strings.Contains(q, "appointment") ||
+		(strings.Contains(q, "calendar") && (strings.Contains(q, "book") || strings.Contains(q, "schedule") || strings.Contains(q, "upcoming"))) {
+		add("list_upcoming_bookings", nil)
 	}
 	if len(out) == 0 {
 		if len(entities) > 0 {

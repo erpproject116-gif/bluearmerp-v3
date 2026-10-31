@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbound"
 )
 
 // EmitERPEvent evaluates active workspace automation rules for the given event.
@@ -22,6 +23,7 @@ func EmitERPEvent(ctx context.Context, pool *pgxpool.Pool, tenantID int64, event
 	if err := runAutomation(ctx, pool, tenantID, event, payload); err != nil {
 		log.Printf("operations automation: event=%s tenant=%d err=%v", event, tenantID, err)
 	}
+	outbound.Emit(ctx, pool, tenantID, event, payload)
 }
 
 func runAutomation(ctx context.Context, pool *pgxpool.Pool, tenantID int64, event string, payload map[string]any) error {
@@ -32,9 +34,13 @@ func runAutomation(ctx context.Context, pool *pgxpool.Pool, tenantID int64, even
 	args := []any{tenantID, event}
 	n := 3
 	if workspaceID > 0 {
+		// Work-item / workspace events: tenant-wide rules or this workspace.
 		where += fmt.Sprintf(" and (workspace_id is null or workspace_id = $%d)", n)
 		args = append(args, workspaceID)
 		n++
+	} else {
+		// CRM/booking (and similar) events have no workspace: only tenant-wide rules.
+		where += " and workspace_id is null"
 	}
 
 	q := fmt.Sprintf(`

@@ -346,6 +346,12 @@ func createFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "crm.task.create", "crm_follow_up_task", &id, nil, body)
 		row, _ := scanFollowUpTask(pool.QueryRow(r.Context(), followUpTaskByIDQuery(), id))
 		_ = operations.MirrorCRMFollowUpTask(r.Context(), pool, tu.TenantID, id)
+		operations.EmitERPEvent(r.Context(), pool, tu.TenantID, "crm.follow_up.created", map[string]any{
+			"follow_up_task_id": id,
+			"stage":             row.Stage,
+			"status":            row.Stage,
+			"actor_user_id":     tu.AppUserID,
+		})
 		response.OK(w, row, "Created.")
 	}
 }
@@ -409,6 +415,12 @@ func patchFollowUpTask(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "crm.task.update", "crm_follow_up_task", &id, nil, body)
 		row, _ := scanFollowUpTask(pool.QueryRow(r.Context(), followUpTaskByIDQuery(), id))
 		_ = operations.MirrorCRMFollowUpTask(r.Context(), pool, tu.TenantID, id)
+		operations.EmitERPEvent(r.Context(), pool, tu.TenantID, "crm.follow_up.updated", map[string]any{
+			"follow_up_task_id": id,
+			"stage":             row.Stage,
+			"status":            row.Stage,
+			"actor_user_id":     tu.AppUserID,
+		})
 		response.OK(w, row, "Updated.")
 	}
 }
@@ -450,6 +462,12 @@ func patchFollowUpTaskStage(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "crm.task.stage", "crm_follow_up_task", &id, nil, body)
 		row, _ := scanFollowUpTask(pool.QueryRow(r.Context(), followUpTaskByIDQuery(), id))
 		_ = operations.MirrorCRMFollowUpTask(r.Context(), pool, tu.TenantID, id)
+		operations.EmitERPEvent(r.Context(), pool, tu.TenantID, "crm.follow_up.stage_changed", map[string]any{
+			"follow_up_task_id": id,
+			"stage":             row.Stage,
+			"status":            row.Stage,
+			"actor_user_id":     tu.AppUserID,
+		})
 		response.OK(w, row, "Updated.")
 	}
 }

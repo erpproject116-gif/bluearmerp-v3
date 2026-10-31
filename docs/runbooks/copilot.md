@@ -77,6 +77,7 @@ Regression proofs: `go test ./internal/modules/copilot/` (sanitizer allowlists),
 | Financial health / overdue | `dashboard.kpis` read |
 | Find stock | `inventory.stock_movements` read |
 | CRM follow-ups | `crm.follow_up_tasks` read (or KPIs) |
+| Upcoming bookings | `booking.bookings` read |
 | Create follow-up (approve) | `crm.follow_up_tasks` write |
 | Create recurring expense (approve) | `finance.contract_write` write |
 | Entity search | authenticated tenant user |

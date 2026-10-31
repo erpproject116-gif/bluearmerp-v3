@@ -53,6 +53,8 @@ func runTool(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, name s
 		tr = toolFindStock(ctx, pool, tu, q)
 	case "crm_follow_ups":
 		tr = toolCRMFollowUps(ctx, pool, tu)
+	case "list_upcoming_bookings":
+		tr = toolUpcomingBookings(ctx, pool, tu)
 	case "lookup_entities":
 		q, _ := args["q"].(string)
 		tr = toolLookupEntities(ctx, pool, tu, entitiesFromArgs(args), q)
@@ -263,6 +265,57 @@ func toolCRMFollowUps(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUse
 		OK:        true,
 		Data:      raw,
 		DeepLinks: []deepLink{{Label: "Follow-up tasks", Href: "/app/crm/follow-up-tasks"}},
+	}
+}
+
+// toolUpcomingBookings lists near-term scheduled/confirmed bookings (read-only).
+func toolUpcomingBookings(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser) toolResult {
+	if !tu.HasPermission("booking.bookings", auth.AccessRead) {
+		return toolResult{Name: "list_upcoming_bookings", Denied: true, Error: "Missing booking.bookings read permission."}
+	}
+	rows, err := pool.Query(ctx, `
+		select b.id, coalesce(b.booking_no, ''), coalesce(b.title, ''), coalesce(b.status, ''),
+		       b.starts_at::text, b.ends_at::text, coalesce(p.company_name, '')
+		from public.book_bookings b
+		left join public.inv_partners p on p.id = b.partner_id and p.tenant_id = b.tenant_id
+		where b.tenant_id = $1
+		  and b.status in ('scheduled', 'confirmed')
+		  and b.starts_at >= (now() - interval '1 day')
+		order by b.starts_at
+		limit 15`, tu.TenantID)
+	if err != nil {
+		return toolResult{Name: "list_upcoming_bookings", OK: false, Error: "Booking query failed."}
+	}
+	defer rows.Close()
+	type row struct {
+		ID          int64  `json:"id"`
+		BookingNo   string `json:"booking_no"`
+		Title       string `json:"title"`
+		Status      string `json:"status"`
+		StartsAt    string `json:"starts_at"`
+		EndsAt      string `json:"ends_at"`
+		PartnerName string `json:"partner_name,omitempty"`
+	}
+	var out []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.ID, &r.BookingNo, &r.Title, &r.Status, &r.StartsAt, &r.EndsAt, &r.PartnerName); err != nil {
+			continue
+		}
+		out = append(out, r)
+	}
+	if out == nil {
+		out = []row{}
+	}
+	raw, _ := json.Marshal(map[string]any{"bookings": out, "as_of": time.Now().UTC().Format(time.RFC3339)})
+	return toolResult{
+		Name: "list_upcoming_bookings",
+		OK:   true,
+		Data: raw,
+		DeepLinks: []deepLink{
+			{Label: "Booking calendar", Href: "/app/booking/calendar"},
+			{Label: "Bookings", Href: "/app/booking/bookings"},
+		},
 	}
 }
 

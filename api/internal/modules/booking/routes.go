@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/operations"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
@@ -446,6 +447,12 @@ func createBooking(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "booking.booking.create", "book_booking", &id, nil, body)
+		operations.EmitERPEvent(r.Context(), pool, tu.TenantID, "booking.created", map[string]any{
+			"booking_id":    id,
+			"booking_no":    bookingNo,
+			"status":        status,
+			"actor_user_id": tu.AppUserID,
+		})
 		row, _ := loadBooking(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Created.")
 	}
@@ -505,6 +512,14 @@ func updateBooking(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "booking.booking.update", "book_booking", &id, map[string]any{"status": prevStatus}, body)
+		if status != prevStatus {
+			operations.EmitERPEvent(r.Context(), pool, tu.TenantID, "booking.status_changed", map[string]any{
+				"booking_id":    id,
+				"status":        status,
+				"prev_status":   prevStatus,
+				"actor_user_id": tu.AppUserID,
+			})
+		}
 		row, _ := loadBooking(r.Context(), pool, tu.TenantID, id)
 		response.OK(w, row, "Updated.")
 	}
