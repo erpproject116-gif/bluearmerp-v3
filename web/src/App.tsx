@@ -163,6 +163,7 @@ import {
   ModuleSetupHubPage,
   MappingCenterPage,
   MigrationCenterPage,
+  OutboundWebhookPage,
   ModuleFeaturesPage,
   DemoDataPage,
   BookingsPage,
@@ -1157,6 +1158,11 @@ export default function App() {
           <Route path="/user-management/migration-center" component={() => (
             <AdminModuleRoute>
               <MigrationCenterPage />
+            </AdminModuleRoute>
+          )} />
+          <Route path="/user-management/outbound-webhook" component={() => (
+            <AdminModuleRoute>
+              <OutboundWebhookPage />
             </AdminModuleRoute>
           )} />
           <Route path="/user-management/demo-data" component={() => (

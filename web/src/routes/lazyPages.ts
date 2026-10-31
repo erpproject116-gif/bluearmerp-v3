@@ -159,6 +159,7 @@ export const ProcessPoliciesPage = lazy(() => import("../modules/user-management
 export const ModuleSetupHubPage = lazy(() => import("../modules/shared/ModuleSetupHubPage"));
 export const MappingCenterPage = lazy(() => import("../modules/user-management/mapping-center/MappingCenterPage"));
 export const MigrationCenterPage = lazy(() => import("../modules/migration/MigrationCenterPage"));
+export const OutboundWebhookPage = lazy(() => import("../modules/user-management/outbound-webhook/OutboundWebhookPage"));
 export const ModuleFeaturesPage = lazy(() => import("../modules/user-management/tenant-modules/ModuleFeaturesPage"));
 export const DemoDataPage = lazy(() => import("../modules/user-management/demo-data/DemoDataPage"));
 export const BookingsPage = lazy(() => import("../modules/booking/BookingsPage"));

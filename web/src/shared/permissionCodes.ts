@@ -230,6 +230,7 @@ export const hrefPermissionCode: Record<string, string> = {
   "/app/finance/acct-ii/setup": "settings.process_policies",
   "/app/user-management/mapping-center": "user_management.users",
   "/app/user-management/migration-center": "migration.center",
+  "/app/user-management/outbound-webhook": "platform.outbound_webhook",
   "/app/user-management/tenant-modules": "settings.tenant_modules",
   "/app/user-management/demo-data": "settings.demo_data",
   "/app/user-management/help-feedback": "user_management.users",
@@ -305,6 +306,7 @@ export function permissionCodeForHref(href: string): string | undefined {
   if (path.startsWith("/app/services/requests")) return "services.requests";
   if (path.startsWith("/app/services/")) return "services.jobs";
   if (path.startsWith("/app/user-management/migration-center")) return "migration.center";
+  if (path.startsWith("/app/user-management/outbound-webhook")) return "platform.outbound_webhook";
   if (path.startsWith("/app/finance/budgets/")) return "finance.budget_read";
   if (path.startsWith("/app/finance/banking")) return "finance.official_receipts";
   const base = path.replace(/\/settings$/, "").replace(/\/new$/, "");

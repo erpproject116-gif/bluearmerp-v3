@@ -1,6 +1,7 @@
 import { createSignal, For, onMount, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { MigrationMappedImportModal } from "./MigrationMappedImportModal";
+import MigrationAttachmentVaultPanel from "./MigrationAttachmentVaultPanel";
 import { takeMigImportSeed, downloadMigImportTemplate, type MigImportSeed, type MigKind } from "../../shared/migrationCsvImport";
 import { useToast } from "../../shared/toast";
 
@@ -200,16 +201,12 @@ export default function MigrationCenterPage() {
             <li>Opening stock: warehouse count vs import; serial/lot items are skipped here — receive via Serial &amp; Lot.</li>
             <li>Open AR/AP: totals vs legacy aging for remaining unpaid only (no paid history).</li>
             <li>Re-import the same open <code class="rounded bg-white px-1">source_doc_no</code> skips duplicates — it does not update.</li>
-            <li>
-              Files/PDFs/images: use Attachment vault API{" "}
-              <code class="rounded bg-white px-1">POST /api/v1/migration/attachments/import</code> (multipart{" "}
-              <code class="rounded bg-white px-1">files</code> + optional manifest CSV). List orphans via{" "}
-              <code class="rounded bg-white px-1">GET /api/v1/migration/attachments?orphans=1</code>. Requires migration{" "}
-              <code class="rounded bg-white px-1">334</code>.
-            </li>
+            <li>Files/PDFs/images: use the Attachment vault panel below (import + orphan list + metadata link).</li>
           </ul>
         </div>
       </section>
+
+      <MigrationAttachmentVaultPanel />
 
       <section class="space-y-3">
         <h3 class="text-sm font-semibold text-text-primary">1. Masters (optional)</h3>

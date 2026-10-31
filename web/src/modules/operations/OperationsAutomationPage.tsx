@@ -1,4 +1,5 @@
 import { createSignal, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useToast } from "../../shared/toast";
@@ -25,6 +26,7 @@ export default function OperationsAutomationPage() {
   const [triggerEvent, setTriggerEvent] = createSignal("work_item.created");
   const [actionType, setActionType] = createSignal("notify");
   const [message, setMessage] = createSignal("Automation triggered.");
+  const [emailTo, setEmailTo] = createSignal("");
   const [setStatus, setSetStatus] = createSignal("done");
   const [setPriority, setSetPriority] = createSignal("high");
   const [saving, setSaving] = createSignal(false);
@@ -41,6 +43,7 @@ export default function OperationsAutomationPage() {
     setTriggerEvent("work_item.created");
     setActionType("notify");
     setMessage("Automation triggered.");
+    setEmailTo("");
     setSetStatus("done");
     setSetPriority("high");
     setModalOpen(true);
@@ -52,6 +55,11 @@ export default function OperationsAutomationPage() {
         return { status: setStatus() };
       case "set_priority":
         return { priority: setPriority() };
+      case "email":
+        return {
+          message: message().trim() || "Automation triggered.",
+          to: emailTo().trim(),
+        };
       default:
         return { message: message().trim() || "Automation triggered." };
     }
@@ -60,6 +68,10 @@ export default function OperationsAutomationPage() {
   const saveRule = async () => {
     if (!ruleName().trim()) {
       toast.warning("Rule name is required.");
+      return;
+    }
+    if (actionType() === "email" && !emailTo().trim()) {
+      toast.warning("Email action needs at least one recipient.");
       return;
     }
     setSaving(true);
@@ -116,8 +128,20 @@ export default function OperationsAutomationPage() {
       </div>
 
       <p class="mb-3 text-sm text-text-secondary">
-        Rules run when work items are created, moved, or status-changed. Notify/log actions appear in Activity Log;
-        set status/priority update the card automatically.
+        In-app automation is a limited extension of Bluearm (notify, log, set work-item status/priority) — not Make or
+        Zapier. For Slack, Sheets, or other apps, connect{" "}
+        <A href="/app/user-management/outbound-webhook" class="font-medium text-brand-600 hover:underline">
+          Outbound webhooks
+        </A>{" "}
+        to your Make/Zapier/n8n Cloud account. Triggers: work items, workspace, booking, and CRM follow-ups/alerts.
+        Notify/log runs appear in{" "}
+        <A
+          href="/app/activity-logs?action_code=operations.automation.notify"
+          class="font-medium text-brand-600 hover:underline"
+        >
+          Activity Log
+        </A>
+        .
       </p>
 
       <Show when={rules.isError}>
@@ -190,19 +214,31 @@ export default function OperationsAutomationPage() {
             <option value="crm.follow_up.created">CRM follow-up created</option>
             <option value="crm.follow_up.updated">CRM follow-up updated</option>
             <option value="crm.follow_up.stage_changed">CRM follow-up stage changed</option>
+            <option value="crm.alert.created">CRM alert created</option>
           </select>
         </Field>
         <Field label="Action type">
           <select class={inputClass} value={actionType()} onChange={(e) => setActionType(e.currentTarget.value)}>
             <option value="notify">Notify (Activity Log)</option>
             <option value="log">Log event</option>
-            <option value="set_status">Set status</option>
-            <option value="set_priority">Set priority</option>
+            <option value="set_status">Set status (work item only)</option>
+            <option value="set_priority">Set priority (work item only)</option>
+            <option value="email">Email (requires mail configured)</option>
           </select>
         </Field>
-        <Show when={actionType() === "notify" || actionType() === "log"}>
+        <Show when={actionType() === "notify" || actionType() === "log" || actionType() === "email"}>
           <Field label="Message">
             <input class={inputClass} value={message()} onInput={(e) => setMessage(e.currentTarget.value)} />
+          </Field>
+        </Show>
+        <Show when={actionType() === "email"}>
+          <Field label="To emails (comma-separated)">
+            <input
+              class={inputClass}
+              placeholder="owner@example.com"
+              value={emailTo()}
+              onInput={(e) => setEmailTo(e.currentTarget.value)}
+            />
           </Field>
         </Show>
         <Show when={actionType() === "set_status"}>

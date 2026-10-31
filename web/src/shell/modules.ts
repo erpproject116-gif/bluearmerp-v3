@@ -693,6 +693,12 @@ export const appModules: AppModule[] = [
         headerPriority: "overflow",
       },
       {
+        label: "Outbound webhooks",
+        href: "/app/user-management/outbound-webhook",
+        settingsHref: "/app/user-management/outbound-webhook",
+        headerPriority: "overflow",
+      },
+      {
         label: "Demo Data",
         href: "/app/user-management/demo-data",
         settingsHref: "/app/user-management/demo-data",

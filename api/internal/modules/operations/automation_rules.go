@@ -294,6 +294,17 @@ func validateAutomationRuleBody(body automationRuleBody) map[string]string {
 	} else if !allowedActions[action] {
 		errs["action_type"] = "Unsupported action type."
 	}
+	if action == "email" {
+		to := ""
+		if body.ActionConfig != nil {
+			if v, ok := body.ActionConfig["to"]; ok && v != nil {
+				to = strings.TrimSpace(fmt.Sprint(v))
+			}
+		}
+		if to == "" {
+			errs["action_config.to"] = "Email action requires at least one recipient in to."
+		}
+	}
 	if len(errs) > 0 {
 		return errs
 	}
@@ -307,11 +318,12 @@ var allowedTriggers = map[string]bool{
 	"work_item.quotation_created": true,
 	"workspace.created":           true,
 	// CRM / booking (tenant-wide; emit without workspace_id — see events.go)
-	"booking.created":           true,
-	"booking.status_changed":    true,
-	"crm.follow_up.created":     true,
-	"crm.follow_up.updated":     true,
+	"booking.created":             true,
+	"booking.status_changed":      true,
+	"crm.follow_up.created":       true,
+	"crm.follow_up.updated":       true,
 	"crm.follow_up.stage_changed": true,
+	"crm.alert.created":           true,
 }
 
 var allowedActions = map[string]bool{
@@ -319,6 +331,7 @@ var allowedActions = map[string]bool{
 	"log":          true,
 	"set_status":   true,
 	"set_priority": true,
+	"email":        true,
 }
 
 func defaultMap(m map[string]any) map[string]any {

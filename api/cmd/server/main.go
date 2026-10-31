@@ -103,6 +103,7 @@ func main() {
 
 	audit.Configure(cfg)
 	audit.StartWorker(pool, cfg)
+	outbound.StartWorker(pool)
 
 	r := chi.NewRouter()
 	// CORS must wrap all handlers so every response (including errors) carries ACAO.

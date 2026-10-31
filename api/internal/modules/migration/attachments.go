@@ -4,19 +4,28 @@ import (
 	"crypto/sha256"
 	"encoding/csv"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/attachmentx"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
+
+// Kinds that may be linked via mig_import_keys (metadata only — no module attachment copy).
+var vaultLinkAllowlist = map[string]bool{
+	"open_quo": true, "open_so": true, "open_si": true, "open_po": true, "open_ap": true,
+	"open_pr": true, "open_rfq": true, "opening_stock": true, "opening_lots": true, "in_transit": true,
+}
 
 type vaultRow struct {
 	ID               int64  `json:"id"`
@@ -201,5 +210,94 @@ func importAttachmentVault(pool *pgxpool.Pool) http.HandlerFunc {
 		response.OK(w, map[string]any{
 			"created": created, "failed": failed, "orphans": orphans, "row_errors": rowErrors,
 		}, "Vault import finished.")
+	}
+}
+
+type linkVaultBody struct {
+	LegacyDocType    string `json:"legacy_doc_type"`
+	LegacyDocNo      string `json:"legacy_doc_no"`
+	LinkedEntityType string `json:"linked_entity_type"`
+	LinkedEntityID   int64  `json:"linked_entity_id"`
+}
+
+// linkAttachmentVault sets linked_entity_* from mig_import_keys and clears is_orphan.
+// Does not insert into quotation/sales/PO attachment tables.
+func linkAttachmentVault(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		vaultID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || vaultID <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid vault id."})
+			return
+		}
+		var body linkVaultBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+
+		kind := strings.TrimSpace(body.LegacyDocType)
+		docNo := strings.TrimSpace(body.LegacyDocNo)
+		entityType := strings.TrimSpace(body.LinkedEntityType)
+		entityID := body.LinkedEntityID
+
+		if kind != "" && docNo != "" {
+			if !vaultLinkAllowlist[kind] {
+				response.Validation(w, map[string]string{"legacy_doc_type": "Kind not in vault link allowlist."})
+				return
+			}
+			hit, docID := alreadyImported(r.Context(), pool, tu.TenantID, kind, docNo)
+			if !hit || docID <= 0 {
+				response.Validation(w, map[string]string{"legacy_doc_no": "No Migration Center import key for that kind/source_doc_no."})
+				return
+			}
+			entityType = kind
+			entityID = docID
+		} else if entityType != "" && entityID > 0 {
+			if !vaultLinkAllowlist[entityType] {
+				response.Validation(w, map[string]string{"linked_entity_type": "Type not in vault link allowlist."})
+				return
+			}
+			var exists bool
+			err := pool.QueryRow(r.Context(), `
+				select exists(
+				  select 1 from public.mig_import_keys
+				  where tenant_id = $1 and kind = $2 and document_id = $3
+				)`, tu.TenantID, entityType, entityID).Scan(&exists)
+			if err != nil || !exists {
+				response.Validation(w, map[string]string{"linked_entity_id": "No Migration Center import key for that type/id."})
+				return
+			}
+		} else {
+			response.Validation(w, map[string]string{
+				"body": "Provide legacy_doc_type+legacy_doc_no or linked_entity_type+linked_entity_id.",
+			})
+			return
+		}
+
+		tag, err := pool.Exec(r.Context(), `
+			update public.mig_attachment_vault
+			set linked_entity_type = $3,
+			    linked_entity_id = $4,
+			    legacy_doc_type = case when coalesce(legacy_doc_type,'') = '' then $3 else legacy_doc_type end,
+			    legacy_doc_no = case when coalesce(legacy_doc_no,'') = '' then $5 else legacy_doc_no end,
+			    is_orphan = false
+			where id = $1 and tenant_id = $2`,
+			vaultID, tu.TenantID, entityType, entityID, docNo,
+		)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to link vault row.", "ERR_INTERNAL")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Vault row not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.OK(w, map[string]any{
+			"id":                 vaultID,
+			"linked_entity_type": entityType,
+			"linked_entity_id":   entityID,
+			"is_orphan":          false,
+		}, "Linked.")
 	}
 }

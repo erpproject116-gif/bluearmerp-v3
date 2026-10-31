@@ -9,6 +9,7 @@ func TestAllowedTriggersIncludeCRMAndBooking(t *testing.T) {
 		"crm.follow_up.created",
 		"crm.follow_up.updated",
 		"crm.follow_up.stage_changed",
+		"crm.alert.created",
 		"workspace.created",
 		"work_item.created",
 	}
@@ -38,6 +39,27 @@ func TestValidateAutomationRuleBodyAcceptsBookingCreated(t *testing.T) {
 		RuleName:     "Booking notify",
 		TriggerEvent: "booking.created",
 		ActionType:   "log",
+	})
+	if errs != nil {
+		t.Fatalf("unexpected errs: %#v", errs)
+	}
+}
+
+func TestValidateAutomationRuleBodyEmailRequiresTo(t *testing.T) {
+	errs := validateAutomationRuleBody(automationRuleBody{
+		RuleName:     "Email me",
+		TriggerEvent: "booking.created",
+		ActionType:   "email",
+		ActionConfig: map[string]any{"message": "hi"},
+	})
+	if errs == nil || errs["action_config.to"] == "" {
+		t.Fatal("expected action_config.to validation error")
+	}
+	errs = validateAutomationRuleBody(automationRuleBody{
+		RuleName:     "Email me",
+		TriggerEvent: "booking.created",
+		ActionType:   "email",
+		ActionConfig: map[string]any{"to": "a@b.com", "message": "hi"},
 	})
 	if errs != nil {
 		t.Fatalf("unexpected errs: %#v", errs)

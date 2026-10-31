@@ -13,10 +13,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/operations"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/notify"
-	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbound"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
@@ -195,7 +195,7 @@ func insertNotification(ctx context.Context, pool *pgxpool.Pool, tenantID int64,
 	}
 	inserted := tag.RowsAffected() > 0
 	if inserted {
-		outbound.Emit(ctx, pool, tenantID, "crm.alert.created", map[string]any{
+		operations.EmitERPEvent(ctx, pool, tenantID, "crm.alert.created", map[string]any{
 			"rule_id": ruleID, "severity": severity, "title": title, "body": body,
 			"entity_type": entityType, "entity_id": entityID, "dedupe_key": dedupeKey,
 		})
@@ -507,8 +507,8 @@ func evalOverdueAR(ctx context.Context, pool *pgxpool.Pool, tenantID int64, rule
 	minBalance := 0.01
 	if len(rule.ThresholdJSON) > 0 {
 		var th struct {
-			MinAgeDays  int     `json:"min_age_days"`
-			MinBalance  float64 `json:"min_balance"`
+			MinAgeDays int     `json:"min_age_days"`
+			MinBalance float64 `json:"min_balance"`
 		}
 		if json.Unmarshal(rule.ThresholdJSON, &th) == nil {
 			if th.MinAgeDays > 0 {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbound"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/outbox"
 )
 
 // EmitERPEvent evaluates active workspace automation rules for the given event.
@@ -162,6 +163,37 @@ func executeAction(ctx context.Context, pool *pgxpool.Pool, tenantID, workItemID
 			update public.wm_work_items set priority = $3, updated_at = now()
 			where id = $1 and tenant_id = $2`, workItemID, tenantID, priority)
 		return err
+
+	case "email":
+		if !outbox.MailConfigured() {
+			return fmt.Errorf("email not configured")
+		}
+		toRaw := strings.TrimSpace(fmt.Sprint(rule.ActionConfig["to"]))
+		var recipients []string
+		for _, part := range strings.Split(toRaw, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				recipients = append(recipients, part)
+			}
+		}
+		if len(recipients) == 0 {
+			return fmt.Errorf("email action requires action_config.to")
+		}
+		subject := fmt.Sprintf("[Bluearm] %s", rule.RuleName)
+		html := fmt.Sprintf(`<p>%s</p><p style="color:#64748b;font-size:12px">Event: %s</p>`, msg, event)
+		if err := outbox.DeliverHTMLToMany(recipients, subject, html, msg); err != nil {
+			return err
+		}
+		actorID := int64From(payload["actor_user_id"])
+		detail := map[string]any{
+			"rule_id": rule.ID, "rule_name": rule.RuleName, "event": event,
+			"message": msg, "to": recipients,
+		}
+		var target *int64
+		if workItemID > 0 {
+			target = &workItemID
+		}
+		return audit.Log(ctx, pool, tenantID, actorID, "operations.automation.email", "wm_work_item", target, nil, detail)
 
 	default:
 		actorID := int64From(payload["actor_user_id"])

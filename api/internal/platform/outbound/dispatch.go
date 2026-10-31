@@ -1,88 +1,102 @@
 package outbound
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Emit posts a signed JSON event to the tenant outbound webhook when configured.
-// Safe to call from CRM/booking/ops paths; failures are logged only.
+const maxDeliveryAttempts = 5
+
+// Emit enqueues a signed JSON event for each active tenant outbound webhook endpoint.
+// Safe to call from CRM/booking/ops paths; does not wait on remote HTTP.
 func Emit(ctx context.Context, pool *pgxpool.Pool, tenantID int64, event string, payload map[string]any) {
 	if pool == nil || tenantID <= 0 || strings.TrimSpace(event) == "" {
 		return
 	}
-	cfg, err := loadConfig(ctx, pool, tenantID)
-	if err != nil || cfg == nil || !cfg.Active || strings.TrimSpace(cfg.URL) == "" || strings.TrimSpace(cfg.Secret) == "" {
-		return
-	}
-	if !eventAllowed(cfg.Filter, event) {
+	cfgs, err := loadActiveEndpoints(ctx, pool, tenantID)
+	if err != nil || len(cfgs) == 0 {
 		return
 	}
 	body := map[string]any{
-		"event":      event,
-		"tenant_id":  tenantID,
+		"event":       event,
+		"tenant_id":   tenantID,
 		"occurred_at": time.Now().UTC().Format(time.RFC3339),
-		"payload":    payload,
+		"payload":     payload,
 	}
 	raw, err := json.Marshal(body)
 	if err != nil {
 		return
 	}
-	sig := signBody(cfg.Secret, raw)
-	go func() {
-		reqCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-		defer cancel()
-		req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, cfg.URL, bytes.NewReader(raw))
+	for _, cfg := range cfgs {
+		if !eventAllowed(cfg.Filter, event) {
+			continue
+		}
+		if strings.TrimSpace(cfg.URL) == "" || strings.TrimSpace(cfg.Secret) == "" {
+			continue
+		}
+		_, err = pool.Exec(ctx, `
+			insert into public.tenant_outbound_webhook_deliveries (
+			  tenant_id, endpoint_id, event, body_json, status, next_attempt_at
+			) values ($1, $2, $3, $4, 'pending', now())`,
+			tenantID, cfg.ID, event, string(raw),
+		)
 		if err != nil {
-			log.Printf("outbound webhook: tenant=%d build req: %v", tenantID, err)
-			return
+			log.Printf("outbound webhook: tenant=%d endpoint=%d enqueue: %v", tenantID, cfg.ID, err)
 		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Bluearm-Signature", "sha256="+sig)
-		req.Header.Set("X-Bluearm-Event", event)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Printf("outbound webhook: tenant=%d event=%s post: %v", tenantID, event, err)
-			return
-		}
-		_ = resp.Body.Close()
-		if resp.StatusCode >= 300 {
-			log.Printf("outbound webhook: tenant=%d event=%s status=%d", tenantID, event, resp.StatusCode)
-		}
-	}()
+	}
 }
 
 type config struct {
+	ID     int64
 	URL    string
 	Secret string
 	Active bool
 	Filter []string
 }
 
-func loadConfig(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (*config, error) {
-	var url, secret string
-	var active bool
-	var filterRaw []byte
-	err := pool.QueryRow(ctx, `
-		select coalesce(target_url,''), coalesce(signing_secret,''), is_active, coalesce(event_filter,'[]'::jsonb)
-		from public.tenant_outbound_webhooks where tenant_id = $1`, tenantID,
-	).Scan(&url, &secret, &active, &filterRaw)
+func loadActiveEndpoints(ctx context.Context, pool *pgxpool.Pool, tenantID int64) ([]config, error) {
+	rows, err := pool.Query(ctx, `
+		select id, coalesce(target_url,''), coalesce(signing_secret,''), is_active, coalesce(event_filter,'[]'::jsonb)
+		from public.tenant_outbound_webhook_endpoints
+		where tenant_id = $1 and is_active = true`, tenantID)
 	if err != nil {
 		return nil, err
 	}
-	var filter []string
-	_ = json.Unmarshal(filterRaw, &filter)
-	return &config{URL: url, Secret: secret, Active: active, Filter: filter}, nil
+	defer rows.Close()
+	var out []config
+	for rows.Next() {
+		var c config
+		var filterRaw []byte
+		if err := rows.Scan(&c.ID, &c.URL, &c.Secret, &c.Active, &filterRaw); err != nil {
+			continue
+		}
+		_ = json.Unmarshal(filterRaw, &c.Filter)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func loadEndpoint(ctx context.Context, pool *pgxpool.Pool, tenantID, endpointID int64) (*config, error) {
+	var c config
+	var filterRaw []byte
+	err := pool.QueryRow(ctx, `
+		select id, coalesce(target_url,''), coalesce(signing_secret,''), is_active, coalesce(event_filter,'[]'::jsonb)
+		from public.tenant_outbound_webhook_endpoints
+		where tenant_id = $1 and id = $2`, tenantID, endpointID,
+	).Scan(&c.ID, &c.URL, &c.Secret, &c.Active, &filterRaw)
+	if err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal(filterRaw, &c.Filter)
+	return &c, nil
 }
 
 func eventAllowed(filter []string, event string) bool {
@@ -116,4 +130,15 @@ func VerifySignature(secret, header string, body []byte) bool {
 	header = strings.TrimPrefix(header, "sha256=")
 	want := signBody(secret, body)
 	return hmac.Equal([]byte(want), []byte(header))
+}
+
+func backoffDuration(attemptsAfterFail int) time.Duration {
+	if attemptsAfterFail < 1 {
+		attemptsAfterFail = 1
+	}
+	sec := 30 << (attemptsAfterFail - 1)
+	if sec > 900 {
+		sec = 900
+	}
+	return time.Duration(sec) * time.Second
 }

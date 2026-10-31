@@ -24,7 +24,7 @@ export default function ActivityLogListPage() {
     dateFrom: "",
     dateTo: "",
     actorUserId: "",
-    actionCode: "",
+    actionCode: typeof params.action_code === "string" ? params.action_code : "",
     targetType: typeof params.target_type === "string" ? params.target_type : "",
     targetId: typeof params.target_id === "string" ? params.target_id : "",
     module: typeof params.module === "string" ? params.module : "",
@@ -36,11 +36,13 @@ export default function ActivityLogListPage() {
 
   createEffect(() => {
     const moduleParam = typeof params.module === "string" ? params.module : "";
+    const actionCodeParam = typeof params.action_code === "string" ? params.action_code : "";
     const targetTypeParam = typeof params.target_type === "string" ? params.target_type : "";
     const targetIdParam = typeof params.target_id === "string" ? params.target_id : "";
     const refParam = typeof params.reference_no === "string" ? params.reference_no : "";
     if (
       moduleParam !== draftFilters().module ||
+      actionCodeParam !== draftFilters().actionCode ||
       targetTypeParam !== draftFilters().targetType ||
       targetIdParam !== draftFilters().targetId ||
       refParam !== draftFilters().referenceNo
@@ -48,6 +50,7 @@ export default function ActivityLogListPage() {
       const next = {
         ...draftFilters(),
         module: moduleParam,
+        actionCode: actionCodeParam,
         targetType: targetTypeParam,
         targetId: targetIdParam,
         referenceNo: refParam,
@@ -82,11 +85,12 @@ export default function ActivityLogListPage() {
 
   const reset = () => {
     const moduleParam = typeof params.module === "string" ? params.module : "";
+    const actionCodeParam = typeof params.action_code === "string" ? params.action_code : "";
     const cleared = {
       dateFrom: "",
       dateTo: "",
       actorUserId: "",
-      actionCode: "",
+      actionCode: actionCodeParam,
       targetType: typeof params.target_type === "string" ? params.target_type : "",
       targetId: typeof params.target_id === "string" ? params.target_id : "",
       module: moduleParam,
