@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { apiFetch } from "../../../shared/api";
 import { hasPermission, useAuth } from "../../../shared/auth-context";
 import { useToast } from "../../../shared/toast";
@@ -171,9 +172,13 @@ export default function OutboundWebhookPage() {
       <div>
         <h2 class="text-lg font-semibold text-text-primary">Outbound webhooks</h2>
         <p class="mt-1 text-sm text-text-secondary">
-          Optional automation extension: push signed Bluearm events to{" "}
-          <strong class="font-medium text-text-primary">your</strong> Make, Zapier, or n8n Cloud webhook URL. Bluearm
-          does not host Make/n8n and is not a Make replacement — use Operations → Automation for simple in-app rules.
+          <strong class="font-medium text-text-primary">BYO tier:</strong> push signed Bluearm events to{" "}
+          <strong class="font-medium text-text-primary">your</strong> Make, Zapier, or n8n Cloud URL. For Bluearm-operated
+          multi-step CRM recipes use{" "}
+          <A href="/app/crm/workflows" class="font-medium text-brand-600 hover:underline">
+            CRM → Workflows
+          </A>
+          . For one-step in-app rules use Project Management → Automation. Not Make/GHL parity.
         </p>
         <p class="mt-2 text-xs text-text-secondary">
           Signature header:{" "}

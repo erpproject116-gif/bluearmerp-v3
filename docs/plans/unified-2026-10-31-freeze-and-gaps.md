@@ -8,8 +8,8 @@
 |----------|--------|
 | System of record | Bluearm ERP (Go API + SolidJS + Supabase) |
 | GHL / second ERP | **Skip** adopting GoHyperLevel, Aperture, Odoo, ERPNext, Twenty, Krayin/Espo/Suite/Dolibarr as replacements |
-| Glue engine | At most **one** of n8n **or** Activepieces — only after webhook approval (**Defer** until B-HOOK) |
-| Rules engine | Extend `wm_automation_rules` + CRM alert rules only — **no** second engine; Windmill not default |
+| Glue engine | At most **one** of n8n **or** Activepieces — B-HOOK cleared; Path B chooses **Activepieces** (see `workflows-path-b-decisions.md`) |
+| Rules engine | Lite tier: `wm_automation_rules` + CRM alert rules. **Waive 2026-10-31:** exactly one second engine allowed = Activepieces under Bluearm ops (`workflows-path-b-decisions.md`). Windmill not default |
 | Commercial bridges | Call-only: lead convert-to-quotation, booking to-quotation, ops create-quotation — **no** quotation package redesign |
 | Baiko locks | Approve-before-write; no Zapier agents; no arbitrary HTTP/SSRF; orchestration stays in Go |
 | Open WebUI | **Abort** until product waives “No second Python service” (**B-OWUI-1**) |
@@ -35,7 +35,7 @@
 | B-OWUI-1 | **Cleared for external OWUI only** — no Python inside Go API; adapter shipped |
 | B-OWUI-2 | **Cleared** — `/copilot/openai/v1/*` adapter |
 | B-MIG | **Cleared for Lane C local disk** — vault API; Lane B history policy still archive-only by design |
-| B-POINT | **Open** — no named paid workflows; wiring docs only (see `unified-integrations-finish.md`) |
+| B-POINT | **Closed for Path B MVP recipes** — see `workflows-named-recipes.md` (R1–R3). Point-tool embeds (Listmonk/Chatwoot/…) still deferred until product marks those In |
 
 ### Do-not-touch (frozen modules)
 

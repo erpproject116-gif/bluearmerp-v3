@@ -181,6 +181,7 @@ import {
   QuotationPipelinePage,
   CustomerWarrantyPage,
   AlertRulesSettingsPage,
+  CrmWorkflowsPage,
   CustomerQuotationsReportPage,
   ItemDemandReportPage,
   ConversionFunnelReportPage,
@@ -903,6 +904,9 @@ export default function App() {
           }} />
           <Route path="/crm/settings/alert-rules" component={() => (
             <CrmRoute><AlertRulesSettingsPage /></CrmRoute>
+          )} />
+          <Route path="/crm/workflows" component={() => (
+            <CrmRoute><CrmWorkflowsPage /></CrmRoute>
           )} />
           <Route path="/crm/reports/customer-quotations" component={() => (
             <CrmRoute><CrmAnalyticsRoute><CustomerQuotationsReportPage /></CrmAnalyticsRoute></CrmRoute>

@@ -1,0 +1,29 @@
+-- Path B: CRM Workflows inbound action idempotency + permission
+-- Does not embed Activepieces; supports recipe R2 writeback.
+
+begin;
+
+create table if not exists public.workflow_action_idempotency (
+  tenant_id bigint not null references public.tenants(id) on delete cascade,
+  idempotency_key text not null,
+  action_code text not null,
+  result_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  primary key (tenant_id, idempotency_key)
+);
+
+create index if not exists idx_workflow_action_idempotency_created
+  on public.workflow_action_idempotency (tenant_id, created_at desc);
+
+insert into public.permission_registry (permission_code, module_code, feature_key, label, sort_order) values
+  ('platform.workflows', 'crm', 'workflows', 'CRM Workflows', 57)
+on conflict (permission_code) do nothing;
+
+insert into public.tenant_role_permissions (tenant_id, role_code, permission_code, access_level)
+select t.id, 'store_admin', 'platform.workflows', 'write'
+from public.tenants t
+join public.tenant_roles tr on tr.tenant_id = t.id and tr.role_code = 'store_admin'
+on conflict (tenant_id, role_code, permission_code) do update
+set access_level = excluded.access_level;
+
+commit;

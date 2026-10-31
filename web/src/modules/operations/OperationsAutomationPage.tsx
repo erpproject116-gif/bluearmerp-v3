@@ -128,13 +128,16 @@ export default function OperationsAutomationPage() {
       </div>
 
       <p class="mb-3 text-sm text-text-secondary">
-        In-app automation is a limited extension of Bluearm (notify, log, set work-item status/priority) — not Make or
-        Zapier. For Slack, Sheets, or other apps, connect{" "}
+        <strong class="font-medium text-text-primary">Lite rules</strong> only (notify, log, email, set work-item
+        status/priority) — not a workflow canvas and not Make/GHL parity. Multi-step CRM recipes:{" "}
+        <A href="/app/crm/workflows" class="font-medium text-brand-600 hover:underline">
+          CRM → Workflows
+        </A>
+        . BYO Make/Zapier/n8n Cloud:{" "}
         <A href="/app/user-management/outbound-webhook" class="font-medium text-brand-600 hover:underline">
           Outbound webhooks
-        </A>{" "}
-        to your Make/Zapier/n8n Cloud account. Triggers: work items, workspace, booking, and CRM follow-ups/alerts.
-        Notify/log runs appear in{" "}
+        </A>
+        . Notify/log runs appear in{" "}
         <A
           href="/app/activity-logs?action_code=operations.automation.notify"
           class="font-medium text-brand-600 hover:underline"

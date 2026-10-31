@@ -382,6 +382,12 @@ export const appModules: AppModule[] = [
         settingsHref: "/app/crm/settings/alert-rules",
       },
       { label: "Alert Rules", href: "/app/crm/settings/alert-rules", settingsHref: "/app/crm/settings/alert-rules", managersOnly: true },
+      {
+        label: "Workflows",
+        href: "/app/crm/workflows",
+        settingsHref: "/app/crm/workflows",
+        headerPriority: "overflow",
+      },
     ],
   },
   {
