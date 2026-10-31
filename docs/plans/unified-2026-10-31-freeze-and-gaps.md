@@ -77,10 +77,10 @@
 | 2–3 CRM/Booking | Emit `crm.follow_up.*` / `booking.*` into ops automation (no quotation package edits) |
 | 4 Ops | New `allowedTriggers` + tenant-wide-only match when no `workspace_id` + Automation UI options |
 | 5 Baiko | **Done** — `list_upcoming_bookings` (read-only) |
-| 6 Webhooks / n8n\|AP | **Defer** (B-HOOK) |
-| 7 Point tools | **Defer** (B-POINT) |
-| 8 Open WebUI | **Abort** (B-OWUI-1) |
-| 9 Migration | **Partial** — Lane A checklist on Migration Center; vault/job logs still **Defer** (B-MIG) |
+| 6 Webhooks / n8n\|AP | **Done** in-repo — migration 334 applied; host Activepieces/n8n separately |
+| 7 Point tools | **Defer** (B-POINT) — docs only until named workflows |
+| 8 Open WebUI | **Done** Go OpenAI adapter; OWUI stays external (no second Python in API) |
+| 9 Migration | **Partial** — Lane A checklist + vault API; auto-link orphans still follow-up |
 | 10 Tests | ops/booking/crm + `./internal/modules/copilot/` — pass |
 
 ### Files touched by this task only

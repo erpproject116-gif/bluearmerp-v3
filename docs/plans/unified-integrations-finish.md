@@ -13,7 +13,7 @@ Owner instruction: proceed until remaining tracks finished. Product blockers tre
 
 ### Smoke
 
-1. Apply migration 334.
+1. Apply migration 334 — **done** (operator, 2026-10-31).
 2. `POST …/rotate-secret` → save secret.
 3. `PUT` with `target_url`, `is_active: true`, filter e.g. `["booking.*","crm.*"]`.
 4. Create booking → receiver gets signed JSON.
