@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -16,10 +17,26 @@ import (
 )
 
 var (
-	errSampleOpen = errors.New("an HR sample batch is already open")
-	errLMSI5      = errors.New("LMSI_5 evaluation template is missing")
-	errNoSample   = errors.New("no HR sample batch is open")
+	errSampleOpen    = errors.New("an HR sample batch is already open")
+	errLMSI5         = errors.New("LMSI_5 evaluation template is missing")
+	errNoSample      = errors.New("no HR sample batch is open")
+	errSampleSalesNo = errors.New("sample sales number is longer than 15 characters")
 )
+
+type sampleMasterError struct {
+	Name string
+}
+
+func (e sampleMasterError) Error() string {
+	return fmt.Sprintf("Sample client bill needs an existing %s. Add one, then seed again.", e.Name)
+}
+
+type sampleSalesMasters struct {
+	partnerID  int64
+	locationID int64
+	currencyID int64
+	taxTypeID  int64
+}
 
 type sampleBlockedError struct {
 	Table string
@@ -114,9 +131,16 @@ func writeSampleErr(w http.ResponseWriter, err error, fallback string) {
 		response.Err(w, http.StatusBadRequest, "No sample data to remove.", "ERR_VALIDATION")
 	case errors.Is(err, errLMSI5):
 		response.Err(w, http.StatusBadRequest, "Migration 338 is not applied. The LMSI_5 evaluation template is missing.", "ERR_VALIDATION")
+	case errors.Is(err, errSampleSalesNo):
+		response.Err(w, http.StatusBadRequest, errSampleSalesNo.Error(), "ERR_VALIDATION")
 	case errors.As(err, &blocked):
 		response.Err(w, http.StatusBadRequest, blocked.Error(), "ERR_VALIDATION")
 	default:
+		var missing sampleMasterError
+		if errors.As(err, &missing) {
+			response.Err(w, http.StatusBadRequest, missing.Error(), "ERR_VALIDATION")
+			return
+		}
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			response.Err(w, http.StatusBadRequest, "A sample name or pay date already exists. Remove the sample set or rename the existing row.", "ERR_VALIDATION")
@@ -164,6 +188,10 @@ func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error)
 	if err != nil {
 		return 0, err
 	}
+	masters, err := lookupSampleSalesMasters(ctx, tx, tenantID)
+	if err != nil {
+		return 0, err
+	}
 
 	var batchID int64
 	if err := tx.QueryRow(ctx, `
@@ -173,9 +201,11 @@ func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error)
 	s := sampler{ctx: ctx, tx: tx, batch: batchID}
 
 	deptNames := []struct{ code, name string }{
-		{"SAMPLE-OFFICE", "Sample Office"},
-		{"SAMPLE-PLANT", "Sample Plant"},
-		{"SAMPLE-SITE", "Sample Site"},
+		{"SAMPLE-B1", "Sample Branch 1"},
+		{"SAMPLE-B2", "Sample Branch 2"},
+		{"SAMPLE-B3", "Sample Branch 3"},
+		{"SAMPLE-B4", "Sample Branch 4"},
+		{"SAMPLE-B5", "Sample Branch 5"},
 	}
 	depts := make([]int64, len(deptNames))
 	for i, d := range deptNames {
@@ -188,32 +218,36 @@ func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error)
 		depts[i] = id
 	}
 
-	type person struct {
-		name, title, status string
-		dept                int
-		salary              float64
-	}
-	people := []person{
-		{"Sample Ana Cruz", "Clerk", "active", 0, 20000},
-		{"Sample Ben Santos", "Operator", "active", 1, 22000},
-		{"Sample Cara Diaz", "Aide", "active", 2, 18000},
-		{"Sample Dan Reyes", "Lead", "active", 0, 25000},
-		{"Sample Eva Lim", "Technician", "active", 1, 21000},
-		{"Sample Finn Cruz", "Aide", "terminated", 2, 19000},
-	}
-	emps := make([]int64, len(people))
-	for i, p := range people {
-		no := fmt.Sprintf("SEEDHR-%d-%02d", batchID, i+1)
+	salaries := []float64{20000, 22000, 18000, 25000, 21000}
+	active := make([]int64, 0, 20)
+	emps := make([]int64, 0, 21)
+	for i := 0; i < 20; i++ {
+		n := i + 1
+		dept := i % 5
 		id, err := s.ins("hr_employees", `
 			insert into public.hr_employees (
-			  tenant_id, employee_no, full_name, department, department_id, job_title, hire_date, status, base_salary, notes
-			) values ($1,$2,$3,$4,$5,$6,'2024-01-15',$7,$8,'Sample HR data') returning id`,
-			tenantID, no, p.name, deptNames[p.dept].name, depts[p.dept], p.title, p.status, p.salary)
+			  tenant_id, employee_no, full_name, department, department_id, job_title, hire_date,
+			  status, base_salary, notes, tin, sss_no, philhealth_no, pagibig_no, tax_status
+			) values ($1,$2,$3,$4,$5,'Staff','2024-01-15','active',$6,'Sample HR data',$7,$8,$9,$10,'S') returning id`,
+			tenantID, fmt.Sprintf("SEEDHR-%d-%02d", batchID, n), fmt.Sprintf("Sample Active %02d", n),
+			deptNames[dept].name, depts[dept], salaries[dept],
+			fmt.Sprintf("SEED-TIN-%02d", n), fmt.Sprintf("SEED-SSS-%02d", n),
+			fmt.Sprintf("SEED-PH-%02d", n), fmt.Sprintf("SEED-PI-%02d", n))
 		if err != nil {
 			return 0, err
 		}
-		emps[i] = id
+		active = append(active, id)
+		emps = append(emps, id)
 	}
+	terminatedID, err := s.ins("hr_employees", `
+		insert into public.hr_employees (
+		  tenant_id, employee_no, full_name, department, department_id, job_title, hire_date, status, base_salary, notes
+		) values ($1,$2,'Sample Finn Cruz',$3,$4,'Aide','2024-01-15','terminated',19000,'Sample HR data') returning id`,
+		tenantID, fmt.Sprintf("SEEDHR-%d-21", batchID), deptNames[4].name, depts[4])
+	if err != nil {
+		return 0, err
+	}
+	emps = append(emps, terminatedID)
 	if _, err := s.ins("hr_compensation_history", `
 		insert into public.hr_compensation_history (tenant_id, employee_id, pay_rate, effective_end)
 		values ($1,$2,10000,'2025-12-31') returning id`, tenantID, emps[0]); err != nil {
@@ -223,17 +257,78 @@ func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error)
 	if err := seedSampleApplicants(s, tenantID); err != nil {
 		return 0, err
 	}
-	if err := seedSamplePeopleOps(s, tenantID, emps, templateID); err != nil {
+	if err := seedSamplePeopleOps(s, tenantID, emps, active, templateID); err != nil {
+		return 0, err
+	}
+	if err := seedSampleAttendance(s, tenantID, active); err != nil {
 		return 0, err
 	}
 	if err := seedSamplePay(s, tenantID); err != nil {
 		return 0, err
 	}
+	if err := seedSampleClientBill(s, tenantID, masters); err != nil {
+		return 0, err
+	}
 	return batchID, nil
 }
 
+func lookupSampleSalesMasters(ctx context.Context, tx pgx.Tx, tenantID int64) (sampleSalesMasters, error) {
+	var m sampleSalesMasters
+	err := tx.QueryRow(ctx, `
+		select id from public.inv_partners
+		where tenant_id = $1 and deleted_at is null and status = 'active'
+		  and partner_kind in ('customer', 'both')
+		order by id limit 1`, tenantID).Scan(&m.partnerID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return m, sampleMasterError{Name: "customer"}
+	}
+	if err != nil {
+		return m, err
+	}
+	err = tx.QueryRow(ctx, `
+		select id from public.inv_locations
+		where tenant_id = $1 and deleted_at is null and status = 'active'
+		order by id limit 1`, tenantID).Scan(&m.locationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return m, sampleMasterError{Name: "stock location"}
+	}
+	if err != nil {
+		return m, err
+	}
+	err = tx.QueryRow(ctx, `
+		select id from public.quo_currencies
+		where tenant_id = $1 and deleted_at is null and status = 'active'
+		order by is_default desc, id limit 1`, tenantID).Scan(&m.currencyID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return m, sampleMasterError{Name: "currency"}
+	}
+	if err != nil {
+		return m, err
+	}
+	err = tx.QueryRow(ctx, `
+		select id from public.quo_tax_types
+		where tenant_id = $1 and deleted_at is null and status = 'active'
+		order by case when tax_mode = 'none' then 0 else 1 end, id
+		limit 1`, tenantID).Scan(&m.taxTypeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return m, sampleMasterError{Name: "tax type"}
+	}
+	return m, err
+}
+
+func sampleSalesNo(batchID int64) (string, error) {
+	no := fmt.Sprintf("SH%d", batchID)
+	if len(no) > 15 {
+		return "", errSampleSalesNo
+	}
+	return no, nil
+}
+
 func seedSampleApplicants(s sampler, tenantID int64) error {
-	industries := []string{"Sample Industry A", "Sample Industry B", "Sample Industry C"}
+	industries := []string{
+		"Sample Industry A", "Sample Industry B", "Sample Industry C",
+		"Sample Industry D", "Sample Industry E",
+	}
 	industryIDs := make([]int64, len(industries))
 	for i, name := range industries {
 		id, err := s.ins("hr_applicant_segments", `
@@ -299,17 +394,44 @@ func seedSampleApplicants(s sampler, tenantID int64) error {
 				values ($1,'Sample Reference','Supervisor','Sample Previous Co','09001112222') returning id`, appID); err != nil {
 				return err
 			}
-			if _, err := s.ins("hr_application_comments", `
-				insert into public.hr_application_comments (tenant_id, application_id, body)
-				values ($1,$2,'Sample comment') returning id`, tenantID, appID); err != nil {
+			if err := insertSampleComment(s, tenantID, appID, "Sample comment"); err != nil {
+				return err
+			}
+		}
+		if status == "hired" {
+			if err := insertSampleComment(s, tenantID, appID, "Sample hired comment"); err != nil {
 				return err
 			}
 		}
 	}
-	return nil
+	personID, err := s.ins("hr_applicant_people", `
+		insert into public.hr_applicant_people (tenant_id, full_name, email, mobile)
+		values ($1,'Sample Applicant Extra',$2,'09000000009') returning id`,
+		tenantID, fmt.Sprintf("sample.extra.%d@example.test", s.batch))
+	if err != nil {
+		return err
+	}
+	appID, err := s.ins("hr_applications", `
+		insert into public.hr_applications (
+		  tenant_id, person_id, status, position_desired, email, cellphone,
+		  industry_id, workplace_type_id, certified
+		) values ($1,$2,'pooling','Sample role',$3,'09000000009',$4,$5,true) returning id`,
+		tenantID, personID, fmt.Sprintf("sample.extra.%d@example.test", s.batch),
+		industryIDs[0], workplaceIDs[0])
+	if err != nil {
+		return err
+	}
+	return insertSampleComment(s, tenantID, appID, "Sample extra comment")
 }
 
-func seedSamplePeopleOps(s sampler, tenantID int64, emps []int64, templateID int64) error {
+func insertSampleComment(s sampler, tenantID, appID int64, body string) error {
+	_, err := s.ins("hr_application_comments", `
+		insert into public.hr_application_comments (tenant_id, application_id, body)
+		values ($1,$2,$3) returning id`, tenantID, appID, body)
+	return err
+}
+
+func seedSamplePeopleOps(s sampler, tenantID int64, emps, active []int64, templateID int64) error {
 	leaveTypeID, err := reuseOrInsert(s, "hr_leave_types", `
 		select id from public.hr_leave_types where tenant_id = $1 and code = 'VL'`,
 		`insert into public.hr_leave_types (tenant_id, code, name) values ($1,'SAMPLE-LEAVE','Sample Leave') returning id`,
@@ -326,16 +448,6 @@ func seedSamplePeopleOps(s sampler, tenantID int64, emps []int64, templateID int
 		insert into public.hr_leave_requests (tenant_id, employee_id, leave_type_id, date_from, date_to, days, status, reason)
 		values ($1,$2,$3,'2099-01-06','2099-01-06',1,'submitted','Sample leave') returning id`,
 		tenantID, emps[0], leaveTypeID); err != nil {
-		return err
-	}
-	if _, err := s.ins("hr_dtr_entries", `
-		insert into public.hr_dtr_entries (tenant_id, employee_id, work_date, source, status, hours_worked)
-		values ($1,$2,'2099-01-02','manual','present',8) returning id`, tenantID, emps[0]); err != nil {
-		return err
-	}
-	if _, err := s.ins("hr_dtr_entries", `
-		insert into public.hr_dtr_entries (tenant_id, employee_id, work_date, source, status, hours_worked)
-		values ($1,$2,'2099-01-03','manual','absent',0) returning id`, tenantID, emps[1]); err != nil {
 		return err
 	}
 	if _, err := s.ins("hr_company_records", `
@@ -394,18 +506,20 @@ func seedSamplePeopleOps(s sampler, tenantID int64, emps []int64, templateID int
 	if err != nil {
 		return err
 	}
-	if _, err := s.ins("hr_performance_reviews", `
-		insert into public.hr_performance_reviews (
-		  tenant_id, cycle_id, employee_id, status, manager_comments, overall_score, scores_json, review_source
-		) values ($1,$2,$3,'manager_done','Sample agency review',4,$4::jsonb,'agency') returning id`,
-		tenantID, cycleID, emps[0], scores); err != nil {
-		return err
+	for _, empID := range active {
+		if _, err := s.ins("hr_performance_reviews", `
+			insert into public.hr_performance_reviews (
+			  tenant_id, cycle_id, employee_id, status, manager_comments, overall_score, scores_json, review_source
+			) values ($1,$2,$3,'manager_done','Sample agency review',4,$4::jsonb,'agency') returning id`,
+			tenantID, cycleID, empID, scores); err != nil {
+			return err
+		}
 	}
 	if _, err := s.ins("hr_performance_reviews", `
 		insert into public.hr_performance_reviews (
 		  tenant_id, cycle_id, employee_id, status, manager_comments, overall_score, scores_json, review_source
 		) values ($1,$2,$3,'manager_done','Sample client review',4,$4::jsonb,'client') returning id`,
-		tenantID, cycleID, emps[1], scores); err != nil {
+		tenantID, cycleID, active[0], scores); err != nil {
 		return err
 	}
 
@@ -460,9 +574,38 @@ func reuseOrInsert(s sampler, table, lookup, insert string, tenantID int64) (int
 	return s.ins(table, insert, tenantID)
 }
 
+func seedSampleAttendance(s sampler, tenantID int64, active []int64) error {
+	start := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2099, 3, 31, 0, 0, 0, 0, time.UTC)
+	var firstWeekday time.Time
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+			continue
+		}
+		if firstWeekday.IsZero() {
+			firstWeekday = d
+		}
+		for i, empID := range active {
+			status := "present"
+			hours := 8.0
+			if i == 0 && d.Equal(firstWeekday) {
+				status = "absent"
+				hours = 0
+			}
+			if _, err := s.ins("hr_dtr_entries", `
+				insert into public.hr_dtr_entries (tenant_id, employee_id, work_date, source, status, hours_worked)
+				values ($1,$2,$3,'manual',$4,$5) returning id`,
+				tenantID, empID, d.Format("2006-01-02"), status, hours); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func seedSamplePay(s sampler, tenantID int64) error {
 	rows, err := s.tx.Query(s.ctx, `
-		select e.id, e.status, e.base_salary::float8
+		select e.id, e.employee_no, e.full_name, e.status, e.base_salary::float8
 		from public.hr_employees e
 		join public.hr_sample_rows r on r.row_id = e.id and r.table_name = 'hr_employees' and r.batch_id = $1
 		order by e.employee_no`, s.batch)
@@ -471,13 +614,15 @@ func seedSamplePay(s sampler, tenantID int64) error {
 	}
 	type empPay struct {
 		id     int64
+		no     string
+		name   string
 		status string
 		salary float64
 	}
 	var emps []empPay
 	for rows.Next() {
 		var e empPay
-		if err := rows.Scan(&e.id, &e.status, &e.salary); err != nil {
+		if err := rows.Scan(&e.id, &e.no, &e.name, &e.status, &e.salary); err != nil {
 			rows.Close()
 			return err
 		}
@@ -488,30 +633,60 @@ func seedSamplePay(s sampler, tenantID int64) error {
 		return err
 	}
 
-	regularID, err := s.ins("hr_pay_periods", `
-		insert into public.hr_pay_periods (tenant_id, period_label, period_start, period_end, status, run_type)
-		values ($1,'Sample regular','2099-01-01','2099-01-15','processed','regular') returning id`, tenantID)
-	if err != nil {
-		return err
+	periods := []struct{ label, start, end string }{
+		{"Sample Jan 2099", "2099-01-01", "2099-01-31"},
+		{"Sample Feb 2099", "2099-02-01", "2099-02-28"},
+		{"Sample Mar 2099", "2099-03-01", "2099-03-31"},
 	}
+	var januaryID int64
 	var terminated empPay
-	for _, e := range emps {
-		if e.status != "active" {
-			terminated = e
-			continue
-		}
-		slipID, err := s.ins("hr_payslips", `
-			insert into public.hr_payslips (tenant_id, pay_period_id, employee_id, gross_pay, deductions, net_pay, status)
-			values ($1,$2,$3,$4,0,$4,'posted') returning id`, tenantID, regularID, e.id, e.salary)
+	for i, p := range periods {
+		periodID, err := s.ins("hr_pay_periods", `
+			insert into public.hr_pay_periods (tenant_id, period_label, period_start, period_end, status, run_type)
+			values ($1,$2,$3,$4,'processed','regular') returning id`, tenantID, p.label, p.start, p.end)
 		if err != nil {
 			return err
 		}
-		if _, err := s.ins("hr_payslip_lines", `
-			insert into public.hr_payslip_lines (payslip_id, line_no, line_type, line_code, description, amount)
-			values ($1,1,'earning','BASIC','Sample basic',$2) returning id`, slipID, e.salary); err != nil {
+		if i == 0 {
+			januaryID = periodID
+		}
+		start, err := time.Parse("2006-01-02", p.start)
+		if err != nil {
 			return err
 		}
+		end, err := time.Parse("2006-01-02", p.end)
+		if err != nil {
+			return err
+		}
+		for _, e := range emps {
+			if e.status != "active" {
+				terminated = e
+				continue
+			}
+			if err := insertDraftPayslip(s, tenantID, periodID, e.id, e.no, e.name, e.salary, start, end); err != nil {
+				return err
+			}
+		}
 	}
+	var ee, er, ec float64
+	if err := s.tx.QueryRow(s.ctx, `
+		select
+		  coalesce(sum(case when pl.line_code = 'SSS_EE' then pl.amount else 0 end), 0)::float8,
+		  coalesce(sum(case when pl.line_code = 'SSS_ER' then pl.amount else 0 end), 0)::float8,
+		  coalesce(sum(case when pl.line_code = 'SSS_EC' then pl.amount else 0 end), 0)::float8
+		from public.hr_payslip_lines pl
+		join public.hr_payslips ps on ps.id = pl.payslip_id
+		where ps.pay_period_id = $1`, januaryID).Scan(&ee, &er, &ec); err != nil {
+		return err
+	}
+	if _, err := s.ins("hr_remittance_batches", `
+		insert into public.hr_remittance_batches (
+		  tenant_id, pay_period_id, agency, period_label, status, total_employee, total_employer, total_amount
+		) values ($1,$2,'sss','Sample Jan 2099','draft',$3,$4,$5) returning id`,
+		tenantID, januaryID, ee, er+ec, ee+er+ec); err != nil {
+		return err
+	}
+
 	thirteenthID, err := s.ins("hr_pay_periods", `
 		insert into public.hr_pay_periods (tenant_id, period_label, period_start, period_end, status, run_type)
 		values ($1,'Sample 13th month','2099-12-01','2099-12-31','processed','thirteenth') returning id`, tenantID)
@@ -555,13 +730,65 @@ func seedSamplePay(s sampler, tenantID int64) error {
 		values ($1,1,'earning','FINAL_PAY','Sample final pay',$2) returning id`, slipID, terminated.salary); err != nil {
 		return err
 	}
-	_, err = s.ins("hr_remittance_batches", `
-		insert into public.hr_remittance_batches (tenant_id, pay_period_id, agency, period_label, status)
-		values ($1,$2,'sss','Sample regular','draft') returning id`, tenantID, regularID)
+	return nil
+}
+
+func insertDraftPayslip(s sampler, tenantID, periodID, employeeID int64, employeeNo, employeeName string, salary float64, start, end time.Time) error {
+	draft, err := buildEmployeePayslipDraft(s.ctx, s.tx, tenantID, employeeID, employeeNo, employeeName, salary, start, end)
+	if err != nil {
+		return err
+	}
+	slipID, err := s.ins("hr_payslips", `
+		insert into public.hr_payslips (tenant_id, pay_period_id, employee_id, gross_pay, deductions, net_pay, status)
+		values ($1,$2,$3,$4,$5,$6,'posted') returning id`,
+		tenantID, periodID, employeeID, draft.GrossPay, draft.Deductions, draft.NetPay)
+	if err != nil {
+		return err
+	}
+	for _, ln := range draft.Lines {
+		if _, err := s.ins("hr_payslip_lines", `
+			insert into public.hr_payslip_lines (payslip_id, line_no, line_type, line_code, description, amount)
+			values ($1,$2,$3,$4,$5,$6) returning id`,
+			slipID, ln.LineNo, ln.LineType, ln.LineCode, ln.Description, ln.Amount); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedSampleClientBill(s sampler, tenantID int64, masters sampleSalesMasters) error {
+	salesNo, err := sampleSalesNo(s.batch)
+	if err != nil {
+		return err
+	}
+	var dateSeq int
+	if err := s.tx.QueryRow(s.ctx, `
+		select coalesce(max(date_seq), 0) + 1
+		from public.sa_sales
+		where tenant_id = $1 and order_date = '2099-01-31'`, tenantID).Scan(&dateSeq); err != nil {
+		return err
+	}
+	salesID, err := s.ins("sa_sales", `
+		insert into public.sa_sales (
+		  tenant_id, order_date, date_seq, sales_no, tax_type_id, currency_id, partner_id, location_id,
+		  progress_status, invoicing_status, subtotal, tax_total, grand_total, notes
+		) values ($1,'2099-01-31',$2,$3,$4,$5,$6,$7,'unconfirmed',false,10000,0,10000,'Sample HR client bill')
+		returning id`,
+		tenantID, dateSeq, salesNo, masters.taxTypeID, masters.currencyID, masters.partnerID, masters.locationID)
+	if err != nil {
+		return err
+	}
+	_, err = s.ins("sa_sales_lines", `
+		insert into public.sa_sales_lines (
+		  sales_id, line_no, item_code, item_name, qty, unit_non_vat, non_vat_total,
+		  tax_amount, unit_vat_inc, line_total, discount_amount, discounted_unit_non_vat, discounted_unit_vat_inc
+		) values ($1,1,'','Sample manpower service',1,10000,10000,0,0,10000,0,10000,0) returning id`, salesID)
 	return err
 }
 
 var sampleRetractOrder = []string{
+	"sa_sales_lines",
+	"sa_sales",
 	"hr_application_children",
 	"hr_application_jobs",
 	"hr_application_references",

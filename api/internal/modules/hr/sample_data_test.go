@@ -35,6 +35,16 @@ func TestSampleEmployeeExcludeSQL(t *testing.T) {
 	}
 }
 
+func TestSampleSalesNo(t *testing.T) {
+	no, err := sampleSalesNo(1)
+	if err != nil || no != "SH1" {
+		t.Fatalf("sales no = %s err=%v", no, err)
+	}
+	if _, err := sampleSalesNo(1e14); err != errSampleSalesNo {
+		t.Fatalf("long sales no err = %v", err)
+	}
+}
+
 func TestSampleSeedRetract(t *testing.T) {
 	cfg := config.Load()
 	if strings.TrimSpace(cfg.DatabaseURL) == "" {
@@ -105,8 +115,105 @@ func TestSampleSeedRetract(t *testing.T) {
 	if hiredEmployees != 0 {
 		t.Fatal("hired application created an employee")
 	}
+	var activeCount, regularSlips, missingStatutory, shareTokens int
+	if err := tx.QueryRow(ctx, `
+		select count(*) from public.hr_employees e
+		join public.hr_sample_rows r on r.row_id = e.id and r.table_name = 'hr_employees' and r.batch_id = $1
+		where e.status = 'active'`, batchID).Scan(&activeCount); err != nil {
+		t.Fatal(err)
+	}
+	if activeCount != 20 {
+		t.Fatalf("active employees = %d", activeCount)
+	}
+	if err := tx.QueryRow(ctx, `
+		select count(*) from public.hr_payslips ps
+		join public.hr_pay_periods pp on pp.id = ps.pay_period_id
+		join public.hr_sample_rows r on r.row_id = pp.id and r.table_name = 'hr_pay_periods' and r.batch_id = $1
+		where pp.run_type = 'regular'`, batchID).Scan(&regularSlips); err != nil {
+		t.Fatal(err)
+	}
+	if regularSlips != 60 {
+		t.Fatalf("regular payslips = %d", regularSlips)
+	}
+	if err := tx.QueryRow(ctx, `
+		select count(*) from public.hr_payslips ps
+		join public.hr_pay_periods pp on pp.id = ps.pay_period_id
+		join public.hr_sample_rows r on r.row_id = pp.id and r.table_name = 'hr_pay_periods' and r.batch_id = $1
+		where pp.run_type = 'regular'
+		  and (
+		    not exists (select 1 from public.hr_payslip_lines pl where pl.payslip_id = ps.id and pl.line_code = 'SSS_EE')
+		    or not exists (select 1 from public.hr_payslip_lines pl where pl.payslip_id = ps.id and pl.line_code = 'PHIC_EE')
+		    or not exists (select 1 from public.hr_payslip_lines pl where pl.payslip_id = ps.id and pl.line_code = 'HDMF_EE')
+		    or not exists (select 1 from public.hr_payslip_lines pl where pl.payslip_id = ps.id and pl.line_code = 'WHT')
+		  )`, batchID).Scan(&missingStatutory); err != nil {
+		t.Fatal(err)
+	}
+	if missingStatutory != 0 {
+		t.Fatalf("regular payslips missing statutory lines = %d", missingStatutory)
+	}
+	if err := tx.QueryRow(ctx, `
+		select count(*) from public.hr_payslip_share_tokens t
+		join public.hr_payslips ps on ps.id = t.payslip_id
+		join public.hr_sample_rows r on r.row_id = ps.id and r.table_name = 'hr_payslips' and r.batch_id = $1`,
+		batchID).Scan(&shareTokens); err != nil {
+		t.Fatal(err)
+	}
+	if shareTokens != 0 {
+		t.Fatalf("share tokens = %d", shareTokens)
+	}
+	var empID int64
+	var empNo, empName string
+	var salary float64
+	if err := tx.QueryRow(ctx, `
+		select id, employee_no, full_name, base_salary::float8
+		from public.hr_employees
+		where tenant_id = $1 and employee_no = $2`, tenantID, fmt.Sprintf("SEEDHR-%d-01", batchID)).Scan(&empID, &empNo, &empName, &salary); err != nil {
+		t.Fatal(err)
+	}
+	draft, err := buildEmployeePayslipDraft(ctx, tx, tenantID, empID, empNo, empName, salary,
+		time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2099, 1, 31, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasAbsence := false
+	for _, ln := range draft.Lines {
+		if ln.LineCode == "ABSENCE" {
+			hasAbsence = true
+		}
+	}
+	if !hasAbsence {
+		t.Fatal("January draft for employee 01 has no ABSENCE line")
+	}
+	lineRows, err := tx.Query(ctx, `
+		select pl.line_no, pl.line_code, pl.amount::float8
+		from public.hr_payslip_lines pl
+		join public.hr_payslips ps on ps.id = pl.payslip_id
+		join public.hr_pay_periods pp on pp.id = ps.pay_period_id
+		where ps.employee_id = $1 and pp.run_type = 'regular'
+		  and pp.period_start = '2099-01-01' and pp.period_end = '2099-01-31'
+		order by pl.line_no`, empID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stored []draftPayslipLine
+	for lineRows.Next() {
+		var ln draftPayslipLine
+		if err := lineRows.Scan(&ln.LineNo, &ln.LineCode, &ln.Amount); err != nil {
+			lineRows.Close()
+			t.Fatal(err)
+		}
+		stored = append(stored, ln)
+	}
+	lineRows.Close()
+	if len(stored) != len(draft.Lines) {
+		t.Fatalf("stored lines %d != draft lines %d", len(stored), len(draft.Lines))
+	}
+	for i := range draft.Lines {
+		if stored[i].LineCode != draft.Lines[i].LineCode || stored[i].Amount != draft.Lines[i].Amount {
+			t.Fatalf("line %d stored %s %v draft %s %v", i, stored[i].LineCode, stored[i].Amount, draft.Lines[i].LineCode, draft.Lines[i].Amount)
+		}
+	}
 	var thirteenth float64
-	var basic float64
 	if err := tx.QueryRow(ctx, `
 		select coalesce(sum(pl.amount),0)::float8
 		from public.hr_payslip_lines pl
@@ -116,17 +223,25 @@ func TestSampleSeedRetract(t *testing.T) {
 		where pp.run_type = 'thirteenth' and pl.line_code = 'THIRTEENTH'`, batchID).Scan(&thirteenth); err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.QueryRow(ctx, `
-		select coalesce(sum(pl.amount),0)::float8
-		from public.hr_payslip_lines pl
-		join public.hr_payslips ps on ps.id = pl.payslip_id
-		join public.hr_pay_periods pp on pp.id = ps.pay_period_id
-		join public.hr_sample_rows r on r.row_id = pp.id and r.table_name = 'hr_pay_periods' and r.batch_id = $1
-		where pp.run_type = 'regular' and pl.line_code = 'BASIC'`, batchID).Scan(&basic); err != nil {
+	if roundMoney(thirteenth) != expectedSampleThirteenth() {
+		t.Fatalf("13th month %v != %v", thirteenth, expectedSampleThirteenth())
+	}
+	salesNo, err := sampleSalesNo(batchID)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if roundMoney(thirteenth) != roundMoney(basic/12) && !thirteenthClose(thirteenth, basic) {
-		t.Fatalf("13th month %v is not basic %v / 12", thirteenth, basic)
+	var invoiceCount int
+	var invoiceTotal float64
+	var invoiceStatus string
+	if err := tx.QueryRow(ctx, `
+		select count(*), coalesce(max(s.grand_total),0)::float8, coalesce(max(s.progress_status),'')
+		from public.sa_sales s
+		join public.hr_sample_rows r on r.row_id = s.id and r.table_name = 'sa_sales' and r.batch_id = $1`,
+		batchID).Scan(&invoiceCount, &invoiceTotal, &invoiceStatus); err != nil {
+		t.Fatal(err)
+	}
+	if invoiceCount != 1 || invoiceTotal != 10000 || invoiceStatus != "unconfirmed" {
+		t.Fatalf("invoice count=%d total=%v status=%s", invoiceCount, invoiceTotal, invoiceStatus)
 	}
 
 	keeperNo := fmt.Sprintf("KEEP-%d", time.Now().UnixNano())
@@ -155,9 +270,21 @@ func TestSampleSeedRetract(t *testing.T) {
 	if sampleLeft != 0 {
 		t.Fatal("sample employees remain after retract")
 	}
+	var invoiceLeft int
+	if err := tx.QueryRow(ctx, `
+		select count(*) from public.sa_sales where tenant_id = $1 and sales_no = $2`, tenantID, salesNo).Scan(&invoiceLeft); err != nil {
+		t.Fatal(err)
+	}
+	if invoiceLeft != 0 {
+		t.Fatal("sample invoice remains after retract")
+	}
 }
 
-func thirteenthClose(thirteenth, basic float64) bool {
-	perEmployee := roundMoney(20000/12) + roundMoney(22000/12) + roundMoney(18000/12) + roundMoney(25000/12) + roundMoney(21000/12)
-	return roundMoney(thirteenth) == roundMoney(perEmployee) && roundMoney(basic) == 106000
+func expectedSampleThirteenth() float64 {
+	salaries := []float64{20000, 22000, 18000, 25000, 21000}
+	var total float64
+	for i := 0; i < 20; i++ {
+		total += roundMoney(salaries[i%5] / 12)
+	}
+	return roundMoney(total)
 }
