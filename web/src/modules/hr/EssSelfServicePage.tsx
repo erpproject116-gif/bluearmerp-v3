@@ -220,7 +220,40 @@ function EssSelfServiceView() {
           {(d) => <p class="text-sm">{d.doc_type}: {d.title}</p>}
         </For>
       </section>
+
+      <EssRequests />
     </div>
+  );
+}
+
+function EssRequests() {
+  const toast = useToast();
+  const [kind, setKind] = createSignal("loan");
+  const [details, setDetails] = createSignal("");
+  const [rows, { refetch }] = createResource(async () => (await apiFetch<{ id: number; kind: string; status: string; details: string }[]>("/api/v1/hr/ess/requests")).data ?? []);
+  const submit = async () => {
+    const res = await apiFetch("/api/v1/hr/ess/requests", { method: "POST", body: JSON.stringify({ kind: kind(), details: details() }) });
+    if (!res.success) return toast.warning(res.message ?? "Could not submit the request.");
+    toast.success("Request submitted.");
+    setDetails("");
+    void refetch();
+  };
+  return (
+    <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">Requests</h2>
+      <Field label="Kind">
+        <select class={inputClass} value={kind()} onChange={(e) => setKind(e.currentTarget.value)}>
+          <option value="loan">Loan</option>
+          <option value="salary_advance">Salary advance</option>
+          <option value="pay_question">Pay question</option>
+          <option value="certificate">Certificate</option>
+          <option value="resignation">Resignation</option>
+        </select>
+      </Field>
+      <Field label="Details"><textarea class={inputClass} value={details()} onInput={(e) => setDetails(e.currentTarget.value)} /></Field>
+      <button type="button" class="mt-2 rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void submit()}>Submit request</button>
+      <For each={rows() ?? []}>{(row) => <p class="mt-2 text-sm">{row.kind} · {row.status} · {row.details}</p>}</For>
+    </section>
   );
 }
 

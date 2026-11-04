@@ -70,6 +70,9 @@ var formEntityTypes = map[string]bool{
 	"svc_load_slip":          true,
 	"hr_employee":            true,
 	"hr_leave_request":       true,
+	"hr_application":         true,
+	"hr_workplace_problem":   true,
+	"hr_worker_request":      true,
 }
 
 type querier interface {

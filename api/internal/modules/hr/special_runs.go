@@ -18,9 +18,9 @@ import (
 )
 
 type specialRunBody struct {
-	Year          int    `json:"year"`
-	PeriodLabel   string `json:"period_label"`
-	EmployeeID    *int64 `json:"employee_id"` // final pay: one employee
+	Year           int    `json:"year"`
+	PeriodLabel    string `json:"period_label"`
+	EmployeeID     *int64 `json:"employee_id"` // final pay: one employee
 	SeparationDate string `json:"separation_date"`
 }
 
@@ -36,13 +36,13 @@ type specialRunPreviewRow struct {
 }
 
 type specialRunResult struct {
-	RunType       string                 `json:"run_type"`
-	PayPeriodID   int64                  `json:"pay_period_id,omitempty"`
-	PayslipCount  int                    `json:"payslip_count"`
-	TotalGross    float64                `json:"total_gross"`
-	TotalNet      float64                `json:"total_net"`
-	Employees     []specialRunPreviewRow `json:"employees"`
-	JournalEntryID *int64                `json:"journal_entry_id,omitempty"`
+	RunType        string                 `json:"run_type"`
+	PayPeriodID    int64                  `json:"pay_period_id,omitempty"`
+	PayslipCount   int                    `json:"payslip_count"`
+	TotalGross     float64                `json:"total_gross"`
+	TotalNet       float64                `json:"total_net"`
+	Employees      []specialRunPreviewRow `json:"employees"`
+	JournalEntryID *int64                 `json:"journal_entry_id,omitempty"`
 }
 
 func registerSpecialRunRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -57,7 +57,7 @@ func registerSpecialRunRoutes(r chi.Router, pool *pgxpool.Pool) {
 func computeThirteenthRows(ctx context.Context, tx pgx.Tx, tenantID int64, year int) ([]specialRunPreviewRow, error) {
 	start := fmt.Sprintf("%d-01-01", year)
 	end := fmt.Sprintf("%d-12-31", year)
-	rows, err := tx.Query(ctx, `
+	rows, err := tx.Query(ctx, fmt.Sprintf(`
 		select e.id, e.employee_no, e.full_name, e.base_salary::float8,
 		  coalesce((
 		    select sum(pl.amount)::float8
@@ -79,8 +79,8 @@ func computeThirteenthRows(ctx context.Context, tx pgx.Tx, tenantID int64, year 
 		      and coalesce(pp.run_type, 'regular') = 'regular'
 		  ), 0)
 		from public.hr_employees e
-		where e.tenant_id = $1 and e.status in ('active', 'terminated') and e.base_salary > 0
-		order by e.full_name`, tenantID, start, end)
+		where e.tenant_id = $1 and e.status in ('active', 'terminated') and e.base_salary > 0%s
+		order by e.full_name`, sampleEmployeeExcludeSQL("e")), tenantID, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -282,6 +282,15 @@ func runFinalPay(pool *pgxpool.Pool) http.HandlerFunc {
 		var body specialRunBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.EmployeeID == nil || *body.EmployeeID <= 0 {
 			response.Validation(w, map[string]string{"employee_id": "Required."})
+			return
+		}
+		sampleEmp, err := employeeInOpenSample(r.Context(), pool, tu.TenantID, *body.EmployeeID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to run final pay.", "ERR_INTERNAL")
+			return
+		}
+		if sampleEmp {
+			response.Err(w, http.StatusBadRequest, "Sample employees cannot be included in final pay. Remove the sample data first.", "ERR_VALIDATION")
 			return
 		}
 		sep, err := parseDate(body.SeparationDate)

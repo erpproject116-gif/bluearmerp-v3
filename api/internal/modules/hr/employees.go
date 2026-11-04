@@ -108,6 +108,7 @@ func registerEmployeeRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/employees/actions/bulk-delete", bulkDeleteEmployees(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/employees/actions/bulk-restore", bulkRestoreEmployees(pool))
 	r.Get("/employees/{id}", getEmployee(pool))
+	r.Get("/employees/{id}/compensation-history", listCompensationHistory(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Patch("/employees/{id}", patchEmployee(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/employees/{id}/actions/delete", deleteEmployee(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/employees/{id}/actions/restore", restoreEmployee(pool))
@@ -431,11 +432,34 @@ func patchEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
+		var previousSalary *float64
+		if body.BaseSalary != nil {
+			var current float64
+			if err := tx.QueryRow(r.Context(), `
+				select base_salary::float8 from public.hr_employees
+				where id = $1 and tenant_id = $2 and deleted_at is null`, id, tu.TenantID).Scan(&current); err != nil {
+				response.Err(w, http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
+				return
+			}
+			previousSalary = &current
+		}
 		q := fmt.Sprintf(`update public.hr_employees set %s where id = $1 and tenant_id = $2 and deleted_at is null`, strings.Join(sets, ", "))
 		tag, err := tx.Exec(r.Context(), q, args...)
 		if err != nil || tag.RowsAffected() == 0 {
 			response.Err(w, http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
 			return
+		}
+		if previousSalary != nil && body.BaseSalary != nil && *previousSalary != *body.BaseSalary {
+			var createdBy any
+			if tu.AppUserID > 0 {
+				createdBy = tu.AppUserID
+			}
+			if _, err := tx.Exec(r.Context(), `
+				insert into public.hr_compensation_history (tenant_id, employee_id, pay_rate, effective_end, created_by)
+				values ($1,$2,$3,current_date,$4)`, tu.TenantID, id, *previousSalary, createdBy); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to keep the previous basic pay.", "ERR_INTERNAL")
+				return
+			}
 		}
 		if body.CustomValues != nil {
 			if errs := customfields.ValidateAndSave(r.Context(), tx, tu.TenantID, "hr_employee", id, body.CustomValues); errs != nil {
@@ -778,6 +802,39 @@ func normalizeEmployeeStatus(s string) string {
 		return strings.TrimSpace(strings.ToLower(s))
 	default:
 		return "active"
+	}
+}
+
+func listCompensationHistory(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		id, err := parseID(chi.URLParam(r, "id"))
+		if err != nil {
+			response.Validation(w, map[string]string{"id": "Invalid id."})
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select id, pay_rate::float8, effective_end::text, created_at::text
+			from public.hr_compensation_history
+			where tenant_id = $1 and employee_id = $2
+			order by effective_end desc, id desc`, tu.TenantID, id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load basic-pay history.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		out := []map[string]any{}
+		for rows.Next() {
+			var hid int64
+			var rate float64
+			var end, created string
+			if err := rows.Scan(&hid, &rate, &end, &created); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load basic-pay history.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, map[string]any{"id": hid, "pay_rate": rate, "effective_end": end, "created_at": created})
+		}
+		response.OK(w, out, "OK")
 	}
 }
 

@@ -42,11 +42,27 @@ func getHrOverview(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to load HR overview.", "ERR_INTERNAL")
 			return
 		}
+		var applicants, openProblems, lateProblems, evaluationsDue, closedThisMonth, leaveWaiting, loansWaiting, payQuestions, requestsWaiting int
+		if err := pool.QueryRow(r.Context(), extraOverviewSQL, tu.TenantID).Scan(
+			&applicants, &openProblems, &lateProblems, &evaluationsDue, &closedThisMonth, &leaveWaiting, &loansWaiting, &payQuestions, &requestsWaiting,
+		); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load HR overview.", "ERR_INTERNAL")
+			return
+		}
 		response.OK(w, map[string]int{
-			"active_employees":      active,
-			"open_discipline_cases": discipline,
-			"pending_leave":         leave,
-			"open_absence_alerts":   alerts,
+			"active_employees":           active,
+			"open_discipline_cases":      discipline,
+			"pending_leave":              leave,
+			"open_absence_alerts":        alerts,
+			"applicants":                 applicants,
+			"open_workplace_problems":    openProblems,
+			"late_workplace_problems":    lateProblems,
+			"evaluations_due":            evaluationsDue,
+			"problems_closed_this_month": closedThisMonth,
+			"leave_waiting":              leaveWaiting,
+			"loans_waiting":              loansWaiting,
+			"pay_questions_waiting":      payQuestions,
+			"requests_waiting":           requestsWaiting,
 		}, "OK")
 	}
 }

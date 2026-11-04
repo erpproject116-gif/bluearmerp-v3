@@ -29,21 +29,24 @@ type ReviewCycle struct {
 }
 
 type PerformanceReview struct {
-	ID               int64           `json:"id"`
-	CycleID          *int64          `json:"cycle_id,omitempty"`
-	EmployeeID       int64           `json:"employee_id"`
-	EmployeeNo       string          `json:"employee_no,omitempty"`
-	EmployeeName     string          `json:"employee_name,omitempty"`
-	Status           string          `json:"status"`
-	SelfComments     string          `json:"self_comments"`
-	ManagerComments  string          `json:"manager_comments"`
-	OverallScore     *float64        `json:"overall_score,omitempty"`
-	ScoresJSON       json.RawMessage `json:"scores_json"`
-	AcknowledgedAt   *string         `json:"acknowledged_at,omitempty"`
-	DocumentID       *int64          `json:"document_id,omitempty"`
+	ID              int64           `json:"id"`
+	CycleID         *int64          `json:"cycle_id,omitempty"`
+	EmployeeID      int64           `json:"employee_id"`
+	EmployeeNo      string          `json:"employee_no,omitempty"`
+	EmployeeName    string          `json:"employee_name,omitempty"`
+	Status          string          `json:"status"`
+	SelfComments    string          `json:"self_comments"`
+	ManagerComments string          `json:"manager_comments"`
+	OverallScore    *float64        `json:"overall_score,omitempty"`
+	ScoresJSON      json.RawMessage `json:"scores_json"`
+	AcknowledgedAt  *string         `json:"acknowledged_at,omitempty"`
+	DocumentID      *int64          `json:"document_id,omitempty"`
+	ReviewSource    string          `json:"review_source"`
+	PeriodEnd       string          `json:"period_end,omitempty"`
 }
 
 func registerPerformanceRoutes(r chi.Router, pool *pgxpool.Pool) {
+	registerClientReviewRoute(r, pool)
 	r.With(auth.RequirePermission("hr.performance", auth.AccessRead)).Get("/performance/cycles", listReviewCycles(pool))
 	r.With(auth.RequirePermission("hr.performance", auth.AccessWrite)).Post("/performance/cycles", createReviewCycle(pool))
 	r.With(auth.RequirePermission("hr.performance", auth.AccessWrite)).Post("/performance/cycles/{id}/assign", assignReviews(pool))
@@ -92,7 +95,7 @@ func createReviewCycle(pool *pgxpool.Pool) http.HandlerFunc {
 		} else {
 			var tid int64
 			if err := pool.QueryRow(r.Context(), `
-				select id from public.hr_review_templates where tenant_id=$1 and is_active order by id limit 1`, tu.TenantID).Scan(&tid); err == nil {
+				select id from public.hr_review_templates where tenant_id=$1 and is_active order by case when code = 'DEFAULT' then 0 else 1 end, id limit 1`, tu.TenantID).Scan(&tid); err == nil {
 				tmplID = &tid
 			}
 		}
@@ -149,6 +152,11 @@ func listReviews(pool *pgxpool.Pool) http.HandlerFunc {
 		where := "r.tenant_id=$1"
 		args := []any{tu.TenantID}
 		n := 2
+		if src := strings.TrimSpace(r.URL.Query().Get("source")); src == "client" || src == "agency" {
+			where += fmt.Sprintf(" and r.review_source=$%d", n)
+			args = append(args, src)
+			n++
+		}
 		if c := strings.TrimSpace(r.URL.Query().Get("cycle_id")); c != "" {
 			if id, err := strconv.ParseInt(c, 10, 64); err == nil {
 				where += fmt.Sprintf(" and r.cycle_id=$%d", n)
@@ -158,9 +166,11 @@ func listReviews(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
 			select r.id, r.cycle_id, r.employee_id, e.employee_no, e.full_name, r.status,
-			  r.self_comments, r.manager_comments, r.overall_score::float8, r.scores_json, r.acknowledged_at::text, r.document_id
+			  r.self_comments, r.manager_comments, r.overall_score::float8, r.scores_json, r.acknowledged_at::text, r.document_id,
+			  coalesce(r.review_source,'agency'), coalesce(c.period_end::text,'')
 			from public.hr_performance_reviews r
 			join public.hr_employees e on e.id=r.employee_id
+			left join public.hr_review_cycles c on c.id = r.cycle_id
 			where %s
 			order by e.full_name
 			limit 500`, where), args...)
@@ -174,7 +184,7 @@ func listReviews(pool *pgxpool.Pool) http.HandlerFunc {
 			var row PerformanceReview
 			var score *float64
 			_ = rows.Scan(&row.ID, &row.CycleID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.Status,
-				&row.SelfComments, &row.ManagerComments, &score, &row.ScoresJSON, &row.AcknowledgedAt, &row.DocumentID)
+				&row.SelfComments, &row.ManagerComments, &score, &row.ScoresJSON, &row.AcknowledgedAt, &row.DocumentID, &row.ReviewSource, &row.PeriodEnd)
 			row.OverallScore = score
 			if row.ScoresJSON == nil {
 				row.ScoresJSON = json.RawMessage(`{}`)
@@ -203,6 +213,19 @@ func patchReview(pool *pgxpool.Pool) http.HandlerFunc {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			response.Validation(w, map[string]string{"body": "Invalid JSON."})
 			return
+		}
+		if body.ScoresJSON != nil {
+			var scores map[string]float64
+			if err := json.Unmarshal(*body.ScoresJSON, &scores); err != nil {
+				response.Validation(w, map[string]string{"scores": "Enter all five scores from 1 to 5."})
+				return
+			}
+			avg, err := averageFiveScores(scores)
+			if err != nil {
+				response.Validation(w, map[string]string{"scores": "Enter all five scores from 1 to 5."})
+				return
+			}
+			body.OverallScore = &avg
 		}
 		sets := []string{"updated_at = now()"}
 		args := []any{id, tu.TenantID}
@@ -408,4 +431,3 @@ func storeSignedReviewDoc(ctx context.Context, pool *pgxpool.Pool, tenantID, rev
 		update public.hr_performance_reviews set document_id=$3, updated_at=now() where id=$1 and tenant_id=$2`,
 		reviewID, tenantID, docID)
 }
-

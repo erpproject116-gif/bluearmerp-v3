@@ -123,10 +123,14 @@ export type CrmFeature = keyof typeof CRM_ENTITY;
 
 export const HR_ENTITY = {
   employee: "hr_employee",
+  application: "hr_application",
+  workplaceProblem: "hr_workplace_problem",
+  workerRequest: "hr_worker_request",
 } as const;
 
 export const HR_SETTINGS_HREF = {
   employee: "/app/hr/employees/settings",
+  application: "/app/hr/applicants/settings",
 } as const;
 
 export type HrFeature = keyof typeof HR_ENTITY;

@@ -32,6 +32,7 @@ func registerESSRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Patch("/ess/reviews/{id}", essPatchReview(pool))
 	r.Get("/ess/documents", essDocuments(pool))
 	r.Get("/ess/tax-certificate", essTaxCertificate(pool))
+	registerESSRequestRoutes(r, pool)
 }
 
 func essLinkedEmployeeID(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool) (int64, bool) {

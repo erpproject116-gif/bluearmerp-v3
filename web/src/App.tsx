@@ -252,6 +252,10 @@ import {
   CompanyRecordsPage,
   AbsenteeismPage,
   DisciplinePage,
+  ApplicantsPage,
+  ApplicantsSettingsPage,
+  WorkplaceProblemsPage,
+  RequestsPage,
   HrOverviewPage,
   HrReportsPage,
   HireOnboardingPage,
@@ -1037,6 +1041,18 @@ export default function App() {
           )} />
           <Route path="/hr/employees" component={() => (
             <HrRoute><HrEmployeesPage /></HrRoute>
+          )} />
+          <Route path="/hr/applicants/settings" component={() => (
+            <HrRoute><ApplicantsSettingsPage /></HrRoute>
+          )} />
+          <Route path="/hr/applicants" component={() => (
+            <HrRoute><ApplicantsPage /></HrRoute>
+          )} />
+          <Route path="/hr/workplace-problems" component={() => (
+            <HrRoute><WorkplaceProblemsPage /></HrRoute>
+          )} />
+          <Route path="/hr/requests" component={() => (
+            <HrRoute><RequestsPage /></HrRoute>
           )} />
           <Route path="/hr/payroll-runs" component={() => (
             <HrRoute><PayrollRunsPage /></HrRoute>

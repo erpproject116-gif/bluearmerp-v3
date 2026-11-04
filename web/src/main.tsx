@@ -87,7 +87,7 @@ function hideBootSplashWhenPainted() {
 }
 
 const bootPath = window.location.pathname;
-const lightShell = LIGHT_PATHS.has(bootPath);
+const lightShell = LIGHT_PATHS.has(bootPath) || bootPath === "/apply" || bootPath.startsWith("/apply/");
 if (!lightShell && bootPath.startsWith("/app")) {
   void import("./shell/AppShell");
   if (bootPath === "/app/production" || bootPath.startsWith("/app/production/")) {

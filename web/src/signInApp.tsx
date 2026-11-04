@@ -19,6 +19,7 @@ const WelcomePage = lazy(() => import("./modules/auth/WelcomePage"));
 const PendingApprovalPage = lazy(() => import("./modules/auth/PendingApprovalPage"));
 const AuthCallbackPage = lazy(() => import("./modules/auth/AuthCallbackPage"));
 const PortalLoginPage = lazy(() => import("./modules/portal/PortalLoginPage"));
+const ApplyPage = lazy(() => import("./modules/hr/ApplyPage"));
 
 /** The light shell has no /app routes. A client navigation into the product reloads the full app. */
 function AppHandOff() {
@@ -62,6 +63,7 @@ export default function SignInApp() {
                 <Route path="/pending-approval" component={PendingApprovalPage} />
                 <Route path="/auth/callback" component={AuthCallbackPage} />
                 <Route path="/portal/login" component={PortalLoginPage} />
+                <Route path="/apply/:code" component={ApplyPage} />
                 <Route path="/app/*" component={AppHandOff} />
                 <Route path="/platform/*" component={AppHandOff} />
                 <Route path="*" component={AuthEntryRedirect} />

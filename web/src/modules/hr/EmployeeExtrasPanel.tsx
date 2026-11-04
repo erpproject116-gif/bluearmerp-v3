@@ -64,6 +64,20 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 /** Pay item assignments + 201 file docs for an existing employee. */
+function PayHistory(props: { employeeId: number }) {
+  const [rows] = createResource(
+    () => props.employeeId,
+    async (id) => (await apiFetch<{ id: number; pay_rate: number; effective_end: string }[]>(`/api/v1/hr/employees/${id}/compensation-history`)).data ?? [],
+  );
+  return (
+    <ul class="mb-3 space-y-1 text-sm text-text-secondary">
+      <For each={rows() ?? []} fallback={<li>No previous basic pay.</li>}>
+        {(row) => <li>Previous basic pay {formatPeso(row.pay_rate)} ended {row.effective_end}</li>}
+      </For>
+    </ul>
+  );
+}
+
 export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?: boolean }) {
   const toast = useToast();
   const [typeId, setTypeId] = createSignal("");
@@ -282,6 +296,7 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
     <div class="col-span-full mt-4 space-y-4 border-t border-stroke pt-4">
       <section>
         <h3 class="mb-2 text-sm font-semibold">Recurring pay items</h3>
+        <PayHistory employeeId={props.employeeId} />
         <ul class="mb-2 space-y-1 text-sm">
           <For each={payItems() ?? []}>
             {(p) => (

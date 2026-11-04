@@ -33,6 +33,9 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 			registerPayrollDepthRoutes(admin, pool)
 			registerHrDeskRoutes(admin, pool)
 			registerCompanyRecordRoutes(admin, pool)
+			registerApplicationRoutes(admin, pool)
+			registerRelationRoutes(admin, pool)
+			registerSampleDataRoutes(admin, pool)
 		})
 	})
 }

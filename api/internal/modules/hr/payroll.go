@@ -30,18 +30,18 @@ type PayPeriod struct {
 }
 
 type Payslip struct {
-	ID             int64          `json:"id"`
-	PayPeriodID    int64          `json:"pay_period_id"`
-	PeriodLabel    string         `json:"period_label,omitempty"`
-	EmployeeID     int64          `json:"employee_id"`
-	EmployeeNo     string         `json:"employee_no,omitempty"`
-	EmployeeName   string         `json:"employee_name,omitempty"`
-	GrossPay       float64        `json:"gross_pay"`
-	Deductions     float64        `json:"deductions"`
-	NetPay         float64        `json:"net_pay"`
-	Status         string         `json:"status"`
-	JournalEntryID *int64         `json:"journal_entry_id,omitempty"`
-	Lines          []PayslipLine  `json:"lines,omitempty"`
+	ID             int64         `json:"id"`
+	PayPeriodID    int64         `json:"pay_period_id"`
+	PeriodLabel    string        `json:"period_label,omitempty"`
+	EmployeeID     int64         `json:"employee_id"`
+	EmployeeNo     string        `json:"employee_no,omitempty"`
+	EmployeeName   string        `json:"employee_name,omitempty"`
+	GrossPay       float64       `json:"gross_pay"`
+	Deductions     float64       `json:"deductions"`
+	NetPay         float64       `json:"net_pay"`
+	Status         string        `json:"status"`
+	JournalEntryID *int64        `json:"journal_entry_id,omitempty"`
+	Lines          []PayslipLine `json:"lines,omitempty"`
 }
 
 type PayslipLine struct {
@@ -157,24 +157,24 @@ func listPayslips(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 type payrollPreviewRow struct {
-	EmployeeID     int64   `json:"employee_id"`
-	EmployeeNo     string  `json:"employee_no"`
-	EmployeeName   string  `json:"employee_name"`
-	BaseSalary     float64 `json:"base_salary"`
-	PremiumTotal   float64 `json:"premium_total"`
-	DTRDays        int     `json:"dtr_days"`
-	GrossPay       float64 `json:"gross_pay"`
-	Deductions     float64 `json:"deductions"`
-	NetPay         float64 `json:"net_pay"`
+	EmployeeID   int64   `json:"employee_id"`
+	EmployeeNo   string  `json:"employee_no"`
+	EmployeeName string  `json:"employee_name"`
+	BaseSalary   float64 `json:"base_salary"`
+	PremiumTotal float64 `json:"premium_total"`
+	DTRDays      int     `json:"dtr_days"`
+	GrossPay     float64 `json:"gross_pay"`
+	Deductions   float64 `json:"deductions"`
+	NetPay       float64 `json:"net_pay"`
 }
 
 type payrollPreviewResult struct {
-	PeriodStart  string              `json:"period_start"`
-	PeriodEnd    string              `json:"period_end"`
-	EmployeeCount int                `json:"employee_count"`
-	TotalGross   float64             `json:"total_gross"`
-	TotalNet     float64             `json:"total_net"`
-	Employees    []payrollPreviewRow `json:"employees"`
+	PeriodStart   string              `json:"period_start"`
+	PeriodEnd     string              `json:"period_end"`
+	EmployeeCount int                 `json:"employee_count"`
+	TotalGross    float64             `json:"total_gross"`
+	TotalNet      float64             `json:"total_net"`
+	Employees     []payrollPreviewRow `json:"employees"`
 }
 
 func previewPayroll(pool *pgxpool.Pool) http.HandlerFunc {
@@ -207,11 +207,11 @@ func previewPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 
-		empRows, err := tx.Query(r.Context(), `
+		empRows, err := tx.Query(r.Context(), fmt.Sprintf(`
 			select id, employee_no, full_name, base_salary::float8
 			from public.hr_employees
-			where tenant_id = $1 and status = 'active' and base_salary > 0
-			order by full_name`, tu.TenantID)
+			where tenant_id = $1 and status = 'active' and base_salary > 0%s
+			order by full_name`, sampleEmployeeExcludeSQL("hr_employees")), tu.TenantID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load employees.", "ERR_INTERNAL")
 			return
@@ -313,11 +313,11 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
-		empRows, err := tx.Query(r.Context(), `
+		empRows, err := tx.Query(r.Context(), fmt.Sprintf(`
 			select id, employee_no, full_name, base_salary::float8
 			from public.hr_employees
-			where tenant_id = $1 and status = 'active' and base_salary > 0
-			order by full_name`, tu.TenantID)
+			where tenant_id = $1 and status = 'active' and base_salary > 0%s
+			order by full_name`, sampleEmployeeExcludeSQL("hr_employees")), tu.TenantID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load employees.", "ERR_INTERNAL")
 			return

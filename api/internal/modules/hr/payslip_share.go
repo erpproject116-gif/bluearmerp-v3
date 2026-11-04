@@ -20,10 +20,10 @@ import (
 
 type payslipDetail struct {
 	Payslip
-	PeriodStart string        `json:"period_start,omitempty"`
-	PeriodEnd   string        `json:"period_end,omitempty"`
-	Lines       []PayslipLine `json:"lines"`
-	EmployerTotal float64     `json:"employer_total"`
+	PeriodStart   string        `json:"period_start,omitempty"`
+	PeriodEnd     string        `json:"period_end,omitempty"`
+	Lines         []PayslipLine `json:"lines"`
+	EmployerTotal float64       `json:"employer_total"`
 }
 
 type shareLinkResult struct {
@@ -40,6 +40,7 @@ func registerPayslipDetailRoutes(r chi.Router, pool *pgxpool.Pool) {
 // RegisterPublicRoutes mounts token-based payslip viewing (no session auth).
 func RegisterPublicRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/hr/payslips/shared/{token}", viewSharedPayslip(pool))
+	registerPublicApplyRoutes(r, pool)
 }
 
 func getPayslip(pool *pgxpool.Pool) http.HandlerFunc {

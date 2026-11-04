@@ -263,6 +263,38 @@ export default function DisciplinePage() {
           </Show>
         </section>
       </div>
+      <ClientViolations />
     </HrLayout>
+  );
+}
+
+function ClientViolations() {
+  const toast = useToast();
+  const [empId, setEmpId] = createSignal<number | null>(null);
+  const [empLabel, setEmpLabel] = createSignal("");
+  const [description, setDescription] = createSignal("");
+  const reports = createQuery(() => ({
+    queryKey: ["hr-client-violations"],
+    queryFn: async () => (await apiFetch<{ id: number; employee_name: string; description: string; status: string }[]>("/api/v1/hr/client-violations")).data ?? [],
+  }));
+  const save = async () => {
+    if (!empId()) return toast.warning("Choose an employee.");
+    const res = await apiFetch("/api/v1/hr/client-violations", {
+      method: "POST",
+      body: JSON.stringify({ employee_id: empId(), description: description() }),
+    });
+    if (!res.success) return toast.warning(res.message ?? "Could not save the report.");
+    toast.success("Violation report is waiting.");
+    setDescription("");
+    void reports.refetch();
+  };
+  return (
+    <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <h2 class="mb-3 text-lg font-medium">Waiting client violation reports</h2>
+      <LookupCombo label="Employee" value={empLabel} selectedId={empId} onInput={setEmpLabel} onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }} onClear={() => { setEmpId(null); setEmpLabel(""); }} fetchOptions={(q) => fetchEmployeeOptions(q)} placeholder="Search employees…" />
+      <Field label="Description"><textarea class={inputClass} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} /></Field>
+      <button type="button" class="mt-2 rounded bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void save()}>Record report</button>
+      <For each={reports.data ?? []}>{(row) => <p class="mt-2 text-sm">{row.employee_name} · {row.status} · {row.description}</p>}</For>
+    </section>
   );
 }

@@ -9,9 +9,18 @@ import { HrLayout } from "./HrLayout";
 
 type Cycle = { id: number; name: string; period_start: string; period_end: string; status: string };
 type Review = {
-  id: number; employee_no?: string; employee_name?: string; status: string;
+  id: number; employee_id?: number; employee_no?: string; employee_name?: string; status: string;
   self_comments: string; manager_comments: string; overall_score?: number | null;
+  scores_json?: Record<string, number>; review_source?: string; period_end?: string;
 };
+
+const SCORE_FIELDS = [
+  ["attendance_punctuality", "Attendance and punctuality"],
+  ["job_performance", "Job performance"],
+  ["work_attitude", "Work attitude and professionalism"],
+  ["communication", "Communication"],
+  ["following_instructions", "Following reasonable work instructions"],
+] as const;
 
 export default function PerformancePage() {
   const toast = useToast();
@@ -21,8 +30,11 @@ export default function PerformancePage() {
   const [end, setEnd] = createSignal("");
   const [cycleId, setCycleId] = createSignal<number | null>(null);
   const [editId, setEditId] = createSignal<number | null>(null);
-  const [score, setScore] = createSignal("");
+  const [scores, setScores] = createSignal<Record<string, string>>({});
   const [comments, setComments] = createSignal("");
+  const [clientEmp, setClientEmp] = createSignal("");
+  const [clientScores, setClientScores] = createSignal<Record<string, string>>({});
+  const [clientNotes, setClientNotes] = createSignal("");
   const [ackId, setAckId] = createSignal<number | null>(null);
   const [signedName, setSignedName] = createSignal("");
   const [sigUrl, setSigUrl] = createSignal<string | null>(null);
@@ -63,11 +75,12 @@ export default function PerformancePage() {
   const saveManager = async () => {
     const id = editId();
     if (!id) return;
+    const scoresJson = Object.fromEntries(SCORE_FIELDS.map(([key]) => [key, Number(scores()[key])]));
     const res = await apiFetch(`/api/v1/hr/performance/reviews/${id}`, {
       method: "PATCH",
       body: JSON.stringify({
         manager_comments: comments(),
-        overall_score: Number(score()) || null,
+        scores_json: scoresJson,
         status: "manager_done",
       }),
     });
@@ -149,7 +162,7 @@ export default function PerformancePage() {
                     class="rounded border border-stroke px-2 py-1 text-xs"
                     onClick={() => {
                       setEditId(r.id);
-                      setScore(String(r.overall_score ?? ""));
+                      setScores(Object.fromEntries(SCORE_FIELDS.map(([key]) => [key, String(r.scores_json?.[key] ?? "")])));
                       setComments(r.manager_comments || "");
                     }}
                   >
@@ -179,7 +192,13 @@ export default function PerformancePage() {
                 </div>
                 <Show when={editId() === r.id}>
                   <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                    <Field label="Score"><input class={inputClass} value={score()} onInput={(e) => setScore(e.currentTarget.value)} /></Field>
+                    <For each={SCORE_FIELDS}>
+                      {([key, label]) => (
+                        <Field label={label}>
+                          <input class={inputClass} type="number" min="1" max="5" value={scores()[key] ?? ""} onInput={(e) => setScores({ ...scores(), [key]: e.currentTarget.value })} />
+                        </Field>
+                      )}
+                    </For>
                     <Field label="Comments"><input class={inputClass} value={comments()} onInput={(e) => setComments(e.currentTarget.value)} /></Field>
                     <button type="button" class="rounded bg-brand-600 px-3 py-1.5 text-xs text-white" onClick={() => void saveManager()}>Save</button>
                   </div>
@@ -189,6 +208,8 @@ export default function PerformancePage() {
           </For>
         </section>
       </Show>
+
+      <ClientEvaluations emp={clientEmp} setEmp={setClientEmp} scores={clientScores} setScores={setClientScores} notes={clientNotes} setNotes={setClientNotes} />
 
       <Modal open={ackId() != null} onClose={() => setAckId(null)} title="Acknowledge with signature">
         <div class="space-y-3">
@@ -205,5 +226,51 @@ export default function PerformancePage() {
         </div>
       </Modal>
     </HrLayout>
+  );
+}
+
+function ClientEvaluations(props: {
+  emp: () => string;
+  setEmp: (v: string) => void;
+  scores: () => Record<string, string>;
+  setScores: (v: Record<string, string>) => void;
+  notes: () => string;
+  setNotes: (v: string) => void;
+}) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const reviews = createQuery(() => ({
+    queryKey: ["hr-client-reviews"],
+    queryFn: async () => (await apiFetch<Review[]>("/api/v1/hr/performance/reviews?source=client")).data ?? [],
+  }));
+  const save = async () => {
+    const scores = Object.fromEntries(SCORE_FIELDS.map(([key]) => [key, Number(props.scores()[key])]));
+    const res = await apiFetch("/api/v1/hr/performance/reviews/client", {
+      method: "POST",
+      body: JSON.stringify({ employee_id: Number(props.emp()), scores, notes: props.notes() }),
+    });
+    if (!res.success) return toast.warning(res.message ?? "Could not save the client evaluation.");
+    toast.success("Client evaluation saved.");
+    void qc.invalidateQueries({ queryKey: ["hr-client-reviews"] });
+  };
+  return (
+    <section class="mt-4 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <h2 class="mb-3 text-lg font-medium">Client evaluations</h2>
+      <div class="grid gap-2 sm:grid-cols-2">
+        <Field label="Employee id"><input class={inputClass} value={props.emp()} onInput={(e) => props.setEmp(e.currentTarget.value)} /></Field>
+        <For each={SCORE_FIELDS}>
+          {([key, label]) => (
+            <Field label={label}>
+              <input class={inputClass} type="number" min="1" max="5" value={props.scores()[key] ?? ""} onInput={(e) => props.setScores({ ...props.scores(), [key]: e.currentTarget.value })} />
+            </Field>
+          )}
+        </For>
+        <Field label="Notes"><input class={inputClass} value={props.notes()} onInput={(e) => props.setNotes(e.currentTarget.value)} /></Field>
+      </div>
+      <button type="button" class="mt-2 rounded bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void save()}>Save client evaluation</button>
+      <For each={reviews.data ?? []}>
+        {(r) => <p class="mt-2 text-sm">{r.employee_name} · {r.overall_score ?? "—"} · {r.manager_comments || "No notes"}</p>}
+      </For>
+    </section>
   );
 }
