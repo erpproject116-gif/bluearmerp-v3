@@ -3,6 +3,7 @@ package hr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -230,7 +231,7 @@ func previewPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			draft, err := buildEmployeePayslipDraft(r.Context(), tx, tu.TenantID, empID, empNo, empName, baseSalary, start, end)
 			if err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to compute payslip preview.", "ERR_INTERNAL")
+				writePayslipComputeErr(w, err, "Failed to compute payslip preview.")
 				return
 			}
 			rows = append(rows, payrollPreviewRow{
@@ -304,6 +305,19 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 			if label == "" {
 				label = fmt.Sprintf("%s – %s", start.Format("Jan 2, 2006"), end.Format("Jan 2, 2006"))
 			}
+			var overlapLabel string
+			err = tx.QueryRow(r.Context(), `
+				select period_label from public.hr_pay_periods
+				where tenant_id = $1 and period_start <= $3::date and period_end >= $2::date
+				limit 1`, tu.TenantID, start, end).Scan(&overlapLabel)
+			if err == nil {
+				response.Err(w, http.StatusBadRequest, fmt.Sprintf("Pay period %s overlaps this range.", overlapLabel), "ERR_VALIDATION")
+				return
+			}
+			if !errors.Is(err, pgx.ErrNoRows) {
+				response.Err(w, http.StatusInternalServerError, "Failed to check pay periods.", "ERR_INTERNAL")
+				return
+			}
 			if err := tx.QueryRow(r.Context(), `
 				insert into public.hr_pay_periods (tenant_id, period_label, period_start, period_end)
 				values ($1,$2,$3,$4) returning id`,
@@ -345,7 +359,7 @@ func runPayroll(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			draft, err := buildEmployeePayslipDraft(r.Context(), tx, tu.TenantID, empID, empNo, empName, baseSalary, periodStart, periodEnd)
 			if err != nil {
-				response.Err(w, http.StatusInternalServerError, "Failed to compute payslip.", "ERR_INTERNAL")
+				writePayslipComputeErr(w, err, "Failed to compute payslip.")
 				return
 			}
 			grossPay := draft.GrossPay
@@ -521,4 +535,17 @@ func postPayrollAccrualJE(ctx context.Context, tx pgx.Tx, tenantID, periodID int
 
 func roundMoney(v float64) float64 {
 	return float64(int64(v*10000+0.5)) / 10000
+}
+
+func periodsOverlap(aStart, aEnd, bStart, bEnd time.Time) bool {
+	return !aStart.After(bEnd) && !bStart.After(aEnd)
+}
+
+func writePayslipComputeErr(w http.ResponseWriter, err error, fallback string) {
+	var missing statutoryPackageError
+	if errors.As(err, &missing) {
+		response.Err(w, http.StatusBadRequest, missing.Error(), "ERR_VALIDATION")
+		return
+	}
+	response.Err(w, http.StatusInternalServerError, fallback, "ERR_INTERNAL")
 }

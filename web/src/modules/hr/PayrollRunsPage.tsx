@@ -1,4 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
+import { createQuery } from "@tanstack/solid-query";
 import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import {
@@ -15,6 +16,7 @@ import { exportPayrollRegisterCsv } from "../../shared/hrCsvImport";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import type { Cutoff } from "./attendanceShared";
 import { formatAmount, formatPeso } from "../../shared/money";
 
 export default function PayrollRunsPage() {
@@ -24,6 +26,24 @@ export default function PayrollRunsPage() {
   const [periodStart, setPeriodStart] = createSignal("");
   const [periodEnd, setPeriodEnd] = createSignal("");
   const [periodLabel, setPeriodLabel] = createSignal("");
+  const [cutoffId, setCutoffId] = createSignal("");
+  const cutoffs = createQuery(() => ({
+    queryKey: ["hr-cutoffs"],
+    queryFn: async () => {
+      const res = await apiFetch<Cutoff[]>("/api/v1/hr/cutoffs");
+      if (!res.success) throw new Error(res.message ?? "Failed to load cut-offs");
+      return res.data ?? [];
+    },
+  }));
+  const applyCutoff = (id: string) => {
+    setCutoffId(id);
+    if (!id) return;
+    const row = (cutoffs.data ?? []).find((c) => String(c.id) === id);
+    if (!row) return;
+    setPeriodStart(row.cutoff_start);
+    setPeriodEnd(row.cutoff_end);
+    setPeriodLabel(row.label);
+  };
   const [running, setRunning] = createSignal(false);
   const [previewing, setPreviewing] = createSignal(false);
   const [preview, setPreview] = createSignal<PayrollPreviewResult | null>(null);
@@ -125,6 +145,18 @@ export default function PayrollRunsPage() {
         saveLabel="Run payroll"
         saving={running() || previewing()}
       >
+        <Field label="Saved cut-off">
+          <select class={inputClass} value={cutoffId()} onChange={(e) => applyCutoff(e.currentTarget.value)}>
+            <option value="">Type dates</option>
+            <For each={cutoffs.data ?? []}>
+              {(c) => (
+                <option value={String(c.id)}>
+                  {c.label} ({c.cutoff_start} → {c.cutoff_end})
+                </option>
+              )}
+            </For>
+          </select>
+        </Field>
         <Field label="Period start"><input type="date" class={inputClass} value={periodStart()} onInput={(e) => setPeriodStart(e.currentTarget.value)} /></Field>
         <Field label="Period end"><input type="date" class={inputClass} value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} /></Field>
         <Field label="Label (optional)"><input class={inputClass} value={periodLabel()} onInput={(e) => setPeriodLabel(e.currentTarget.value)} /></Field>

@@ -3,6 +3,7 @@ package hr
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
@@ -63,6 +65,7 @@ func registerAttendanceRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/cutoffs", listCutoffs(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/cutoffs", createCutoff(pool))
+	r.With(auth.RequirePermission("hr.attendance", auth.AccessWrite)).Post("/cutoffs/quincenas", createQuincenaCutoffs(pool))
 
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/dtr", listDTR(pool))
 	r.With(auth.RequirePermission("hr.attendance", auth.AccessRead)).Get("/dtr/month-overview", listDTRMonthOverview(pool))
@@ -253,6 +256,76 @@ func createCutoff(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, map[string]any{"id": id}, "Created.")
+	}
+}
+
+func quincenaRanges(year int, month time.Month) (start1, end1, start2, end2 time.Time, err error) {
+	if year < 1 || month < time.January || month > time.December {
+		return time.Time{}, time.Time{}, time.Time{}, time.Time{}, fmt.Errorf("invalid month")
+	}
+	start1 = time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	end1 = time.Date(year, month, 15, 0, 0, 0, 0, time.UTC)
+	start2 = time.Date(year, month, 16, 0, 0, 0, 0, time.UTC)
+	end2 = time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC)
+	return start1, end1, start2, end2, nil
+}
+
+func createQuincenaCutoffs(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		var body struct {
+			Month string `json:"month"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Validation(w, map[string]string{"body": "Invalid JSON."})
+			return
+		}
+		parsed, err := time.Parse("2006-01", strings.TrimSpace(body.Month))
+		if err != nil {
+			response.Validation(w, map[string]string{"month": "Use YYYY-MM."})
+			return
+		}
+		start1, end1, start2, end2, err := quincenaRanges(parsed.Year(), parsed.Month())
+		if err != nil {
+			response.Validation(w, map[string]string{"month": "Invalid month."})
+			return
+		}
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create cut-offs.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		ranges := []struct {
+			label      string
+			start, end time.Time
+		}{
+			{"1st quincena", start1, end1},
+			{"2nd quincena", start2, end2},
+		}
+		ids := make([]int64, 0, 2)
+		for _, row := range ranges {
+			var id int64
+			err = tx.QueryRow(r.Context(), `
+				insert into public.hr_pay_cutoffs (tenant_id, label, cutoff_start, cutoff_end)
+				values ($1,$2,$3,$4) returning id`,
+				tu.TenantID, row.label, row.start, row.end).Scan(&id)
+			if err != nil {
+				var pgErr *pgconn.PgError
+				if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+					response.Err(w, http.StatusBadRequest, "A cut-off for this range already exists.", "ERR_VALIDATION")
+					return
+				}
+				response.Err(w, http.StatusInternalServerError, "Failed to create cut-offs.", "ERR_INTERNAL")
+				return
+			}
+			ids = append(ids, id)
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create cut-offs.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"ids": ids}, "Created.")
 	}
 }
 

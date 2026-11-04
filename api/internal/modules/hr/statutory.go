@@ -3,31 +3,41 @@ package hr
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
+type statutoryPackageError struct {
+	Agency string
+}
+
+func (e statutoryPackageError) Error() string {
+	return fmt.Sprintf("%s statutory package is missing for this period end.", e.Agency)
+}
+
 type statutoryConfigSSS struct {
-	EmployeeRate     float64 `json:"employee_rate"`
-	EmployerRate     float64 `json:"employer_rate"`
-	MSCMin           float64 `json:"msc_min"`
-	MSCMax           float64 `json:"msc_max"`
-	RegularMSCCap    float64 `json:"regular_msc_cap"`
-	ECLow            float64 `json:"ec_low"`
-	ECHigh           float64 `json:"ec_high"`
-	ECCompThreshold  float64 `json:"ec_comp_threshold"`
-	BandStart        float64 `json:"band_start"`
-	BandWidth        float64 `json:"band_width"`
+	EmployeeRate    float64 `json:"employee_rate"`
+	EmployerRate    float64 `json:"employer_rate"`
+	MSCMin          float64 `json:"msc_min"`
+	MSCMax          float64 `json:"msc_max"`
+	RegularMSCCap   float64 `json:"regular_msc_cap"`
+	ECLow           float64 `json:"ec_low"`
+	ECHigh          float64 `json:"ec_high"`
+	ECCompThreshold float64 `json:"ec_comp_threshold"`
+	BandStart       float64 `json:"band_start"`
+	BandWidth       float64 `json:"band_width"`
 }
 
 type statutoryConfigPHIC struct {
-	Rate           float64 `json:"rate"`
-	EmployeeShare  float64 `json:"employee_share"`
-	EmployerShare  float64 `json:"employer_share"`
-	SalaryFloor    float64 `json:"salary_floor"`
-	SalaryCeiling  float64 `json:"salary_ceiling"`
+	Rate          float64 `json:"rate"`
+	EmployeeShare float64 `json:"employee_share"`
+	EmployerShare float64 `json:"employer_share"`
+	SalaryFloor   float64 `json:"salary_floor"`
+	SalaryCeiling float64 `json:"salary_ceiling"`
 }
 
 type statutoryConfigHDMF struct {
@@ -77,6 +87,17 @@ func loadAgencyConfig(ctx context.Context, q pgx.Tx, agency string, asOf time.Ti
 		order by effective_from desc
 		limit 1`, agency, asOf.Format("2006-01-02")).Scan(&code, &cfg)
 	return cfg, code, err
+}
+
+func requireAgencyConfig(ctx context.Context, q pgx.Tx, agency, label string, asOf time.Time) (json.RawMessage, string, error) {
+	raw, code, err := loadAgencyConfig(ctx, q, agency, asOf)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", statutoryPackageError{Agency: label}
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	return raw, code, nil
 }
 
 func mscFromCompensation(comp float64, cfg statutoryConfigSSS) float64 {
@@ -201,7 +222,9 @@ func computeStatutoryDeductions(ctx context.Context, tx pgx.Tx, asOf time.Time, 
 	lineNo++
 
 	// SSS
-	if raw, code, err := loadAgencyConfig(ctx, tx, "sss", asOf); err == nil {
+	if raw, code, err := requireAgencyConfig(ctx, tx, "sss", "SSS", asOf); err != nil {
+		return out, err
+	} else {
 		var cfg statutoryConfigSSS
 		_ = json.Unmarshal(raw, &cfg)
 		ee, erMain, erEC, _ := computeSSS(monthlyBasic, cfg)
@@ -222,7 +245,9 @@ func computeStatutoryDeductions(ctx context.Context, tx pgx.Tx, asOf time.Time, 
 	}
 
 	// PhilHealth
-	if raw, code, err := loadAgencyConfig(ctx, tx, "philhealth", asOf); err == nil {
+	if raw, code, err := requireAgencyConfig(ctx, tx, "philhealth", "PhilHealth", asOf); err != nil {
+		return out, err
+	} else {
 		var cfg statutoryConfigPHIC
 		_ = json.Unmarshal(raw, &cfg)
 		ee, er := computePhilHealth(monthlyBasic, cfg)
@@ -239,7 +264,9 @@ func computeStatutoryDeductions(ctx context.Context, tx pgx.Tx, asOf time.Time, 
 	}
 
 	// Pag-IBIG
-	if raw, code, err := loadAgencyConfig(ctx, tx, "pagibig", asOf); err == nil {
+	if raw, code, err := requireAgencyConfig(ctx, tx, "pagibig", "Pag-IBIG", asOf); err != nil {
+		return out, err
+	} else {
 		var cfg statutoryConfigHDMF
 		_ = json.Unmarshal(raw, &cfg)
 		ee, er := computePagibig(monthlyBasic, cfg)
@@ -265,7 +292,9 @@ func computeStatutoryDeductions(ctx context.Context, tx pgx.Tx, asOf time.Time, 
 	if taxable < 0 {
 		taxable = 0
 	}
-	if raw, code, err := loadAgencyConfig(ctx, tx, "bir", asOf); err == nil {
+	if raw, code, err := requireAgencyConfig(ctx, tx, "bir", "BIR", asOf); err != nil {
+		return out, err
+	} else {
 		var cfg statutoryConfigBIR
 		_ = json.Unmarshal(raw, &cfg)
 		wht := computeBIRWithholding(taxable, cfg)

@@ -20,6 +20,9 @@ export default function AttendanceSetupPage() {
   const [cutoffStart, setCutoffStart] = createSignal("");
   const [cutoffEnd, setCutoffEnd] = createSignal("");
   const [cutoffLabel, setCutoffLabel] = createSignal("");
+  const [quincenaMonth, setQuincenaMonth] = createSignal(
+    `${year}-${String(new Date().getMonth() + 1).padStart(2, "0")}`,
+  );
 
   const holidays = createQuery(() => ({
     queryKey: ["hr-holidays", year],
@@ -86,6 +89,19 @@ export default function AttendanceSetupPage() {
       return;
     }
     toast.success("Cut-off saved.");
+    void qc.invalidateQueries({ queryKey: ["hr-cutoffs"] });
+  };
+
+  const addQuincenas = async () => {
+    const res = await apiFetch("/api/v1/hr/cutoffs/quincenas", {
+      method: "POST",
+      body: JSON.stringify({ month: quincenaMonth() }),
+    });
+    if (!res.success) {
+      toast.warning(res.message ?? "Failed to create quincena cut-offs.");
+      return;
+    }
+    toast.success("Two quincena cut-offs saved.");
     void qc.invalidateQueries({ queryKey: ["hr-cutoffs"] });
   };
 
@@ -180,6 +196,23 @@ export default function AttendanceSetupPage() {
           >
             Add cut-off
           </button>
+          <div class="mb-3 flex flex-wrap items-end gap-3">
+            <Field label="Month">
+              <input
+                type="month"
+                class={inputClass}
+                value={quincenaMonth()}
+                onInput={(e) => setQuincenaMonth(e.currentTarget.value)}
+              />
+            </Field>
+            <button
+              type="button"
+              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-primary hover:erp-panel"
+              onClick={() => void addQuincenas()}
+            >
+              Add two quincenas
+            </button>
+          </div>
           <ul class="max-h-56 space-y-1 overflow-auto text-sm">
             <For each={cutoffs.data ?? []} fallback={<li class="text-text-secondary">No cut-offs yet.</li>}>
               {(c) => (
