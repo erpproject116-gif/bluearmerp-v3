@@ -13,7 +13,7 @@ type RequestRow = {
   created_at: string;
 };
 
-const FILTERS = [
+const KIND_FILTERS = [
   ["", "All requests"],
   ["loan", "Loans"],
   ["salary_advance", "Salary advances"],
@@ -22,13 +22,26 @@ const FILTERS = [
   ["resignation", "Resignations"],
 ] as const;
 
+const STATUS_FILTERS = [
+  ["", "All"],
+  ["pending", "Pending"],
+  ["closed", "Closed"],
+] as const;
+
 export default function RequestsPage() {
   const toast = useToast();
   const [kind, setKind] = createSignal("");
-  const [requests, { refetch }] = createResource(kind, async (value) => {
-    const res = await apiFetch<RequestRow[]>(`/api/v1/hr/worker-requests${value ? `?kind=${value}` : ""}`);
-    return res.data ?? [];
-  });
+  const [status, setStatus] = createSignal("");
+  const [requests, { refetch }] = createResource(
+    () => `${kind()}|${status()}`,
+    async () => {
+      const q = new URLSearchParams();
+      if (kind()) q.set("kind", kind());
+      if (status()) q.set("status", status());
+      const res = await apiFetch<RequestRow[]>(`/api/v1/hr/worker-requests?${q}`);
+      return res.data ?? [];
+    },
+  );
   const rows = createMemo(() => requests() ?? []);
 
   const close = async (row: RequestRow) => {
@@ -43,7 +56,7 @@ export default function RequestsPage() {
       <label class="mb-3 block text-sm">
         Kind
         <select class="ml-2 rounded border border-stroke px-2 py-1" value={kind()} onChange={(e) => setKind(e.currentTarget.value)}>
-          {FILTERS.map(([value, label]) => <option value={value}>{label}</option>)}
+          {KIND_FILTERS.map(([value, label]) => <option value={value}>{label}</option>)}
         </select>
       </label>
       <SpreadsheetGrid
@@ -53,19 +66,20 @@ export default function RequestsPage() {
           { key: "status", header: "Status" },
           { key: "details", header: "Details" },
           { key: "created_at", header: "Submitted" },
+          { key: "id", header: "", render: (row) => <button type="button" class="text-sm text-brand-700" onClick={() => void close(row)}>Close</button> },
         ]}
         rows={rows()}
         loading={requests.loading}
         selectedId={null}
         onSelect={() => {}}
-        onEdit={(row) => void close(row)}
+        onEdit={() => {}}
         onNew={() => {}}
         showNew={false}
         codeKey="employee_name"
         nameKey="kind"
-        status={kind()}
-        onStatusChange={setKind}
-        statusOptions={FILTERS.map(([value, label]) => ({ value, label }))}
+        status={status()}
+        onStatusChange={setStatus}
+        statusOptions={STATUS_FILTERS.map(([value, label]) => ({ value, label }))}
       />
     </HrLayout>
   );

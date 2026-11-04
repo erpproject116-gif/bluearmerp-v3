@@ -206,12 +206,17 @@ func listWorkerRequests(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
 		kind := strings.TrimSpace(r.URL.Query().Get("kind"))
+		status := strings.TrimSpace(r.URL.Query().Get("status"))
+		if status != "" && status != "pending" && status != "closed" {
+			response.Validation(w, map[string]string{"status": "Status must be pending or closed."})
+			return
+		}
 		rows, err := pool.Query(r.Context(), `
 			select q.id, q.employee_id, e.full_name, q.kind, q.status, q.details, q.created_at::text
 			from public.hr_worker_requests q
 			join public.hr_employees e on e.id = q.employee_id
-			where q.tenant_id = $1 and ($2 = '' or q.kind = $2)
-			order by q.created_at desc limit 300`, tu.TenantID, kind)
+			where q.tenant_id = $1 and ($2 = '' or q.kind = $2) and ($3 = '' or q.status = $3)
+			order by q.created_at desc limit 300`, tu.TenantID, kind, status)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load requests.", "ERR_INTERNAL")
 			return

@@ -52,7 +52,7 @@ const textFields: { key: string; label: string; type?: string; wide?: boolean }[
 ];
 
 const pairGrid = "grid grid-cols-1 gap-3 sm:grid-cols-2";
-const STEPS = ["Personal Data", "Children", "Employment Record", "Character References", "Photos and resume", "Certification"];
+const STEPS = ["Personal and contact", "Children", "Work history", "Character References", "Documents", "Review and consent"];
 
 export default function ApplyPage() {
   const params = useParams();
@@ -143,7 +143,7 @@ export default function ApplyPage() {
       <p class="mb-4 text-text-secondary">Step {step() + 1} of {STEPS.length}</p>
       <Show when={form()?.unavailable}><p class="mb-3">This application form is not available.</p></Show>
       <section class={step() === 0 ? "" : "hidden"}>
-        <h2 class="mb-3 text-base font-semibold">Personal Data</h2>
+        <h2 class="mb-3 text-base font-semibold">{STEPS[0]}</h2>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <For each={textFields}>
             {(field) => (
@@ -155,7 +155,7 @@ export default function ApplyPage() {
         </div>
       </section>
       <section class={step() === 1 ? "mt-0" : "hidden"}>
-        <h2 class="mb-3 text-base font-semibold">Children</h2>
+        <h2 class="mb-3 text-base font-semibold">{STEPS[1]}</h2>
         <For each={children()}>
           {(row, index) => (
             <div class={`${pairGrid} mb-3`}>
@@ -167,7 +167,7 @@ export default function ApplyPage() {
         <button type="button" class="min-h-11 rounded border border-stroke px-3 py-2" onClick={() => setChildren([...children(), { name: "", birth_date: "" }])}>Add child</button>
       </section>
       <section class={step() === 2 ? "" : "hidden"}>
-        <h2 class="mb-3 text-base font-semibold">Employment Record</h2>
+        <h2 class="mb-3 text-base font-semibold">{STEPS[2]}</h2>
         <For each={jobs()}>
           {(row, index) => (
             <div class={`${pairGrid} mb-3`}>
@@ -181,7 +181,7 @@ export default function ApplyPage() {
         <button type="button" class="min-h-11 rounded border border-stroke px-3 py-2" onClick={() => setJobs([...jobs(), { company: "", position: "", from: "", to: "" }])}>Add job</button>
       </section>
       <section class={step() === 3 ? "" : "hidden"}>
-        <h2 class="mb-3 text-base font-semibold">Character References</h2>
+        <h2 class="mb-3 text-base font-semibold">{STEPS[3]}</h2>
         <For each={refs()}>
           {(row, index) => (
             <div class={`${pairGrid} mb-3`}>
@@ -204,7 +204,7 @@ export default function ApplyPage() {
         </For>
       </section>
       <section class={step() === 4 ? "mt-6" : "hidden"}>
-        <h2 class="mb-3 text-base font-semibold">Photos and resume</h2>
+        <h2 class="mb-3 text-base font-semibold">{STEPS[4]}</h2>
         <div class={pairGrid}>
           <Field label="Selfie"><input class={inputClass} type="file" accept="image/*" onChange={(e) => setSelfie(e.currentTarget.files?.[0] ?? null)} /></Field>
           <Field label="Valid ID photos"><input class={inputClass} type="file" accept="image/*" multiple onChange={(e) => setIds(Array.from(e.currentTarget.files ?? []))} /></Field>
@@ -212,7 +212,7 @@ export default function ApplyPage() {
         </div>
       </section>
       <section class={step() === 5 ? "space-y-3" : "hidden"}>
-        <h2 class="text-base font-semibold">Certification</h2>
+        <h2 class="text-base font-semibold">{STEPS[5]}</h2>
         <label class="flex min-h-11 items-start gap-2">
           <input class="mt-1 h-5 w-5" type="checkbox" checked={certified()} onChange={(e) => setCertified(e.currentTarget.checked)} />
           <span>I hereby certify that the above information is true and correct to the best of my knowledge and belief.</span>

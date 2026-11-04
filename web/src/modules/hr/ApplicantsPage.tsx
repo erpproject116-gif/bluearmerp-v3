@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { KanbanBoard, type KanbanColumn } from "../../shared/KanbanBoard";
@@ -109,6 +110,7 @@ export default function ApplicantsPage() {
       <p class="font-medium">{row.full_name}</p>
       <p class="text-text-secondary">{row.position_desired || "No position"}</p>
       <p class="text-text-secondary">{row.industry || "No industry"} · {row.workplace || "No workplace"}</p>
+      <A href={`/app/hr/applicants/${row.id}`} class="mt-1 mr-2 text-xs text-brand-700">Open record</A>
       <button type="button" class="mt-1 text-xs text-brand-700" onClick={() => setSelected(row.id)}>Comment</button>
     </div>
   );
@@ -144,7 +146,7 @@ export default function ApplicantsPage() {
       <Show when={mode() === "board"} fallback={
         <SpreadsheetGrid
           columns={[
-            { key: "full_name", header: "Name" },
+            { key: "full_name", header: "Name", render: (row) => <A href={`/app/hr/applicants/${row.id}`}>{row.full_name}</A> },
             { key: "position_desired", header: "Position desired" },
             { key: "status", header: "Status", render: (row) => STATUSES.find(([id]) => id === row.status)?.[1] ?? row.status },
             { key: "industry", header: "Industry" },

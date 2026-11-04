@@ -32,6 +32,8 @@ func registerPublicApplyRoutes(r chi.Router, pool *pgxpool.Pool) {
 
 func registerApplicationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/applications", listApplications(pool))
+	r.Get("/applications/{id}/comments", listApplicationComments(pool))
+	r.Get("/applications/{id}/files/{fileId}", downloadApplicationFile(pool))
 	r.Get("/applications/{id}", getApplication(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Patch("/applications/{id}", patchApplication(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/applications/{id}/comments", addApplicationComment(pool))
@@ -434,7 +436,84 @@ func getApplication(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusNotFound, "Application not found.", "ERR_NOT_FOUND")
 			return
 		}
-		response.OK(w, json.RawMessage(raw), "OK")
+		var app map[string]any
+		if err := json.Unmarshal(raw, &app); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to read the application.", "ERR_INTERNAL")
+			return
+		}
+		app["children"] = applicationJSONList(r.Context(), pool, `select coalesce(json_agg(json_build_object('child_name', child_name, 'birth_date', birth_date)), '[]'::json) from public.hr_application_children where application_id=$1`, id)
+		app["jobs"] = applicationJSONList(r.Context(), pool, `select coalesce(json_agg(json_build_object('company_name', company_name, 'position', position, 'started_on', started_on, 'ended_on', ended_on)), '[]'::json) from public.hr_application_jobs where application_id=$1`, id)
+		app["references"] = applicationJSONList(r.Context(), pool, `select coalesce(json_agg(json_build_object('ref_name', ref_name, 'position', position, 'company_name', company_name, 'contact_no', contact_no)), '[]'::json) from public.hr_application_references where application_id=$1`, id)
+		app["files"] = applicationJSONList(r.Context(), pool, `select coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'file_name', file_name, 'mime_type', mime_type) order by id), '[]'::json) from public.hr_application_files where application_id=$1 and tenant_id=$2`, id, tu.TenantID)
+		delete(app, "signature_data_url")
+		response.OK(w, app, "OK")
+	}
+}
+
+func applicationJSONList(ctx context.Context, pool *pgxpool.Pool, query string, args ...any) json.RawMessage {
+	var raw []byte
+	if err := pool.QueryRow(ctx, query, args...).Scan(&raw); err != nil || len(raw) == 0 {
+		return json.RawMessage("[]")
+	}
+	return json.RawMessage(raw)
+}
+
+func listApplicationComments(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select c.body, c.file_name, c.created_at::text
+			from public.hr_application_comments c
+			join public.hr_applications a on a.id = c.application_id
+			where c.application_id = $1 and a.tenant_id = $2
+			order by c.created_at`, chi.URLParam(r, "id"), tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load comments.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		out := []map[string]string{}
+		for rows.Next() {
+			var body, name, created string
+			if err := rows.Scan(&body, &name, &created); err != nil {
+				continue
+			}
+			out = append(out, map[string]string{"body": body, "file_name": name, "created_at": created})
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+func downloadApplicationFile(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		var name, mime string
+		var body []byte
+		err := pool.QueryRow(r.Context(), `
+			select file_name, mime_type, file_bytes
+			from public.hr_application_files
+			where id = $1 and application_id = $2 and tenant_id = $3`,
+			chi.URLParam(r, "fileId"), chi.URLParam(r, "id"), tu.TenantID).Scan(&name, &mime, &body)
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "File not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if mime == "" {
+			mime = "application/octet-stream"
+		}
+		name = strings.NewReplacer(`"`, "", "\n", "", "\r", "").Replace(name)
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
 	}
 }
 

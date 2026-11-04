@@ -6,6 +6,7 @@ import { LoadingText } from "../../shared/LoadingText";
 import { formatPeso } from "../../shared/money";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { HrLayout } from "./HrLayout";
 
 type EssMe = {
   id: number;
@@ -93,6 +94,7 @@ function EssSelfServiceView() {
   };
 
   return (
+    <HrLayout>
     <div class="mx-auto max-w-3xl p-6">
       <h1 class="mb-1 text-2xl font-semibold text-text-primary">My HR</h1>
       <p class="mb-6 text-sm text-text-secondary">Profile, payslips, leave, learning, discipline, and onboarding.</p>
@@ -223,6 +225,7 @@ function EssSelfServiceView() {
 
       <EssRequests />
     </div>
+    </HrLayout>
   );
 }
 

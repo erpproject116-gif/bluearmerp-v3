@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/solid-query";
 import { Route, Router, type RouteSectionProps, Navigate, useLocation, useParams } from "@solidjs/router";
 import { lazy, Show, Suspense } from "solid-js";
 const AppShell = lazy(() => import("./shell/AppShell").then((m) => ({ default: m.AppShell })));
+const ApplicantDetailPage = lazy(() => import("./modules/hr/ApplicantDetailPage"));
 import { AuthProvider, useAuth } from "./shared/auth-context";
 import { ToastProvider } from "./shared/toast";
 import { InlineGuidesProvider } from "./shared/inlineGuides";
@@ -1045,6 +1046,9 @@ export default function App() {
           <Route path="/hr/applicants/settings" component={() => (
             <HrRoute><ApplicantsSettingsPage /></HrRoute>
           )} />
+          <Route path="/hr/applicants/:id" component={() => (
+            <HrRoute><ApplicantDetailPage /></HrRoute>
+          )} />
           <Route path="/hr/applicants" component={() => (
             <HrRoute><ApplicantsPage /></HrRoute>
           )} />
@@ -1090,6 +1094,9 @@ export default function App() {
           )} />
           <Route path="/hr/absenteeism" component={() => (
             <HrRoute><AbsenteeismPage /></HrRoute>
+          )} />
+          <Route path="/hr/discipline/:id" component={() => (
+            <HrRoute><DisciplinePage /></HrRoute>
           )} />
           <Route path="/hr/discipline" component={() => (
             <HrRoute><DisciplinePage /></HrRoute>

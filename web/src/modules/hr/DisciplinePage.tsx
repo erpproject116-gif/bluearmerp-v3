@@ -1,4 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
+import { useParams } from "@solidjs/router";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
@@ -51,7 +52,14 @@ export default function DisciplinePage() {
   const [payItemTypeId, setPayItemTypeId] = createSignal("");
   const [file, setFile] = createSignal<File | null>(null);
   let fileInput: HTMLInputElement | undefined;
+  const params = useParams<{ id?: string }>();
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
+  createEffect(() => {
+    const raw = params.id;
+    if (!raw) return;
+    const n = Number(raw);
+    if (Number.isInteger(n) && n > 0) setSelectedId(n);
+  });
   const [createOpen, setCreateOpen] = createSignal(false);
 
   const payItems = createQuery(() => ({
