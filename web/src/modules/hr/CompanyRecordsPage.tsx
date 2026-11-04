@@ -82,7 +82,7 @@ export default function CompanyRecordsPage() {
           <textarea class={inputClass} rows={2} value={body()} onInput={(e) => setBody(e.currentTarget.value)} />
         </Field>
       </EntityModal>
-      <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <div class="mb-3 flex items-center justify-between gap-3">
           <h2 class="text-lg font-medium">Records</h2>
           <select class={inputClass + " w-44"} value={kind()} onChange={(e) => setKind(e.currentTarget.value as RecordKind | "")}>

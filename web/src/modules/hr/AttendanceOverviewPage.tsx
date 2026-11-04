@@ -110,7 +110,7 @@ export default function AttendanceOverviewPage() {
                     class={`min-w-9 rounded-lg border px-2 py-1.5 text-sm ${
                       density() === d
                         ? "border-brand-600 bg-brand-50 font-semibold text-brand-800"
-                        : "border-stroke text-text-secondary hover:bg-slate-50"
+                        : "border-stroke text-text-secondary hover:bg-panel"
                     }`}
                     onClick={() => setDensity(d)}
                   >
@@ -162,7 +162,7 @@ export default function AttendanceOverviewPage() {
         </label>
       </div>
 
-      <section class="rounded-xl border border-stroke bg-white shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface shadow-sm">
         <div
           class="max-h-[min(70vh,720px)] overflow-auto overscroll-contain"
           style={{ "scrollbar-gutter": "stable" }}
@@ -177,19 +177,19 @@ export default function AttendanceOverviewPage() {
             <thead>
               <tr class="border-b border-stroke text-xs font-semibold uppercase text-text-secondary">
                 <th
-                  class="sticky left-0 top-0 z-30 border-b border-r border-stroke bg-white py-2 pr-3 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
+                  class="sticky left-0 top-0 z-30 border-b border-r border-stroke bg-surface py-2 pr-3 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
                   style={{ width: `${empColW()}px`, "min-width": `${empColW()}px`, "max-width": `${empColW()}px` }}
                 >
                   Employee
                 </th>
                 <th
-                  class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-3"
+                  class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-3"
                   style={{ width: `${deptColW()}px`, "min-width": `${deptColW()}px` }}
                 >
                   Dept
                 </th>
                 <th
-                  class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-3"
+                  class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-3"
                   style={{ width: `${jobColW()}px`, "min-width": `${jobColW()}px` }}
                 >
                   Job title
@@ -197,7 +197,7 @@ export default function AttendanceOverviewPage() {
                 <For each={dayNums()}>
                   {(d) => (
                     <th
-                      class="sticky top-0 z-20 border-b border-stroke bg-white text-center tabular-nums"
+                      class="sticky top-0 z-20 border-b border-stroke bg-surface text-center tabular-nums"
                       style={{
                         width: `${size().day}px`,
                         "min-width": `${size().day}px`,
@@ -208,16 +208,16 @@ export default function AttendanceOverviewPage() {
                     </th>
                   )}
                 </For>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pl-2 pr-2 text-right">Present</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-2 text-right">Absent</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-2 text-right">AWOL</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-2 text-right">Leave</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-2 text-right">Holiday</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-2 text-right">Rest</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-2 text-right">Short</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-2 text-right">OT</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 pr-2 text-right">Night</th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-white py-2 text-right">Hours</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pl-2 pr-2 text-right">Present</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right">Absent</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right">AWOL</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right">Leave</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right">Holiday</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right">Rest</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right">Short</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right">OT</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right">Night</th>
+                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 text-right">Hours</th>
               </tr>
             </thead>
             <tbody>
@@ -237,7 +237,7 @@ export default function AttendanceOverviewPage() {
                     return (
                       <tr class="hover:bg-slate-50/80" style={{ height: `${size().row}px` }}>
                         <td
-                          class="sticky left-0 z-10 border-b border-r border-slate-100 bg-white pr-3 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
+                          class="sticky left-0 z-10 border-b border-r border-slate-100 bg-surface pr-3 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
                           style={{
                             width: `${empColW()}px`,
                             "min-width": `${empColW()}px`,

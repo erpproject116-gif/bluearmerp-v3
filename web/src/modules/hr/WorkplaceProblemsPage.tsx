@@ -81,7 +81,7 @@ export default function WorkplaceProblemsPage() {
     <HrLayout>
       <h1 class="mb-4 text-2xl font-semibold">Workplace problems</h1>
       <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setOpen(true)}>New problem</button>
-      <div class={open() ? "mb-4 grid gap-2 rounded-xl border border-stroke bg-white p-4" : "hidden"}>
+      <div class={open() ? "mb-4 grid gap-2 rounded-xl border border-stroke bg-surface p-4" : "hidden"}>
         <LookupCombo label="Employee" value={empLabel} selectedId={empId} onInput={setEmpLabel} onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }} onClear={() => { setEmpId(null); setEmpLabel(""); }} fetchOptions={(q) => fetchEmployeeOptions(q)} placeholder="Search employees…" />
         <Field label="Category"><select class={inputClass} value={category()} onChange={(e) => setCategory(e.currentTarget.value)}><For each={CATEGORIES}>{(c) => <option value={c}>{c}</option>}</For></select></Field>
         <Field label="Priority"><select class={inputClass} value={priority()} onChange={(e) => setPriority(e.currentTarget.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></Field>

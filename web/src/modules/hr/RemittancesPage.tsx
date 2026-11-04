@@ -130,7 +130,7 @@ export default function RemittancesPage() {
 
   return (
     <HrLayout>
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-2 text-lg font-medium">Build remittance batch</h2>
         <p class="mb-3 text-sm text-text-secondary">
           Creates or refreshes an agency remittance file from posted payslips for the selected period (SSS, PhilHealth,
@@ -229,7 +229,7 @@ export default function RemittancesPage() {
 
       <Show when={detail.data}>
         {(d) => (
-          <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+          <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
             <h2 class="mb-2 text-lg font-medium">
               Lines — {d().batch.agency.toUpperCase()} ({d().lines.length})
             </h2>

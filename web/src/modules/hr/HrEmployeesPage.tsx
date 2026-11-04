@@ -646,7 +646,7 @@ export default function HrEmployeesPage() {
             class="rounded-md px-3 py-1.5 text-sm font-medium"
             classList={{
               "bg-brand-600 text-white": formSection() === "employment",
-              "text-text-secondary hover:bg-slate-50": formSection() !== "employment",
+              "text-text-secondary hover:bg-panel": formSection() !== "employment",
             }}
             onClick={() => setFormSection("employment")}
           >
@@ -657,7 +657,7 @@ export default function HrEmployeesPage() {
             class="rounded-md px-3 py-1.5 text-sm font-medium"
             classList={{
               "bg-brand-600 text-white": formSection() === "statutory",
-              "text-text-secondary hover:bg-slate-50": formSection() !== "statutory",
+              "text-text-secondary hover:bg-panel": formSection() !== "statutory",
             }}
             onClick={() => setFormSection("statutory")}
           >
@@ -668,7 +668,7 @@ export default function HrEmployeesPage() {
             class="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
             classList={{
               "bg-brand-600 text-white": formSection() === "documents",
-              "text-text-secondary hover:bg-slate-50": formSection() !== "documents",
+              "text-text-secondary hover:bg-panel": formSection() !== "documents",
             }}
             disabled={!selected()?.id}
             onClick={() => setFormSection("documents")}

@@ -124,7 +124,7 @@ export default function PerformancePage() {
         <Field label="End"><input type="date" class={inputClass} value={end()} onInput={(e) => setEnd(e.currentTarget.value)} /></Field>
       </EntityModal>
 
-      <section class="mb-4 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-4 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Cycles</h2>
         <div class="flex flex-wrap gap-2">
           <For each={cycles.data ?? []}>
@@ -148,7 +148,7 @@ export default function PerformancePage() {
       </section>
 
       <Show when={cycleId()}>
-        <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+        <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
           <h2 class="mb-3 text-lg font-medium">Reviews</h2>
           <For each={reviews.data ?? []} fallback={<p class="text-sm text-text-secondary">No reviews — assign first.</p>}>
             {(r) => (
@@ -254,7 +254,7 @@ function ClientEvaluations(props: {
     void qc.invalidateQueries({ queryKey: ["hr-client-reviews"] });
   };
   return (
-    <section class="mt-4 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+    <section class="mt-4 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
       <h2 class="mb-3 text-lg font-medium">Client evaluations</h2>
       <div class="grid gap-2 sm:grid-cols-2">
         <Field label="Employee id"><input class={inputClass} value={props.emp()} onInput={(e) => props.setEmp(e.currentTarget.value)} /></Field>

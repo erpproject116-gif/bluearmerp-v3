@@ -105,7 +105,7 @@ export default function ApplicantsPage() {
   };
 
   const card = (row: Application) => (
-    <div class="mb-2 rounded-lg border border-stroke bg-white p-2 text-sm">
+    <div class="mb-2 rounded-lg border border-stroke bg-surface p-2 text-sm">
       <p class="font-medium">{row.full_name}</p>
       <p class="text-text-secondary">{row.position_desired || "No position"}</p>
       <p class="text-text-secondary">{row.industry || "No industry"} · {row.workplace || "No workplace"}</p>
@@ -170,7 +170,7 @@ export default function ApplicantsPage() {
         {(id) => {
           const row = () => (applications() ?? []).find((item) => item.id === id());
           return (
-            <section class="mt-4 rounded-xl border border-stroke bg-white p-4">
+            <section class="mt-4 rounded-xl border border-stroke bg-surface p-4">
               <h2 class="mb-2 font-medium">{row()?.full_name}</h2>
               <div class="grid gap-2 sm:grid-cols-2">
                 <Field label="Industry">

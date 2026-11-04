@@ -33,7 +33,7 @@ export default function AttendanceHubPage() {
           {(card) => (
             <A
               href={card.href}
-              class="rounded-xl border border-stroke bg-white p-4 shadow-sm transition hover:bg-slate-50"
+              class="rounded-xl border border-stroke bg-surface p-4 shadow-sm transition hover:bg-panel"
             >
               <p class="text-base font-medium text-text-primary">{card.title}</p>
               <p class="mt-2 text-sm text-text-secondary">{card.description}</p>

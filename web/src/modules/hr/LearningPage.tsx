@@ -112,7 +112,7 @@ export default function LearningPage() {
         <Field label="Due"><input type="date" class={inputClass} value={due()} onInput={(e) => setDue(e.currentTarget.value)} /></Field>
       </EntityModal>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Courses</h2>
         <For each={courses.data ?? []} fallback={<p class="text-sm text-text-secondary">No courses.</p>}>
           {(c) => (
@@ -124,7 +124,7 @@ export default function LearningPage() {
         </For>
       </section>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Assignments</h2>
         <For each={assignments.data ?? []} fallback={<p class="text-sm text-text-secondary">None.</p>}>
           {(a) => (
@@ -136,7 +136,7 @@ export default function LearningPage() {
         </For>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Compliance (overdue / incomplete mandatory)</h2>
         <For each={compliance.data ?? []} fallback={<p class="text-sm text-text-secondary">All clear.</p>}>
           {(a) => (

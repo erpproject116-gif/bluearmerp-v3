@@ -44,7 +44,7 @@ export default function HrReportsPage() {
           <input class={inputClass} type="date" value={to()} onInput={(e) => setTo(e.currentTarget.value)} />
         </Field>
       </div>
-      <div class="overflow-x-auto rounded-xl border border-stroke bg-white shadow-sm">
+      <div class="overflow-x-auto rounded-xl border border-stroke bg-surface shadow-sm">
         <table class="min-w-full text-left text-sm">
           <thead class="border-b border-stroke text-text-secondary">
             <tr>

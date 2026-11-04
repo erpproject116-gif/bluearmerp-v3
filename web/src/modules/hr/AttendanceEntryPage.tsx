@@ -186,7 +186,7 @@ export default function AttendanceEntryPage() {
         </p>
       </div>
 
-      <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <div class="mb-2 flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"

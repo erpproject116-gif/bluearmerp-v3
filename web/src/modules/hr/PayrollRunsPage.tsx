@@ -124,7 +124,7 @@ export default function PayrollRunsPage() {
 
   return (
     <HrLayout>
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">New payroll run</h2>
         <p class="mb-3 text-sm text-text-secondary">
           Gross pay includes base salary plus DTR premiums (OT at 125%, night diff 10%, holiday multipliers from the holiday calendar).

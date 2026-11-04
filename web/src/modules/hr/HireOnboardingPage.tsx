@@ -45,13 +45,13 @@ export default function HireOnboardingPage() {
         New-hire checklists (distinct from workspace ERP onboarding). Cases auto-spawn when an active employee is created.
       </p>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Board</h2>
         <For each={cases.data ?? []} fallback={<p class="text-sm text-text-secondary">No onboarding cases yet.</p>}>
           {(c) => (
             <button
               type="button"
-              class="mb-2 block w-full border-b border-slate-100 py-2 text-left text-sm hover:bg-slate-50"
+              class="mb-2 block w-full border-b border-slate-100 py-2 text-left text-sm hover:bg-panel"
               classList={{ "bg-brand-50": caseId() === c.id }}
               onClick={() => setCaseId(c.id)}
             >
@@ -67,7 +67,7 @@ export default function HireOnboardingPage() {
 
       <Show when={detail.data}>
         {(d) => (
-          <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+          <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
             <h2 class="mb-3 text-lg font-medium">Tasks — {d().case.employee_name}</h2>
             <For each={d().tasks}>
               {(t) => (

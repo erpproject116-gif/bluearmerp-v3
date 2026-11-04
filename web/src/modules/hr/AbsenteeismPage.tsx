@@ -113,7 +113,7 @@ export default function AbsenteeismPage() {
         Evaluate thresholds
       </button>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Open alerts</h2>
         <For each={alerts.data ?? []} fallback={<p class="text-sm text-text-secondary">No open alerts.</p>}>
           {(a) => (
@@ -135,7 +135,7 @@ export default function AbsenteeismPage() {
         </For>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Report</h2>
         <div class="mb-3 grid gap-3 sm:grid-cols-2">
           <Field label="From"><input type="date" class={inputClass} value={from()} onInput={(e) => setFrom(e.currentTarget.value)} /></Field>

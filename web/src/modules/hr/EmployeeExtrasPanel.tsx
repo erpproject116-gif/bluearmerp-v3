@@ -264,7 +264,7 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
         />
         <button
           type="button"
-          class="rounded border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50"
+          class="rounded border border-stroke px-3 py-1.5 text-sm hover:bg-panel disabled:opacity-50"
           disabled={uploading()}
           onClick={() => fileInput?.click()}
         >
@@ -280,7 +280,7 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
             onInput={(e) => setDocUrl(e.currentTarget.value)}
           />
         </Field>
-        <button type="button" class="rounded border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50" onClick={() => void addDocUrl()}>
+        <button type="button" class="rounded border border-stroke px-3 py-1.5 text-sm hover:bg-panel" onClick={() => void addDocUrl()}>
           Add link only
         </button>
       </div>
@@ -332,7 +332,7 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
             value={amount()}
             onInput={(e) => setAmount(e.currentTarget.value)}
           />
-          <button type="button" class="rounded border border-stroke px-3 py-1.5 text-sm hover:bg-slate-50" onClick={() => void addPayItem()}>
+          <button type="button" class="rounded border border-stroke px-3 py-1.5 text-sm hover:bg-panel" onClick={() => void addPayItem()}>
             Assign
           </button>
         </div>

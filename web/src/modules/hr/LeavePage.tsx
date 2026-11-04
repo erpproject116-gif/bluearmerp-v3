@@ -196,7 +196,7 @@ export default function LeavePage() {
         <CustomFieldsSection entityType="hr_leave_request" values={customValues} onChange={setCustom} />
       </EntityModal>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <div class="mb-3 flex items-center justify-between">
           <h2 class="text-lg font-medium">Request queue</h2>
           <select class={inputClass + " w-40"} value={statusFilter()} onChange={(e) => setStatusFilter(e.currentTarget.value)}>
@@ -239,7 +239,7 @@ export default function LeavePage() {
         </div>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Balances</h2>
         <div class="overflow-x-auto">
           <table class="min-w-full text-left text-sm">

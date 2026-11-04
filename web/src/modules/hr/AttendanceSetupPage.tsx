@@ -116,7 +116,7 @@ export default function AttendanceSetupPage() {
       </div>
 
       <div class="grid gap-6 lg:grid-cols-2">
-        <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+        <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
           <h2 class="mb-2 text-lg font-medium">Holiday calendar ({year})</h2>
           <p class="mb-3 text-sm text-text-secondary">
             Regular / special holidays drive DTR holiday premiums. Mark days as absent/awol to auto-deduct unpaid
@@ -161,7 +161,7 @@ export default function AttendanceSetupPage() {
           </ul>
         </section>
 
-        <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+        <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
           <h2 class="mb-2 text-lg font-medium">Pay cut-offs</h2>
           <p class="mb-3 text-sm text-text-secondary">Defines the attendance window that should feed the next payroll run.</p>
           <div class="mb-3 grid gap-3 sm:grid-cols-3">

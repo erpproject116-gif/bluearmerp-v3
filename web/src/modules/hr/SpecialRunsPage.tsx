@@ -109,7 +109,7 @@ export default function SpecialRunsPage() {
 
   return (
     <HrLayout>
-      <section class="mb-8 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-8 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-1 text-lg font-medium">13th month pay</h2>
         <p class="mb-3 text-sm text-text-secondary">
           Computes (sum of BASIC payslip lines in the calendar year) ÷ 12. Preview before posting.
@@ -170,7 +170,7 @@ export default function SpecialRunsPage() {
         </div>
       </EntityModal>
 
-      <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-1 text-lg font-medium">Final pay</h2>
         <p class="mb-3 text-sm text-text-secondary">
           Last-month pro-rate + leave cash-out (cashable balances) + pro-rated 13th.

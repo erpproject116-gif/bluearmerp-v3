@@ -105,7 +105,7 @@ function EssSelfServiceView() {
       </Show>
       <Show when={me()}>
         {(e) => (
-          <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+          <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-text-secondary">Profile</h2>
             <p class="mt-2 text-lg font-medium">{e().full_name}</p>
             <p class="text-sm text-text-secondary">
@@ -126,7 +126,7 @@ function EssSelfServiceView() {
         )}
       </Show>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">Leave balances</h2>
         <For each={balances() ?? []} fallback={<p class="text-sm text-text-secondary">No balances yet.</p>}>
           {(b) => (
@@ -156,7 +156,7 @@ function EssSelfServiceView() {
         </ul>
       </section>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">Payslips</h2>
         <Show when={(payslips() ?? []).length === 0 && !payslips.loading}>
           <p class="text-sm text-text-secondary">No posted payslips yet.</p>
@@ -176,7 +176,7 @@ function EssSelfServiceView() {
         </ul>
       </section>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">My onboarding</h2>
         <Show when={!onboarding()?.case}>
           <p class="text-sm text-text-secondary">No hire onboarding case.</p>
@@ -186,14 +186,14 @@ function EssSelfServiceView() {
         </For>
       </section>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">My learning</h2>
         <For each={learning() ?? []} fallback={<p class="text-sm text-text-secondary">No assignments.</p>}>
           {(c) => <p class="text-sm">{c.course_title} · {c.status}</p>}
         </For>
       </section>
 
-      <section class="mb-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">Discipline</h2>
         <For each={discipline() ?? []} fallback={<p class="text-sm text-text-secondary">No open cases.</p>}>
           {(c) => (
@@ -214,7 +214,7 @@ function EssSelfServiceView() {
         </For>
       </section>
 
-      <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">201 documents (read-only)</h2>
         <For each={docs() ?? []} fallback={<p class="text-sm text-text-secondary">No documents.</p>}>
           {(d) => <p class="text-sm">{d.doc_type}: {d.title}</p>}
@@ -239,7 +239,7 @@ function EssRequests() {
     void refetch();
   };
   return (
-    <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+    <section class="mt-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
       <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">Requests</h2>
       <Field label="Kind">
         <select class={inputClass} value={kind()} onChange={(e) => setKind(e.currentTarget.value)}>

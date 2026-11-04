@@ -178,13 +178,13 @@ export default function DisciplinePage() {
       </EntityModal>
 
       <div class="grid gap-6 lg:grid-cols-2">
-        <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+        <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
           <h2 class="mb-3 text-lg font-medium">Cases</h2>
           <For each={cases.data ?? []} fallback={<p class="text-sm text-text-secondary">No cases.</p>}>
             {(c) => (
               <button
                 type="button"
-                class="mb-1 block w-full rounded border border-transparent px-2 py-2 text-left text-sm hover:bg-slate-50"
+                class="mb-1 block w-full rounded border border-transparent px-2 py-2 text-left text-sm hover:bg-panel"
                 classList={{ "border-brand-500 bg-brand-50": selectedId() === c.id }}
                 onClick={() => setSelectedId(c.id)}
               >
@@ -193,7 +193,7 @@ export default function DisciplinePage() {
             )}
           </For>
         </section>
-        <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+        <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
           <h2 class="mb-3 text-lg font-medium">Detail</h2>
           <Show when={detail.data} fallback={<p class="text-sm text-text-secondary">Select a case.</p>}>
             {(d) => (
@@ -289,7 +289,7 @@ function ClientViolations() {
     void reports.refetch();
   };
   return (
-    <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+    <section class="mt-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
       <h2 class="mb-3 text-lg font-medium">Waiting client violation reports</h2>
       <LookupCombo label="Employee" value={empLabel} selectedId={empId} onInput={setEmpLabel} onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }} onClear={() => { setEmpId(null); setEmpLabel(""); }} fetchOptions={(q) => fetchEmployeeOptions(q)} placeholder="Search employees…" />
       <Field label="Description"><textarea class={inputClass} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} /></Field>

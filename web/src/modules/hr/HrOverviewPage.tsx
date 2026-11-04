@@ -70,7 +70,7 @@ export default function HrOverviewPage() {
       <div class="grid gap-3 sm:grid-cols-2">
         <For each={cards}>
           {(card) => (
-            <A href={card.href} class="rounded-xl border border-stroke bg-white p-4 shadow-sm hover:bg-slate-50">
+            <A href={card.href} class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel">
               <p class="text-sm text-text-secondary">{card.label}</p>
               <p class="mt-1 text-2xl font-semibold">{overview.data?.[card.key] ?? "—"}</p>
             </A>
@@ -80,7 +80,7 @@ export default function HrOverviewPage() {
       <div class="mt-3 grid gap-3 sm:grid-cols-2">
         <For each={moreCards}>
           {(card) => (
-            <A href={card.href} class="rounded-xl border border-stroke bg-white p-4 shadow-sm hover:bg-slate-50">
+            <A href={card.href} class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel">
               <p class="text-sm text-text-secondary">{card.label}</p>
               <p class="mt-1 text-2xl font-semibold">{overview.data?.[card.key] ?? "—"}</p>
             </A>
@@ -90,7 +90,7 @@ export default function HrOverviewPage() {
       <A href="/app/hr/reports" class="mt-4 inline-block text-sm text-brand-700 hover:underline">
         Discipline report
       </A>
-      <section class="mt-6 rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="mt-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="text-lg font-medium">Sample HR data</h2>
         <p class="mt-1 text-sm text-text-secondary">
           Sample employees are excluded from a real payroll run while the batch exists. Remove deletes only the sample batch.

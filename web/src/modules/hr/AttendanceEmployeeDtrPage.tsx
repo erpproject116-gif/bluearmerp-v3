@@ -100,19 +100,19 @@ export default function AttendanceEmployeeDtrPage() {
       <Show when={log.data?.totals}>
         {(t) => (
           <div class="mb-4 grid gap-3 sm:grid-cols-4">
-            <div class="rounded-xl border border-stroke bg-white p-3 shadow-sm">
+            <div class="rounded-xl border border-stroke bg-surface p-3 shadow-sm">
               <p class="text-xs text-text-secondary">Hours</p>
               <p class="text-lg font-semibold tabular-nums">{t().hours_worked_sum}</p>
             </div>
-            <div class="rounded-xl border border-stroke bg-white p-3 shadow-sm">
+            <div class="rounded-xl border border-stroke bg-surface p-3 shadow-sm">
               <p class="text-xs text-text-secondary">OT</p>
               <p class="text-lg font-semibold tabular-nums">{t().ot_hours_sum}</p>
             </div>
-            <div class="rounded-xl border border-stroke bg-white p-3 shadow-sm">
+            <div class="rounded-xl border border-stroke bg-surface p-3 shadow-sm">
               <p class="text-xs text-text-secondary">Night diff</p>
               <p class="text-lg font-semibold tabular-nums">{t().night_diff_hours_sum}</p>
             </div>
-            <div class="rounded-xl border border-stroke bg-white p-3 shadow-sm">
+            <div class="rounded-xl border border-stroke bg-surface p-3 shadow-sm">
               <p class="text-xs text-text-secondary">Absent / AWOL days</p>
               <p class="text-lg font-semibold tabular-nums">{t().absent_days}</p>
             </div>
@@ -120,7 +120,7 @@ export default function AttendanceEmployeeDtrPage() {
         )}
       </Show>
 
-      <section class="rounded-xl border border-stroke bg-white p-4 shadow-sm">
+      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <div class="overflow-x-auto">
           <table class="min-w-full text-left text-sm">
             <thead>
