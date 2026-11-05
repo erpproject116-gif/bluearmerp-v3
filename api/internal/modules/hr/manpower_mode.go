@@ -16,7 +16,18 @@ import (
 
 func registerManpowerModeRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/manpower-mode", getManpowerMode(pool))
-	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Patch("/manpower-mode", patchManpowerMode(pool))
+	r.Patch("/manpower-mode", patchManpowerMode(pool))
+}
+
+// RegisterManpowerSettingsRoutes exposes the same switch on Apps & features.
+func RegisterManpowerSettingsRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.Get("/hr-manpower-mode", getManpowerMode(pool))
+	r.Patch("/hr-manpower-mode", patchManpowerMode(pool))
+}
+
+func canSetManpowerMode(tu auth.TenantUser) bool {
+	return tu.HasPermission("settings.tenant_modules", auth.AccessWrite) ||
+		tu.IsStoreAdmin || tu.IsTenantOwner || tu.IsPlatformSuperadmin
 }
 
 func getManpowerMode(pool *pgxpool.Pool) http.HandlerFunc {
@@ -40,6 +51,10 @@ func patchManpowerMode(pool *pgxpool.Pool) http.HandlerFunc {
 		tu, ok := auth.FromContext(r.Context())
 		if !ok {
 			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !canSetManpowerMode(tu) {
+			response.Err(w, http.StatusForbidden, "Not allowed.", "ERR_FORBIDDEN")
 			return
 		}
 		var body struct {

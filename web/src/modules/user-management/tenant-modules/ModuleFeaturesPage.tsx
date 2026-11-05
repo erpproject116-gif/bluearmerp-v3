@@ -1,6 +1,7 @@
 import { uiLabel } from "../../../shared/branding/uiLabel";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { A } from "@solidjs/router";
+import { useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../../shared/api";
 import { useAuth } from "../../../shared/auth-context";
 import type { TenantModuleRow } from "../../../shared/moduleAccess";
@@ -41,7 +42,10 @@ function policyCurrentValue(policy: ProcessPolicy | null, field: string): boolea
 export default function ModuleFeaturesPage() {
   const toast = useToast();
   const auth = useAuth();
+  const qc = useQueryClient();
   const [loading, setLoading] = createSignal(true);
+  const [manpower, setManpower] = createSignal<boolean | null>(null);
+  const [manpowerSaving, setManpowerSaving] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [canManage, setCanManage] = createSignal(false);
   const [rows, setRows] = createSignal<TenantModuleRow[]>([]);
@@ -55,10 +59,12 @@ export default function ModuleFeaturesPage() {
 
   const load = async () => {
     setLoading(true);
-    const res = await apiFetch<{ modules: TenantModuleRow[]; can_manage: boolean }>(
-      "/api/v1/user-management/tenant-modules",
-    );
+    const [res, modeRes] = await Promise.all([
+      apiFetch<{ modules: TenantModuleRow[]; can_manage: boolean }>("/api/v1/user-management/tenant-modules"),
+      apiFetch<{ manpower_mode: boolean }>("/api/v1/user-management/hr-manpower-mode"),
+    ]);
     setLoading(false);
+    if (modeRes.success && modeRes.data) setManpower(modeRes.data.manpower_mode);
     if (res.success && res.data) {
       const list = res.data.modules ?? [];
       setRows(list);
@@ -80,6 +86,23 @@ export default function ModuleFeaturesPage() {
   const baselineEnabled = (code: string): boolean | null => {
     const row = baseline().find((r) => r.module_code === code);
     return row ? row.is_enabled : null;
+  };
+
+  const saveManpower = async (on: boolean) => {
+    if (!canManage()) return;
+    setManpowerSaving(true);
+    const res = await apiFetch<{ manpower_mode: boolean }>("/api/v1/user-management/hr-manpower-mode", {
+      method: "PATCH",
+      body: JSON.stringify({ manpower_mode: on }),
+    }, { silent: true });
+    setManpowerSaving(false);
+    if (!res.success || !res.data) {
+      toast.error(res.message || "Could not save manpower mode.");
+      return;
+    }
+    setManpower(res.data.manpower_mode);
+    void qc.invalidateQueries({ queryKey: ["hr-manpower-mode"] });
+    toast.success(on ? "Manpower pages are in the HR menu." : "Older HR pages are in the menu. Client records were kept.");
   };
 
   const toggle = (code: string) => {
@@ -178,6 +201,28 @@ export default function ModuleFeaturesPage() {
           Prefer a starter pack if you are not sure what to change.
         </p>
       </div>
+
+      <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900">HR manpower mode</h2>
+        <Show
+          when={manpower() !== null}
+          fallback={<p class="mt-1 text-xs text-slate-600">Loading manpower mode…</p>}
+        >
+          <p class="mt-1 text-xs text-slate-600">
+            {manpower()
+              ? "Clients, roster, client time, and client billing stay in the HR menu. Turning this off keeps those records and shows the older HR pages."
+              : "The older HR and Payroll pages are in the menu. Client and site records are kept."}
+          </p>
+        </Show>
+        <button
+          type="button"
+          class="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50"
+          disabled={manpower() === null || !canManage() || manpowerSaving()}
+          onClick={() => void saveManpower(!manpower())}
+        >
+          {manpower() ? "Use older HR pages" : "Turn manpower mode on"}
+        </button>
+      </section>
 
       <Show when={canManage()}>
         <div class="grid gap-3 sm:grid-cols-3">

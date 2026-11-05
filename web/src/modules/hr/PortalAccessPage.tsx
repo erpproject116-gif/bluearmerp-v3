@@ -1,11 +1,11 @@
-import { createResource, createSignal, For } from "solid-js";
+import { createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 
 type Client = { id: number; name: string };
-type Access = { id: number; client_name: string; email: string; display_name: string; is_active: boolean };
+type Access = { id: number; client_name: string; email: string; display_name: string; is_active: boolean; login_url: string };
 
 export default function PortalAccessPage() {
   const toast = useToast();
@@ -49,6 +49,15 @@ export default function PortalAccessPage() {
           { key: "email", header: "Email" },
           { key: "display_name", header: "Name" },
           { key: "is_active", header: "Active", render: (row) => row.is_active ? "Yes" : "No" },
+          {
+            key: "login_url",
+            header: "Sign-in",
+            render: (row) => (
+              <Show when={row.login_url} fallback={<span class="text-text-secondary">No link</span>}>
+                <a class="text-brand-700" href={row.login_url}>Open portal</a>
+              </Show>
+            ),
+          },
         ]}
         rows={rows() ?? []}
         loading={rows.loading}

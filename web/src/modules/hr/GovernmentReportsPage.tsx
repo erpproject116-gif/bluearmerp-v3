@@ -17,7 +17,7 @@ export default function GovernmentReportsPage() {
   return (
     <HrLayout>
       <h1 class="mb-4 text-2xl font-semibold">Government reports</h1>
-      <p class="mb-3 text-sm text-text-secondary">Withholding already stored on payslips. Remittance files stay on the Remittances page. This is not a second 13th-month calculation.</p>
+      <p class="mb-3 text-sm text-text-secondary">Withholding already stored on payslips. Remittance files stay on the Remittances page. This is not a second 13th-month calculation. Sample withholding is in 2099.</p>
       <div class="mb-4 max-w-xs">
         <Field label="Year"><input class={inputClass} value={year()} onInput={(e) => setYear(e.currentTarget.value)} /></Field>
       </div>

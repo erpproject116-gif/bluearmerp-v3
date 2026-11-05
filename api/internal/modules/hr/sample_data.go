@@ -2,6 +2,7 @@ package hr
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -387,6 +388,30 @@ func seedSampleApplicants(s sampler, tenantID int64) ([]int64, error) {
 			return nil, err
 		}
 		if i == 0 {
+			if _, err := s.tx.Exec(s.ctx, `
+				update public.hr_applications set signature_data_url = $2 where id = $1`,
+				appID, "data:image/png;base64,"+samplePNGBase64); err != nil {
+				return nil, err
+			}
+			png, err := base64.StdEncoding.DecodeString(samplePNGBase64)
+			if err != nil {
+				return nil, err
+			}
+			for _, file := range []struct {
+				kind, name, mime string
+				body             []byte
+			}{
+				{"selfie", "sample-selfie.png", "image/png", png},
+				{"id_photo", "sample-id.png", "image/png", png},
+				{"resume", "sample-resume.pdf", "application/pdf", []byte("%PDF-1.1\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")},
+			} {
+				if _, err := s.ins("hr_application_files", `
+					insert into public.hr_application_files (tenant_id, application_id, kind, file_name, mime_type, file_bytes)
+					values ($1,$2,$3,$4,$5,$6) returning id`,
+					tenantID, appID, file.kind, file.name, file.mime, file.body); err != nil {
+					return nil, err
+				}
+			}
 			if _, err := s.ins("hr_application_children", `
 				insert into public.hr_application_children (application_id, child_name, birth_date)
 				values ($1,'Sample Child','2018-04-02') returning id`, appID); err != nil {
@@ -474,6 +499,16 @@ func seedSampleClients(s sampler, tenantID int64, active, industryIDs []int64) (
 		}
 	}
 	for i, empID := range active {
+		if i == len(active)-1 {
+			_, err := s.ins("hr_assignments", `
+				insert into public.hr_assignments (tenant_id, employee_id, site_id, start_date, end_date)
+				values ($1,$2,$3,'2024-01-15','2024-06-30') returning id`,
+				tenantID, empID, sites[i%5][(i/5)%2])
+			if err != nil {
+				return nil, nil, err
+			}
+			continue
+		}
 		_, err := s.ins("hr_assignments", `
 			insert into public.hr_assignments (tenant_id, employee_id, site_id, start_date)
 			values ($1,$2,$3,'2024-01-15') returning id`,
@@ -534,13 +569,22 @@ func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, em
 		return err
 	}
 	for i, partnerID := range partnerIDs {
-		if _, err := s.ins("portal_users", `
+		userID, err := s.ins("portal_users", `
 			insert into public.portal_users (tenant_id, partner_id, email, display_name)
 			values ($1,$2,$3,$4) returning id`,
 			tenantID, partnerID,
 			fmt.Sprintf("sample.client.%d.%d@example.test", i+1, s.batch),
-			fmt.Sprintf("Sample Client %d", i+1)); err != nil {
+			fmt.Sprintf("Sample Client %d", i+1))
+		if err != nil {
 			return err
+		}
+		if i == 0 {
+			if _, err := s.ins("portal_magic_links", `
+				insert into public.portal_magic_links (portal_user_id, token, expires_at)
+				values ($1,$2,'2099-12-31 00:00:00+00') returning id`,
+				userID, fmt.Sprintf("samplehr%d", s.batch)); err != nil {
+				return err
+			}
 		}
 	}
 	if _, err := s.ins("hr_clearances", `
@@ -871,8 +915,43 @@ func seedSamplePay(s sampler, tenantID int64) error {
 		values ($1,1,'earning','FINAL_PAY','Sample final pay',$2) returning id`, slipID, terminated.salary); err != nil {
 		return err
 	}
+	var first empPay
+	for _, e := range emps {
+		if e.status == "active" {
+			first = e
+			break
+		}
+	}
+	if first.id == 0 {
+		return fmt.Errorf("sample active employee missing")
+	}
+	halves := []struct{ label, start, end string }{
+		{"Sample 1st quincena Apr 2099", "2099-04-01", "2099-04-15"},
+		{"Sample 2nd quincena Apr 2099", "2099-04-16", "2099-04-30"},
+	}
+	for _, p := range halves {
+		periodID, err := s.ins("hr_pay_periods", `
+			insert into public.hr_pay_periods (tenant_id, period_label, period_start, period_end, status, run_type)
+			values ($1,$2,$3,$4,'processed','regular') returning id`, tenantID, p.label, p.start, p.end)
+		if err != nil {
+			return err
+		}
+		start, err := time.Parse("2006-01-02", p.start)
+		if err != nil {
+			return err
+		}
+		end, err := time.Parse("2006-01-02", p.end)
+		if err != nil {
+			return err
+		}
+		if err := insertDraftPayslip(s, tenantID, periodID, first.id, first.no, first.name, first.salary, start, end); err != nil {
+			return err
+		}
+	}
 	return nil
 }
+
+const samplePNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 
 func insertDraftPayslip(s sampler, tenantID, periodID, employeeID int64, employeeNo, employeeName string, salary float64, start, end time.Time) error {
 	draft, err := buildEmployeePayslipDraft(s.ctx, s.tx, tenantID, employeeID, employeeNo, employeeName, salary, start, end)
@@ -929,6 +1008,7 @@ func seedSampleClientBill(s sampler, tenantID int64, masters sampleSalesMasters)
 
 var sampleRetractOrder = []string{
 	"hr_client_bills",
+	"portal_magic_links",
 	"hr_client_time_submissions",
 	"hr_job_orders",
 	"hr_manpower_requests",
@@ -942,6 +1022,7 @@ var sampleRetractOrder = []string{
 	"hr_client_sites",
 	"hr_clients",
 	"inv_partners",
+	"hr_application_files",
 	"hr_application_children",
 	"hr_application_jobs",
 	"hr_application_references",

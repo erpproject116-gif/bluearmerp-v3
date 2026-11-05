@@ -132,7 +132,7 @@ func TestSampleSeedRetract(t *testing.T) {
 		where pp.run_type = 'regular'`, batchID).Scan(&regularSlips); err != nil {
 		t.Fatal(err)
 	}
-	if regularSlips != 60 {
+	if regularSlips != 62 {
 		t.Fatalf("regular payslips = %d", regularSlips)
 	}
 	if err := tx.QueryRow(ctx, `
@@ -140,6 +140,7 @@ func TestSampleSeedRetract(t *testing.T) {
 		join public.hr_pay_periods pp on pp.id = ps.pay_period_id
 		join public.hr_sample_rows r on r.row_id = pp.id and r.table_name = 'hr_pay_periods' and r.batch_id = $1
 		where pp.run_type = 'regular'
+		  and pp.period_label <> 'Sample 1st quincena Apr 2099'
 		  and (
 		    not exists (select 1 from public.hr_payslip_lines pl where pl.payslip_id = ps.id and pl.line_code = 'SSS_EE')
 		    or not exists (select 1 from public.hr_payslip_lines pl where pl.payslip_id = ps.id and pl.line_code = 'PHIC_EE')
@@ -279,6 +280,62 @@ func TestSampleSeedRetract(t *testing.T) {
 	if stillActive != "active" {
 		t.Fatalf("assignment changed employee status to %s", stillActive)
 	}
+	var endedSeed int
+	if err := tx.QueryRow(ctx, `
+		select count(*) from public.hr_assignments a
+		join public.hr_sample_rows r on r.row_id = a.id and r.table_name = 'hr_assignments' and r.batch_id = $1
+		where a.end_date = '2024-06-30'`, batchID).Scan(&endedSeed); err != nil {
+		t.Fatal(err)
+	}
+	if endedSeed != 1 {
+		t.Fatalf("ended sample assignments = %d", endedSeed)
+	}
+	var firstBasic float64
+	var firstStatutory int
+	if err := tx.QueryRow(ctx, `
+		select
+		  coalesce(max(case when pl.line_code = 'BASIC' then pl.amount else null end), -1)::float8,
+		  count(*) filter (where pl.line_code in ('SSS_EE','PHIC_EE','HDMF_EE','WHT'))
+		from public.hr_payslip_lines pl
+		join public.hr_payslips ps on ps.id = pl.payslip_id
+		join public.hr_pay_periods pp on pp.id = ps.pay_period_id
+		where pp.tenant_id = $1 and pp.period_label = 'Sample 1st quincena Apr 2099'`, tenantID).Scan(&firstBasic, &firstStatutory); err != nil {
+		t.Fatal(err)
+	}
+	if firstBasic != 0 || firstStatutory != 0 {
+		t.Fatalf("first quincena basic=%v statutory=%d", firstBasic, firstStatutory)
+	}
+	var secondBasic float64
+	var secondStatutory int
+	if err := tx.QueryRow(ctx, `
+		select
+		  coalesce(max(case when pl.line_code = 'BASIC' then pl.amount else null end), 0)::float8,
+		  count(*) filter (where pl.line_code = 'SSS_EE')
+		from public.hr_payslip_lines pl
+		join public.hr_payslips ps on ps.id = pl.payslip_id
+		join public.hr_pay_periods pp on pp.id = ps.pay_period_id
+		where pp.tenant_id = $1 and pp.period_label = 'Sample 2nd quincena Apr 2099'`, tenantID).Scan(&secondBasic, &secondStatutory); err != nil {
+		t.Fatal(err)
+	}
+	if secondBasic <= 0 || secondStatutory != 1 {
+		t.Fatalf("second quincena basic=%v sss=%d", secondBasic, secondStatutory)
+	}
+	var fileCount int
+	var hasSignature bool
+	if err := tx.QueryRow(ctx, `
+		select
+		  (select count(*) from public.hr_application_files f
+		    join public.hr_sample_rows r on r.row_id = f.id and r.table_name = 'hr_application_files' and r.batch_id = $1),
+		  exists (
+		    select 1 from public.hr_applications a
+		    join public.hr_applicant_people p on p.id = a.person_id
+		    where a.tenant_id = $2 and p.full_name = 'Sample Applicant pooling' and a.signature_data_url <> ''
+		  )`, batchID, tenantID).Scan(&fileCount, &hasSignature); err != nil {
+		t.Fatal(err)
+	}
+	if fileCount != 3 || !hasSignature {
+		t.Fatalf("application files=%d signature=%v", fileCount, hasSignature)
+	}
 	var assignmentID int64
 	if err := tx.QueryRow(ctx, `
 		select id from public.hr_assignments
@@ -339,7 +396,7 @@ func TestSampleSeedRetract(t *testing.T) {
 		t.Fatal(err)
 	}
 	if jobOrders != 10 || requests != 2 || submitted != 1 || accepted != 1 || bills != 1 || billTotal != 1200 ||
-		portalUsers != 5 || magicLinks != 0 || clearances != 1 || cutoffs != 2 || holidays != 1 || dtrFromTime != 0 {
+		portalUsers != 5 || magicLinks != 1 || clearances != 1 || cutoffs != 2 || holidays != 1 || dtrFromTime != 0 {
 		t.Fatalf("orders=%d requests=%d submitted=%d accepted=%d bills=%d total=%v users=%d links=%d clearances=%d cutoffs=%d holidays=%d linkedDtr=%d",
 			jobOrders, requests, submitted, accepted, bills, billTotal, portalUsers, magicLinks, clearances, cutoffs, holidays, dtrFromTime)
 	}

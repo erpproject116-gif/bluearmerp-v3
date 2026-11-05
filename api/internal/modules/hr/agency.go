@@ -1,11 +1,15 @@
 package hr
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -425,7 +429,14 @@ func listClientPortalAccess(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		rows, err := pool.Query(r.Context(), `
-			select u.id, c.id, c.name, u.email, u.display_name, u.is_active
+			select u.id, c.id, c.name, u.email, u.display_name, u.is_active,
+			  coalesce((
+			    select '/portal/dashboard?token=' || ml.token
+			    from public.portal_magic_links ml
+			    where ml.portal_user_id = u.id and ml.expires_at > now()
+			    order by ml.expires_at desc
+			    limit 1
+			  ), '')
 			from public.portal_users u
 			join public.hr_clients c on c.partner_id = u.partner_id and c.tenant_id = u.tenant_id
 			where u.tenant_id = $1
@@ -438,14 +449,15 @@ func listClientPortalAccess(pool *pgxpool.Pool) http.HandlerFunc {
 		out := []map[string]any{}
 		for rows.Next() {
 			var id, clientID int64
-			var client, email, name string
+			var client, email, name, loginURL string
 			var active bool
-			if err := rows.Scan(&id, &clientID, &client, &email, &name, &active); err != nil {
+			if err := rows.Scan(&id, &clientID, &client, &email, &name, &active, &loginURL); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load portal access.", "ERR_INTERNAL")
 				return
 			}
 			out = append(out, map[string]any{
 				"id": id, "client_id": clientID, "client_name": client, "email": email, "display_name": name, "is_active": active,
+				"login_url": loginURL,
 			})
 		}
 		response.OK(w, out, "OK")
@@ -500,8 +512,31 @@ func createClientPortalUser(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save portal access.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, map[string]any{"id": id}, "Created.")
+		loginURL, err := insertPortalMagicLink(r.Context(), pool, id, time.Now().Add(7*24*time.Hour))
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create the portal sign-in link.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"id": id, "login_url": loginURL}, "Created.")
 	}
+}
+
+func insertPortalMagicLink(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}, portalUserID int64, expires time.Time) (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	token := hex.EncodeToString(buf)
+	var linkID int64
+	err := q.QueryRow(ctx, `
+		insert into public.portal_magic_links (portal_user_id, token, expires_at)
+		values ($1,$2,$3) returning id`, portalUserID, token, expires).Scan(&linkID)
+	if err != nil {
+		return "", err
+	}
+	return "/portal/dashboard?token=" + token, nil
 }
 
 func listClearances(pool *pgxpool.Pool) http.HandlerFunc {

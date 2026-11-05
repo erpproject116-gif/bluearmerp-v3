@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/modules/hr"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 )
 
@@ -14,6 +15,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 		registerRoleRoutes(ur, pool)
 		registerPermissionRoutes(ur, pool)
 		registerTenantModuleRoutes(ur, pool)
+		hr.RegisterManpowerSettingsRoutes(ur, pool)
 		registerUserDataScopeRoutes(ur, pool)
 	})
 }

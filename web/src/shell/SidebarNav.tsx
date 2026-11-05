@@ -22,7 +22,6 @@ export function isFinanceModulePath(pathname: string): boolean {
   if (pathname === "/app/finance" || pathname.startsWith("/app/finance/")) return true;
   if (isReviewPurchasesPath(pathname)) return true;
   if (isTaxMngtPath(pathname)) return true;
-  if (pathname === "/app/hr/payroll-runs" || pathname.startsWith("/app/hr/payroll-runs/")) return true;
   if (pathname === "/app/fixed-assets" || pathname.startsWith("/app/fixed-assets/")) return true;
   if (isFinanceUnderSalesReportPath(pathname)) return true;
   return false;

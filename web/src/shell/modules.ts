@@ -752,8 +752,6 @@ export function resolveModule(pathname: string): AppModule | undefined {
   if (
     isReviewPurchasesPath(pathname) ||
     isTaxMngtPath(pathname) ||
-    pathname === "/app/hr/payroll-runs" ||
-    pathname.startsWith("/app/hr/payroll-runs/") ||
     pathname === "/app/fixed-assets" ||
     pathname.startsWith("/app/fixed-assets/") ||
     pathname === "/app/sales/reports/ar-by-customer" ||

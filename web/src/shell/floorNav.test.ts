@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isSellBuyDesktopPreferredPath } from "./DesktopPreferredHint";
 import { shouldShowFloorBottomNav } from "./FloorBottomNav";
 import { HOME_SIDEBAR_AREAS, type HomeSidebarArea } from "./ecount-top-nav";
+import { resolveModule } from "./modules";
 import { navGroupForModuleId } from "./navGroups";
 import type { MeData } from "../shared/auth-context";
 
@@ -256,6 +257,12 @@ describe("HR sidebar groups", () => {
     ]);
     expect(hr?.children?.find((c) => c.id === "hr_report")?.href).toBe("/app/hr/reports");
     expect(hr?.children?.every((c) => c.moduleId === "hr")).toBe(true);
+    const icons = hr?.children?.map((c) => c.iconId) ?? [];
+    expect(new Set(icons).size).toBe(icons.length);
+  });
+
+  it("keeps payroll runs inside HR", () => {
+    expect(resolveModule("/app/hr/payroll-runs")?.id).toBe("hr");
   });
 });
 

@@ -2,10 +2,8 @@ import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
-import { hasPermission, useAuth } from "../../shared/auth-context";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { useManpowerMode } from "./manpowerMode";
 
 type Overview = {
   active_employees: number;
@@ -47,8 +45,6 @@ const queueCards = [
 
 export default function HrOverviewPage() {
   const toast = useToast();
-  const auth = useAuth();
-  const mode = useManpowerMode();
   const qc = useQueryClient();
   const [busy, setBusy] = createSignal(false);
   const [confirmRemove, setConfirmRemove] = createSignal(false);
@@ -126,27 +122,12 @@ export default function HrOverviewPage() {
       <A href="/app/hr/reports" class="mt-4 inline-block text-sm text-brand-700 hover:underline">
         Discipline report
       </A>
-      <Show when={hasPermission(auth.me, "hr.employees", "write") && !mode.loading()}>
-        <section class="mt-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-          <h2 class="text-lg font-medium">Manpower mode</h2>
-          <p class="mt-1 text-sm text-text-secondary">
-            {mode.enabled()
-              ? "Clients, roster, client time, and client billing are in the menu. Turning this off keeps those records and shows the older HR pages."
-              : "The older HR and Payroll pages are in the menu. Client and site records are kept."}
-          </p>
-          <button
-            type="button"
-            class="mt-3 rounded-lg border border-stroke px-4 py-2 text-sm"
-            onClick={() => void mode.save(!mode.enabled())}
-          >
-            {mode.enabled() ? "Use older HR pages" : "Turn manpower mode on"}
-          </button>
-        </section>
-      </Show>
       <section class="mt-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="text-lg font-medium">Sample HR data</h2>
         <p class="mt-1 text-sm text-text-secondary">
           Sample employees are excluded from a real payroll run while the batch exists. Remove deletes only the sample batch.
+          Sample attendance, payroll, and withholding are in 2099. Set the attendance month to 2099-01 and the government report year to 2099.
+          The first client portal login is listed on Portal access.
         </p>
         <div class="mt-3 flex flex-wrap gap-2">
           <button
