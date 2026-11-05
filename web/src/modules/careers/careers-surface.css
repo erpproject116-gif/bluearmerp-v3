@@ -1,0 +1,63 @@
+.careers-surface {
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #f8fafc, #fff);
+  color: #0f172a;
+}
+
+.careers-surface .ap-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.careers-surface .ap-top .grow {
+  flex: 1;
+}
+
+.careers-surface .ap-wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.careers-surface .jobhero {
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: #fff;
+  border-radius: 16px;
+  padding: 22px;
+}
+
+.careers-surface .jobhero .input {
+  background: #fff;
+  color: #0f172a;
+}
+
+.careers-surface .jobs {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.careers-surface .job-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.careers-surface .job-card:hover {
+  border-color: #93c5fd;
+}
+
+@media (max-width: 760px) {
+  .careers-surface .jobs {
+    grid-template-columns: 1fr;
+  }
+}

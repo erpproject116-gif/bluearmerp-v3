@@ -18,6 +18,7 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/audit"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/customfields"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/formfields"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -114,7 +115,7 @@ func listPublicOpenings(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		rows, err := pool.Query(r.Context(), `
-			select p.title, s.site_name, p.headcount
+			select p.id, p.title, s.site_name, p.headcount
 			from public.hr_job_postings p
 			join public.hr_client_sites s on s.id = p.site_id and s.tenant_id = p.tenant_id
 			where p.tenant_id = $1 and p.status = 'open'
@@ -126,13 +127,14 @@ func listPublicOpenings(pool *pgxpool.Pool) http.HandlerFunc {
 		defer rows.Close()
 		out := []map[string]any{}
 		for rows.Next() {
+			var id int64
 			var title, site string
 			var head int
-			if err := rows.Scan(&title, &site, &head); err != nil {
+			if err := rows.Scan(&id, &title, &site, &head); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load openings.", "ERR_INTERNAL")
 				return
 			}
-			out = append(out, map[string]any{"title": title, "site_name": site, "headcount": head})
+			out = append(out, map[string]any{"id": id, "title": title, "site_name": site, "headcount": head})
 		}
 		response.OK(w, out, "OK")
 	}
@@ -215,7 +217,21 @@ func getPublicApplyForm(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defs, _ := customfields.ListDefinitions(r.Context(), pool, tenantID, "hr_application", true)
-		response.OK(w, map[string]any{"company_code": chi.URLParam(r, "code"), "custom_fields": defs}, "OK")
+		fields, ferr := formfields.LoadMergedSettings(r.Context(), pool, tenantID, "hr_application")
+		if ferr != nil {
+			fields = nil
+		}
+		visible := make([]formfields.FieldSetting, 0, len(fields))
+		for _, f := range fields {
+			if f.IsVisible && f.IsActive {
+				visible = append(visible, f)
+			}
+		}
+		response.OK(w, map[string]any{
+			"company_code":   chi.URLParam(r, "code"),
+			"custom_fields":  defs,
+			"fields":         visible,
+		}, "OK")
 	}
 }
 

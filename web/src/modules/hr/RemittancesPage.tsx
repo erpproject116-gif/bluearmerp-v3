@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { usePayPeriods } from "../../shared/useHr";
@@ -6,10 +6,11 @@ import { exportRemittanceCsv } from "../../shared/hrCsvImport";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
-import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
-import { HrPageHead } from "./HrUi";
-import { formatAmount } from "../../shared/money";
+import { HrPayrollTabs } from "./HrPayrollTabs";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
+import { formatAmount, formatPeso } from "../../shared/money";
 
 type RemittanceBatch = {
   id: number;
@@ -24,11 +25,31 @@ type RemittanceBatch = {
 };
 
 const AGENCIES = [
-  { id: "sss", label: "SSS" },
-  { id: "philhealth", label: "PhilHealth" },
-  { id: "pagibig", label: "Pag-IBIG" },
-  { id: "bir", label: "BIR (WHT)" },
+  { id: "sss", label: "SSS", form: "Contribution (R3 file)" },
+  { id: "philhealth", label: "PhilHealth", form: "RF-1 / premium" },
+  { id: "pagibig", label: "Pag-IBIG", form: "MCRF" },
+  { id: "bir", label: "BIR", form: "1601-C withholding" },
 ] as const;
+
+function agencyLabel(id: string) {
+  return AGENCIES.find((a) => a.id === id)?.label ?? id.toUpperCase();
+}
+
+function formLabel(id: string) {
+  return AGENCIES.find((a) => a.id === id)?.form ?? "—";
+}
+
+function statusTone(status: string): HrBadgeTone {
+  const s = status.toLowerCase();
+  if (s === "filed" || s === "paid") return "success";
+  if (s === "ready" || s === "draft") return "warning";
+  return "neutral";
+}
+
+function statusLabel(status: string) {
+  if (!status) return "Not started";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
 
 export default function RemittancesPage() {
   const toast = useToast();
@@ -38,8 +59,12 @@ export default function RemittancesPage() {
   const [agency, setAgency] = createSignal("sss");
   const [building, setBuilding] = createSignal(false);
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
-  const [exportFormat, setExportFormat] = createSignal("sss");
+  const [exportFormat, setExportFormat] = createSignal("sss_r3");
   const [buildOpen, setBuildOpen] = createSignal(false);
+  const [payOpen, setPayOpen] = createSignal(false);
+  const [payTarget, setPayTarget] = createSignal<RemittanceBatch | null>(null);
+  const [agencySeg, setAgencySeg] = createSignal("");
+  const [search, setSearch] = createSignal("");
 
   const list = createQuery(() => ({
     queryKey: ["hr-remittances"],
@@ -65,41 +90,41 @@ export default function RemittancesPage() {
     };
   });
 
-  const buildDraftPayload = () => ({
-    period_id: periodId(),
-    agency: agency(),
+  const rows = createMemo(() => {
+    const q = search().trim().toLowerCase();
+    return (list.data ?? []).filter((batch) => {
+      if (agencySeg() && batch.agency !== agencySeg()) return false;
+      if (!q) return true;
+      return (
+        batch.agency.toLowerCase().includes(q) ||
+        batch.period_label.toLowerCase().includes(q) ||
+        batch.status.toLowerCase().includes(q)
+      );
+    });
   });
-
-  const applyDraftPayload = (payload: ReturnType<typeof buildDraftPayload>) => {
-    setPeriodId(payload.period_id);
-    setAgency(payload.agency);
-  };
 
   const draft = useDocumentDraft({
     entityType: DRAFT_ENTITY.hrRemittance,
     draftKey: "build",
-    getPayload: buildDraftPayload,
-    onApply: applyDraftPayload,
+    getPayload: () => ({ period_id: periodId(), agency: agency() }),
+    onApply: (payload) => {
+      setPeriodId(payload.period_id);
+      setAgency(payload.agency);
+    },
     enabled: () => buildOpen(),
     localOnly: true,
     autoApply: () => false,
   });
 
   const build = async () => {
-    if (!periodId()) {
-      toast.warning("Select a pay period.");
-      return;
-    }
+    if (!periodId()) return toast.warning("Select a pay period.");
     setBuilding(true);
     const res = await apiFetch<{ batch_id: number }>("/api/v1/hr/remittances/build", {
       method: "POST",
       body: JSON.stringify({ pay_period_id: periodId(), agency: agency() }),
     });
     setBuilding(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Build failed.");
-      return;
-    }
+    if (!res.success) return toast.warning(res.message ?? "Build failed.");
     toast.success("Remittance batch ready.");
     setSelectedId(res.data?.batch_id ?? null);
     await draft.clearOnSave();
@@ -120,66 +145,53 @@ export default function RemittancesPage() {
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
-    if (!res.success) {
-      toast.warning(res.message ?? "Update failed.");
-      return;
-    }
+    if (!res.success) return toast.warning(res.message ?? "Update failed.");
     void qc.invalidateQueries({ queryKey: ["hr-remittances"] });
     void qc.invalidateQueries({ queryKey: ["hr-remittance", id] });
     toast.success(`Marked ${status}.`);
+    setPayOpen(false);
+    setPayTarget(null);
   };
 
   return (
     <HrLayout>
-      <HrPageHead title="Remittances" subtitle="Agency files built from posted payslips (SSS, PhilHealth, Pag-IBIG, BIR)." />
-      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <h2 class="mb-2 text-lg font-medium">Build remittance batch</h2>
-        <p class="mb-3 text-sm text-text-secondary">
-          Creates or refreshes an agency remittance file from posted payslips for the selected period (SSS, PhilHealth,
-          Pag-IBIG, or BIR withholding).
-        </p>
-        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setBuildOpen(true)}>
-          New remittance
-        </button>
-      </section>
-      <EntityModal
-        open={buildOpen()}
-        title="New remittance"
-        onClose={() => setBuildOpen(false)}
-        onSave={() => void build()}
-        saving={building()}
-        saveLabel="Build batch"
-      >
-        <draft.DraftBanner />
-        <Field label="Pay period">
-          <select
-            class={inputClass}
-            value={periodId() ?? ""}
-            onChange={(e) => setPeriodId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
-          >
-            <option value="">Select…</option>
-            <For each={periods.data ?? []}>
-              {(p) => (
-                <option value={p.id}>
-                  {p.period_label} ({p.status})
-                </option>
-              )}
-            </For>
-          </select>
-        </Field>
-        <Field label="Agency">
-          <select class={inputClass} value={agency()} onChange={(e) => setAgency(e.currentTarget.value)}>
-            <For each={[...AGENCIES]}>{(a) => <option value={a.id}>{a.label}</option>}</For>
-          </select>
-        </Field>
-      </EntityModal>
-      <section class="mb-6">
-        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-lg font-medium">Batches</h2>
-          <div class="flex items-center gap-2 text-sm">
-            <span class="text-text-secondary">Export format</span>
+      <div class="hr-crumb">HR &amp; Payroll › Payroll › Remittances</div>
+      <HrPayrollTabs />
+      <HrPageHead
+        title="Remittances"
+        subtitle="Government contributions and tax due per month."
+        actions={
+          <button type="button" class="hr-btn hr-btn-primary" onClick={() => setBuildOpen(true)}>
+            Generate…
+          </button>
+        }
+      />
+
+      <HrTcard
+        toolbar={
+          <>
+            <input
+              class="grow rounded-lg border border-stroke bg-surface px-3 py-2 text-sm"
+              placeholder="Search…"
+              aria-label="Search"
+              value={search()}
+              onInput={(e) => setSearch(e.currentTarget.value)}
+            />
+            <div class="hr-seg" role="group" aria-label="Agency">
+              <button type="button" classList={{ on: agencySeg() === "" }} onClick={() => setAgencySeg("")}>
+                All
+              </button>
+              <For each={[...AGENCIES]}>
+                {(a) => (
+                  <button type="button" classList={{ on: agencySeg() === a.id }} onClick={() => setAgencySeg(a.id)}>
+                    {a.label}
+                  </button>
+                )}
+              </For>
+            </div>
             <select
-              class="rounded-lg border border-stroke px-2 py-1 text-sm"
+              class="rounded-lg border border-stroke bg-surface px-2 text-sm"
+              aria-label="Export format"
               value={exportFormat()}
               onChange={(e) => setExportFormat(e.currentTarget.value)}
             >
@@ -189,72 +201,111 @@ export default function RemittancesPage() {
               <option value="bir_1601c">BIR 1601-C style</option>
               <option value="generic">Generic</option>
             </select>
-          </div>
-        </div>
-        <SpreadsheetGrid
-          columns={[
-            { key: "agency", header: "Agency", render: (batch) => <span class="uppercase">{batch.agency}</span> },
-            { key: "period_label", header: "Period" },
-            { key: "status", header: "Status" },
-            { key: "total_employee", header: "EE", render: (batch) => <span class="tabular-nums">{formatAmount(batch.total_employee)}</span> },
-            { key: "total_employer", header: "ER", render: (batch) => <span class="tabular-nums">{formatAmount(batch.total_employer)}</span> },
-            { key: "total_amount", header: "Total", render: (batch) => <span class="tabular-nums">{formatAmount(batch.total_amount)}</span> },
-            {
-              key: "actions",
-              header: "Actions",
-              clickable: false,
-              render: (batch) => (
-                <div class="flex flex-wrap gap-2">
-                  <button type="button" class="text-brand-700 underline" onClick={() => setSelectedId(batch.id)}>View</button>
-                  <button type="button" class="text-brand-700 underline" onClick={() => void exportCsv(batch.id)}>CSV</button>
-                  <button type="button" class="text-text-secondary underline" onClick={() => void markStatus(batch.id, "filed")}>Filed</button>
-                  <button type="button" class="text-text-secondary underline" onClick={() => void markStatus(batch.id, "paid")}>Paid</button>
-                </div>
-              ),
-            },
-          ]}
-          rows={list.data ?? []}
-          loading={list.isFetching}
-          selectedId={selectedId()}
-          onSelect={setSelectedId}
-          onEdit={(batch) => setSelectedId(batch.id)}
-          onNew={() => setBuildOpen(true)}
-          showNew={true}
-          newLabel="New remittance"
-          codeKey="agency"
-          nameKey="period_label"
-          page={1}
-          pageSize={50}
-          total={(list.data ?? []).length}
-        />
-      </section>
-
-      <Show when={detail.data}>
-        {(d) => (
-          <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-            <h2 class="mb-2 text-lg font-medium">
-              Lines — {d().batch.agency.toUpperCase()} ({d().lines.length})
-            </h2>
-            <div class="overflow-auto rounded-lg border border-stroke">
-              <table class="min-w-full text-sm">
-                <thead class="bg-slate-50 text-left">
+          </>
+        }
+      >
+        <div class="hr-tbl-wrap">
+          <table class="hr-tbl">
+            <thead>
+              <tr>
+                <th>Agency</th>
+                <th>Month</th>
+                <th>Form</th>
+                <th class="num">Amount</th>
+                <th>Status</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              <For
+                each={rows()}
+                fallback={
                   <tr>
-                    <th class="px-3 py-2">Employee</th>
-                    <th class="px-3 py-2">Gov ID</th>
-                    <th class="px-3 py-2 text-right">EE</th>
-                    <th class="px-3 py-2 text-right">ER</th>
+                    <td colspan="6">
+                      <HrEmpty title="No matches" hint="Generate a remittance batch from a posted pay period." />
+                    </td>
+                  </tr>
+                }
+              >
+                {(batch) => (
+                  <tr>
+                    <td>
+                      <HrBadge tone="neutral">{agencyLabel(batch.agency)}</HrBadge>
+                    </td>
+                    <td>{batch.period_label}</td>
+                    <td>{formLabel(batch.agency)}</td>
+                    <td class="num">{formatPeso(batch.total_amount)}</td>
+                    <td>
+                      <HrBadge tone={statusTone(batch.status)}>{statusLabel(batch.status)}</HrBadge>
+                    </td>
+                    <td>
+                      <details class="hr-menu hr-rowmenu">
+                        <summary class="hr-rowmenu-btn" aria-label="Row actions">
+                          ⋯
+                        </summary>
+                        <div>
+                          <button type="button" class="menu-item" onClick={() => setSelectedId(batch.id)}>
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            class="menu-item"
+                            onClick={() => {
+                              setPayTarget(batch);
+                              setPayOpen(true);
+                            }}
+                          >
+                            Mark filed
+                          </button>
+                          <button type="button" class="menu-item" onClick={() => void exportCsv(batch.id)}>
+                            Download
+                          </button>
+                          <button type="button" class="menu-item" onClick={() => void markStatus(batch.id, "paid")}>
+                            Mark paid
+                          </button>
+                        </div>
+                      </details>
+                    </td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
+      </HrTcard>
+
+      <Show when={detail.data && selectedId()}>
+        {(d) => (
+          <section class="hr-w s12 mt-4" aria-label="Remittance lines">
+            <header>
+              <h3>
+                Lines · {agencyLabel(d().batch.agency)} · {d().batch.period_label}
+              </h3>
+              <span class="grow" />
+              <button type="button" class="hr-btn hr-btn-sm" onClick={() => setSelectedId(null)}>
+                Close
+              </button>
+            </header>
+            <div class="hr-tbl-wrap">
+              <table class="hr-tbl">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Gov ID</th>
+                    <th class="num">EE</th>
+                    <th class="num">ER</th>
                   </tr>
                 </thead>
                 <tbody>
                   <For each={d().lines}>
                     {(ln) => (
-                      <tr class="border-t">
-                        <td class="px-3 py-2">
+                      <tr>
+                        <td>
                           {String(ln.employee_no)} — {String(ln.employee_name)}
                         </td>
-                        <td class="px-3 py-2">{String(ln.gov_id || "—")}</td>
-                        <td class="px-3 py-2 text-right tabular-nums">{formatAmount(Number(ln.ee_amount))}</td>
-                        <td class="px-3 py-2 text-right tabular-nums">{formatAmount(Number(ln.er_amount))}</td>
+                        <td>{String(ln.gov_id || "—")}</td>
+                        <td class="num">{formatAmount(Number(ln.ee_amount))}</td>
+                        <td class="num">{formatAmount(Number(ln.er_amount))}</td>
                       </tr>
                     )}
                   </For>
@@ -262,6 +313,77 @@ export default function RemittancesPage() {
               </table>
             </div>
           </section>
+        )}
+      </Show>
+
+      <Show when={buildOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Generate remittance">
+          <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">Generate remittance</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setBuildOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <draft.DraftBanner />
+            <div class="grid gap-3">
+              <Field label="Pay period">
+                <select
+                  class={inputClass}
+                  value={periodId() ?? ""}
+                  onChange={(e) => setPeriodId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+                >
+                  <option value="">Select…</option>
+                  <For each={periods.data ?? []}>
+                    {(p) => (
+                      <option value={p.id}>
+                        {p.period_label} ({p.status})
+                      </option>
+                    )}
+                  </For>
+                </select>
+              </Field>
+              <Field label="Agency">
+                <select class={inputClass} value={agency()} onChange={(e) => setAgency(e.currentTarget.value)}>
+                  <For each={[...AGENCIES]}>{(a) => <option value={a.id}>{a.label}</option>}</For>
+                </select>
+              </Field>
+            </div>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setBuildOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" disabled={building()} onClick={() => void build()}>
+                Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={payOpen() && payTarget()}>
+        {(batch) => (
+          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Mark filed">
+            <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+              <div class="mb-3 flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold">Mark filed?</h2>
+                <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setPayOpen(false)}>
+                  ✕
+                </button>
+              </div>
+              <p class="mb-3 text-sm">
+                {agencyLabel(batch().agency)} · {batch().period_label} · {formatPeso(batch().total_amount)}
+              </p>
+              <div class="mt-4 flex flex-wrap justify-end gap-2">
+                <button type="button" class="hr-btn" onClick={() => setPayOpen(false)}>
+                  Cancel
+                </button>
+                <button type="button" class="hr-btn hr-btn-primary" onClick={() => void markStatus(batch().id, "filed")}>
+                  Mark filed
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </Show>
     </HrLayout>

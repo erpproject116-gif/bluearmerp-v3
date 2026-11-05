@@ -39,7 +39,7 @@ export function HrSkel(props: { width?: string }) {
 }
 
 export function HrPageHead(props: {
-  title: string;
+  title: JSX.Element | string;
   subtitle?: string;
   crumb?: JSX.Element;
   actions?: JSX.Element;

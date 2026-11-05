@@ -6,7 +6,7 @@ import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../shared/ViewModeToggle";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrPageHead } from "./HrUi";
+import { HrBadge, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
 
 type Application = {
   id: number;
@@ -34,12 +34,46 @@ const STATUSES = [
   ["resigned", "Resigned"],
 ] as const;
 
+function statusLabel(status: string) {
+  return STATUSES.find(([id]) => id === status)?.[1] ?? status.replaceAll("_", " ");
+}
+
+function statusTone(status: string): HrBadgeTone {
+  switch (status) {
+    case "hired":
+    case "onboarding":
+      return "success";
+    case "rejected":
+    case "terminated":
+      return "danger";
+    case "resigned":
+      return "neutral";
+    case "exam":
+    case "final_interview":
+      return "warning";
+    case "initial_interview":
+      return "info";
+    case "pooling":
+    default:
+      return "brand";
+  }
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+}
+
 export default function ApplicantsPage() {
   const toast = useToast();
   const [mode, setMode] = createSignal<ViewMode>(loadViewMode("hr-applicants", "board"));
   const storedAxis = typeof localStorage === "undefined" ? null : localStorage.getItem("hr-applicants-board-axis");
   const [axis, setAxis] = createSignal<"horizontal" | "vertical">(storedAxis === "vertical" ? "vertical" : "horizontal");
   const [collapsed, setCollapsed] = createSignal<string[]>([]);
+  const [statusFilter, setStatusFilter] = createSignal("");
+  const [search, setSearch] = createSignal("");
   const chooseAxis = (next: "horizontal" | "vertical") => {
     setAxis(next);
     if (typeof localStorage !== "undefined") localStorage.setItem("hr-applicants-board-axis", next);
@@ -53,7 +87,6 @@ export default function ApplicantsPage() {
   const [comment, setComment] = createSignal("");
   const [newKind, setNewKind] = createSignal<"industry" | "workplace">("industry");
   const [newName, setNewName] = createSignal("");
-
   const [segments, { refetch: refetchSegments }] = createResource(async () => (await apiFetch<Segment[]>("/api/v1/hr/applicant-segments")).data ?? []);
   const [applications, { refetch: refetchApplications }] = createResource(
     () => `${industry()}|${workplace()}`,
@@ -66,8 +99,24 @@ export default function ApplicantsPage() {
     },
   );
 
+  const filteredApps = createMemo(() => {
+    const q = search().trim().toLowerCase();
+    const st = statusFilter();
+    return (applications() ?? []).filter((row) => {
+      if (st && row.status !== st) return false;
+      if (!q) return true;
+      return (
+        row.full_name.toLowerCase().includes(q) ||
+        (row.position_desired || "").toLowerCase().includes(q) ||
+        (row.email || "").toLowerCase().includes(q) ||
+        (row.industry || "").toLowerCase().includes(q) ||
+        (row.workplace || "").toLowerCase().includes(q)
+      );
+    });
+  });
+
   const columns = createMemo<KanbanColumn<Application>[]>(() =>
-    STATUSES.map(([id, label]) => ({ id, label, items: (applications() ?? []).filter((row) => row.status === id) })),
+    STATUSES.map(([id, label]) => ({ id, label, items: filteredApps().filter((row) => row.status === id) })),
   );
 
   const move = async (row: Application, _from: string, to: string) => {
@@ -107,6 +156,7 @@ export default function ApplicantsPage() {
   };
 
   const addSegment = async () => {
+    if (!newName().trim()) return toast.warning("Enter a list name.");
     const res = await apiFetch("/api/v1/hr/applicant-segments", {
       method: "POST",
       body: JSON.stringify({ kind: newKind(), name: newName().trim() }),
@@ -114,88 +164,221 @@ export default function ApplicantsPage() {
     if (!res.success) return toast.warning(res.message ?? "Could not add the name.");
     setNewName("");
     void refetchSegments();
+    toast.success("List item added.");
   };
 
   const card = (row: Application) => (
-    <div class="mb-2 rounded-lg border border-stroke bg-surface p-2 text-sm">
-      <p class="font-medium">{row.full_name}</p>
+    <div class="hr-kb-card mb-2 rounded-lg border border-stroke bg-surface p-2 text-sm">
+      <div class="hr-who mb-1">
+        <div class="hr-avatar" aria-hidden="true">{initials(row.full_name)}</div>
+        <b class="truncate">{row.full_name}</b>
+      </div>
       <p class="text-text-secondary">{row.position_desired || "No position"}</p>
-      <p class="text-text-secondary">{row.industry || "No industry"} · {row.workplace || "No workplace"}</p>
-      <A href={`/app/hr/applicants/${row.id}`} class="mt-1 mr-2 text-xs text-brand-700">Open record</A>
-      <button type="button" class="mt-1 text-xs text-brand-700" onClick={() => setSelected(row.id)}>Comment</button>
+      <p class="text-xs text-text-secondary">{row.industry || "No industry"} · {row.workplace || "No workplace"}</p>
+      <div class="mt-2 flex flex-wrap items-center gap-1">
+        <HrBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</HrBadge>
+        <span class="hr-muted">
+          Docs <HrPlanned />
+        </span>
+      </div>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <A href={`/app/hr/applicants/${row.id}`} class="text-xs font-semibold text-brand-700">
+          Open record
+        </A>
+        <button type="button" class="text-xs font-semibold text-brand-700" onClick={() => setSelected(row.id)}>
+          Comment
+        </button>
+      </div>
     </div>
   );
 
   return (
     <HrLayout>
+      <div class="hr-crumb">HR &amp; Payroll › People › Applicants</div>
       <HrPageHead
         title="Applicants"
-        subtitle="Submissions from the public application form."
+        subtitle="Submissions from the public application form, as a pipeline board. Drag cards between stages."
         actions={
-          <>
+          <div class="hr-actions">
+            <A class="hr-btn" href="/app/hr/applicants/settings">
+              Open application form ↗
+            </A>
+            <A class="hr-btn" href="/app/hr/hire-onboarding">
+              Onboarding ↗
+            </A>
+            <A class="hr-btn" href="/app/hr/workforce">
+              Employee board ↗
+            </A>
+            <details class="hr-menu">
+              <summary class="hr-btn">Manage lists ▾</summary>
+              <div class="p-2">
+                <p class="mb-2 text-xs text-text-secondary">Add industry or workplace names used on applications.</p>
+                <select class={`${inputClass} mb-2`} value={newKind()} onChange={(e) => setNewKind(e.currentTarget.value as "industry" | "workplace")}>
+                  <option value="industry">Industry</option>
+                  <option value="workplace">Workplace</option>
+                </select>
+                <input class={`${inputClass} mb-2`} placeholder="List name" value={newName()} onInput={(e) => setNewName(e.currentTarget.value)} />
+                <button type="button" class="hr-btn hr-btn-primary hr-btn-sm w-full" onClick={() => void addSegment()}>
+                  Add to list
+                </button>
+              </div>
+            </details>
+            <A class="hr-btn" href="/app/hr/applicants/settings">
+              Form settings
+            </A>
             <Show when={mode() === "board"}>
-              <div class="hr-seg flex overflow-hidden rounded-lg border border-stroke">
-                <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "horizontal", "text-text-secondary": axis() !== "horizontal" }} onClick={() => chooseAxis("horizontal")}>Columns</button>
-                <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "vertical", "text-text-secondary": axis() !== "vertical" }} onClick={() => chooseAxis("vertical")}>Rows</button>
+              <div class="hr-seg" role="group" aria-label="Board orientation">
+                <button type="button" classList={{ on: axis() === "horizontal" }} onClick={() => chooseAxis("horizontal")}>
+                  Columns
+                </button>
+                <button type="button" classList={{ on: axis() === "vertical" }} onClick={() => chooseAxis("vertical")}>
+                  Rows
+                </button>
               </div>
             </Show>
             <ViewModeToggle value={mode()} onChange={setMode} storageKey="hr-applicants" />
-          </>
+          </div>
         }
       />
-      <div class="mb-4 grid gap-2 sm:grid-cols-2">
+
+      <p class="hr-muted mb-3">
+        SLA / aging targets per stage are <HrPlanned />. Rejection notice email is <HrPlanned />.
+      </p>
+
+      <div class="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stroke bg-surface p-2">
+        <input
+          class="grow rounded-lg border border-stroke bg-surface px-3 py-2 text-sm"
+          placeholder="Search name, position, email…"
+          aria-label="Search"
+          value={search()}
+          onInput={(e) => setSearch(e.currentTarget.value)}
+        />
         <Field label="Industry">
           <select class={inputClass} value={industry()} onChange={(e) => setIndustry(e.currentTarget.value)}>
-            <option value="">All</option>
+            <option value="">Industry: All</option>
             <For each={(segments() ?? []).filter((s) => s.kind === "industry")}>{(s) => <option value={s.id}>{s.name}</option>}</For>
           </select>
         </Field>
         <Field label="Workplace">
           <select class={inputClass} value={workplace()} onChange={(e) => setWorkplace(e.currentTarget.value)}>
-            <option value="">All</option>
+            <option value="">Workplace: All</option>
             <For each={(segments() ?? []).filter((s) => s.kind === "workplace")}>{(s) => <option value={s.id}>{s.name}</option>}</For>
           </select>
         </Field>
       </div>
-      <div class="mb-4 flex flex-wrap gap-2">
-        <select class={inputClass} value={newKind()} onChange={(e) => setNewKind(e.currentTarget.value as "industry" | "workplace")}>
-          <option value="industry">Industry</option>
-          <option value="workplace">Workplace</option>
-        </select>
-        <input class={inputClass} placeholder="List name" value={newName()} onInput={(e) => setNewName(e.currentTarget.value)} />
-        <button type="button" class="rounded border border-stroke px-3 py-1.5 text-sm" onClick={() => void addSegment()}>Add to list</button>
+
+      <div class="hr-chiprow mb-3" role="group" aria-label="Status filter">
+        <button type="button" classList={{ on: statusFilter() === "" }} onClick={() => setStatusFilter("")}>
+          All
+        </button>
+        <For each={[...STATUSES]}>
+          {([id, label]) => (
+            <button type="button" classList={{ on: statusFilter() === id }} onClick={() => setStatusFilter(id)}>
+              {label}
+            </button>
+          )}
+        </For>
       </div>
-      <Show when={mode() === "board"} fallback={
-        <SpreadsheetGrid
-          columns={[
-            { key: "full_name", header: "Name", render: (row) => <A href={`/app/hr/applicants/${row.id}`}>{row.full_name}</A> },
-            { key: "position_desired", header: "Position desired" },
-            { key: "status", header: "Status", render: (row) => STATUSES.find(([id]) => id === row.status)?.[1] ?? row.status },
-            { key: "industry", header: "Industry" },
-            { key: "workplace", header: "Workplace" },
-            { key: "email", header: "Email" },
-            { key: "cellphone", header: "Cellphone No." },
-          ]}
-          rows={applications() ?? []}
+
+      <Show
+        when={mode() === "board"}
+        fallback={
+          <SpreadsheetGrid
+            columns={[
+              {
+                key: "full_name",
+                header: "Name",
+                render: (row) => (
+                  <A href={`/app/hr/applicants/${row.id}`} class="hr-who">
+                    <div class="hr-avatar" aria-hidden="true">{initials(row.full_name)}</div>
+                    <b>{row.full_name}</b>
+                  </A>
+                ),
+                exportValue: (row) => row.full_name,
+              },
+              { key: "position_desired", header: "Position desired" },
+              {
+                key: "status",
+                header: "Status",
+                render: (row) => <HrBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</HrBadge>,
+                exportValue: (row) => statusLabel(row.status),
+              },
+              { key: "industry", header: "Industry" },
+              { key: "workplace", header: "Workplace" },
+              { key: "email", header: "Email" },
+              { key: "cellphone", header: "Cellphone No." },
+              {
+                key: "actions",
+                header: "Actions",
+                sortable: false,
+                hideable: false,
+                render: (row) => (
+                  <details class="hr-menu hr-rowmenu">
+                    <summary class="hr-rowmenu-btn" aria-label="Row actions">
+                      ⋯
+                    </summary>
+                    <div>
+                      <A class="menu-item" href={`/app/hr/applicants/${row.id}`}>
+                        Open record
+                      </A>
+                      <button type="button" class="menu-item" onClick={() => setSelected(row.id)}>
+                        Comment
+                      </button>
+                      <button
+                        type="button"
+                        class="menu-item"
+                        onClick={() => toast.warning("Reject dialog extras need backend remarks workflow.")}
+                      >
+                        Reject <HrPlanned />
+                      </button>
+                    </div>
+                  </details>
+                ),
+              },
+            ]}
+            rows={filteredApps()}
+            loading={applications.loading}
+            selectedId={selected()}
+            onSelect={setSelected}
+            onEdit={(row) => setSelected(row.id)}
+            onNew={() => {}}
+            showNew={false}
+            hideExport
+            codeKey="full_name"
+            nameKey="position_desired"
+            settingsHref="/app/hr/applicants/settings"
+          />
+        }
+      >
+        <KanbanBoard
+          columns={columns()}
+          getCardId={(row) => row.id}
+          onDrop={(row, from, to) => void move(row, from, to)}
+          renderCard={card}
           loading={applications.loading}
-          selectedId={selected()}
-          onSelect={setSelected}
-          onEdit={(row) => setSelected(row.id)}
-          onNew={() => {}}
-          showNew={false}
-          codeKey="full_name"
-          nameKey="position_desired"
-          settingsHref="/app/hr/applicants/settings"
+          orientation={axis()}
+          collapsedIds={collapsed()}
+          onToggleColumn={toggleColumn}
         />
-      }>
-        <KanbanBoard columns={columns()} getCardId={(row) => row.id} onDrop={(row, from, to) => void move(row, from, to)} renderCard={card} loading={applications.loading} orientation={axis()} collapsedIds={collapsed()} onToggleColumn={toggleColumn} />
       </Show>
+
       <Show when={selected()}>
         {(id) => {
           const row = () => (applications() ?? []).find((item) => item.id === id());
           return (
             <section class="mt-4 rounded-xl border border-stroke bg-surface p-4">
-              <h2 class="mb-2 font-medium">{row()?.full_name}</h2>
+              <div class="mb-2 flex flex-wrap items-center gap-2">
+                <div class="hr-who">
+                  <div class="hr-avatar" aria-hidden="true">{initials(row()?.full_name || "?")}</div>
+                  <h2 class="font-medium">{row()?.full_name}</h2>
+                </div>
+                <Show when={row()}>
+                  <HrBadge tone={statusTone(row()!.status)}>{statusLabel(row()!.status)}</HrBadge>
+                </Show>
+                <A href={`/app/hr/applicants/${id()}`} class="ml-auto text-sm text-brand-700">
+                  Full applicant flow →
+                </A>
+              </div>
               <div class="grid gap-2 sm:grid-cols-2">
                 <Field label="Industry">
                   <select class={inputClass} value={row()?.industry_id ?? ""} onChange={(e) => row() && void saveSegments(row()!, e.currentTarget.value, "")}>
@@ -214,7 +397,9 @@ export default function ApplicantsPage() {
                 <textarea class={inputClass} value={comment()} onInput={(e) => setComment(e.currentTarget.value)} />
               </Field>
               <input id="applicant-comment-file" class={`${inputClass} mt-2`} type="file" />
-              <button type="button" class="mt-2 rounded bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void addComment()}>Save comment</button>
+              <button type="button" class="hr-btn hr-btn-primary mt-2" onClick={() => void addComment()}>
+                Save comment
+              </button>
             </section>
           );
         }}

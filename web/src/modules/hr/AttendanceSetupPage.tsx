@@ -1,4 +1,4 @@
-import { createSignal, For } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
@@ -6,7 +6,22 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
+import { HrAttendanceTabs } from "./HrAttendanceTabs";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
 import type { Cutoff, Holiday } from "./attendanceShared";
+
+function holidayTone(type: string): HrBadgeTone {
+  if (type === "regular") return "success";
+  if (type.startsWith("special")) return "warning";
+  return "neutral";
+}
+
+function holidayLabel(type: string): string {
+  if (type === "regular") return "Regular";
+  if (type === "special_non_working") return "Special non-working";
+  if (type === "special_working") return "Special working";
+  return type;
+}
 
 export default function AttendanceSetupPage() {
   const toast = useToast();
@@ -41,6 +56,16 @@ export default function AttendanceSetupPage() {
       return res.data ?? [];
     },
   }));
+
+  const missingQuincenaHint = createMemo(() => {
+    const ym = quincenaMonth();
+    const list = cutoffs.data ?? [];
+    const has = list.some((c) => (c.cutoff_start || "").startsWith(ym) || (c.cutoff_end || "").startsWith(ym));
+    if (has) return null;
+    const [y, m] = ym.split("-");
+    const name = new Date(Date.UTC(Number(y), Number(m) - 1, 1)).toLocaleString("en", { month: "long", timeZone: "UTC" });
+    return `No pay cut-offs yet for ${name} ${y}.`;
+  });
 
   const holidayDraft = useDocumentDraft({
     entityType: DRAFT_ENTITY.hrAttendance,
@@ -107,25 +132,27 @@ export default function AttendanceSetupPage() {
 
   return (
     <HrLayout>
-      <div class="hr-pagehead">
-        <div>
-          <h1 class="text-2xl font-semibold">Attendance setup</h1>
-          <p class="mt-1 text-sm text-text-secondary">Holidays and pay cut-offs used by DTR and payroll.</p>
-        </div>
-      </div>
+      <div class="hr-crumb">HR &amp; Payroll › Time &amp; leave › Attendance / DTR › Setup</div>
+      <HrAttendanceTabs />
+      <HrPageHead title="Attendance setup" subtitle="Holidays and pay cut-offs used by DTR and payroll." />
 
-      <div class="grid gap-6 lg:grid-cols-2">
+      <Show when={missingQuincenaHint()}>
+        <HrNotice>
+          ⚠ {missingQuincenaHint()}{" "}
+          <a href="#cut" class="font-semibold underline">
+            Add two quincenas
+          </a>
+        </HrNotice>
+      </Show>
+
+      <div class="mt-4 grid gap-6 lg:grid-cols-2">
         <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-          <h2 class="mb-2 text-lg font-medium">Holiday calendar ({holidayYear()})</h2>
+          <h2 class="mb-2 text-lg font-medium">Holiday calendar · {holidayYear()}</h2>
           <div class="mb-3 max-w-[8rem]">
             <Field label="Year">
               <input class={inputClass} value={holidayYear()} onInput={(e) => setHolidayYear(e.currentTarget.value)} />
             </Field>
           </div>
-          <p class="mb-3 text-sm text-text-secondary">
-            Regular / special holidays drive DTR holiday premiums. Mark days as absent/awol to auto-deduct unpaid
-            absence (daily rate) on the next payroll run.
-          </p>
           <holidayDraft.DraftBanner />
           <div class="mb-3 grid gap-3 grid-cols-1 min-[1024px]:grid-cols-3">
             <Field label="Date">
@@ -134,35 +161,49 @@ export default function AttendanceSetupPage() {
             <Field label="Holiday name">
               <input class={inputClass} value={holName()} onInput={(e) => setHolName(e.currentTarget.value)} />
             </Field>
-            <Field label="Holiday type">
+            <Field label="Type">
               <select class={inputClass} value={holType()} onChange={(e) => setHolType(e.currentTarget.value)}>
-                <option value="regular">Regular (×2)</option>
+                <option value="regular">Regular holiday</option>
                 <option value="special_non_working">Special non-working</option>
                 <option value="special_working">Special working</option>
               </select>
             </Field>
           </div>
-          <button
-            type="button"
-            class="mb-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={() => void addHoliday()}
-          >
+          <button type="button" class="hr-btn hr-btn-primary mb-3" onClick={() => void addHoliday()}>
             Add holiday
           </button>
-          <ul class="max-h-56 space-y-1 overflow-auto text-sm">
-            <For each={holidays.data ?? []} fallback={<li class="text-text-secondary">No holidays yet.</li>}>
-              {(h) => (
-                <li class="flex justify-between border-b border-slate-100 py-1">
-                  <span>
-                    {h.holiday_date} — {h.name}
-                  </span>
-                  <span class="text-text-secondary">
-                    {h.holiday_type} ×{h.pay_multiplier}
-                  </span>
-                </li>
-              )}
-            </For>
-          </ul>
+          <div class="hr-tbl-wrap max-h-64 overflow-auto">
+            <Show
+              when={(holidays.data ?? []).length > 0}
+              fallback={<HrEmpty title={holidays.isFetching ? "Loading…" : "No holidays yet"} />}
+            >
+              <table class="hr-tbl">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={holidays.data ?? []}>
+                    {(h) => (
+                      <tr>
+                        <td>{h.holiday_date}</td>
+                        <td>{h.name}</td>
+                        <td>
+                          <HrBadge tone={holidayTone(h.holiday_type)}>
+                            {holidayLabel(h.holiday_type)} ×{h.pay_multiplier}
+                          </HrBadge>
+                        </td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </Show>
+          </div>
+          <p class="mt-2 text-xs text-text-secondary">Confirm against the official proclamation each year.</p>
         </section>
 
         <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
@@ -193,44 +234,92 @@ export default function AttendanceSetupPage() {
               />
             </Field>
           </div>
-          <button
-            type="button"
-            class="mb-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            onClick={() => void addCutoff()}
-          >
+          <button type="button" class="hr-btn mb-3" onClick={() => void addCutoff()}>
             Add cut-off
           </button>
-          <div class="mb-3 flex flex-wrap items-end gap-3">
-            <Field label="Month">
-              <input
-                type="month"
-                class={inputClass}
-                value={quincenaMonth()}
-                onInput={(e) => setQuincenaMonth(e.currentTarget.value)}
-              />
-            </Field>
-            <button
-              type="button"
-              class="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-primary hover:erp-panel"
-              onClick={() => void addQuincenas()}
-            >
-              Add two quincenas
-            </button>
+          <div id="cut" class="mb-3 rounded-lg border border-stroke bg-slate-50 p-3">
+            <div class="flex flex-wrap items-end gap-3">
+              <Field label="Month">
+                <input
+                  type="month"
+                  class={inputClass}
+                  value={quincenaMonth()}
+                  onInput={(e) => setQuincenaMonth(e.currentTarget.value)}
+                />
+              </Field>
+              <button type="button" class="hr-btn" onClick={() => void addQuincenas()}>
+                Add two quincenas
+              </button>
+            </div>
+            <p class="mt-2 text-xs text-text-secondary">
+              Creates the 1st–15th and 16th–end-of-month periods. Overlapping ranges are rejected.
+            </p>
           </div>
-          <ul class="max-h-56 space-y-1 overflow-auto text-sm">
-            <For each={cutoffs.data ?? []} fallback={<li class="text-text-secondary">No cut-offs yet.</li>}>
-              {(c) => (
-                <li class="flex justify-between border-b border-slate-100 py-1">
-                  <span>{c.label}</span>
-                  <span class="text-text-secondary">
-                    {c.cutoff_start} → {c.cutoff_end} ({c.status})
-                  </span>
-                </li>
-              )}
-            </For>
-          </ul>
+          <div class="hr-tbl-wrap max-h-56 overflow-auto">
+            <Show
+              when={(cutoffs.data ?? []).length > 0}
+              fallback={<HrEmpty title={cutoffs.isFetching ? "Loading…" : "No cut-offs yet"} />}
+            >
+              <table class="hr-tbl">
+                <thead>
+                  <tr>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Label</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={cutoffs.data ?? []}>
+                    {(c) => (
+                      <tr>
+                        <td>{c.cutoff_start}</td>
+                        <td>{c.cutoff_end}</td>
+                        <td>{c.label || "—"}</td>
+                        <td>
+                          <HrBadge tone={c.status === "open" ? "success" : "neutral"}>{c.status}</HrBadge>
+                        </td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </Show>
+          </div>
         </section>
       </div>
+
+      <section class="mt-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
+        <h2 class="mb-1 text-lg font-medium">
+          Per-client cut-off calendar <HrPlanned />
+        </h2>
+        <p class="mb-3 text-sm text-text-secondary">
+          Each client can have its own DTR submission due date per cut-off.
+        </p>
+        <div class="hr-tbl-wrap">
+          <table class="hr-tbl">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Cut-off</th>
+                <th>DTR due</th>
+                <th>Late after</th>
+                <th>Who may override</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colSpan={5} class="text-text-secondary">
+                  No per-client calendars yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <HrNotice>
+          <b>Needs backend:</b> cut-off calendar per client.
+        </HrNotice>
+      </section>
     </HrLayout>
   );
 }

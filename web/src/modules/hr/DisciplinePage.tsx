@@ -1,14 +1,15 @@
 import { useParams } from "@solidjs/router";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { LookupCombo } from "../../shared/LookupCombo";
-import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { HrCasesTabs } from "./HrCasesTabs";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
 
 const CASE_STEPS = [
   "1. Incident",
@@ -19,15 +20,67 @@ const CASE_STEPS = [
   "6. Sanction & 201 filing",
 ];
 
+const CASE_TYPES: { value: string; label: string }[] = [
+  { value: "coaching", label: "Coaching" },
+  { value: "nte", label: "Notice to explain" },
+  { value: "written_warning", label: "Written warning" },
+  { value: "final_warning", label: "Final warning" },
+  { value: "suspension", label: "Suspension" },
+  { value: "termination", label: "Termination" },
+];
+
 type CaseRow = {
-  id: number; case_no: string; case_type: string; status: string; subject: string;
-  employee_no?: string; employee_name?: string; employee_id: number;
+  id: number;
+  case_no: string;
+  case_type: string;
+  status: string;
+  subject: string;
+  employee_no?: string;
+  employee_name?: string;
+  employee_id: number;
   has_real_file?: boolean;
   penalty_amount?: number | null;
   authority_to_deduct?: boolean;
+  created_at?: string;
 };
 type PayItemType = { id: number; item_code: string; item_name: string; item_kind: string };
 type CaseFile = { id: number; document_id: number; title: string; file_name: string };
+type Violation = { id: number; employee_name: string; description: string; status: string; created_at?: string };
+
+function typeLabel(value: string) {
+  return CASE_TYPES.find((t) => t.value === value)?.label ?? value.replace(/_/g, " ");
+}
+
+function typeTone(value: string): HrBadgeTone {
+  switch (value) {
+    case "termination":
+      return "danger";
+    case "suspension":
+    case "final_warning":
+      return "warning";
+    case "written_warning":
+      return "warning";
+    case "nte":
+      return "info";
+    default:
+      return "neutral";
+  }
+}
+
+function statusTone(status: string): HrBadgeTone {
+  return status === "closed" ? "neutral" : "warning";
+}
+
+function statusLabel(status: string) {
+  if (!status) return "—";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function formatOpened(iso?: string) {
+  if (!iso) return "—";
+  const d = iso.slice(0, 10);
+  return d || iso;
+}
 
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAccessToken();
@@ -72,6 +125,10 @@ export default function DisciplinePage() {
   });
   const [createOpen, setCreateOpen] = createSignal(false);
   const [caseStep, setCaseStep] = createSignal(0);
+  const [search, setSearch] = createSignal("");
+  const [typeFilter, setTypeFilter] = createSignal("");
+  const [statusSeg, setStatusSeg] = createSignal<"" | "open" | "closed">("");
+  const [busy, setBusy] = createSignal(false);
 
   const payItems = createQuery(() => ({
     queryKey: ["hr-pay-item-types", "deduction"],
@@ -93,21 +150,45 @@ export default function DisciplinePage() {
     },
   }));
 
+  const filtered = createMemo(() => {
+    const q = search().trim().toLowerCase();
+    return (cases.data ?? []).filter((row) => {
+      if (typeFilter() && row.case_type !== typeFilter()) return false;
+      if (statusSeg() === "open" && row.status === "closed") return false;
+      if (statusSeg() === "closed" && row.status !== "closed") return false;
+      if (!q) return true;
+      return (
+        row.case_no.toLowerCase().includes(q) ||
+        (row.employee_name || "").toLowerCase().includes(q) ||
+        (row.employee_no || "").toLowerCase().includes(q) ||
+        typeLabel(row.case_type).toLowerCase().includes(q)
+      );
+    });
+  });
+
   const create = async () => {
     const chosen = file();
     if (!empId() || !subject().trim()) return toast.warning("Employee and subject required.");
     if (!chosen) return toast.warning("Choose a file before creating the case.");
-    const posted = await postFile("/api/v1/hr/discipline/cases", {
-      employee_id: String(empId() ?? ""),
-      case_type: caseType(),
-      subject: subject().trim(),
-      details: details().trim(),
-      penalty_amount: penalty().trim(),
-      authority_to_deduct: authority() ? "true" : "false",
-    }, chosen);
+    setBusy(true);
+    const posted = await postFile(
+      "/api/v1/hr/discipline/cases",
+      {
+        employee_id: String(empId() ?? ""),
+        case_type: caseType(),
+        subject: subject().trim(),
+        details: details().trim(),
+        penalty_amount: penalty().trim(),
+        authority_to_deduct: authority() ? "true" : "false",
+      },
+      chosen,
+    );
+    setBusy(false);
     if (!posted.ok) return toast.warning(posted.message ?? "Create failed.");
     toast.success("Case created.");
-    setSubject(""); setDetails(""); setFile(null);
+    setSubject("");
+    setDetails("");
+    setFile(null);
     setCreateOpen(false);
     if (fileInput) fileInput.value = "";
     void qc.invalidateQueries({ queryKey: ["hr-discipline-cases"] });
@@ -127,7 +208,8 @@ export default function DisciplinePage() {
     const id = selectedId();
     if (!id) return;
     const res = await apiFetch(`/api/v1/hr/discipline/cases/${id}/advance`, {
-      method: "POST", body: JSON.stringify({ action, notes: "" }),
+      method: "POST",
+      body: JSON.stringify({ action, notes: "" }),
     });
     if (!res.success) return toast.warning(res.message ?? "Failed.");
     void qc.invalidateQueries({ queryKey: ["hr-discipline-case", id] });
@@ -145,92 +227,143 @@ export default function DisciplinePage() {
 
   return (
     <HrLayout>
+      <div class="hr-crumb">HR &amp; Payroll › HR cases › Cases › Discipline</div>
+      <HrCasesTabs />
       <HrPageHead
-        title="Discipline"
-        subtitle="Case timeline and letter → 201. Have PH labor counsel review wording before claiming DOLE compliance."
+        title={
+          <>
+            Discipline <span class="text-sm font-medium text-text-secondary">(Notice to Explain)</span>
+          </>
+        }
+        subtitle="Case timeline and letters, filed to the employee's 201 file (personnel file)."
         actions={
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCreateOpen(true)}>
-            New case
-          </button>
+          <div class="hr-actions">
+            <Show when={selectedId()}>
+              <button type="button" class="hr-btn" onClick={() => setSelectedId(null)}>
+                Back to list
+              </button>
+            </Show>
+            <button type="button" class="hr-btn hr-btn-primary" onClick={() => setCreateOpen(true)}>
+              + New case
+            </button>
+          </div>
         }
       />
-      <EntityModal
-        open={createOpen()}
-        title="New case"
-        onClose={() => setCreateOpen(false)}
-        onSave={() => void create()}
-        saveLabel="Create"
-      >
-        <LookupCombo
-          label="Employee"
-          value={empLabel}
-          selectedId={empId}
-          onInput={setEmpLabel}
-          onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }}
-          onClear={() => { setEmpId(null); setEmpLabel(""); }}
-          fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
-          placeholder="Search employees…"
-        />
-        <Field label="Type">
-          <select class={inputClass} value={caseType()} onChange={(e) => setCaseType(e.currentTarget.value)}>
-            <option value="coaching">Coaching</option>
-            <option value="nte">NTE</option>
-            <option value="written_warning">Written warning</option>
-            <option value="final_warning">Final warning</option>
-            <option value="suspension">Suspension</option>
-            <option value="termination">Termination</option>
-          </select>
-        </Field>
-        <Field label="Subject"><input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} /></Field>
-        <Field label="Details"><textarea class={inputClass} rows={2} value={details()} onInput={(e) => setDetails(e.currentTarget.value)} /></Field>
-        <Field label="Penalty amount">
-          <input type="number" min="0" step="0.01" class={inputClass} value={penalty()} placeholder="Optional" onInput={(e) => setPenalty(e.currentTarget.value)} />
-        </Field>
-        <Field label="Authority to deduct">
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={authority()} onChange={(e) => setAuthority(e.currentTarget.checked)} />
-            Record only. Pay changes when a pay item includes it.
-          </label>
-        </Field>
-        <Field label="File (required)">
-          <input ref={fileInput} class={inputClass} type="file" onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} />
-        </Field>
-      </EntityModal>
 
-      <div class="grid gap-6 lg:grid-cols-2">
-        <HrTcard>
-          <div class="p-4">
-            <h2 class="mb-3 text-lg font-medium">Cases</h2>
-            <For each={cases.data ?? []} fallback={<HrEmpty title="No cases" hint="Create a case to start due process." />}>
-              {(c) => (
-                <button
-                  type="button"
-                  class="mb-1 block w-full rounded border border-transparent px-2 py-2 text-left text-sm hover:bg-panel"
-                  classList={{ "border-brand-500 bg-brand-50": selectedId() === c.id }}
-                  onClick={() => { setSelectedId(c.id); setCaseStep(0); }}
-                >
-                  <span class="font-medium">{c.case_no}</span> · {c.employee_name} · {c.case_type}{" "}
-                  <HrBadge tone={c.status === "closed" ? "neutral" : "warning"}>{c.status}</HrBadge>
+      <Show when={!selectedId()}>
+        <HrTcard
+          toolbar={
+            <>
+              <input
+                class="grow rounded-lg border border-stroke bg-surface px-3 py-2 text-sm"
+                placeholder="Search case no. or employee…"
+                aria-label="Search"
+                value={search()}
+                onInput={(e) => setSearch(e.currentTarget.value)}
+              />
+              <select
+                class="rounded-lg border border-stroke bg-surface px-2 text-sm"
+                aria-label="Type"
+                value={typeFilter()}
+                onChange={(e) => setTypeFilter(e.currentTarget.value)}
+              >
+                <option value="">Type: All</option>
+                <For each={CASE_TYPES}>{(t) => <option value={t.value}>{t.label}</option>}</For>
+              </select>
+              <div class="hr-seg" role="group" aria-label="Status">
+                <button type="button" classList={{ on: statusSeg() === "" }} onClick={() => setStatusSeg("")}>
+                  All
                 </button>
-              )}
-            </For>
+                <button type="button" classList={{ on: statusSeg() === "open" }} onClick={() => setStatusSeg("open")}>
+                  Open
+                </button>
+                <button type="button" classList={{ on: statusSeg() === "closed" }} onClick={() => setStatusSeg("closed")}>
+                  Closed
+                </button>
+              </div>
+            </>
+          }
+        >
+          <div class="hr-tbl-wrap">
+            <table class="hr-tbl">
+              <thead>
+                <tr>
+                  <th>Case no.</th>
+                  <th>Employee</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Opened</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For
+                  each={filtered()}
+                  fallback={
+                    <tr>
+                      <td colspan="5">
+                        <HrEmpty title="No matches" hint="Try a different search or clear the filters." />
+                      </td>
+                    </tr>
+                  }
+                >
+                  {(c) => (
+                    <tr>
+                      <td>
+                        <button
+                          type="button"
+                          class="font-mono text-sm text-brand-700 underline-offset-2 hover:underline"
+                          onClick={() => {
+                            setSelectedId(c.id);
+                            setCaseStep(0);
+                          }}
+                        >
+                          {c.case_no}
+                        </button>
+                      </td>
+                      <td>{c.employee_name}</td>
+                      <td>
+                        <HrBadge tone={typeTone(c.case_type)}>{typeLabel(c.case_type)}</HrBadge>
+                      </td>
+                      <td>
+                        <HrBadge tone={statusTone(c.status)}>{statusLabel(c.status)}</HrBadge>
+                      </td>
+                      <td>{formatOpened(c.created_at)}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
           </div>
         </HrTcard>
+
+        <ClientViolations />
+      </Show>
+
+      <Show when={selectedId()}>
         <HrTcard>
           <div class="p-4">
-            <h2 class="mb-3 text-lg font-medium">Case detail</h2>
-            <Show when={detail.data} fallback={<HrEmpty title="Select a case" />}>
+            <Show when={detail.data} fallback={<HrEmpty title="Loading case…" />}>
               {(d) => (
                 <div class="space-y-3 text-sm">
-                  <p class="font-medium">{d().case.case_no} — {d().case.subject}</p>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-base font-semibold">
+                      <span class="font-mono">{d().case.case_no}</span> · {d().case.employee_name}
+                    </h2>
+                    <HrBadge tone={typeTone(d().case.case_type)}>{typeLabel(d().case.case_type)}</HrBadge>
+                    <HrBadge tone={statusTone(d().case.status)}>{statusLabel(d().case.status)}</HrBadge>
+                  </div>
+                  <p class="text-text-secondary">{d().case.subject}</p>
+                  <HrNotice>
+                    Letters are drafts for review. Consult labor counsel before serious action (DOLE due process: two-notice rule).
+                  </HrNotice>
                   <HrSteps steps={CASE_STEPS} current={caseStep()} onSelect={setCaseStep} />
 
                   <Show when={caseStep() === 0}>
-                    <p class="text-text-secondary">Type: {d().case.case_type}</p>
+                    <p class="text-text-secondary">Type: {typeLabel(d().case.case_type)}</p>
                     <p class="text-text-secondary">
                       Penalty {d().case.penalty_amount ?? 0}
-                      {d().case.authority_to_deduct ? " · authority to deduct recorded" : ""}
-                      . Pay is unchanged until a deduction pay item includes it.
+                      {d().case.authority_to_deduct ? " · authority to deduct recorded" : ""}. Pay is unchanged until a deduction pay item
+                      includes it.
                     </p>
                   </Show>
 
@@ -239,12 +372,16 @@ export default function DisciplinePage() {
                       <p class="font-semibold">NOTICE TO EXPLAIN</p>
                       <p class="mt-1 text-xs text-text-secondary">Generate the letter and store it in the 201 file with the button below.</p>
                     </div>
-                    <button type="button" class="rounded bg-brand-600 px-2 py-1 text-xs text-white" onClick={() => void renderLetter()}>Letter → 201</button>
+                    <button type="button" class="hr-btn hr-btn-primary hr-btn-sm" onClick={() => void renderLetter()}>
+                      Letter → 201
+                    </button>
                   </Show>
 
                   <Show when={caseStep() === 2}>
                     <p class="text-text-secondary">Advance to under review when the explanation period is handled.</p>
-                    <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("under_review")}>Under review</button>
+                    <button type="button" class="hr-btn hr-btn-sm" onClick={() => void advance("under_review")}>
+                      Under review
+                    </button>
                     <div>
                       <p class="mb-1 font-medium">Attach explanation / files</p>
                       <input
@@ -260,18 +397,28 @@ export default function DisciplinePage() {
                   </Show>
 
                   <Show when={caseStep() === 3}>
-                    <HrNotice>Hearing date, attendees, and minutes are <HrPlanned />. Use events below for notes until those fields exist.</HrNotice>
-                    <label class="block text-sm font-medium">Hearing date <HrPlanned /></label>
+                    <HrNotice>
+                      Hearing date, attendees, and minutes are <HrPlanned />. Use events below for notes until those fields exist.
+                    </HrNotice>
+                    <label class="block text-sm font-medium">
+                      Hearing date <HrPlanned />
+                    </label>
                     <input type="datetime-local" class={inputClass} disabled />
-                    <label class="block text-sm font-medium">Attendees <HrPlanned /></label>
+                    <label class="block text-sm font-medium">
+                      Attendees <HrPlanned />
+                    </label>
                     <input class={inputClass} disabled />
-                    <label class="block text-sm font-medium">Minutes <HrPlanned /></label>
+                    <label class="block text-sm font-medium">
+                      Minutes <HrPlanned />
+                    </label>
                     <textarea class={inputClass} rows={3} disabled />
                   </Show>
 
                   <Show when={caseStep() === 4}>
                     <div class="flex flex-wrap gap-2">
-                      <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("decide")}>Decide</button>
+                      <button type="button" class="hr-btn hr-btn-sm" onClick={() => void advance("decide")}>
+                        Decide
+                      </button>
                     </div>
                   </Show>
 
@@ -281,12 +428,16 @@ export default function DisciplinePage() {
                         <select class={inputClass + " w-56"} value={payItemTypeId()} onChange={(e) => setPayItemTypeId(e.currentTarget.value)}>
                           <option value="">Deduction pay item…</option>
                           <For each={(payItems.data ?? []).filter((t) => t.item_kind === "deduction")}>
-                            {(t) => <option value={t.id}>{t.item_code} — {t.item_name}</option>}
+                            {(t) => (
+                              <option value={t.id}>
+                                {t.item_code} — {t.item_name}
+                              </option>
+                            )}
                           </For>
                         </select>
                         <button
                           type="button"
-                          class="rounded border border-stroke px-2 py-1 text-xs"
+                          class="hr-btn hr-btn-sm"
                           onClick={() => {
                             const id = selectedId();
                             if (!id || !payItemTypeId()) return toast.warning("Choose a deduction pay item.");
@@ -304,8 +455,12 @@ export default function DisciplinePage() {
                       </div>
                     </Show>
                     <div class="flex flex-wrap gap-2">
-                      <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("close")}>Close</button>
-                      <button type="button" class="rounded bg-brand-600 px-2 py-1 text-xs text-white" onClick={() => void renderLetter()}>Issue decision & file to 201</button>
+                      <button type="button" class="hr-btn hr-btn-sm" onClick={() => void advance("close")}>
+                        Close
+                      </button>
+                      <button type="button" class="hr-btn hr-btn-primary hr-btn-sm" onClick={() => void renderLetter()}>
+                        Issue decision &amp; file to 201
+                      </button>
                     </div>
                   </Show>
 
@@ -318,8 +473,19 @@ export default function DisciplinePage() {
                       {(f) => <p>{f.file_name || f.title}</p>}
                     </For>
                   </div>
-                  <ul class="space-y-1 border-t border-stroke pt-2">
-                    <For each={d().events}>{(ev) => <li><span class="font-medium">{ev.event_type}</span> · {ev.notes}</li>}</For>
+                  <ul class="hr-aq">
+                    <For each={d().events} fallback={<li><div class="hr-wempty" style={{ width: "100%" }}>No events yet.</div></li>}>
+                      {(ev) => (
+                        <li>
+                          <span class="t">
+                            <b>{ev.event_type}</b>
+                            <span class="xs">
+                              {ev.notes} · {formatOpened(ev.created_at)}
+                            </span>
+                          </span>
+                        </li>
+                      )}
+                    </For>
                   </ul>
                   <HrWizardNav
                     canBack={caseStep() > 0}
@@ -332,8 +498,80 @@ export default function DisciplinePage() {
             </Show>
           </div>
         </HrTcard>
-      </div>
-      <ClientViolations />
+      </Show>
+
+      <Show when={createOpen()}>
+        <div
+          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="New discipline case"
+        >
+          <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">New discipline case</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setCreateOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div class="grid gap-3">
+              <LookupCombo
+                label="Employee"
+                value={empLabel}
+                selectedId={empId}
+                onInput={setEmpLabel}
+                onSelect={(o) => {
+                  setEmpId(o.id);
+                  setEmpLabel(o.label);
+                }}
+                onClear={() => {
+                  setEmpId(null);
+                  setEmpLabel("");
+                }}
+                fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
+                placeholder="Search employees…"
+              />
+              <Field label="Type">
+                <select class={inputClass} value={caseType()} onChange={(e) => setCaseType(e.currentTarget.value)}>
+                  <For each={CASE_TYPES}>{(t) => <option value={t.value}>{t.label}</option>}</For>
+                </select>
+              </Field>
+              <Field label="Subject">
+                <input class={inputClass} value={subject()} onInput={(e) => setSubject(e.currentTarget.value)} />
+              </Field>
+              <Field label="Description">
+                <textarea class={inputClass} rows={3} value={details()} onInput={(e) => setDetails(e.currentTarget.value)} />
+              </Field>
+              <Field label="Penalty amount">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class={inputClass}
+                  value={penalty()}
+                  placeholder="Optional"
+                  onInput={(e) => setPenalty(e.currentTarget.value)}
+                />
+              </Field>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={authority()} onChange={(e) => setAuthority(e.currentTarget.checked)} />
+                Authority to deduct (record only — pay changes when a pay item includes it)
+              </label>
+              <Field label="File (required)">
+                <input ref={fileInput} class={inputClass} type="file" onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} />
+              </Field>
+            </div>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void create()}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </HrLayout>
   );
 }
@@ -343,12 +581,16 @@ function ClientViolations() {
   const [empId, setEmpId] = createSignal<number | null>(null);
   const [empLabel, setEmpLabel] = createSignal("");
   const [description, setDescription] = createSignal("");
+  const [recordOpen, setRecordOpen] = createSignal(false);
   const reports = createQuery(() => ({
     queryKey: ["hr-client-violations"],
-    queryFn: async () => (await apiFetch<{ id: number; employee_name: string; description: string; status: string }[]>("/api/v1/hr/client-violations")).data ?? [],
+    queryFn: async () => (await apiFetch<Violation[]>("/api/v1/hr/client-violations")).data ?? [],
   }));
+  const waiting = createMemo(() => (reports.data ?? []).filter((r) => r.status === "waiting" || r.status !== "closed"));
+
   const save = async () => {
     if (!empId()) return toast.warning("Choose an employee.");
+    if (!description().trim()) return toast.warning("Description is required.");
     const res = await apiFetch("/api/v1/hr/client-violations", {
       method: "POST",
       body: JSON.stringify({ employee_id: empId(), description: description() }),
@@ -356,15 +598,101 @@ function ClientViolations() {
     if (!res.success) return toast.warning(res.message ?? "Could not save the report.");
     toast.success("Violation report is waiting.");
     setDescription("");
+    setEmpId(null);
+    setEmpLabel("");
+    setRecordOpen(false);
     void reports.refetch();
   };
+
   return (
-    <section class="mt-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-      <h2 class="mb-3 text-lg font-medium">Waiting client violation reports</h2>
-      <LookupCombo label="Employee" value={empLabel} selectedId={empId} onInput={setEmpLabel} onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }} onClear={() => { setEmpId(null); setEmpLabel(""); }} fetchOptions={(q) => fetchEmployeeOptions(q)} placeholder="Search employees…" />
-      <Field label="Description"><textarea class={inputClass} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} /></Field>
-      <button type="button" class="mt-2 rounded bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void save()}>Record report</button>
-      <For each={reports.data ?? []}>{(row) => <p class="mt-2 text-sm">{row.employee_name} · {row.status} · {row.description}</p>}</For>
+    <section class="hr-w s12 mt-4" aria-label="Waiting client violation reports">
+      <header>
+        <h3>Waiting client violation reports</h3>
+        <span class="grow" />
+        <button type="button" class="hr-btn hr-btn-sm" onClick={() => setRecordOpen(true)}>
+          + Record report
+        </button>
+      </header>
+      <div class="hr-tbl-wrap">
+        <table class="hr-tbl">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Client report</th>
+              <th>Received</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <For
+              each={waiting()}
+              fallback={
+                <tr>
+                  <td colspan="4">
+                    <div class="hr-wempty">No waiting client reports.</div>
+                  </td>
+                </tr>
+              }
+            >
+              {(row) => (
+                <tr>
+                  <td>{row.employee_name}</td>
+                  <td>{row.description}</td>
+                  <td>{formatOpened(row.created_at)}</td>
+                  <td>
+                    <HrBadge tone="warning">{statusLabel(row.status)}</HrBadge>
+                  </td>
+                </tr>
+              )}
+            </For>
+          </tbody>
+        </table>
+      </div>
+
+      <Show when={recordOpen()}>
+        <div
+          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Record client violation"
+        >
+          <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">Record client violation</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setRecordOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <LookupCombo
+              label="Employee"
+              value={empLabel}
+              selectedId={empId}
+              onInput={setEmpLabel}
+              onSelect={(o) => {
+                setEmpId(o.id);
+                setEmpLabel(o.label);
+              }}
+              onClear={() => {
+                setEmpId(null);
+                setEmpLabel("");
+              }}
+              fetchOptions={(q) => fetchEmployeeOptions(q)}
+              placeholder="Search employees…"
+            />
+            <Field label="Description">
+              <textarea class={inputClass} rows={3} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} />
+            </Field>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setRecordOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" onClick={() => void save()}>
+                Record report
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </section>
   );
 }

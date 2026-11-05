@@ -1,6 +1,6 @@
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
-import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import {
   createPayslipShareLink,
@@ -17,9 +17,23 @@ import { exportPayrollRegisterCsv } from "../../shared/hrCsvImport";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav } from "./HrUi";
+import { HrPayrollTabs } from "./HrPayrollTabs";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
 import type { Cutoff } from "./attendanceShared";
 import { formatAmount, formatPeso } from "../../shared/money";
+
+function periodStatusTone(status: string): HrBadgeTone {
+  const s = status.toLowerCase();
+  if (s === "processed" || s === "posted" || s === "locked") return "success";
+  if (s === "draft" || s === "open") return "warning";
+  return "neutral";
+}
+
+function periodStatusLabel(status: string) {
+  if (status === "processed") return "Posted";
+  if (!status) return "—";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
 
 const PAY_STEPS = [
   "1. Period & group",
@@ -66,7 +80,33 @@ export default function PayrollRunsPage() {
   const [selectedId, setSelectedId] = createSignal<number | null>(null);
   const [runOpen, setRunOpen] = createSignal(false);
   const [sharing, setSharing] = createSignal(false);
+  const [showAmounts, setShowAmounts] = createSignal(false);
+  const [statusSeg, setStatusSeg] = createSignal("");
+  const [search, setSearch] = createSignal("");
+  const [postOpen, setPostOpen] = createSignal(false);
+  const [postConfirm, setPostConfirm] = createSignal(false);
+  const [detailOpen, setDetailOpen] = createSignal(false);
   const payslips = usePayslips(selectedPeriodId);
+
+  const periodRows = createMemo(() => {
+    const q = search().trim().toLowerCase();
+    return (periods.data ?? []).filter((p) => {
+      if (statusSeg() === "Draft" && p.status !== "draft" && p.status !== "open") return false;
+      if (statusSeg() === "Posted" && p.status !== "processed" && p.status !== "locked") return false;
+      if (!q) return true;
+      return p.period_label.toLowerCase().includes(q) || p.period_start.includes(q) || p.period_end.includes(q);
+    });
+  });
+
+  const periodNet = createMemo(() => {
+    if (!selectedPeriodId()) return null;
+    const slips = payslips.data ?? [];
+    if (!slips.length) return null;
+    return {
+      count: slips.length,
+      net: slips.reduce((s, r) => s + (Number(r.net_pay) || 0), 0),
+    };
+  });
 
   const runPreview = async () => {
     if (!periodStart() || !periodEnd()) {
@@ -137,29 +177,63 @@ export default function PayrollRunsPage() {
     }
   };
 
+  const openPeriod = (p: PayPeriod) => {
+    setSelectedPeriodId(p.id);
+    setDetailOpen(true);
+  };
+
+  const lockSelected = async () => {
+    const id = selectedPeriodId();
+    if (!id) return;
+    if (!postConfirm()) return toast.warning("Confirm you reviewed exceptions and totals.");
+    const res = await apiFetch(`/api/v1/hr/pay-periods/${id}/lock`, { method: "POST", body: "{}" });
+    if (!res.success) return toast.warning(res.message ?? "Lock failed.");
+    toast.success("Period locked.");
+    setPostOpen(false);
+    setPostConfirm(false);
+    invalidate();
+  };
+
   return (
     <HrLayout>
+      <div class="hr-crumb">HR &amp; Payroll › Payroll › Payroll runs</div>
+      <HrPayrollTabs />
       <HrPageHead
         title="Payroll runs"
-        subtitle="Compute, review and post payroll per cut-off. Pay amounts stay on this page."
+        subtitle="Compute, review and post payroll per cut-off."
         actions={
-          <button
-            type="button"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white"
-            onClick={() => {
-              setWizStep(0);
-              setApproved(false);
-              setRunOpen(true);
-            }}
-          >
-            New payroll run
-          </button>
+          <div class="hr-actions">
+            <button type="button" class="hr-btn" onClick={() => setShowAmounts(!showAmounts())}>
+              {showAmounts() ? "Hide amounts" : "👁 Show amounts"}
+            </button>
+            <button
+              type="button"
+              class="hr-btn hr-btn-primary"
+              onClick={() => {
+                setWizStep(0);
+                setApproved(false);
+                setRunOpen(true);
+              }}
+            >
+              + New run
+            </button>
+          </div>
         }
       />
 
+      <HrNotice>
+        Payroll by client / pay group <HrPlanned /> — today one run covers the company.
+      </HrNotice>
+
       <Show when={runOpen()}>
-        <HrTcard class="mb-6">
+        <HrTcard class="mb-6 mt-3">
           <div class="p-4">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">New payroll run</h2>
+              <button type="button" class="hr-btn hr-btn-sm" onClick={() => setRunOpen(false)}>
+                Close
+              </button>
+            </div>
             <HrSteps steps={PAY_STEPS} current={wizStep()} onSelect={setWizStep} />
 
             <Show when={wizStep() === 0}>
@@ -322,135 +396,259 @@ export default function PayrollRunsPage() {
         </HrTcard>
       </Show>
 
-      <section class="mb-6">
-        <h2 class="mb-2 text-lg font-medium">Pay periods</h2>
-        <div class="flex flex-wrap gap-2">
-          <For each={periods.data ?? []} fallback={<p class="text-sm text-text-secondary">No pay periods yet.</p>}>
-            {(p) => (
+      <HrTcard
+        class="mt-3"
+        toolbar={
+          <>
+            <input
+              class="grow rounded-lg border border-stroke bg-surface px-3 py-2 text-sm"
+              placeholder="Search run…"
+              aria-label="Search"
+              value={search()}
+              onInput={(e) => setSearch(e.currentTarget.value)}
+            />
+            <div class="hr-seg" role="group" aria-label="Status">
+              <button type="button" classList={{ on: statusSeg() === "" }} onClick={() => setStatusSeg("")}>
+                All
+              </button>
+              <button type="button" classList={{ on: statusSeg() === "Draft" }} onClick={() => setStatusSeg("Draft")}>
+                Draft
+              </button>
+              <button type="button" classList={{ on: statusSeg() === "Posted" }} onClick={() => setStatusSeg("Posted")}>
+                Posted
+              </button>
+            </div>
+          </>
+        }
+      >
+        <div class="hr-tbl-wrap">
+          <table class="hr-tbl">
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Cut-off</th>
+                <th>Status</th>
+                <th class="num">Employees</th>
+                <th class="num">Net pay</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              <For
+                each={periodRows()}
+                fallback={
+                  <tr>
+                    <td colspan="6">
+                      <HrEmpty title="No matches" hint="Create a payroll run to start." />
+                    </td>
+                  </tr>
+                }
+              >
+                {(p) => {
+                  const selected = () => selectedPeriodId() === p.id;
+                  const net = () => (selected() ? periodNet() : null);
+                  return (
+                    <tr classList={{ "bg-brand-50": selected() }}>
+                      <td>
+                        <button type="button" class="font-mono text-sm text-brand-700 underline-offset-2 hover:underline" onClick={() => openPeriod(p)}>
+                          {p.period_label}
+                        </button>
+                      </td>
+                      <td>
+                        {p.period_start} – {p.period_end}
+                      </td>
+                      <td>
+                        <HrBadge tone={periodStatusTone(p.status)}>{periodStatusLabel(p.status)}</HrBadge>
+                      </td>
+                      <td class="num">{selected() && net() ? net()!.count : selected() && payslips.isFetching ? "…" : "—"}</td>
+                      <td class="num">
+                        <Show when={showAmounts() && selected() && net()} fallback={<span class="hr-muted">{selected() ? "••••••" : "—"}</span>}>
+                          {formatPeso(net()!.net)}
+                        </Show>
+                      </td>
+                      <td>
+                        <details class="hr-menu hr-rowmenu">
+                          <summary class="hr-rowmenu-btn" aria-label="Row actions">
+                            ⋯
+                          </summary>
+                          <div>
+                            <button type="button" class="menu-item" onClick={() => openPeriod(p)}>
+                              Open
+                            </button>
+                            <button
+                              type="button"
+                              class="menu-item"
+                              onClick={() => {
+                                setSelectedPeriodId(p.id);
+                                setPeriodStart(p.period_start);
+                                setPeriodEnd(p.period_end);
+                                setPeriodLabel(p.period_label);
+                                setWizStep(2);
+                                setRunOpen(true);
+                              }}
+                            >
+                              Compute
+                            </button>
+                            <button
+                              type="button"
+                              class="menu-item"
+                              onClick={() => {
+                                setSelectedPeriodId(p.id);
+                                setPostConfirm(false);
+                                setPostOpen(true);
+                              }}
+                            >
+                              Post…
+                            </button>
+                            <button type="button" class="menu-item" onClick={() => openPeriod(p)}>
+                              Payslips
+                            </button>
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  );
+                }}
+              </For>
+            </tbody>
+          </table>
+        </div>
+      </HrTcard>
+
+      <Show when={detailOpen() && selectedPeriodId()}>
+        <section class="hr-w s12 mt-4" aria-label="Run detail">
+          <header>
+            <h3>
+              {(periods.data ?? []).find((p) => p.id === selectedPeriodId())?.period_label ?? "Run"} · payslips
+            </h3>
+            <span class="grow" />
+            <div class="hr-actions">
               <button
                 type="button"
-                class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
-                classList={{ "border-brand-500 bg-brand-50 text-brand-700": selectedPeriodId() === p.id }}
-                onClick={() => setSelectedPeriodId(p.id)}
+                class="hr-btn hr-btn-sm"
+                onClick={() => {
+                  const id = selectedPeriodId();
+                  if (id) void exportPayrollRegisterCsv(id).catch(() => toast.error("Export failed."));
+                }}
               >
-                {p.period_label} ({p.status})
+                Export register
               </button>
-            )}
-          </For>
-        </div>
-      </section>
-
-      <Show when={selectedPeriodId()}>
-        <div class="mb-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
-            onClick={() => {
-              const id = selectedPeriodId();
-              if (id) void exportPayrollRegisterCsv(id).catch(() => toast.error("Export failed."));
-            }}
-          >
-            Export payroll register (CSV)
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
-            onClick={() => {
-              const id = selectedPeriodId();
-              if (!id) return;
-              window.open(`/api/v1/hr/pay-periods/${id}/bank-export?format=generic_csv`, "_blank");
-            }}
-          >
-            Export bank file
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
-            onClick={() => {
-              const id = selectedPeriodId();
-              if (!id) return;
-              void apiFetch(`/api/v1/hr/pay-periods/${id}/lock`, { method: "POST", body: "{}" }).then((res) => {
-                if (!res.success) toast.warning(res.message ?? "Lock failed.");
-                else toast.success("Period locked.");
-              });
-            }}
-          >
-            Lock period
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
-            onClick={() => {
-              const id = selectedPeriodId();
-              if (!id) return;
-              void apiFetch(`/api/v1/hr/pay-periods/${id}/unlock`, { method: "POST", body: "{}" }).then((res) => {
-                if (!res.success) toast.warning(res.message ?? "Unlock failed.");
-                else toast.success("Period unlocked.");
-              });
-            }}
-          >
-            Unlock period
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel disabled:opacity-50"
-            disabled={!selectedId()}
-            onClick={() => {
-              const row = (payslips.data ?? []).find((r) => r.id === selectedId());
-              if (row) openPrint(row);
-            }}
-          >
-            Print / PDF
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel disabled:opacity-50"
-            disabled={!selectedId() || sharing()}
-            onClick={() => {
-              const row = (payslips.data ?? []).find((r) => r.id === selectedId());
-              if (row) void sharePayslip(row);
-            }}
-          >
-            {sharing() ? "Creating link…" : "Copy secure employee link"}
-          </button>
-        </div>
-        <SpreadsheetGrid
-          columns={[
-            { key: "employee_no", header: "Employee #" },
-            { key: "employee_name", header: "Name" },
-            { key: "gross_pay", header: "Gross", render: (r: Payslip) => <span>{formatAmount(r.gross_pay)}</span> },
-            { key: "deductions", header: "Deductions", render: (r: Payslip) => <span>{formatAmount(r.deductions)}</span> },
-            { key: "net_pay", header: "Net", render: (r: Payslip) => <span>{formatAmount(r.net_pay)}</span> },
-            { key: "status", header: "Status" },
-            {
-              key: "history",
-              header: "History",
-              sortable: false,
-              render: (r: Payslip) => (
-                <ActivityHistoryLink
-                  module="hr"
-                  targetType="hr_payslip"
-                  targetId={r.id}
-                  title={`History — ${r.employee_no || r.employee_name}`}
-                />
-              ),
-            },
-          ]}
-          rows={payslips.data ?? []}
-          loading={payslips.isFetching}
-          selectedId={selectedId()}
-          onSelect={setSelectedId}
-          onEdit={(row) => openPrint(row)}
-          onNew={() => setRunOpen(true)}
-          showNew={true}
-          newLabel="New payroll run"
-          codeKey="employee_no"
-          nameKey="employee_name"
-          page={1}
-          pageSize={200}
-          total={(payslips.data ?? []).length}
-        />
+              <button
+                type="button"
+                class="hr-btn hr-btn-sm"
+                onClick={() => {
+                  const id = selectedPeriodId();
+                  if (!id) return;
+                  window.open(`/api/v1/hr/pay-periods/${id}/bank-export?format=generic_csv`, "_blank");
+                }}
+              >
+                Bank file
+              </button>
+              <button
+                type="button"
+                class="hr-btn hr-btn-sm"
+                disabled={!selectedId() || sharing()}
+                onClick={() => {
+                  const row = (payslips.data ?? []).find((r) => r.id === selectedId());
+                  if (row) void sharePayslip(row);
+                }}
+              >
+                {sharing() ? "Creating link…" : "Share payslip link"}
+              </button>
+              <button type="button" class="hr-btn hr-btn-sm" onClick={() => setDetailOpen(false)}>
+                Close
+              </button>
+            </div>
+          </header>
+          <p class="hr-muted px-3 text-xs">Payslip share links expire after 72 hours.</p>
+          <div class="hr-tbl-wrap">
+            <table class="hr-tbl">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th class="num">Gross</th>
+                  <th class="num">Deductions</th>
+                  <th class="num">Net</th>
+                  <th>Status</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                <For
+                  each={payslips.data ?? []}
+                  fallback={
+                    <tr>
+                      <td colspan="6">
+                        <HrEmpty title="No payslips" hint="Compute and run payroll for this period." />
+                      </td>
+                    </tr>
+                  }
+                >
+                  {(r) => (
+                    <tr
+                      classList={{ "bg-brand-50": selectedId() === r.id }}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setSelectedId(r.id)}
+                    >
+                      <td>
+                        <div class="font-semibold">{r.employee_name}</div>
+                        <div class="hr-muted">{r.employee_no}</div>
+                      </td>
+                      <td class="num">{showAmounts() ? formatAmount(r.gross_pay) : "••••"}</td>
+                      <td class="num">{showAmounts() ? formatAmount(r.deductions) : "••••"}</td>
+                      <td class="num">{showAmounts() ? formatAmount(r.net_pay) : "••••"}</td>
+                      <td>
+                        <HrBadge tone="neutral">{r.status}</HrBadge>
+                      </td>
+                      <td>
+                        <div class="flex flex-wrap gap-1">
+                          <button type="button" class="hr-btn hr-btn-sm" onClick={(e) => { e.stopPropagation(); openPrint(r); }}>
+                            Print
+                          </button>
+                          <ActivityHistoryLink
+                            module="hr"
+                            targetType="hr_payslip"
+                            targetId={r.id}
+                            title={`History — ${r.employee_no || r.employee_name}`}
+                            class="hr-btn hr-btn-sm"
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </Show>
+
+      <Show when={postOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Post and lock payroll run?">
+          <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">Post and lock payroll run?</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setPostOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <p class="mb-3 text-sm text-text-secondary">Posting locks the run. Corrections need an adjustment run.</p>
+            <label class="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={postConfirm()} onChange={(e) => setPostConfirm(e.currentTarget.checked)} class="mt-0.5" />
+              <span>I reviewed exceptions and totals.</span>
+            </label>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setPostOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" onClick={() => void lockSelected()}>
+                Post &amp; lock
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
       <ClientPayrollReport periods={periods.data ?? []} />
     </HrLayout>
   );
@@ -470,20 +668,28 @@ function ClientPayrollReport(props: { periods: PayPeriod[] }) {
     },
   }));
   return (
-    <section class="mt-8 rounded-xl border border-stroke bg-surface p-4">
-      <h2 class="text-lg font-semibold">By client</h2>
-      <p class="mb-3 text-sm text-text-secondary">Posted payslip totals grouped by the assignment that covers the period start. This does not create another payroll run.</p>
-      <select class={inputClass + " mb-3 w-full max-w-sm"} value={periodId()} onChange={(e) => setPeriodId(e.currentTarget.value)}>
-        <option value="">Choose a period</option>
-        <For each={props.periods}>{(period) => <option value={period.id}>{period.period_label}</option>}</For>
-      </select>
-      <For each={report.data ?? []} fallback={<p class="text-sm text-text-secondary">Choose a period to see the groups.</p>}>
-        {(row) => (
-          <p class="border-t border-stroke py-2 text-sm">
-            {row.client_name} · {row.people} · gross {formatAmount(row.gross_pay)} · deductions {formatAmount(row.deductions)} · net {formatAmount(row.net_pay)}
-          </p>
-        )}
-      </For>
+    <section class="hr-w s12 mt-4" aria-label="By client">
+      <header>
+        <h3>By client</h3>
+      </header>
+      <p class="px-3 text-sm text-text-secondary">
+        Posted payslip totals grouped by assignment. This does not create another payroll run. Bank file + by-client groups as separate runs{" "}
+        <HrPlanned />.
+      </p>
+      <div class="p-3">
+        <select class={inputClass + " mb-3 w-full max-w-sm"} value={periodId()} onChange={(e) => setPeriodId(e.currentTarget.value)}>
+          <option value="">Choose a period</option>
+          <For each={props.periods}>{(period) => <option value={period.id}>{period.period_label}</option>}</For>
+        </select>
+        <For each={report.data ?? []} fallback={<p class="text-sm text-text-secondary">Choose a period to see the groups.</p>}>
+          {(row) => (
+            <p class="border-t border-stroke py-2 text-sm">
+              {row.client_name} · {row.people} · gross {formatAmount(row.gross_pay)} · deductions {formatAmount(row.deductions)} · net{" "}
+              {formatAmount(row.net_pay)}
+            </p>
+          )}
+        </For>
+      </div>
     </section>
   );
 }

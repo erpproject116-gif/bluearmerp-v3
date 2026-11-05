@@ -102,6 +102,43 @@ export function dtrStatusLetter(status: string): string {
   }
 }
 
+export type DtrMatrixTone = "ok" | "chk" | "bad" | "neu";
+
+/** Option E matrix glyph + tone (ok / chk / bad / neu). */
+export function dtrMatrixCell(status: string, hoursWorked = 0): { tone: DtrMatrixTone; icon: string; tag?: string } {
+  if (status === "absent" || status === "awol") return { tone: "bad", icon: "✖", tag: "A" };
+  if (status === "leave") return { tone: "neu", icon: "🌴", tag: "LV" };
+  if (status === "holiday") return { tone: "neu", icon: "★", tag: "H" };
+  if (status === "rest") return { tone: "neu", icon: "·", tag: "R" };
+  if (status === "present") {
+    if (hoursWorked > 0 && hoursWorked < 8) return { tone: "chk", icon: "⏰", tag: "L" };
+    if (hoursWorked > 8) return { tone: "chk", icon: "＋", tag: "OT" };
+    return { tone: "ok", icon: "✓" };
+  }
+  return { tone: "neu", icon: "·" };
+}
+
+export function dtrNeedsLook(status: string, hoursWorked = 0): boolean {
+  const t = dtrMatrixCell(status, hoursWorked).tone;
+  return t === "chk" || t === "bad";
+}
+
+export function shiftYearMonth(ym: string, delta: number): string {
+  const b = monthBounds(ym);
+  if (!b) return ym;
+  const d = new Date(Date.UTC(b.year, b.month - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function weekdayShort(year: number, month: number, day: number): string {
+  return ["Su", "M", "T", "W", "Th", "F", "Sa"][new Date(Date.UTC(year, month - 1, day)).getUTCDay()] ?? "";
+}
+
+export function isWeekendDay(year: number, month: number, day: number): boolean {
+  const w = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return w === 0 || w === 6;
+}
+
 /** Duty cell colors: green full day (≥8h), orange half-day, red absent/AWOL. */
 export function dtrDutyCellClass(status: string, hoursWorked = 0): string {
   if (status === "absent" || status === "awol") {

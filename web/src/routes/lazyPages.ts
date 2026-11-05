@@ -354,6 +354,9 @@ export const FinanceReportsHubPage = lazy(() => import("../modules/finance/repor
 export const FinanceWorkspacePage = lazy(() => import("../modules/finance/FinanceWorkspacePage"));
 export const PortalLoginPage = lazy(() => import("../modules/portal/PortalLoginPage"));
 export const PortalDashboardPage = lazy(() => import("../modules/portal/PortalDashboardPage"));
+export const ClientPortalApp = lazy(() => import("../modules/portal/ClientPortalApp"));
+export const CareersBoardPage = lazy(() => import("../modules/careers/CareersBoardPage"));
+export const ApplyPage = lazy(() => import("../modules/hr/ApplyPage"));
 export const ReportsIndexPage = lazy(() => import("../modules/reports/ReportsIndexPage"));
 export const SavedViewsPage = lazy(() => import("../modules/reports/SavedViewsPage"));
 export const DashboardPage = lazy(() => import("../modules/dashboard/DashboardPage"));

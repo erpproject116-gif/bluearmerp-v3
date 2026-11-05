@@ -1,18 +1,29 @@
 import { createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
-import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
-import { Modal } from "../../shared/Modal";
+import { fetchEmployeeOptions } from "../../shared/useHr";
+import { LookupCombo } from "../../shared/LookupCombo";
+import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { SignaturePad } from "../../shared/SignaturePad";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrPageHead } from "./HrUi";
+import { HrPerformanceTabs } from "./HrPerformanceTabs";
+import { HrBadge, HrEmpty, HrPageHead, type HrBadgeTone } from "./HrUi";
 
 type Cycle = { id: number; name: string; period_start: string; period_end: string; status: string };
 type Review = {
-  id: number; employee_id?: number; employee_no?: string; employee_name?: string; status: string;
-  self_comments: string; manager_comments: string; overall_score?: number | null;
-  scores_json?: Record<string, number>; review_source?: string; period_end?: string;
+  id: number;
+  employee_id?: number;
+  employee_no?: string;
+  employee_name?: string;
+  status: string;
+  self_comments: string;
+  manager_comments: string;
+  overall_score?: number | null;
+  scores_json?: Record<string, number>;
+  review_source?: string;
+  period_end?: string;
+  acknowledged_at?: string | null;
 };
 
 const SCORE_FIELDS = [
@@ -22,6 +33,52 @@ const SCORE_FIELDS = [
   ["communication", "Communication"],
   ["following_instructions", "Following reasonable work instructions"],
 ] as const;
+
+function cycleStatusTone(status: string): HrBadgeTone {
+  return status === "closed" ? "neutral" : "warning";
+}
+
+function cycleStatusLabel(status: string) {
+  if (!status) return "—";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function formatPeriod(start: string, end: string) {
+  if (!start && !end) return "—";
+  if (start && end) return `${start.slice(0, 7)} – ${end.slice(0, 7)}`;
+  return start || end;
+}
+
+function ScorePips(props: { score: number | null | undefined }) {
+  const n = () => Math.max(0, Math.min(5, Math.round(Number(props.score) || 0)));
+  return (
+    <span class="hr-score" aria-label={`${props.score ?? 0} of 5`}>
+      <For each={[1, 2, 3, 4, 5]}>{(i) => <i classList={{ f: i <= n() }} />}</For>
+    </span>
+  );
+}
+
+function ScoreSeg(props: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div class="fld mb-3">
+      <label class="mb-1 block text-sm font-medium">{props.label}</label>
+      <div class="hr-seg" role="radiogroup" aria-label={props.label}>
+        <For each={["1", "2", "3", "4", "5"]}>
+          {(v) => (
+            <button type="button" classList={{ on: props.value === v }} onClick={() => props.onChange(v)}>
+              {v}
+            </button>
+          )}
+        </For>
+      </div>
+      <div class="hr-muted mt-1">1 Poor · 5 Excellent</div>
+    </div>
+  );
+}
 
 export default function PerformancePage() {
   const toast = useToast();
@@ -33,13 +90,19 @@ export default function PerformancePage() {
   const [editId, setEditId] = createSignal<number | null>(null);
   const [scores, setScores] = createSignal<Record<string, string>>({});
   const [comments, setComments] = createSignal("");
-  const [clientEmp, setClientEmp] = createSignal("");
-  const [clientScores, setClientScores] = createSignal<Record<string, string>>({});
+  const [signOff, setSignOff] = createSignal(false);
+  const [clientOpen, setClientOpen] = createSignal(false);
+  const [clientEmpId, setClientEmpId] = createSignal<number | null>(null);
+  const [clientEmpLabel, setClientEmpLabel] = createSignal("");
+  const [clientScores, setClientScores] = createSignal<Record<string, string>>(
+    Object.fromEntries(SCORE_FIELDS.map(([k]) => [k, "4"])),
+  );
   const [clientNotes, setClientNotes] = createSignal("");
   const [ackId, setAckId] = createSignal<number | null>(null);
   const [signedName, setSignedName] = createSignal("");
   const [sigUrl, setSigUrl] = createSignal<string | null>(null);
   const [cycleOpen, setCycleOpen] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
 
   const cycles = createQuery(() => ({
     queryKey: ["hr-review-cycles"],
@@ -50,16 +113,25 @@ export default function PerformancePage() {
     enabled: !!cycleId(),
     queryFn: async () => (await apiFetch<Review[]>(`/api/v1/hr/performance/reviews?cycle_id=${cycleId()}`)).data ?? [],
   }));
+  const clientReviews = createQuery(() => ({
+    queryKey: ["hr-client-reviews"],
+    queryFn: async () => (await apiFetch<Review[]>("/api/v1/hr/performance/reviews?source=client")).data ?? [],
+  }));
 
   const createCycle = async () => {
     if (!name().trim() || !start() || !end()) return toast.warning("Name and period required.");
+    setBusy(true);
     const res = await apiFetch<Cycle>("/api/v1/hr/performance/cycles", {
       method: "POST",
       body: JSON.stringify({ name: name().trim(), period_start: start(), period_end: end(), cycle_kind: "annual" }),
     });
+    setBusy(false);
     if (!res.success) return toast.warning(res.message ?? "Failed.");
     toast.success("Cycle created.");
     setCycleOpen(false);
+    setName("");
+    setStart("");
+    setEnd("");
     setCycleId(res.data?.id ?? null);
     void qc.invalidateQueries({ queryKey: ["hr-review-cycles"] });
   };
@@ -73,9 +145,22 @@ export default function PerformancePage() {
     void qc.invalidateQueries({ queryKey: ["hr-reviews"] });
   };
 
+  const openEvaluate = (r: Review) => {
+    setEditId(r.id);
+    setScores(Object.fromEntries(SCORE_FIELDS.map(([key]) => [key, String(r.scores_json?.[key] ?? "")])));
+    setComments(r.manager_comments || "");
+    setSignOff(false);
+  };
+
   const saveManager = async () => {
     const id = editId();
     if (!id) return;
+    if (!signOff()) return toast.warning("Confirm evaluator sign-off before submit.");
+    for (const [key] of SCORE_FIELDS) {
+      const v = Number(scores()[key]);
+      if (!v || v < 1 || v > 5) return toast.warning("Score each criterion 1–5.");
+    }
+    setBusy(true);
     const scoresJson = Object.fromEntries(SCORE_FIELDS.map(([key]) => [key, Number(scores()[key])]));
     const res = await apiFetch(`/api/v1/hr/performance/reviews/${id}`, {
       method: "PATCH",
@@ -85,10 +170,31 @@ export default function PerformancePage() {
         status: "manager_done",
       }),
     });
+    setBusy(false);
     if (!res.success) return toast.warning(res.message ?? "Failed.");
-    toast.success("Saved.");
+    toast.success("Evaluation saved. Employee signs on My HR.");
     setEditId(null);
     void qc.invalidateQueries({ queryKey: ["hr-reviews"] });
+  };
+
+  const saveClient = async () => {
+    if (!clientEmpId()) return toast.warning("Choose an employee.");
+    for (const [key] of SCORE_FIELDS) {
+      const v = Number(clientScores()[key]);
+      if (!v || v < 1 || v > 5) return toast.warning("Score each criterion 1–5.");
+    }
+    setBusy(true);
+    const scoresPayload = Object.fromEntries(SCORE_FIELDS.map(([key]) => [key, Number(clientScores()[key])]));
+    const res = await apiFetch("/api/v1/hr/performance/reviews/client", {
+      method: "POST",
+      body: JSON.stringify({ employee_id: clientEmpId(), scores: scoresPayload, notes: clientNotes() }),
+    });
+    setBusy(false);
+    if (!res.success) return toast.warning(res.message ?? "Could not save the client evaluation.");
+    toast.success("Client evaluation saved.");
+    setClientOpen(false);
+    setClientNotes("");
+    void qc.invalidateQueries({ queryKey: ["hr-client-reviews"] });
   };
 
   const submitAck = async () => {
@@ -96,6 +202,7 @@ export default function PerformancePage() {
     if (!id) return;
     if (!sigUrl()) return toast.warning("Draw a signature before acknowledging.");
     if (!signedName().trim()) return toast.warning("Typed name is required.");
+    setBusy(true);
     const res = await apiFetch(`/api/v1/hr/performance/reviews/${id}/acknowledge`, {
       method: "POST",
       body: JSON.stringify({
@@ -103,174 +210,346 @@ export default function PerformancePage() {
         signed_name: signedName().trim(),
       }),
     });
+    setBusy(false);
     if (!res.success) return toast.warning(res.message ?? "Failed.");
     toast.success("Acknowledged with signature — stored in 201.");
     setAckId(null);
     setSigUrl(null);
     setSignedName("");
     void qc.invalidateQueries({ queryKey: ["hr-reviews"] });
+    void qc.invalidateQueries({ queryKey: ["hr-client-reviews"] });
   };
 
   return (
     <HrLayout>
-      <HrPageHead title="Evaluations" subtitle="Review cycles and client evaluations. A score does not change pay, assignment, or status." />
+      <div class="hr-crumb">HR &amp; Payroll › Performance › Evaluations &amp; learning › Evaluations</div>
+      <HrPerformanceTabs />
+      <HrPageHead
+        title="Evaluations"
+        subtitle="Review cycles and client evaluations (template LMSI_5). Scores never change pay, assignment or status."
+        actions={
+          <div class="hr-actions">
+            <button type="button" class="hr-btn hr-btn-primary" onClick={() => setCycleOpen(true)}>
+              + New cycle
+            </button>
+          </div>
+        }
+      />
 
-      <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCycleOpen(true)}>
-        New cycle
-      </button>
-      <EntityModal open={cycleOpen()} title="New cycle" onClose={() => setCycleOpen(false)} onSave={() => void createCycle()} saveLabel="Create cycle">
-        <Field label="Name"><input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} /></Field>
-        <Field label="Start"><input type="date" class={inputClass} value={start()} onInput={(e) => setStart(e.currentTarget.value)} /></Field>
-        <Field label="End"><input type="date" class={inputClass} value={end()} onInput={(e) => setEnd(e.currentTarget.value)} /></Field>
-      </EntityModal>
-
-      <section class="mb-4 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <h2 class="mb-3 text-lg font-medium">Cycles</h2>
-        <div class="flex flex-wrap gap-2">
-          <For each={cycles.data ?? []}>
-            {(c) => (
-              <button
-                type="button"
-                class="rounded-lg border border-stroke px-3 py-1.5 text-sm"
-                classList={{ "border-brand-500 bg-brand-50": cycleId() === c.id }}
-                onClick={() => setCycleId(c.id)}
-              >
-                {c.name} ({c.status})
+      <div class="grid gap-4 lg:grid-cols-2">
+        <section class="hr-w s12" aria-label="Review cycles">
+          <header>
+            <h3>Review cycles</h3>
+            <span class="grow" />
+            <Show when={cycleId()}>
+              <button type="button" class="hr-btn hr-btn-sm" onClick={() => void assign()}>
+                Assign employees
               </button>
-            )}
-          </For>
-        </div>
-        <Show when={cycleId()}>
-          <button type="button" class="mt-3 rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => void assign()}>
-            Assign to all active employees
-          </button>
-        </Show>
-      </section>
-
-      <Show when={cycleId()}>
-        <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-          <h2 class="mb-3 text-lg font-medium">Reviews</h2>
-          <For each={reviews.data ?? []} fallback={<p class="text-sm text-text-secondary">No reviews — assign first.</p>}>
-            {(r) => (
-              <div class="mb-4 border-b border-slate-100 pb-3 text-sm">
-                <p class="font-medium">{r.employee_no} — {r.employee_name} · {r.status}</p>
-                <p class="text-text-secondary">Self: {r.self_comments || "—"}</p>
-                <p class="text-text-secondary">Manager: {r.manager_comments || "—"} · score {r.overall_score ?? "—"}</p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    class="rounded border border-stroke px-2 py-1 text-xs"
-                    onClick={() => {
-                      setEditId(r.id);
-                      setScores(Object.fromEntries(SCORE_FIELDS.map(([key]) => [key, String(r.scores_json?.[key] ?? "")])));
-                      setComments(r.manager_comments || "");
-                    }}
-                  >
-                    Edit manager review
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded border border-stroke px-2 py-1 text-xs"
-                    onClick={() => void apiFetch(`/api/v1/hr/performance/reviews/${r.id}/store-201`, { method: "POST", body: "{}" }).then((res) => {
-                      if (!res.success) toast.warning(res.message ?? "Failed.");
-                      else toast.success("Stored in 201.");
-                    })}
-                  >
-                    Store 201
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded border border-stroke px-2 py-1 text-xs"
-                    onClick={() => {
-                      setAckId(r.id);
-                      setSignedName(r.employee_name ?? "");
-                      setSigUrl(null);
-                    }}
-                  >
-                    Acknowledge
-                  </button>
-                </div>
-                <Show when={editId() === r.id}>
-                  <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                    <For each={SCORE_FIELDS}>
-                      {([key, label]) => (
-                        <Field label={label}>
-                          <input class={inputClass} type="number" min="1" max="5" value={scores()[key] ?? ""} onInput={(e) => setScores({ ...scores(), [key]: e.currentTarget.value })} />
-                        </Field>
-                      )}
-                    </For>
-                    <Field label="Comments"><input class={inputClass} value={comments()} onInput={(e) => setComments(e.currentTarget.value)} /></Field>
-                    <button type="button" class="rounded bg-brand-600 px-3 py-1.5 text-xs text-white" onClick={() => void saveManager()}>Save</button>
+            </Show>
+          </header>
+          <div class="hr-tbl-wrap">
+            <table class="hr-tbl">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Period</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For
+                  each={cycles.data ?? []}
+                  fallback={
+                    <tr>
+                      <td colspan="3">
+                        <HrEmpty title="No cycles" hint="Create a review cycle to start." />
+                      </td>
+                    </tr>
+                  }
+                >
+                  {(c) => (
+                    <tr
+                      classList={{ "bg-brand-50": cycleId() === c.id }}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setCycleId(c.id)}
+                    >
+                      <td class="font-semibold">{c.name}</td>
+                      <td>
+                        <HrBadge tone={cycleStatusTone(c.status)}>{cycleStatusLabel(c.status)}</HrBadge>
+                      </td>
+                      <td>{formatPeriod(c.period_start, c.period_end)}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+          <Show when={cycleId()}>
+            <div class="border-t border-stroke p-3">
+              <h4 class="mb-2 text-sm font-semibold">Reviews in cycle</h4>
+              <For each={reviews.data ?? []} fallback={<p class="hr-muted text-sm">No reviews — assign employees first.</p>}>
+                {(r) => (
+                  <div class="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 py-2 text-sm">
+                    <div>
+                      <div class="font-medium">
+                        {r.employee_name} <span class="hr-muted">{r.employee_no}</span>
+                      </div>
+                      <div class="hr-muted">
+                        {r.status} · score {r.overall_score ?? "—"}
+                        <Show when={r.overall_score != null}>
+                          <ScorePips score={r.overall_score} />
+                        </Show>
+                      </div>
+                    </div>
+                    <div class="flex flex-wrap gap-1">
+                      <button type="button" class="hr-btn hr-btn-primary hr-btn-sm" onClick={() => openEvaluate(r)}>
+                        Evaluate…
+                      </button>
+                      <button
+                        type="button"
+                        class="hr-btn hr-btn-sm"
+                        onClick={() =>
+                          void apiFetch(`/api/v1/hr/performance/reviews/${r.id}/store-201`, { method: "POST", body: "{}" }).then((res) => {
+                            if (!res.success) toast.warning(res.message ?? "Failed.");
+                            else toast.success("Stored in 201.");
+                          })
+                        }
+                      >
+                        Store 201
+                      </button>
+                      <button
+                        type="button"
+                        class="hr-btn hr-btn-sm"
+                        onClick={() => {
+                          setAckId(r.id);
+                          setSignedName(r.employee_name ?? "");
+                          setSigUrl(null);
+                        }}
+                      >
+                        Acknowledge
+                      </button>
+                    </div>
                   </div>
-                </Show>
-              </div>
-            )}
-          </For>
+                )}
+              </For>
+            </div>
+          </Show>
         </section>
+
+        <section class="hr-w s12" aria-label="Client evaluations">
+          <header>
+            <h3>Client evaluations</h3>
+            <span class="grow" />
+            <button type="button" class="hr-btn hr-btn-sm" onClick={() => setClientOpen(true)}>
+              Add client evaluation
+            </button>
+          </header>
+          <div class="hr-tbl-wrap">
+            <table class="hr-tbl">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Score</th>
+                  <th>Notes</th>
+                  <th>Signed by employee</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For
+                  each={clientReviews.data ?? []}
+                  fallback={
+                    <tr>
+                      <td colspan="4">
+                        <HrEmpty title="No client evaluations" hint="Add a client evaluation to start." />
+                      </td>
+                    </tr>
+                  }
+                >
+                  {(r) => (
+                    <tr>
+                      <td class="font-semibold">{r.employee_name}</td>
+                      <td>
+                        {r.overall_score != null ? `${Number(r.overall_score).toFixed(1)} / 5` : "—"}
+                        <ScorePips score={r.overall_score} />
+                      </td>
+                      <td>{r.manager_comments || "—"}</td>
+                      <td>
+                        <Show when={r.acknowledged_at || r.status === "acknowledged"} fallback={<HrBadge tone="warning">Due</HrBadge>}>
+                          <HrBadge tone="success">Signed</HrBadge>
+                        </Show>
+                      </td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <Show when={cycleOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New review cycle">
+          <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">New review cycle</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setCycleOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div class="grid gap-3">
+              <Field label="Name">
+                <input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} />
+              </Field>
+              <Field label="Period start">
+                <input type="date" class={inputClass} value={start()} onInput={(e) => setStart(e.currentTarget.value)} />
+              </Field>
+              <Field label="Period end">
+                <input type="date" class={inputClass} value={end()} onInput={(e) => setEnd(e.currentTarget.value)} />
+              </Field>
+            </div>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setCycleOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void createCycle()}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       </Show>
 
-      <ClientEvaluations emp={clientEmp} setEmp={setClientEmp} scores={clientScores} setScores={setClientScores} notes={clientNotes} setNotes={setClientNotes} />
-
-      <Modal open={ackId() != null} onClose={() => setAckId(null)} title="Acknowledge with signature">
-        <div class="space-y-3">
-          <Field label="Full name (typed)">
-            <input class={inputClass} value={signedName()} onInput={(e) => setSignedName(e.currentTarget.value)} />
-          </Field>
-          <div>
-            <p class="mb-1 text-xs font-medium text-text-secondary">Draw signature</p>
-            <SignaturePad onChange={(url) => setSigUrl(url)} />
-          </div>
-          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void submitAck()}>
-            Confirm acknowledgment
-          </button>
-        </div>
-      </Modal>
-    </HrLayout>
-  );
-}
-
-function ClientEvaluations(props: {
-  emp: () => string;
-  setEmp: (v: string) => void;
-  scores: () => Record<string, string>;
-  setScores: (v: Record<string, string>) => void;
-  notes: () => string;
-  setNotes: (v: string) => void;
-}) {
-  const toast = useToast();
-  const qc = useQueryClient();
-  const reviews = createQuery(() => ({
-    queryKey: ["hr-client-reviews"],
-    queryFn: async () => (await apiFetch<Review[]>("/api/v1/hr/performance/reviews?source=client")).data ?? [],
-  }));
-  const save = async () => {
-    const scores = Object.fromEntries(SCORE_FIELDS.map(([key]) => [key, Number(props.scores()[key])]));
-    const res = await apiFetch("/api/v1/hr/performance/reviews/client", {
-      method: "POST",
-      body: JSON.stringify({ employee_id: Number(props.emp()), scores, notes: props.notes() }),
-    });
-    if (!res.success) return toast.warning(res.message ?? "Could not save the client evaluation.");
-    toast.success("Client evaluation saved.");
-    void qc.invalidateQueries({ queryKey: ["hr-client-reviews"] });
-  };
-  return (
-    <section class="mt-4 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-      <h2 class="mb-3 text-lg font-medium">Client evaluations</h2>
-      <div class="grid gap-2 sm:grid-cols-2">
-        <Field label="Employee id"><input class={inputClass} value={props.emp()} onInput={(e) => props.setEmp(e.currentTarget.value)} /></Field>
-        <For each={SCORE_FIELDS}>
-          {([key, label]) => (
-            <Field label={label}>
-              <input class={inputClass} type="number" min="1" max="5" value={props.scores()[key] ?? ""} onInput={(e) => props.setScores({ ...props.scores(), [key]: e.currentTarget.value })} />
+      <Show when={clientOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Add client evaluation">
+          <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">Add client evaluation</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setClientOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <LookupCombo
+              label="Employee"
+              value={clientEmpLabel}
+              selectedId={clientEmpId}
+              onInput={setClientEmpLabel}
+              onSelect={(o) => {
+                setClientEmpId(o.id);
+                setClientEmpLabel(o.label);
+              }}
+              onClear={() => {
+                setClientEmpId(null);
+                setClientEmpLabel("");
+              }}
+              fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
+              placeholder="Search employees…"
+            />
+            <p class="hr-muted mb-3 text-xs">Searchable picker; submits the same employee id as today.</p>
+            <For each={SCORE_FIELDS}>
+              {([key, label]) => (
+                <ScoreSeg
+                  label={label}
+                  value={clientScores()[key] ?? ""}
+                  onChange={(v) => setClientScores({ ...clientScores(), [key]: v })}
+                />
+              )}
+            </For>
+            <Field label="Notes">
+              <textarea class={inputClass} rows={3} value={clientNotes()} onInput={(e) => setClientNotes(e.currentTarget.value)} />
             </Field>
-          )}
-        </For>
-        <Field label="Notes"><input class={inputClass} value={props.notes()} onInput={(e) => props.setNotes(e.currentTarget.value)} /></Field>
-      </div>
-      <button type="button" class="mt-2 rounded bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void save()}>Save client evaluation</button>
-      <For each={reviews.data ?? []}>
-        {(r) => <p class="mt-2 text-sm">{r.employee_name} · {r.overall_score ?? "—"} · {r.manager_comments || "No notes"}</p>}
-      </For>
-    </section>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setClientOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void saveClient()}>
+                Save client evaluation
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={editId() != null}>
+        <div
+          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Evaluation · LMSI_5"
+        >
+          <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">Evaluation · LMSI_5</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setEditId(null)}>
+                ✕
+              </button>
+            </div>
+            <p class="hr-muted mb-3 text-xs">Criteria match the live LMSI_5 template fields.</p>
+            <For each={SCORE_FIELDS}>
+              {([key, label]) => (
+                <Field label={`${label} *`}>
+                  <select
+                    class={inputClass}
+                    value={scores()[key] ?? ""}
+                    onChange={(e) => setScores({ ...scores(), [key]: e.currentTarget.value })}
+                  >
+                    <option value="">—</option>
+                    <For each={["1", "2", "3", "4", "5"]}>{(v) => <option value={v}>{v}</option>}</For>
+                  </select>
+                </Field>
+              )}
+            </For>
+            <Field label="Comments">
+              <textarea class={inputClass} rows={3} value={comments()} onInput={(e) => setComments(e.currentTarget.value)} />
+            </Field>
+            <label class="mt-3 flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={signOff()} onChange={(e) => setSignOff(e.currentTarget.checked)} class="mt-0.5" />
+              <span>Evaluator sign-off: I confirm this evaluation. The employee signs on My HR.</span>
+            </label>
+            <p class="hr-muted mt-2 text-xs">Scores never change pay, assignment or status.</p>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setEditId(null)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void saveManager()}>
+                Sign &amp; submit
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={ackId() != null}>
+        <div
+          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Acknowledge with signature"
+        >
+          <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">Acknowledge with signature</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setAckId(null)}>
+                ✕
+              </button>
+            </div>
+            <Field label="Full name (typed)">
+              <input class={inputClass} value={signedName()} onInput={(e) => setSignedName(e.currentTarget.value)} />
+            </Field>
+            <div class="mt-3">
+              <p class="mb-1 text-xs font-medium text-text-secondary">Draw signature</p>
+              <SignaturePad onChange={(url) => setSigUrl(url)} />
+            </div>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setAckId(null)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void submitAck()}>
+                Confirm acknowledgment
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+    </HrLayout>
   );
 }

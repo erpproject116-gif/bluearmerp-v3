@@ -19,13 +19,17 @@ const WelcomePage = lazy(() => import("./modules/auth/WelcomePage"));
 const PendingApprovalPage = lazy(() => import("./modules/auth/PendingApprovalPage"));
 const AuthCallbackPage = lazy(() => import("./modules/auth/AuthCallbackPage"));
 const PortalLoginPage = lazy(() => import("./modules/portal/PortalLoginPage"));
+const PortalDashboardPage = lazy(() => import("./modules/portal/PortalDashboardPage"));
+const ClientPortalApp = lazy(() => import("./modules/portal/ClientPortalApp"));
 const ApplyPage = lazy(() => import("./modules/hr/ApplyPage"));
+const CareersBoardPage = lazy(() => import("./modules/careers/CareersBoardPage"));
 
-/** The light shell has no /app routes. A client navigation into the product reloads the full app. */
+/** The light shell has no product /app routes (except client portal). Reload the full app for other /app paths. */
 function AppHandOff() {
   const loc = useLocation();
   onMount(() => {
     const next = `${loc.pathname}${loc.search}${loc.hash || ""}`;
+    if (next === "/app/hr/client-portal" || next.startsWith("/app/hr/client-portal/")) return;
     if (next.startsWith("/app") || next.startsWith("/platform")) {
       window.location.replace(next);
     }
@@ -63,7 +67,12 @@ export default function SignInApp() {
                 <Route path="/pending-approval" component={PendingApprovalPage} />
                 <Route path="/auth/callback" component={AuthCallbackPage} />
                 <Route path="/portal/login" component={PortalLoginPage} />
+                <Route path="/portal/dashboard" component={PortalDashboardPage} />
+                <Route path="/app/hr/client-portal" component={ClientPortalApp} />
+                <Route path="/app/hr/client-portal/*" component={ClientPortalApp} />
                 <Route path="/apply/:code" component={ApplyPage} />
+                <Route path="/careers/:code" component={CareersBoardPage} />
+                <Route path="/careers/:code/:jobId" component={CareersBoardPage} />
                 <Route path="/app/*" component={AppHandOff} />
                 <Route path="/platform/*" component={AppHandOff} />
                 <Route path="*" component={AuthEntryRedirect} />

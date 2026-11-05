@@ -2,9 +2,11 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { LookupCombo } from "../../shared/LookupCombo";
-import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPayrollTabs } from "./HrPayrollTabs";
+import { HrPageHead, HrTcard } from "./HrUi";
 import { formatAmount, formatPeso } from "../../shared/money";
 
 type SpecialRow = {
@@ -46,10 +48,7 @@ export default function SpecialRunsPage() {
       body: JSON.stringify({ year: year() }),
     });
     setBusy(false);
-    if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Preview failed.");
-      return;
-    }
+    if (!res.success || !res.data) return toast.warning(res.message ?? "Preview failed.");
     setPreview13(res.data);
   };
 
@@ -60,162 +59,185 @@ export default function SpecialRunsPage() {
       body: JSON.stringify({ year: year() }),
     });
     setBusy(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Run failed.");
-      return;
-    }
+    if (!res.success) return toast.warning(res.message ?? "Run failed.");
     toast.success(`13th month posted: ${res.data?.payslip_count ?? 0} payslips.`);
     setPreview13(res.data ?? null);
   };
 
   const previewFinal = async () => {
     const id = Number(empId());
-    if (!id) {
-      toast.warning("Select an employee.");
-      return;
-    }
+    if (!id) return toast.warning("Select an employee.");
     setBusy(true);
     const res = await apiFetch<SpecialResult>("/api/v1/hr/special-runs/final-pay/preview", {
       method: "POST",
       body: JSON.stringify({ employee_id: id, separation_date: sepDate() }),
     });
     setBusy(false);
-    if (!res.success || !res.data) {
-      toast.warning(res.message ?? "Preview failed.");
-      return;
-    }
+    if (!res.success || !res.data) return toast.warning(res.message ?? "Preview failed.");
     setFinalPreview(res.data);
   };
 
   const runFinal = async () => {
     const id = Number(empId());
-    if (!id) {
-      toast.warning("Select an employee.");
-      return;
-    }
+    if (!id) return toast.warning("Select an employee.");
     setBusy(true);
     const res = await apiFetch<SpecialResult>("/api/v1/hr/special-runs/final-pay", {
       method: "POST",
       body: JSON.stringify({ employee_id: id, separation_date: sepDate() }),
     });
     setBusy(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Run failed.");
-      return;
-    }
+    if (!res.success) return toast.warning(res.message ?? "Run failed.");
     toast.success("Final pay posted; employee marked terminated.");
     setFinalPreview(res.data ?? null);
   };
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">13th / Final pay</h1>
-      <section class="mb-8 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <h2 class="mb-1 text-lg font-medium">13th month pay</h2>
-        <p class="mb-3 text-sm text-text-secondary">
-          Computes (sum of BASIC payslip lines in the calendar year) ÷ 12. Preview before posting.
-        </p>
-        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setThirteenthOpen(true)}>
-          New 13th month
-        </button>
-      </section>
-      <EntityModal
-        open={thirteenthOpen()}
-        title="New 13th month"
-        wide
-        onClose={() => setThirteenthOpen(false)}
-        onSave={() => void runThirteenth()}
-        onSecondarySave={() => void previewThirteenth()}
-        secondarySaveLabel="Preview"
-        saveLabel="Run & post"
-        saving={busy()}
-      >
-        <Field label="Year">
-          <input
-            type="number"
-            class={inputClass}
-            value={year()}
-            onInput={(e) => setYear(Number(e.currentTarget.value))}
-          />
-        </Field>
-        <div class="sm:col-span-2 lg:col-span-3">
-          <Show when={preview13()}>
-            {(p) => (
-              <div class="overflow-x-auto text-sm">
-                <p class="mb-2 text-text-secondary">
-                  {p().payslip_count} employee(s) · total {formatPeso(p().total_gross)}
-                </p>
-                <table class="min-w-full">
-                  <thead>
-                    <tr class="border-b text-left text-text-secondary">
-                      <th class="py-1 pr-3">Employee</th>
-                      <th class="py-1 pr-3 text-right">YTD basic</th>
-                      <th class="py-1 text-right">13th month</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={p().employees}>
-                      {(row) => (
-                        <tr class="border-b border-stroke/50">
-                          <td class="py-1 pr-3">{row.employee_name}</td>
-                          <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.ytd_basic ?? 0)}</td>
-                          <td class="py-1 text-right tabular-nums">{formatAmount(row.amount)}</td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Show>
-        </div>
-      </EntityModal>
+      <div class="hr-crumb">HR &amp; Payroll › Payroll › Special runs</div>
+      <HrPayrollTabs />
+      <HrPageHead title="Special runs" subtitle="13th month and final pay. Preview before posting." />
 
-      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <h2 class="mb-1 text-lg font-medium">Final pay</h2>
-        <p class="mb-3 text-sm text-text-secondary">
-          Last-month pro-rate + leave cash-out (cashable balances) + pro-rated 13th.
-          Posting marks the employee terminated and writes leave cash-out to the ledger.
-        </p>
-        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setFinalOpen(true)}>
-          New final pay
-        </button>
-      </section>
-      <EntityModal
-        open={finalOpen()}
-        title="New final pay"
-        onClose={() => setFinalOpen(false)}
-        onSave={() => void runFinal()}
-        onSecondarySave={() => void previewFinal()}
-        secondarySaveLabel="Preview"
-        saveLabel="Run & post"
-        saving={busy()}
-      >
-        <LookupCombo
-          label="Employee"
-          value={empLabel}
-          selectedId={empId}
-          onInput={setEmpLabel}
-          onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }}
-          onClear={() => { setEmpId(null); setEmpLabel(""); }}
-          fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
-          placeholder="Search employees…"
-        />
-        <Field label="Separation date">
-          <input type="date" class={inputClass} value={sepDate()} onInput={(e) => setSepDate(e.currentTarget.value)} />
-        </Field>
-        <div class="sm:col-span-2 lg:col-span-3">
-          <Show when={finalPreview()?.employees[0]}>
-            {(row) => (
-              <div class="rounded-lg bg-slate-50 p-3 text-sm">
-                <p class="font-medium">{row().employee_name}</p>
-                <p class="tabular-nums">Amount: {formatPeso(row().amount)}</p>
-                <p class="text-text-secondary">{row().notes}</p>
-              </div>
-            )}
-          </Show>
+      <div class="grid gap-4 lg:grid-cols-2">
+        <section class="hr-w s12" aria-label="13th month">
+          <header>
+            <h3>13th month pay</h3>
+            <span class="grow" />
+            <button type="button" class="hr-btn hr-btn-primary hr-btn-sm" onClick={() => setThirteenthOpen(true)}>
+              + New 13th month
+            </button>
+          </header>
+          <p class="px-3 pb-3 text-sm text-text-secondary">
+            Computes (sum of BASIC payslip lines in the calendar year) ÷ 12. Preview before posting.
+          </p>
+        </section>
+
+        <section class="hr-w s12" aria-label="Final pay">
+          <header>
+            <h3>Final pay</h3>
+            <span class="grow" />
+            <button type="button" class="hr-btn hr-btn-primary hr-btn-sm" onClick={() => setFinalOpen(true)}>
+              + New final pay
+            </button>
+          </header>
+          <p class="px-3 pb-3 text-sm text-text-secondary">
+            Last-month pro-rate + leave cash-out + pro-rated 13th. Posting marks the employee terminated.
+          </p>
+        </section>
+      </div>
+
+      <Show when={thirteenthOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New 13th month">
+          <div class="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">New 13th month</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setThirteenthOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <Field label="Year">
+              <input type="number" class={inputClass} value={year()} onInput={(e) => setYear(Number(e.currentTarget.value))} />
+            </Field>
+            <Show when={preview13()}>
+              {(p) => (
+                <HrTcard class="mt-3">
+                  <div class="p-3">
+                    <p class="mb-2 text-sm text-text-secondary">
+                      {p().payslip_count} employee(s) · total {formatPeso(p().total_gross)}
+                    </p>
+                    <div class="hr-tbl-wrap">
+                      <table class="hr-tbl">
+                        <thead>
+                          <tr>
+                            <th>Employee</th>
+                            <th class="num">YTD basic</th>
+                            <th class="num">13th month</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <For each={p().employees}>
+                            {(row) => (
+                              <tr>
+                                <td>{row.employee_name}</td>
+                                <td class="num">{formatAmount(row.ytd_basic ?? 0)}</td>
+                                <td class="num">{formatAmount(row.amount)}</td>
+                              </tr>
+                            )}
+                          </For>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </HrTcard>
+              )}
+            </Show>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setThirteenthOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn" disabled={busy()} onClick={() => void previewThirteenth()}>
+                Preview
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void runThirteenth()}>
+                Run &amp; post
+              </button>
+            </div>
+          </div>
         </div>
-      </EntityModal>
+      </Show>
+
+      <Show when={finalOpen()}>
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New final pay">
+          <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">New final pay</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setFinalOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div class="grid gap-3">
+              <LookupCombo
+                label="Employee"
+                value={empLabel}
+                selectedId={empId}
+                onInput={setEmpLabel}
+                onSelect={(o) => {
+                  setEmpId(o.id);
+                  setEmpLabel(o.label);
+                }}
+                onClear={() => {
+                  setEmpId(null);
+                  setEmpLabel("");
+                }}
+                fetchOptions={(q) => fetchEmployeeOptions(q, "active")}
+                placeholder="Search employees…"
+              />
+              <Field label="Separation date">
+                <input type="date" class={inputClass} value={sepDate()} onInput={(e) => setSepDate(e.currentTarget.value)} />
+              </Field>
+            </div>
+            <Show when={finalPreview()?.employees[0]}>
+              {(row) => (
+                <div class="mt-3 rounded-lg border border-stroke bg-panel p-3 text-sm">
+                  <p class="font-medium">{row().employee_name}</p>
+                  <p class="tabular-nums">Amount: {formatPeso(row().amount)}</p>
+                  <p class="text-text-secondary">{row().notes}</p>
+                </div>
+              )}
+            </Show>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setFinalOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn" disabled={busy()} onClick={() => void previewFinal()}>
+                Preview
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void runFinal()}>
+                Run &amp; post
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </HrLayout>
   );
 }

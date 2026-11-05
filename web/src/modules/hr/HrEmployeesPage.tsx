@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { EntityModal, Field, SpreadsheetGrid, inputClass } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import { ModalFormGuide } from "../../shared/ModalFormGuide";
@@ -21,6 +21,7 @@ import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY, HR_ENTITY, HR_SETTINGS_HREF } from "../../shared/entityTypes";
 import { useMasterLifecycle } from "../../shared/masterLifecycle";
+import { HrBadge, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
 import { HrLayout } from "./HrLayout";
 import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
 import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
@@ -37,6 +38,25 @@ import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/active
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { QuickDepartmentModal } from "../../shared/QuickDepartmentModal";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+
+function employeeInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+}
+
+function employeeStatusTone(status: string): HrBadgeTone {
+  const s = status.toLowerCase();
+  if (s === "active") return "success";
+  if (s === "terminated" || s === "inactive") return "danger";
+  return "neutral";
+}
+
+function labelizeStatus(status: string) {
+  if (!status) return "—";
+  return status.charAt(0).toUpperCase() + status.slice(1).replaceAll("_", " ");
+}
 
 const STATUS_OPTIONS = ["active", "inactive", "terminated"];
 
@@ -148,6 +168,9 @@ export default function HrEmployeesPage() {
   const [importing, setImporting] = createSignal(false);
   const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
   const [formSection, setFormSection] = createSignal<"employment" | "statutory" | "assignment" | "documents">("employment");
+  const [statusFilter, setStatusFilter] = createSignal("");
+  const [deptFilter, setDeptFilter] = createSignal("");
+  const [showAmounts, setShowAmounts] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateEmployees();
   const qc = useQueryClient();
@@ -253,8 +276,23 @@ export default function HrEmployeesPage() {
     page: page(),
     pageSize: pageSize(),
     q: q() || undefined,
+    status: statusFilter() || undefined,
     lifecycle: lifecycle.filter(),
   }));
+
+  const visibleRows = createMemo(() => {
+    const rows = list.data?.rows ?? [];
+    const dept = deptFilter();
+    if (!dept) return rows;
+    return rows.filter((row) => row.department === dept);
+  });
+
+  const departmentOptions = createMemo(() =>
+    (depts.data ?? [])
+      .filter((d) => d.status === "active")
+      .map((d) => d.department_name)
+      .sort((a, b) => a.localeCompare(b)),
+  );
 
   const fetchDepartments = async (query: string): Promise<LookupOption[]> => {
     const needle = query.trim().toLowerCase();
@@ -537,106 +575,196 @@ export default function HrEmployeesPage() {
 
   return (
     <HrLayout>
-      <div class="hr-pagehead">
-        <div>
-          <h1 class="text-2xl font-semibold">Employees</h1>
-          <p class="mt-1 text-sm text-text-secondary">Employee master records.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
-          onClick={() => void downloadEmployeesImportTemplate().catch(() => toast.error("Could not download template."))}
-        >
-          Download template
-        </button>
-        <label class="cursor-pointer rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel">
-          {importing() ? "Importing…" : "Import CSV"}
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            class="hidden"
-            disabled={importing()}
-            onChange={(e) => {
-              const f = e.currentTarget.files?.[0];
-              e.currentTarget.value = "";
-              if (f) void onImportFile(f);
-            }}
-          />
-        </label>
-        <button
-          type="button"
-          class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
-          onClick={() => setMappedImportOpen(true)}
-        >
-          Import with mapping…
-        </button>
-        <button
-          type="button"
-          class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
-          onClick={() =>
-            void exportEmployeesCsv(q() || undefined).catch(() => toast.error("Export failed."))
-          }
-        >
-          Export CSV
-        </button>
-        </div>
-      </div>
-      <SpreadsheetGrid
-        columns={[
-          { key: "employee_no", header: "Employee #", clickable: true },
-          { key: "full_name", header: "Name" },
-          { key: "department", header: "Department" },
-          { key: "job_title", header: "Job title" },
-          { key: "status", header: "Status" },
-          {
-            key: "base_salary",
-            header: "Base salary",
-            render: (r) => <span>{formatAmount(r.base_salary)}</span>,
-          },
-          {
-            key: "history",
-            header: "History",
-            sortable: false,
-            render: (r) => (
-              <ActivityHistoryLink
-                module="hr"
-                targetType="hr_employee"
-                targetId={r.id}
-                title={`History — ${r.employee_no || r.full_name}`}
-              />
-            ),
-          },
-        ]}
-        rows={list.data?.rows ?? []}
-        loading={list.isFetching}
-        selectedId={selectedId()}
-        onSelect={setSelectedId}
-        selectable
-        selectedIds={lifecycle.selectedIds()}
-        onSelectionChange={lifecycle.onSelectionChange}
-        onEdit={openEdit}
-        onNew={openNew}
-        codeKey="employee_no"
-        nameKey="full_name"
-        sortKey={sort()}
-        sortOrder={order()}
-        onSort={toggleSort}
-        page={page()}
-        pageSize={pageSize()} onPageSizeChange={setPageSize}
-        total={list.data?.total ?? 0}
-        onPageChange={setPage}
-        search={q()}
-        onSearchChange={setQ}
-        searchPlaceholder="Search employees…"
-        settingsHref={HR_SETTINGS_HREF.employee}
-        toolbarExtra={
-          <div class="flex flex-wrap items-end gap-2">
-            <lifecycle.BulkToolbar />
-            <lifecycle.FilterControl />
+      <HrPageHead
+        crumb={<>HR &amp; Payroll › People › Employees</>}
+        title="Employees"
+        subtitle="Employee master records."
+        actions={
+          <div class="hr-actions">
+            <details class="hr-menu">
+              <summary class="hr-btn">Import ▾</summary>
+              <div>
+                <button
+                  type="button"
+                  class="menu-item"
+                  onClick={() => void downloadEmployeesImportTemplate().catch(() => toast.error("Could not download template."))}
+                >
+                  Download template
+                </button>
+                <label class="menu-item cursor-pointer">
+                  {importing() ? "Importing…" : "Import CSV"}
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    class="hidden"
+                    disabled={importing()}
+                    onChange={(e) => {
+                      const f = e.currentTarget.files?.[0];
+                      e.currentTarget.value = "";
+                      if (f) void onImportFile(f);
+                    }}
+                  />
+                </label>
+                <button type="button" class="menu-item" onClick={() => setMappedImportOpen(true)}>
+                  Import with mapping…
+                </button>
+              </div>
+            </details>
+            <button
+              type="button"
+              class="hr-btn"
+              onClick={() => void exportEmployeesCsv(q() || undefined).catch(() => toast.error("Export failed."))}
+            >
+              Export
+            </button>
+            <Show when={canWriteEmployees()}>
+              <button type="button" class="hr-btn hr-btn-primary" onClick={openNew}>+ New employee</button>
+            </Show>
           </div>
         }
       />
+
+      <div class="hr-tcard-grid">
+        <SpreadsheetGrid
+          columns={[
+            { key: "employee_no", header: "Employee #", clickable: true },
+            {
+              key: "full_name",
+              header: "Name",
+              render: (r) => (
+                <div class="hr-who">
+                  <div class="hr-avatar" aria-hidden="true">{employeeInitials(r.full_name)}</div>
+                  <b>{r.full_name}</b>
+                </div>
+              ),
+              exportValue: (r) => r.full_name,
+            },
+            { key: "department", header: "Department" },
+            { key: "job_title", header: "Job title" },
+            {
+              key: "status",
+              header: "Status",
+              render: (r) => <HrBadge tone={employeeStatusTone(r.status)}>{labelizeStatus(r.status)}</HrBadge>,
+              exportValue: (r) => r.status,
+            },
+            {
+              key: "base_salary",
+              header: "Base salary (₱)",
+              render: (r) => (
+                <span class="num tabular-nums">
+                  <Show when={showAmounts()} fallback={<span class="hr-masked">••••••</span>}>
+                    {formatAmount(r.base_salary)}
+                  </Show>
+                </span>
+              ),
+              exportValue: (r) => r.base_salary,
+            },
+            {
+              key: "history",
+              header: "History",
+              sortable: false,
+              render: (r) => (
+                <ActivityHistoryLink
+                  module="hr"
+                  targetType="hr_employee"
+                  targetId={r.id}
+                  title={`Basic-pay history · ${r.full_name}`}
+                />
+              ),
+            },
+          ]}
+          rows={visibleRows()}
+          loading={list.isFetching}
+          selectedId={selectedId()}
+          onSelect={setSelectedId}
+          selectable
+          selectedIds={lifecycle.selectedIds()}
+          onSelectionChange={lifecycle.onSelectionChange}
+          onEdit={openEdit}
+          onNew={openNew}
+          showNew={false}
+          hideExport
+          newLabel="+ New employee"
+          codeKey="employee_no"
+          nameKey="full_name"
+          sortKey={sort()}
+          sortOrder={order()}
+          onSort={toggleSort}
+          page={page()}
+          pageSize={pageSize()}
+          onPageSizeChange={setPageSize}
+          total={list.data?.total ?? 0}
+          onPageChange={setPage}
+          search={q()}
+          onSearchChange={setQ}
+          searchPlaceholder="Search name, employee #, department…"
+          status={statusFilter()}
+          onStatusChange={(value) => {
+            setStatusFilter(value);
+            setPage(1);
+          }}
+          statusLabel="Status"
+          statusOptions={[
+            { value: "", label: "Status: All" },
+            { value: "active", label: "Active" },
+            { value: "terminated", label: "Terminated" },
+            { value: "inactive", label: "Inactive" },
+          ]}
+          settingsHref={HR_SETTINGS_HREF.employee}
+          toolbarExtra={
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs text-text-secondary">Show</span>
+              <div class="hr-seg" role="group" aria-label="Records">
+                <button
+                  type="button"
+                  classList={{ on: lifecycle.filter() === "active" }}
+                  onClick={() => { lifecycle.setFilter("active"); setPage(1); }}
+                >
+                  Active
+                </button>
+                <button
+                  type="button"
+                  classList={{ on: lifecycle.filter() === "deleted" }}
+                  onClick={() => { lifecycle.setFilter("deleted"); setPage(1); }}
+                >
+                  Deleted
+                </button>
+                <button
+                  type="button"
+                  classList={{ on: lifecycle.filter() === "all" }}
+                  onClick={() => { lifecycle.setFilter("all"); setPage(1); }}
+                >
+                  All
+                </button>
+              </div>
+              <select
+                class="rounded-lg border border-stroke bg-surface px-2 text-sm"
+                aria-label="Department"
+                value={deptFilter()}
+                onChange={(e) => setDeptFilter(e.currentTarget.value)}
+              >
+                <option value="">Department: All</option>
+                <For each={departmentOptions()}>{(name) => <option value={name}>{name}</option>}</For>
+              </select>
+              <button type="button" class="hr-btn hr-btn-sm" onClick={() => setShowAmounts((v) => !v)}>
+                {showAmounts() ? "🙈 Hide amounts" : "👁 Show amounts"}
+              </button>
+            </div>
+          }
+        />
+        <div class="hr-bulkbar" classList={{ "hr-bulkbar-on": lifecycle.selectedIds().size > 0 }}>
+          <b>{lifecycle.selectedIds().size} selected</b>
+          <lifecycle.BulkToolbar />
+          <button
+            type="button"
+            class="hr-btn hr-btn-sm"
+            disabled={lifecycle.selectedIds().size === 0}
+            onClick={() => void exportEmployeesCsv(q() || undefined).catch(() => toast.error("Export failed."))}
+          >
+            Export
+          </button>
+        </div>
+      </div>
       <lifecycle.BulkDialog />
       <EntityModal
         open={modalOpen()}
@@ -713,6 +841,14 @@ export default function HrEmployeesPage() {
           <Field label="Full name *">
             <input class={inputClass} value={fullName()} onInput={(e) => setFullName(e.currentTarget.value)} />
           </Field>
+          <Show when={!selected()}>
+            <div class="col-span-full rounded-lg border border-stroke bg-panel p-3">
+              <b>Assignment</b> <HrPlanned />
+              <p class="mt-1 text-xs text-text-secondary">
+                Client, worksite, start date and pay handler are available on the Assignment tab after the employee is saved.
+              </p>
+            </div>
+          </Show>
           <LookupCombo
             label="Department"
             value={department}

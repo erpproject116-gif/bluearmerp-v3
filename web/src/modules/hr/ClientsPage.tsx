@@ -1,11 +1,13 @@
-import { createResource, createSignal, For, Show } from "solid-js";
+import { A } from "@solidjs/router";
+import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { LookupCombo } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
+import { ClientsDeploymentTabs } from "./ClientsDeploymentTabs";
 import { HrLayout } from "./HrLayout";
-import { HrEmpty, HrPageHead, HrTcard } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrTcard } from "./HrUi";
 
 type Person = { employee_id: number; employee_name: string; start_date: string };
 type Site = { id: number; site_name: string; industry_id: number; industry_name: string; people: Person[] };
@@ -13,8 +15,17 @@ type Client = { id: number; name: string; partner_id: number; partner_code: stri
 type Customer = { id: number; partner_code: string; company_name: string };
 type Segment = { id: number; kind: string; name: string };
 
+type InnerTab = "c" | "b" | "i";
+
 export default function ClientsPage() {
   const toast = useToast();
+  const [innerTab, setInnerTab] = createSignal<InnerTab>("c");
+  const [search, setSearch] = createSignal("");
+  const [industryFilter, setIndustryFilter] = createSignal("");
+  const [branchSearch, setBranchSearch] = createSignal("");
+  const [modalOpen, setModalOpen] = createSignal(false);
+  const [siteModalOpen, setSiteModalOpen] = createSignal(false);
+
   const [source, setSource] = createSignal<"existing" | "new">("existing");
   const [partnerId, setPartnerId] = createSignal("");
   const [name, setName] = createSignal("");
@@ -34,6 +45,54 @@ export default function ClientsPage() {
   const [customers] = createResource(async () => (await apiFetch<Customer[]>("/api/v1/hr/sales-customers")).data ?? []);
   const [segments] = createResource(async () => (await apiFetch<Segment[]>("/api/v1/hr/applicant-segments")).data ?? []);
   const industries = () => (segments() ?? []).filter((row) => row.kind === "industry");
+
+  const clientRows = createMemo(() => {
+    const q = search().trim().toLowerCase();
+    const ind = industryFilter();
+    return (clients() ?? [])
+      .map((client) => {
+        const sites = client.sites ?? [];
+        const industryNames = [...new Set(sites.map((s) => s.industry_name).filter(Boolean))];
+        const deployed = sites.reduce((sum, site) => sum + (site.people ?? []).length, 0);
+        return {
+          ...client,
+          branchCount: sites.length,
+          deployed,
+          industryLabel: industryNames.join(", ") || "—",
+          industryNames,
+          status: deployed > 0 || sites.length > 0 ? "Active" : "Prospect",
+        };
+      })
+      .filter((row) => {
+        if (ind && !row.industryNames.includes(ind)) return false;
+        if (!q) return true;
+        return row.name.toLowerCase().includes(q) || row.partner_name.toLowerCase().includes(q) || row.industryLabel.toLowerCase().includes(q);
+      });
+  });
+
+  const branchRows = createMemo(() => {
+    const q = branchSearch().trim().toLowerCase();
+    const out: { id: string; site_name: string; client_name: string; industry_name: string; deployed: number; people: Person[] }[] = [];
+    for (const client of clients() ?? []) {
+      for (const site of client.sites ?? []) {
+        out.push({
+          id: `${client.id}-${site.id}`,
+          site_name: site.site_name,
+          client_name: client.name,
+          industry_name: site.industry_name || "—",
+          deployed: (site.people ?? []).length,
+          people: site.people ?? [],
+        });
+      }
+    }
+    if (!q) return out;
+    return out.filter(
+      (row) =>
+        row.site_name.toLowerCase().includes(q) ||
+        row.client_name.toLowerCase().includes(q) ||
+        row.industry_name.toLowerCase().includes(q),
+    );
+  });
 
   const payloadPerson = (id: number | null, start: string) => (id ? { employee_id: id, start_date: start } : {});
 
@@ -56,7 +115,9 @@ export default function ClientsPage() {
     setName("");
     setEmpId(null);
     setEmpLabel("");
+    setModalOpen(false);
     void refetch();
+    toast.success("Client saved.");
   };
 
   const addSiteToClient = async () => {
@@ -73,106 +134,377 @@ export default function ClientsPage() {
     setAddSite("");
     setAddEmpId(null);
     setAddEmpLabel("");
+    setSiteModalOpen(false);
     void refetch();
+    toast.success("Site saved.");
+  };
+
+  const openAddSite = (clientId?: number) => {
+    setAddClientId(clientId ? String(clientId) : "");
+    setAddSite("");
+    setAddIndustry("");
+    setAddEmpId(null);
+    setAddEmpLabel("");
+    setAddStart("");
+    setSiteModalOpen(true);
   };
 
   return (
     <HrLayout>
-      <HrPageHead title="Clients & sites" subtitle="Client companies, their sites, and the industry of each site." />
-      <HrTcard class="mb-4">
-        <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead>
-            <tr class="border-b border-stroke text-left text-text-secondary"><th class="px-3 py-2">Client</th><th class="px-3 py-2">Sales customer</th><th class="px-3 py-2">Sites</th><th class="px-3 py-2">People on sites</th></tr>
-          </thead>
-          <tbody>
-            <For each={clients() ?? []} fallback={<tr><td colSpan={4}><HrEmpty title="No clients yet" /></td></tr>}>
-              {(client) => (
+      <div class="hr-crumb">HR &amp; Payroll › Clients &amp; deployment › Clients › Clients &amp; sites</div>
+      <ClientsDeploymentTabs />
+
+      <HrPageHead
+        title={
+          <>
+            Clients &amp; sites <HrPlanned />
+          </>
+        }
+        subtitle="Client companies, their branches/worksites and industries."
+        actions={
+          <div class="hr-actions">
+            <button type="button" class="hr-btn" onClick={() => openAddSite()}>
+              + Add site
+            </button>
+            <button type="button" class="hr-btn hr-btn-primary" onClick={() => setModalOpen(true)}>
+              + New client
+            </button>
+          </div>
+        }
+      />
+
+      <HrNotice>
+        🧩 <b>Planned page</b> inside HR &amp; Payroll. Live today: clients linked to sales customers, sites, industries, and people on sites.
+        Contract end dates, prospect status, branch manager and address fields need more backend.
+      </HrNotice>
+
+      <div class="hr-tabs" role="tablist" aria-label="Clients sections">
+        <button type="button" role="tab" classList={{ on: innerTab() === "c" }} aria-selected={innerTab() === "c"} onClick={() => setInnerTab("c")}>
+          Clients
+        </button>
+        <button type="button" role="tab" classList={{ on: innerTab() === "b" }} aria-selected={innerTab() === "b"} onClick={() => setInnerTab("b")}>
+          Branches / sites
+        </button>
+        <button type="button" role="tab" classList={{ on: innerTab() === "i" }} aria-selected={innerTab() === "i"} onClick={() => setInnerTab("i")}>
+          Industries
+        </button>
+      </div>
+
+      <Show when={innerTab() === "c"}>
+        <HrTcard
+          toolbar={
+            <>
+              <input
+                class="grow rounded-lg border border-stroke bg-surface px-3 py-2 text-sm"
+                placeholder="Search client…"
+                aria-label="Search"
+                value={search()}
+                onInput={(e) => setSearch(e.currentTarget.value)}
+              />
+              <select
+                class="rounded-lg border border-stroke bg-surface px-2 text-sm"
+                aria-label="Industry"
+                value={industryFilter()}
+                onChange={(e) => setIndustryFilter(e.currentTarget.value)}
+              >
+                <option value="">Industry: All</option>
+                <For each={industries()}>{(row) => <option value={row.name}>{row.name}</option>}</For>
+              </select>
+              <div class="hr-seg" role="group" aria-label="Status">
+                <button type="button" class="on">
+                  All
+                </button>
+                <button type="button" disabled title="Needs backend status field">
+                  Active <HrPlanned />
+                </button>
+                <button type="button" disabled title="Needs backend status field">
+                  Prospect <HrPlanned />
+                </button>
+              </div>
+            </>
+          }
+        >
+          <div class="hr-tbl-wrap">
+            <table class="hr-tbl">
+              <thead>
                 <tr>
-                  <td>{client.name}</td>
-                  <td>{client.partner_name}</td>
-                  <td>{(client.sites ?? []).map((site) => site.site_name).join(", ") || "—"}</td>
-                  <td class="tabular-nums">{(client.sites ?? []).reduce((sum, site) => sum + (site.people ?? []).length, 0)}</td>
+                  <th>Client</th>
+                  <th>Industry</th>
+                  <th class="num">Branches</th>
+                  <th class="num">Deployed</th>
+                  <th>Status</th>
+                  <th>
+                    Contract ends <HrPlanned />
+                  </th>
+                  <th aria-label="Actions" />
                 </tr>
-              )}
+              </thead>
+              <tbody>
+                <For
+                  each={clientRows()}
+                  fallback={
+                    <tr>
+                      <td colspan="7">
+                        <HrEmpty title="No matches" hint="Try a different search or clear the filters." />
+                      </td>
+                    </tr>
+                  }
+                >
+                  {(row) => (
+                    <tr>
+                      <td>
+                        <div class="font-semibold">{row.name}</div>
+                        <div class="hr-muted">{row.partner_name}</div>
+                      </td>
+                      <td>{row.industryLabel}</td>
+                      <td class="num">{row.branchCount}</td>
+                      <td class="num">{row.deployed}</td>
+                      <td>
+                        <HrBadge tone={row.status === "Active" ? "success" : "neutral"}>{row.status}</HrBadge>
+                      </td>
+                      <td class="hr-muted">—</td>
+                      <td>
+                        <details class="hr-menu hr-rowmenu">
+                          <summary class="hr-rowmenu-btn" aria-label="Row actions">
+                            ⋯
+                          </summary>
+                          <div>
+                            <button type="button" class="menu-item" onClick={() => setInnerTab("b")}>
+                              Open sites
+                            </button>
+                            <button type="button" class="menu-item" onClick={() => openAddSite(row.id)}>
+                              Add branch
+                            </button>
+                            <A class="menu-item" href="/app/hr/clients/portal-access">
+                              Client Rep users
+                            </A>
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </HrTcard>
+      </Show>
+
+      <Show when={innerTab() === "b"}>
+        <HrTcard
+          toolbar={
+            <input
+              class="grow rounded-lg border border-stroke bg-surface px-3 py-2 text-sm"
+              placeholder="Search branch…"
+              aria-label="Search"
+              value={branchSearch()}
+              onInput={(e) => setBranchSearch(e.currentTarget.value)}
+            />
+          }
+        >
+          <div class="hr-tbl-wrap">
+            <table class="hr-tbl">
+              <thead>
+                <tr>
+                  <th>Branch</th>
+                  <th>Client</th>
+                  <th>Industry</th>
+                  <th>
+                    Address <HrPlanned />
+                  </th>
+                  <th>
+                    Branch manager <HrPlanned />
+                  </th>
+                  <th class="num">Deployed</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For
+                  each={branchRows()}
+                  fallback={
+                    <tr>
+                      <td colspan="6">
+                        <HrEmpty title="No sites yet" hint="Add a client with a site, or use Add site." />
+                      </td>
+                    </tr>
+                  }
+                >
+                  {(row) => (
+                    <tr>
+                      <td class="font-semibold">{row.site_name}</td>
+                      <td>{row.client_name}</td>
+                      <td>{row.industry_name}</td>
+                      <td class="hr-muted">—</td>
+                      <td class="hr-muted">—</td>
+                      <td class="num">{row.deployed}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </HrTcard>
+      </Show>
+
+      <Show when={innerTab() === "i"}>
+        <div class="rounded-lg border border-stroke bg-surface p-4 text-sm">
+          Industries reuse the existing Applicants “Manage lists → industry” list.
+          <div class="mt-3 flex flex-wrap gap-2">
+            <For each={industries()} fallback={<span class="hr-muted">No industries configured yet.</span>}>
+              {(row) => <HrBadge tone="info">{row.name}</HrBadge>}
             </For>
-          </tbody>
-        </table>
+          </div>
         </div>
-      </HrTcard>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-2">
-        <Field label="Client">
-          <select class={inputClass} value={source()} onChange={(e) => setSource(e.currentTarget.value as "existing" | "new")}>
-            <option value="existing">Existing sales customer</option>
-            <option value="new">New HR client</option>
-          </select>
-        </Field>
-        <Show when={source() === "existing"} fallback={
-          <Field label="Client name"><input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} /></Field>
-        }>
-          <Field label="Sales customer">
-            <select class={inputClass} value={partnerId()} onChange={(e) => setPartnerId(e.currentTarget.value)}>
-              <option value="">Choose</option>
-              <For each={customers() ?? []}>{(row) => <option value={row.id}>{row.company_name} ({row.partner_code})</option>}</For>
-            </select>
-          </Field>
-        </Show>
-        <Field label="Site name"><input class={inputClass} value={siteName()} onInput={(e) => setSiteName(e.currentTarget.value)} /></Field>
-        <Field label="Industry">
-          <select class={inputClass} value={industryId()} onChange={(e) => setIndustryId(e.currentTarget.value)}>
-            <option value="">Choose</option>
-            <For each={industries()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
-          </select>
-        </Field>
-        <LookupCombo label="Hired employee" value={empLabel} selectedId={empId} onInput={setEmpLabel} onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }} onClear={() => { setEmpId(null); setEmpLabel(""); }} fetchOptions={(q) => fetchEmployeeOptions(q)} placeholder="Optional" />
-        <Field label="Start date"><input type="date" class={inputClass} value={startDate()} onInput={(e) => setStartDate(e.currentTarget.value)} /></Field>
-        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white md:col-span-2" onClick={() => void createClient()}>Save client</button>
-      </div>
+      </Show>
 
-      <div class="mb-6 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-2">
-        <Field label="Add a site to">
-          <select class={inputClass} value={addClientId()} onChange={(e) => setAddClientId(e.currentTarget.value)}>
-            <option value="">Choose</option>
-            <For each={clients() ?? []}>{(row) => <option value={row.id}>{row.name}</option>}</For>
-          </select>
-        </Field>
-        <Field label="Site name"><input class={inputClass} value={addSite()} onInput={(e) => setAddSite(e.currentTarget.value)} /></Field>
-        <Field label="Industry">
-          <select class={inputClass} value={addIndustry()} onChange={(e) => setAddIndustry(e.currentTarget.value)}>
-            <option value="">Choose</option>
-            <For each={industries()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
-          </select>
-        </Field>
-        <LookupCombo label="Hired employee" value={addEmpLabel} selectedId={addEmpId} onInput={setAddEmpLabel} onSelect={(o) => { setAddEmpId(o.id); setAddEmpLabel(o.label); }} onClear={() => { setAddEmpId(null); setAddEmpLabel(""); }} fetchOptions={(q) => fetchEmployeeOptions(q)} placeholder="Optional" />
-        <Field label="Start date"><input type="date" class={inputClass} value={addStart()} onInput={(e) => setAddStart(e.currentTarget.value)} /></Field>
-        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void addSiteToClient()}>Save site</button>
-      </div>
+      <Show when={modalOpen()}>
+        <div
+          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="New client"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setModalOpen(false);
+          }}
+        >
+          <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">New client</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setModalOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <Field label="Client source">
+                <select class={inputClass} value={source()} onChange={(e) => setSource(e.currentTarget.value as "existing" | "new")}>
+                  <option value="existing">Existing sales customer</option>
+                  <option value="new">New HR client</option>
+                </select>
+              </Field>
+              <Show
+                when={source() === "existing"}
+                fallback={
+                  <Field label="Client name">
+                    <input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} />
+                  </Field>
+                }
+              >
+                <Field label="Sales customer">
+                  <select class={inputClass} value={partnerId()} onChange={(e) => setPartnerId(e.currentTarget.value)}>
+                    <option value="">Choose</option>
+                    <For each={customers() ?? []}>{(row) => <option value={row.id}>{row.company_name} ({row.partner_code})</option>}</For>
+                  </select>
+                </Field>
+              </Show>
+              <Field label="Site name">
+                <input class={inputClass} value={siteName()} onInput={(e) => setSiteName(e.currentTarget.value)} />
+              </Field>
+              <Field label="Industry">
+                <select class={inputClass} value={industryId()} onChange={(e) => setIndustryId(e.currentTarget.value)}>
+                  <option value="">Choose</option>
+                  <For each={industries()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
+                </select>
+              </Field>
+              <LookupCombo
+                label="Hired employee (optional)"
+                value={empLabel}
+                selectedId={empId}
+                onInput={setEmpLabel}
+                onSelect={(o) => {
+                  setEmpId(o.id);
+                  setEmpLabel(o.label);
+                }}
+                onClear={() => {
+                  setEmpId(null);
+                  setEmpLabel("");
+                }}
+                fetchOptions={(q) => fetchEmployeeOptions(q)}
+                placeholder="Optional"
+              />
+              <Field label="Start date">
+                <input type="date" class={inputClass} value={startDate()} onInput={(e) => setStartDate(e.currentTarget.value)} />
+              </Field>
+              <div class="sm:col-span-2 rounded-lg border border-dashed border-stroke bg-panel p-3 text-sm">
+                <b>TIN / billing contact / address</b> <HrPlanned />
+                <p class="hr-muted mt-1">Not stored on the live clients API yet.</p>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" onClick={() => void createClient()}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
 
-      <Show when={!clients.loading} fallback={<p class="text-sm text-text-secondary">Loading clients…</p>}>
-        <div class="grid gap-3">
-          <For each={clients() ?? []} fallback={<p class="text-sm text-text-secondary">No clients yet.</p>}>
-            {(client) => (
-              <section class="rounded-xl border border-stroke bg-surface p-4">
-                <h2 class="text-base font-semibold">{client.name}</h2>
-                <p class="mb-3 text-sm text-text-secondary">Sales customer {client.partner_name} ({client.partner_code})</p>
-                <div class="grid gap-3 grid-cols-1 min-[1024px]:grid-cols-2">
-                  <For each={client.sites ?? []}>
-                    {(site) => (
-                      <div class="rounded-lg border border-stroke bg-panel p-3">
-                        <p class="font-medium">{site.site_name}</p>
-                        <p class="text-sm text-text-secondary">{site.industry_name}</p>
-                        <ul class="mt-2 text-sm">
-                          <For each={site.people ?? []} fallback={<li class="text-text-secondary">No hired people on this site.</li>}>
-                            {(person) => <li>{person.employee_name} · {person.start_date}</li>}
-                          </For>
-                        </ul>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </section>
-            )}
-          </For>
+      <Show when={siteModalOpen()}>
+        <div
+          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add site"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setSiteModalOpen(false);
+          }}
+        >
+          <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">Add branch / site</h2>
+              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setSiteModalOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div class="grid gap-3">
+              <Field label="Client">
+                <select class={inputClass} value={addClientId()} onChange={(e) => setAddClientId(e.currentTarget.value)}>
+                  <option value="">Choose</option>
+                  <For each={clients() ?? []}>{(row) => <option value={row.id}>{row.name}</option>}</For>
+                </select>
+              </Field>
+              <Field label="Site name">
+                <input class={inputClass} value={addSite()} onInput={(e) => setAddSite(e.currentTarget.value)} />
+              </Field>
+              <Field label="Industry">
+                <select class={inputClass} value={addIndustry()} onChange={(e) => setAddIndustry(e.currentTarget.value)}>
+                  <option value="">Choose</option>
+                  <For each={industries()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
+                </select>
+              </Field>
+              <LookupCombo
+                label="Hired employee (optional)"
+                value={addEmpLabel}
+                selectedId={addEmpId}
+                onInput={setAddEmpLabel}
+                onSelect={(o) => {
+                  setAddEmpId(o.id);
+                  setAddEmpLabel(o.label);
+                }}
+                onClear={() => {
+                  setAddEmpId(null);
+                  setAddEmpLabel("");
+                }}
+                fetchOptions={(q) => fetchEmployeeOptions(q)}
+                placeholder="Optional"
+              />
+              <Field label="Start date">
+                <input type="date" class={inputClass} value={addStart()} onInput={(e) => setAddStart(e.currentTarget.value)} />
+              </Field>
+            </div>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" class="hr-btn" onClick={() => setSiteModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" class="hr-btn hr-btn-primary" onClick={() => void addSiteToClient()}>
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       </Show>
     </HrLayout>

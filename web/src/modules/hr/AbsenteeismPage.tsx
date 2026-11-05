@@ -4,14 +4,38 @@ import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { HrCasesTabs } from "./HrCasesTabs";
 import { HrLayout } from "./HrLayout";
-import { HrPageHead } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrPlanned, HrTcard } from "./HrUi";
 
 type Alert = {
-  id: number; employee_id: number; employee_no?: string; employee_name?: string;
-  alert_code: string; message: string; occurrence_count: number; discipline_case_id?: number | null;
-  reason?: string; remarks?: string;
+  id: number;
+  employee_id: number;
+  employee_no?: string;
+  employee_name?: string;
+  alert_code: string;
+  message: string;
+  occurrence_count: number;
+  discipline_case_id?: number | null;
+  reason?: string;
+  remarks?: string;
+  status?: string;
+  window_start?: string;
+  window_end?: string;
 };
+
+type ReportRow = {
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  department: string;
+  absent_days: number;
+  awol_days: number;
+  late_days: number;
+  leave_days: number;
+};
+
+type AlertAction = "acknowledge" | "discipline" | "dismiss";
 
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAccessToken();
@@ -24,55 +48,15 @@ async function authHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-function AlertNotes(props: { alert: Alert; onSaved: () => void }) {
-  const toast = useToast();
-  const [reason, setReason] = createSignal(props.alert.reason ?? "");
-  const [remarks, setRemarks] = createSignal(props.alert.remarks ?? "");
-
-  const save = async () => {
-    const res = await apiFetch(`/api/v1/hr/absence-alerts/${props.alert.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ reason: reason(), remarks: remarks() }),
-    });
-    if (!res.success) return toast.warning(res.message ?? "Could not save.");
-    toast.success("Absenteeism notes saved. Pay is unchanged.");
-    props.onSaved();
-  };
-
-  const upload = async (file: File) => {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch(`${apiBase}/api/v1/hr/absence-alerts/${props.alert.id}/files`, {
-      method: "POST",
-      headers: await authHeaders(),
-      body: fd,
-    });
-    if (!res.ok) return toast.warning("File upload failed.");
-    toast.success("File stored on the alert.");
-  };
-
-  return (
-    <div class="mt-2 grid gap-2 sm:grid-cols-2">
-      <Field label="Reason"><input class={inputClass} value={reason()} placeholder="Optional" onInput={(e) => setReason(e.currentTarget.value)} /></Field>
-      <Field label="Remarks"><input class={inputClass} value={remarks()} placeholder="Optional" onInput={(e) => setRemarks(e.currentTarget.value)} /></Field>
-      <Field label="File"><input type="file" class={inputClass} onChange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ""; if (f) void upload(f); }} /></Field>
-      <div class="flex items-end">
-        <button type="button" class="rounded border border-stroke px-3 py-1.5 text-xs" onClick={() => void save()}>Save notes</button>
-      </div>
-    </div>
-  );
-}
-type ReportRow = {
-  employee_id: number; employee_no: string; employee_name: string; department: string;
-  absent_days: number; awol_days: number; late_days: number; leave_days: number;
-};
-
 export default function AbsenteeismPage() {
   const toast = useToast();
   const qc = useQueryClient();
-  const [openId, setOpenId] = createSignal<number | null>(null);
   const [from, setFrom] = createSignal(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
   const [to, setTo] = createSignal(new Date().toISOString().slice(0, 10));
+  const [detail, setDetail] = createSignal<Alert | null>(null);
+  const [action, setAction] = createSignal<AlertAction>("acknowledge");
+  const [remarks, setRemarks] = createSignal("");
+  const [busy, setBusy] = createSignal(false);
 
   const alerts = createQuery(() => ({
     queryKey: ["hr-absence-alerts"],
@@ -87,7 +71,9 @@ export default function AbsenteeismPage() {
   }));
 
   const evaluate = async () => {
+    setBusy(true);
     const res = await apiFetch<{ alerts_created: number }>("/api/v1/hr/absence-alerts/evaluate", { method: "POST", body: "{}" });
+    setBusy(false);
     if (!res.success) return toast.warning(res.message ?? "Failed.");
     toast.success(`Created ${res.data?.alerts_created ?? 0} alert(s).`);
     void qc.invalidateQueries({ queryKey: ["hr-absence-alerts"] });
@@ -97,8 +83,11 @@ export default function AbsenteeismPage() {
     const res = await apiFetch("/api/v1/hr/discipline/cases", {
       method: "POST",
       body: JSON.stringify({
-        employee_id: a.employee_id, case_type: "nte",
-        subject: `Absenteeism: ${a.alert_code}`, details: a.message, absence_alert_id: a.id,
+        employee_id: a.employee_id,
+        case_type: "nte",
+        subject: `Absenteeism: ${a.alert_code}`,
+        details: a.message,
+        absence_alert_id: a.id,
       }),
     });
     if (!res.success) return toast.warning(res.message ?? "Could not open draft.");
@@ -106,64 +95,236 @@ export default function AbsenteeismPage() {
     void qc.invalidateQueries({ queryKey: ["hr-absence-alerts"] });
   };
 
+  const openAlert = (a: Alert) => {
+    setDetail(a);
+    setAction(a.discipline_case_id ? "acknowledge" : "acknowledge");
+    setRemarks(a.remarks ?? "");
+  };
+
+  const saveAlert = async () => {
+    const a = detail();
+    if (!a) return;
+    if (!remarks().trim()) return toast.warning("Remarks are required.");
+    if (action() === "dismiss") {
+      return toast.warning("Dismiss is not available yet.");
+    }
+    setBusy(true);
+    const patched = await apiFetch(`/api/v1/hr/absence-alerts/${a.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ reason: a.reason ?? "", remarks: remarks().trim() }),
+    });
+    if (!patched.success) {
+      setBusy(false);
+      return toast.warning(patched.message ?? "Could not save remarks.");
+    }
+    if (action() === "discipline") {
+      if (a.discipline_case_id) {
+        setBusy(false);
+        toast.success("Remarks saved. Discipline case already linked.");
+        setDetail(null);
+        void qc.invalidateQueries({ queryKey: ["hr-absence-alerts"] });
+        return;
+      }
+      await createDiscipline(a);
+    } else {
+      const ack = await apiFetch(`/api/v1/hr/absence-alerts/${a.id}/acknowledge`, { method: "POST", body: "{}" });
+      if (!ack.success) {
+        setBusy(false);
+        return toast.warning(ack.message ?? "Could not acknowledge.");
+      }
+      toast.success("Alert acknowledged.");
+    }
+    setBusy(false);
+    setDetail(null);
+    void qc.invalidateQueries({ queryKey: ["hr-absence-alerts"] });
+  };
+
+  const upload = async (alertId: number, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`${apiBase}/api/v1/hr/absence-alerts/${alertId}/files`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: fd,
+    });
+    if (!res.ok) return toast.warning("File upload failed.");
+    toast.success("File stored on the alert.");
+  };
+
   return (
     <HrLayout>
-      <HrPageHead title="Absenteeism" subtitle="Checks DTR against your absence rules and creates alerts." />
-      <button type="button" class="mb-4 rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void evaluate()}>
-        Evaluate thresholds
-      </button>
+      <div class="hr-crumb">
+        HR &amp; Payroll › HR cases › Cases › Absenteeism
+      </div>
+      <HrCasesTabs />
+      <HrPageHead
+        title="Absenteeism"
+        subtitle="Alerts from DTR against your absence rules."
+        actions={
+          <button type="button" class="hr-btn" disabled={busy()} onClick={() => void evaluate()}>
+            Evaluate thresholds
+          </button>
+        }
+      />
 
-      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <h2 class="mb-3 text-lg font-medium">Open alerts</h2>
-        <For each={alerts.data ?? []} fallback={<p class="text-sm text-text-secondary">No open alerts.</p>}>
-          {(a) => (
-            <div class="mb-2 border-b border-slate-100 py-2 text-sm">
-              <div class="flex flex-wrap items-start justify-between gap-2">
-              <button type="button" class="text-left" onClick={() => setOpenId(openId() === a.id ? null : a.id)}>
-                <p class="font-medium">{a.employee_no} — {a.employee_name}</p>
-                <p class="text-text-secondary">{a.message}</p>
-              </button>
-              <Show when={!a.discipline_case_id}>
-                <button type="button" class="text-xs text-amber-800" onClick={() => void createDiscipline(a)}>Create discipline draft</button>
-              </Show>
-              </div>
-              <Show when={openId() === a.id}>
-                <AlertNotes alert={a} onSaved={() => void qc.invalidateQueries({ queryKey: ["hr-absence-alerts"] })} />
-              </Show>
-            </div>
-          )}
-        </For>
-      </section>
-
-      <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <h2 class="mb-3 text-lg font-medium">Report</h2>
-        <div class="mb-3 grid gap-3 sm:grid-cols-2">
-          <Field label="From"><input type="date" class={inputClass} value={from()} onInput={(e) => setFrom(e.currentTarget.value)} /></Field>
-          <Field label="To"><input type="date" class={inputClass} value={to()} onInput={(e) => setTo(e.currentTarget.value)} /></Field>
-        </div>
-        <div class="overflow-x-auto">
-        <table class="min-w-full text-left text-sm">
-          <thead><tr class="border-b border-stroke text-text-secondary">
-            <th class="py-2 pr-3">Employee</th><th class="py-2 pr-3">Dept</th><th class="py-2 pr-3">Absent</th>
-            <th class="py-2 pr-3">AWOL</th><th class="py-2 pr-3">Short</th><th class="py-2">Leave</th>
-          </tr></thead>
-          <tbody>
-            <For each={report.data ?? []} fallback={<tr><td colSpan={6} class="py-3 text-text-secondary">No rows.</td></tr>}>
-              {(r) => (
-                <tr class="border-b border-slate-100">
-                  <td class="py-2 pr-3">{r.employee_no} — {r.employee_name}</td>
-                  <td class="py-2 pr-3">{r.department || "—"}</td>
-                  <td class="py-2 pr-3">{r.absent_days}</td>
-                  <td class="py-2 pr-3">{r.awol_days}</td>
-                  <td class="py-2 pr-3">{r.late_days}</td>
-                  <td class="py-2">{r.leave_days}</td>
-                </tr>
+      <div class="grid gap-4 lg:grid-cols-2">
+        <section class="hr-w s12" aria-label="Open alerts">
+          <header>
+            <h3>Open alerts</h3>
+            <span class="grow" />
+            <HrBadge tone={(alerts.data ?? []).length > 0 ? "info" : "neutral"}>{(alerts.data ?? []).length}</HrBadge>
+          </header>
+          <ul class="hr-aq">
+            <For each={alerts.data ?? []} fallback={<li><div class="hr-wempty" style={{ width: "100%" }}>No open alerts.</div></li>}>
+              {(a) => (
+                <li>
+                  <span class="t">
+                    <b>{a.employee_name || a.employee_no}</b>
+                    <span class="xs">
+                      {a.message || a.alert_code}
+                      {a.occurrence_count ? ` · ${a.occurrence_count} occurrence(s)` : ""}
+                    </span>
+                  </span>
+                  <HrBadge tone="info">Open</HrBadge>
+                  <button type="button" class="hr-btn hr-btn-sm" onClick={() => openAlert(a)}>
+                    Open
+                  </button>
+                  <Show when={!a.discipline_case_id}>
+                    <button type="button" class="hr-btn hr-btn-sm" disabled={busy()} onClick={() => void createDiscipline(a)}>
+                      Create discipline draft
+                    </button>
+                  </Show>
+                </li>
               )}
             </For>
-          </tbody>
-        </table>
-        </div>
-      </section>
+          </ul>
+          <p class="hr-muted mt-2 px-1 pb-2">
+            Create a workplace problem from an alert <HrPlanned />
+          </p>
+        </section>
+
+        <HrTcard>
+          <div class="p-3">
+            <h3 class="mb-3 text-sm font-semibold">Period report</h3>
+            <div class="mb-3 grid gap-3 sm:grid-cols-2">
+              <Field label="From">
+                <input type="date" class={inputClass} value={from()} onInput={(e) => setFrom(e.currentTarget.value)} />
+              </Field>
+              <Field label="To">
+                <input type="date" class={inputClass} value={to()} onInput={(e) => setTo(e.currentTarget.value)} />
+              </Field>
+            </div>
+            <div class="hr-tbl-wrap">
+              <table class="hr-tbl">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Dept</th>
+                    <th class="num">Absent</th>
+                    <th class="num">AWOL</th>
+                    <th class="num">Short</th>
+                    <th class="num">Leave</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For
+                    each={report.data ?? []}
+                    fallback={
+                      <tr>
+                        <td colspan="6">
+                          <HrEmpty title="No matches" hint="Try a different date range." />
+                        </td>
+                      </tr>
+                    }
+                  >
+                    {(r) => (
+                      <tr>
+                        <td>
+                          <div class="font-semibold">{r.employee_name}</div>
+                          <div class="hr-muted">{r.employee_no}</div>
+                        </td>
+                        <td>{r.department || "—"}</td>
+                        <td class="num">{r.absent_days}</td>
+                        <td class="num">{r.awol_days}</td>
+                        <td class="num">{r.late_days}</td>
+                        <td class="num">{r.leave_days}</td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </HrTcard>
+      </div>
+
+      <Show when={detail()}>
+        {(a) => (
+          <div
+            class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Absence alert · ${a().employee_name ?? ""}`}
+          >
+            <div class="max-h-[90vh] w-full max-w-md overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+              <div class="mb-3 flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold">Absence alert · {a().employee_name}</h2>
+                <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setDetail(null)}>
+                  ✕
+                </button>
+              </div>
+              <ol class="mb-3 space-y-2 text-sm">
+                <li>
+                  <b>{a().message || a().alert_code}</b>
+                  <div class="hr-muted">
+                    Rule: {a().alert_code}
+                    {a().occurrence_count ? ` · ${a().occurrence_count} occurrence(s)` : ""}
+                  </div>
+                  <Show when={a().window_start || a().window_end}>
+                    <div class="hr-muted">
+                      Window: {a().window_start || "—"} → {a().window_end || "—"}
+                    </div>
+                  </Show>
+                </li>
+              </ol>
+              <Field label="Action">
+                <select class={inputClass} value={action()} onChange={(e) => setAction(e.currentTarget.value as AlertAction)}>
+                  <option value="acknowledge">Acknowledge</option>
+                  <option value="discipline">Create discipline case</option>
+                  <option value="dismiss" disabled>
+                    Dismiss (Planned)
+                  </option>
+                </select>
+              </Field>
+              <label class="mt-3 block text-sm">
+                <span class="mb-1 block font-medium">
+                  Remarks <span class="text-red-700">*</span>
+                </span>
+                <textarea class={inputClass} rows={3} value={remarks()} onInput={(e) => setRemarks(e.currentTarget.value)} />
+              </label>
+              <Field label="File">
+                <input
+                  type="file"
+                  class={inputClass}
+                  onChange={(e) => {
+                    const f = e.currentTarget.files?.[0];
+                    e.currentTarget.value = "";
+                    if (f) void upload(a().id, f);
+                  }}
+                />
+              </Field>
+              <div class="mt-4 flex flex-wrap justify-end gap-2">
+                <button type="button" class="hr-btn" onClick={() => setDetail(null)}>
+                  Cancel
+                </button>
+                <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void saveAlert()}>
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Show>
     </HrLayout>
   );
 }

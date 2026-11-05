@@ -17,7 +17,7 @@ export default function PortalLoginPage() {
   const existing = getPortalToken();
   if (existing) {
     void fetchPortalSession(existing).then((res) => {
-      if (res.ok) navigate("/portal/dashboard", { replace: true });
+      if (res.ok) navigate("/app/hr/client-portal", { replace: true });
     });
   }
 
@@ -36,7 +36,7 @@ export default function PortalLoginPage() {
     const token = res.data?.token;
     if (token) {
       setPortalToken(token);
-      navigate("/portal/dashboard", { replace: true });
+      navigate("/app/hr/client-portal", { replace: true });
       return;
     }
     if (url) setLinkUrl(url);

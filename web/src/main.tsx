@@ -19,7 +19,17 @@ const LIGHT_PATHS = new Set([
   "/auth/reset-password",
   "/auth/callback",
   "/portal/login",
+  "/portal/dashboard",
 ]);
+
+function isLightShellPath(path: string) {
+  if (LIGHT_PATHS.has(path)) return true;
+  if (path === "/apply" || path.startsWith("/apply/")) return true;
+  if (path === "/careers" || path.startsWith("/careers/")) return true;
+  if (path === "/app/hr/client-portal" || path.startsWith("/app/hr/client-portal/")) return true;
+  if (path === "/portal/dashboard" || path.startsWith("/portal/dashboard/")) return true;
+  return false;
+}
 
 function consumeResumePath() {
   const resume = sessionStorage.getItem("bluearm:resume-path");
@@ -87,7 +97,7 @@ function hideBootSplashWhenPainted() {
 }
 
 const bootPath = window.location.pathname;
-const lightShell = LIGHT_PATHS.has(bootPath) || bootPath === "/apply" || bootPath.startsWith("/apply/");
+const lightShell = isLightShellPath(bootPath);
 if (!lightShell && bootPath.startsWith("/app")) {
   void import("./shell/AppShell");
   if (bootPath === "/app/production" || bootPath.startsWith("/app/production/")) {

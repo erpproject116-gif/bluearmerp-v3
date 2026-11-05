@@ -352,6 +352,9 @@ import {
   FinanceWorkspacePage,
   PortalLoginPage,
   PortalDashboardPage,
+  ClientPortalApp,
+  CareersBoardPage,
+  ApplyPage,
   ReportsIndexPage,
   SavedViewsPage,
   DashboardPage,
@@ -485,6 +488,11 @@ export default function App() {
         <Route path="/auth/callback" component={AuthCallbackPage} />
         <Route path="/portal/login" component={PortalLoginPage} />
         <Route path="/portal/dashboard" component={PortalDashboardPage} />
+        <Route path="/app/hr/client-portal" component={ClientPortalApp} />
+        <Route path="/app/hr/client-portal/*" component={ClientPortalApp} />
+        <Route path="/apply/:code" component={ApplyPage} />
+        <Route path="/careers/:code" component={CareersBoardPage} />
+        <Route path="/careers/:code/:jobId" component={CareersBoardPage} />
         <Route path="/payslip/:token" component={PayslipSharedPage} />
         <Route path="/articles" component={CmsPublicLayout}>
           <Route path="/" component={CmsArticlesHubPage} />
