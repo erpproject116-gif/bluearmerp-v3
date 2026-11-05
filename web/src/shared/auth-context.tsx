@@ -128,6 +128,13 @@ function elevatedProductOwner(me: MeData | null | undefined): boolean {
   return isProductOwnerEmail(me.user.email);
 }
 
+/** Platform superadmin, tenant owner, or product-owner email — defeated by role preview. */
+export function elevatedTenantAdmin(me: MeData | null | undefined): boolean {
+  if (!me?.user || isRolePreviewActive(me)) return false;
+  const u = me.user;
+  return Boolean(u.is_platform_superadmin || u.is_tenant_owner || isProductOwnerEmail(u.email));
+}
+
 export function canAccessPlatformConsole(me: MeData | null | undefined): boolean {
   if (!me?.user) return false;
   if (isRolePreviewActive(me)) return false;

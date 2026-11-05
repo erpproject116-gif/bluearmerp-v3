@@ -8,7 +8,7 @@ import { isReviewPurchasesPath } from "./review-purchases-nav";
 import { isTaxMngtPath } from "./tax-mngt-nav";
 import { isTenantModuleEnabled } from "../shared/moduleAccess";
 import { useManpowerMode } from "../modules/hr/manpowerMode";
-import { useAuth, type MeData } from "../shared/auth-context";
+import { elevatedTenantAdmin, useAuth, type MeData } from "../shared/auth-context";
 import {
   writeStoredEcountTop,
   HOME_SIDEBAR_AREAS,
@@ -254,7 +254,9 @@ export function SidebarNav() {
   const manpower = useManpowerMode();
   const childrenOf = (area: HomeSidebarArea) => {
     const kids = (area.children ?? []).filter((c) => areaVisible(c, auth.me));
-    if (area.id !== "hr" || manpower.loading() || manpower.enabled()) return kids;
+    if (area.id !== "hr" || manpower.loading() || manpower.enabled() || elevatedTenantAdmin(auth.me)) {
+      return kids;
+    }
     return kids.filter((c) => c.id !== "hr_clients" && c.id !== "hr_deployments");
   };
 

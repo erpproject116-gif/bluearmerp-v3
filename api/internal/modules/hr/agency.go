@@ -46,6 +46,7 @@ func registerAgencyRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(write).Post("/client-bills", createClientBill(pool))
 	r.Get("/portal-access", listClientPortalAccess(pool))
 	r.With(write).Post("/clients/{id}/portal-users", createClientPortalUser(pool))
+	r.With(write).Post("/clients/{id}/portal-preview", previewClientPortal(pool))
 	r.Get("/clearances", listClearances(pool))
 	r.With(write).Post("/clearances", createClearance(pool))
 	r.With(write).Post("/clearances/{id}/release", releaseClearance(pool))
@@ -589,6 +590,70 @@ func createClientPortalUser(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, map[string]any{"id": id, "login_url": loginURL}, "Created.")
+	}
+}
+
+// previewClientPortal issues a short-lived magic link so staff can open the client portal.
+// Reuses an active portal user for the client when present; otherwise creates a staff-preview user.
+func previewClientPortal(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		clientID, err := parseID(chi.URLParam(r, "id"))
+		if err != nil {
+			response.Err(w, http.StatusBadRequest, "Client not found.", "ERR_BAD_REQUEST")
+			return
+		}
+		var partnerID int64
+		var clientName string
+		err = pool.QueryRow(r.Context(), `
+			select partner_id, name from public.hr_clients where id = $1 and tenant_id = $2`,
+			clientID, tu.TenantID).Scan(&partnerID, &clientName)
+		if errors.Is(err, pgx.ErrNoRows) {
+			response.Err(w, http.StatusNotFound, "Client not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to open portal preview.", "ERR_INTERNAL")
+			return
+		}
+
+		var portalUserID int64
+		err = pool.QueryRow(r.Context(), `
+			select id from public.portal_users
+			where tenant_id = $1 and partner_id = $2 and is_active = true
+			order by id asc
+			limit 1`, tu.TenantID, partnerID).Scan(&portalUserID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			previewEmail := "staff-preview+client" + strconv.FormatInt(clientID, 10) + "@bluearm.internal"
+			display := "Staff preview — " + strings.TrimSpace(clientName)
+			err = pool.QueryRow(r.Context(), `
+				insert into public.portal_users (tenant_id, partner_id, email, display_name)
+				values ($1,$2,$3,$4)
+				on conflict (tenant_id, email) do update
+				  set partner_id = excluded.partner_id,
+				      display_name = excluded.display_name,
+				      is_active = true
+				returning id`,
+				tu.TenantID, partnerID, previewEmail, display).Scan(&portalUserID)
+			if err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to create portal preview user.", "ERR_INTERNAL")
+				return
+			}
+		} else if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to open portal preview.", "ERR_INTERNAL")
+			return
+		}
+
+		loginURL, err := insertPortalMagicLink(r.Context(), pool, portalUserID, time.Now().Add(2*time.Hour))
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create the portal sign-in link.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"login_url": loginURL, "portal_user_id": portalUserID}, "OK")
 	}
 }
 

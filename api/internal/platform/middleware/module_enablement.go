@@ -145,6 +145,12 @@ func ModuleEnablement(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				return
 			}
 
+			// Owners / product owners may mutate HR even when the tenant HR toggle is off.
+			if rule.moduleCode == "hr" && tu.HasOwnerCapability() {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			enabled, err := moduleRuleEnabled(r.Context(), pool, tu.TenantID, rule)
 			if err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to check module access.", "ERR_INTERNAL")

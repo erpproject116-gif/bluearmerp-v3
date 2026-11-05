@@ -1,9 +1,19 @@
 import type { MeData } from "./auth-context";
-import { canManageUsers, canViewActivityLogs, canViewCrm, hasModuleAccess } from "./auth-context";
+import {
+  canManageUsers,
+  canViewActivityLogs,
+  canViewCrm,
+  elevatedTenantAdmin,
+  hasModuleAccess,
+} from "./auth-context";
 
 export function isTenantModuleEnabled(me: MeData | null | undefined, moduleId: string): boolean {
   // Product kill-switch: keep routes/code but hide from nav and ModuleAccessGate.
   if (moduleId === "data_center") return false;
+  // Owners / product owners always reach HR & Payroll even when the tenant toggle is off.
+  if (moduleId === "hr" && elevatedTenantAdmin(me)) {
+    return hasModuleAccess(me, "hr");
+  }
   if (moduleId === "documentation") return true;
   // Reports is a catalog shell, not a tenant-toggle module. Individual report pages
   // still enforce their own module/feature/permission gates.

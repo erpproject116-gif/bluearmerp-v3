@@ -85,6 +85,11 @@ func (tu TenantUser) hasOwnerCapability() bool {
 	return tu.IsPlatformSuperadmin || tu.IsTenantOwner || isBootstrapSuperadminEmail(tu.Email)
 }
 
+// HasOwnerCapability is the exported form for middleware outside this package.
+func (tu TenantUser) HasOwnerCapability() bool {
+	return tu.hasOwnerCapability()
+}
+
 // tryAutoLinkProvisionedUser links a Supabase auth user to at most ONE pre-provisioned
 // customer user row for its email (one email → one customer business).
 // Grandfather: if this auth already has an active membership, additional invites are not linked.

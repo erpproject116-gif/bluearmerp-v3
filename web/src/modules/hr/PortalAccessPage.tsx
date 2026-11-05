@@ -1,14 +1,24 @@
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { elevatedTenantAdmin, useAuth } from "../../shared/auth-context";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrPageHead } from "./HrUi";
 
 type Client = { id: number; name: string };
-type Access = { id: number; client_name: string; email: string; display_name: string; is_active: boolean; login_url: string };
+type Access = {
+  id: number;
+  client_id: number;
+  client_name: string;
+  email: string;
+  display_name: string;
+  is_active: boolean;
+  login_url: string;
+};
 
 export default function PortalAccessPage() {
+  const auth = useAuth();
   const toast = useToast();
   const [clientId, setClientId] = createSignal("");
   const [email, setEmail] = createSignal("");
@@ -17,8 +27,11 @@ export default function PortalAccessPage() {
   const [search, setSearch] = createSignal("");
   const [activeFilter, setActiveFilter] = createSignal<"" | "active" | "inactive">("");
   const [modalOpen, setModalOpen] = createSignal(false);
+  const [previewBusy, setPreviewBusy] = createSignal(false);
   const [clients] = createResource(async () => (await apiFetch<Client[]>("/api/v1/hr/clients")).data ?? []);
   const [rows, { refetch }] = createResource(async () => (await apiFetch<Access[]>("/api/v1/hr/portal-access")).data ?? []);
+
+  const canPreview = () => elevatedTenantAdmin(auth.me);
 
   const filtered = createMemo(() => {
     const q = search().trim().toLowerCase();
@@ -34,6 +47,25 @@ export default function PortalAccessPage() {
       );
     });
   });
+
+  const openPortalPreview = async (forClientId: number) => {
+    if (!forClientId || previewBusy()) return;
+    setPreviewBusy(true);
+    try {
+      const res = await apiFetch<{ login_url: string }>(`/api/v1/hr/clients/${forClientId}/portal-preview`, {
+        method: "POST",
+        body: "{}",
+      });
+      if (!res.success || !res.data?.login_url) {
+        toast.warning(res.message ?? "Could not open portal preview.");
+        return;
+      }
+      window.open(res.data.login_url, "_blank", "noopener,noreferrer");
+      void refetch();
+    } finally {
+      setPreviewBusy(false);
+    }
+  };
 
   const save = async () => {
     if (!clientId() || !email().trim()) return toast.warning("Choose a client and enter an email.");
@@ -59,9 +91,33 @@ export default function PortalAccessPage() {
         }
         subtitle="This login opens the customer portal. It does not open HR pages, and it does not show pay."
         actions={
-          <button type="button" class="hr-btn hr-btn-primary" onClick={() => setModalOpen(true)}>
-            + Invite client user
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <Show when={canPreview()}>
+              <button
+                type="button"
+                class="hr-btn"
+                disabled={previewBusy()}
+                onClick={() => {
+                  const row = (rows() ?? []).find((r) => r.id === selected());
+                  if (row?.client_id) {
+                    void openPortalPreview(row.client_id);
+                    return;
+                  }
+                  const first = clients()?.[0];
+                  if (first?.id) {
+                    void openPortalPreview(first.id);
+                    return;
+                  }
+                  toast.warning("Add a client first, or select a portal user row.");
+                }}
+              >
+                {previewBusy() ? "Opening…" : "Preview portal"}
+              </button>
+            </Show>
+            <button type="button" class="hr-btn hr-btn-primary" onClick={() => setModalOpen(true)}>
+              + Invite client user
+            </button>
+          </div>
         }
       />
 
@@ -112,6 +168,16 @@ export default function PortalAccessPage() {
                   ⋯
                 </summary>
                 <div>
+                  <Show when={canPreview()}>
+                    <button
+                      type="button"
+                      class="menu-item"
+                      disabled={previewBusy()}
+                      onClick={() => void openPortalPreview(row.client_id)}
+                    >
+                      Preview portal
+                    </button>
+                  </Show>
                   <Show when={row.login_url}>
                     <a class="menu-item" href={row.login_url}>
                       Open portal
@@ -204,6 +270,16 @@ export default function PortalAccessPage() {
               <button type="button" class="hr-btn" onClick={() => setModalOpen(false)}>
                 Cancel
               </button>
+              <Show when={canPreview()}>
+                <button
+                  type="button"
+                  class="hr-btn"
+                  disabled={previewBusy() || !clientId()}
+                  onClick={() => void openPortalPreview(Number(clientId()))}
+                >
+                  Preview portal
+                </button>
+              </Show>
               <button type="button" class="hr-btn hr-btn-primary" onClick={() => void save()}>
                 Save
               </button>

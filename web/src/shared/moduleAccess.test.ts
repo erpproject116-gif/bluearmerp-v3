@@ -19,6 +19,7 @@ function me(partial: Partial<MeData> & { enabled_module_codes?: string[]; module
     },
     enabled_module_codes: partial.enabled_module_codes ?? [],
     modules: partial.modules,
+    role_preview: partial.role_preview,
   } as MeData;
 }
 
@@ -58,6 +59,43 @@ describe("isTenantModuleEnabled", () => {
   it("falls back to permissions when modules registry is absent and codes empty", () => {
     const m = me({ enabled_module_codes: [], modules: undefined });
     expect(isTenantModuleEnabled(m, "documentation")).toBe(true);
+  });
+
+  it("lets elevated tenant admins use HR when hr is not in enabled_module_codes", () => {
+    const owner = me({
+      enabled_module_codes: [],
+      modules: [{ module_code: "hr", module_name: "HR", is_enabled: false }],
+      user: { id: 1, email: "owner@co.com", full_name: "Owner", is_tenant_owner: true },
+    });
+    expect(isTenantModuleEnabled(owner, "hr")).toBe(true);
+    expect(isTenantModuleEnabled(owner, "sales")).toBe(false);
+
+    const productOwner = me({
+      enabled_module_codes: ["sales"],
+      modules: [
+        { module_code: "hr", module_name: "HR", is_enabled: false },
+        { module_code: "sales", module_name: "Sales", is_enabled: true },
+      ],
+      user: { id: 2, email: "itsjohnranel@gmail.com", full_name: "PO" },
+    });
+    expect(isTenantModuleEnabled(productOwner, "hr")).toBe(true);
+
+    const staff = me({
+      enabled_module_codes: [],
+      modules: [{ module_code: "hr", module_name: "HR", is_enabled: false }],
+      user: { id: 3, email: "staff@co.com", full_name: "Staff" },
+    });
+    expect(isTenantModuleEnabled(staff, "hr")).toBe(false);
+  });
+
+  it("defeats elevated HR bypass during role preview", () => {
+    const m = me({
+      enabled_module_codes: [],
+      modules: [{ module_code: "hr", module_name: "HR", is_enabled: false }],
+      user: { id: 1, email: "itsjohnranel@gmail.com", full_name: "PO", is_platform_superadmin: true },
+      role_preview: { active: true, role_code: "hr_clerk" },
+    });
+    expect(isTenantModuleEnabled(m, "hr")).toBe(false);
   });
 });
 
