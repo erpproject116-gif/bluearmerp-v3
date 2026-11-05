@@ -4,6 +4,18 @@ import { createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { useManpowerMode } from "./manpowerMode";
+
+type Site = { site_name: string; people: { employee_name: string }[] };
+type Client = { id: number; name: string; sites: Site[] };
+type Assignment = {
+  id: number;
+  employee_name: string;
+  client_name: string;
+  site_name: string;
+  start_date: string;
+  end_date: string;
+};
 
 type Overview = {
   active_employees: number;
@@ -46,6 +58,17 @@ const queueCards = [
 export default function HrOverviewPage() {
   const toast = useToast();
   const qc = useQueryClient();
+  const mode = useManpowerMode();
+  const clients = createQuery(() => ({
+    queryKey: ["hr-overview-clients"],
+    enabled: mode.enabled(),
+    queryFn: async () => (await apiFetch<Client[]>("/api/v1/hr/clients")).data ?? [],
+  }));
+  const assignments = createQuery(() => ({
+    queryKey: ["hr-overview-assignments"],
+    enabled: mode.enabled(),
+    queryFn: async () => (await apiFetch<Assignment[]>("/api/v1/hr/assignments")).data ?? [],
+  }));
   const [busy, setBusy] = createSignal(false);
   const [confirmRemove, setConfirmRemove] = createSignal(false);
   const overview = createQuery(() => ({
@@ -119,6 +142,51 @@ export default function HrOverviewPage() {
           </div>
         </section>
       </div>
+      <Show when={mode.enabled()}>
+        <div class="mt-6 grid gap-6 lg:grid-cols-2">
+          <section class="rounded-xl border border-stroke bg-surface p-4">
+            <div class="mb-2 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-medium text-text-secondary">Clients</h2>
+              <A href="/app/hr/clients" class="text-sm text-brand-700">Clients</A>
+            </div>
+            <Show when={!clients.isPending} fallback={<p class="text-sm text-text-secondary">Loading clients…</p>}>
+              <For each={clients.data ?? []} fallback={<p class="text-sm text-text-secondary">No clients yet.</p>}>
+                {(client) => (
+                  <div class="border-t border-stroke py-2">
+                    <A href="/app/hr/clients" class="text-sm font-medium text-brand-700">{client.name}</A>
+                    <For each={client.sites ?? []}>
+                      {(site) => (
+                        <p class="text-sm text-text-secondary">
+                          {site.site_name}
+                          <Show when={(site.people ?? []).length > 0}>
+                            {" · "}{(site.people ?? []).map((person) => person.employee_name).join(", ")}
+                          </Show>
+                        </p>
+                      )}
+                    </For>
+                  </div>
+                )}
+              </For>
+            </Show>
+          </section>
+          <section class="rounded-xl border border-stroke bg-surface p-4">
+            <div class="mb-2 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-medium text-text-secondary">Deployments</h2>
+              <A href="/app/hr/deployments" class="text-sm text-brand-700">Roster</A>
+            </div>
+            <Show when={!assignments.isPending} fallback={<p class="text-sm text-text-secondary">Loading deployments…</p>}>
+              <For each={assignments.data ?? []} fallback={<p class="text-sm text-text-secondary">No deployments yet.</p>}>
+                {(row) => (
+                  <p class="border-t border-stroke py-2 text-sm">
+                    {row.employee_name} · {row.client_name} · {row.site_name}
+                    <span class="text-text-secondary"> · {row.start_date}{row.end_date ? ` – ${row.end_date}` : ""}</span>
+                  </p>
+                )}
+              </For>
+            </Show>
+          </section>
+        </div>
+      </Show>
       <A href="/app/hr/reports" class="mt-4 inline-block text-sm text-brand-700 hover:underline">
         Discipline report
       </A>

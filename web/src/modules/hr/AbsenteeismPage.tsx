@@ -108,7 +108,7 @@ export default function AbsenteeismPage() {
   return (
     <HrLayout>
       <h1 class="mb-1 text-2xl font-semibold">Absenteeism</h1>
-      <p class="mb-6 text-sm text-text-secondary">DTR threshold alerts and period reports.</p>
+      <p class="mb-6 text-sm text-text-secondary">Checks DTR against your absence rules and creates alerts.</p>
       <button type="button" class="mb-4 rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void evaluate()}>
         Evaluate thresholds
       </button>

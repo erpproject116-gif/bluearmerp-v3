@@ -36,6 +36,16 @@ const STATUSES = [
 export default function ApplicantsPage() {
   const toast = useToast();
   const [mode, setMode] = createSignal<ViewMode>(loadViewMode("hr-applicants", "board"));
+  const storedAxis = typeof localStorage === "undefined" ? null : localStorage.getItem("hr-applicants-board-axis");
+  const [axis, setAxis] = createSignal<"horizontal" | "vertical">(storedAxis === "vertical" ? "vertical" : "horizontal");
+  const [collapsed, setCollapsed] = createSignal<string[]>([]);
+  const chooseAxis = (next: "horizontal" | "vertical") => {
+    setAxis(next);
+    if (typeof localStorage !== "undefined") localStorage.setItem("hr-applicants-board-axis", next);
+  };
+  const toggleColumn = (id: string) => {
+    setCollapsed((cur) => (cur.includes(id) ? cur.filter((item) => item !== id) : [...cur, id]));
+  };
   const [industry, setIndustry] = createSignal("");
   const [workplace, setWorkplace] = createSignal("");
   const [selected, setSelected] = createSignal<number | null>(null);
@@ -122,7 +132,15 @@ export default function ApplicantsPage() {
           <h1 class="text-2xl font-semibold">Applicants</h1>
           <p class="mt-1 text-sm text-text-secondary">Submissions from the public application form.</p>
         </div>
-        <ViewModeToggle value={mode()} onChange={setMode} storageKey="hr-applicants" />
+        <div class="flex flex-wrap items-center gap-2">
+          <Show when={mode() === "board"}>
+            <div class="flex rounded-lg border border-stroke">
+              <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "horizontal", "text-text-secondary": axis() !== "horizontal" }} onClick={() => chooseAxis("horizontal")}>Columns</button>
+              <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "vertical", "text-text-secondary": axis() !== "vertical" }} onClick={() => chooseAxis("vertical")}>Rows</button>
+            </div>
+          </Show>
+          <ViewModeToggle value={mode()} onChange={setMode} storageKey="hr-applicants" />
+        </div>
       </div>
       <div class="mb-4 grid gap-2 sm:grid-cols-2">
         <Field label="Industry">
@@ -169,7 +187,7 @@ export default function ApplicantsPage() {
           settingsHref="/app/hr/applicants/settings"
         />
       }>
-        <KanbanBoard columns={columns()} getCardId={(row) => row.id} onDrop={(row, from, to) => void move(row, from, to)} renderCard={card} loading={applications.loading} />
+        <KanbanBoard columns={columns()} getCardId={(row) => row.id} onDrop={(row, from, to) => void move(row, from, to)} renderCard={card} loading={applications.loading} orientation={axis()} collapsedIds={collapsed()} onToggleColumn={toggleColumn} />
       </Show>
       <Show when={selected()}>
         {(id) => {
