@@ -243,6 +243,150 @@ func TestSampleSeedRetract(t *testing.T) {
 	if invoiceCount != 1 || invoiceTotal != 10000 || invoiceStatus != "unconfirmed" {
 		t.Fatalf("invoice count=%d total=%v status=%s", invoiceCount, invoiceTotal, invoiceStatus)
 	}
+	var clientCount, siteCount, assignCount, bareSites, unlinked, terminatedAssigned int
+	if err := tx.QueryRow(ctx, `
+		select
+		  (select count(*) from public.hr_clients c
+		    join public.hr_sample_rows r on r.row_id = c.id and r.table_name = 'hr_clients' and r.batch_id = $1),
+		  (select count(*) from public.hr_client_sites s
+		    join public.hr_sample_rows r on r.row_id = s.id and r.table_name = 'hr_client_sites' and r.batch_id = $1),
+		  (select count(*) from public.hr_assignments a
+		    join public.hr_sample_rows r on r.row_id = a.id and r.table_name = 'hr_assignments' and r.batch_id = $1),
+		  (select count(*) from public.hr_client_sites s
+		    join public.hr_sample_rows r on r.row_id = s.id and r.table_name = 'hr_client_sites' and r.batch_id = $1
+		    where s.industry_id is null),
+		  (select count(*) from public.hr_clients c
+		    join public.hr_sample_rows r on r.row_id = c.id and r.table_name = 'hr_clients' and r.batch_id = $1
+		    where not exists (
+		      select 1 from public.inv_partners p
+		      where p.id = c.partner_id and p.tenant_id = c.tenant_id and p.partner_kind = 'customer'
+		    )),
+		  (select count(*) from public.hr_assignments a
+		    join public.hr_employees e on e.id = a.employee_id
+		    join public.hr_sample_rows r on r.row_id = e.id and r.table_name = 'hr_employees' and r.batch_id = $1
+		    where e.status = 'terminated')`, batchID).Scan(
+		&clientCount, &siteCount, &assignCount, &bareSites, &unlinked, &terminatedAssigned); err != nil {
+		t.Fatal(err)
+	}
+	if clientCount != 5 || siteCount != 10 || assignCount != 20 || bareSites != 0 || unlinked != 0 || terminatedAssigned != 0 {
+		t.Fatalf("clients=%d sites=%d assignments=%d bare=%d unlinked=%d terminated=%d",
+			clientCount, siteCount, assignCount, bareSites, unlinked, terminatedAssigned)
+	}
+	var stillActive string
+	if err := tx.QueryRow(ctx, `select status from public.hr_employees where id = $1`, empID).Scan(&stillActive); err != nil {
+		t.Fatal(err)
+	}
+	if stillActive != "active" {
+		t.Fatalf("assignment changed employee status to %s", stillActive)
+	}
+	var assignmentID int64
+	if err := tx.QueryRow(ctx, `
+		select id from public.hr_assignments
+		where tenant_id = $1 and employee_id = $2 and end_date is null`, tenantID, empID).Scan(&assignmentID); err != nil {
+		t.Fatal(err)
+	}
+	endedStatus, err := endAssignment(ctx, tx, tenantID, assignmentID, "2024-01-15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if endedStatus != "active" {
+		t.Fatalf("ending an assignment set status to %s", endedStatus)
+	}
+	var endedOn string
+	if err := tx.QueryRow(ctx, `select coalesce(end_date::text, '') from public.hr_assignments where id = $1`, assignmentID).Scan(&endedOn); err != nil {
+		t.Fatal(err)
+	}
+	if endedOn != "2024-01-15" {
+		t.Fatalf("assignment end date = %s", endedOn)
+	}
+	var jobOrders, requests, submitted, accepted, bills, portalUsers, magicLinks, clearances, cutoffs, holidays, dtrFromTime int
+	var billTotal float64
+	var clearanceStatus, docExpiry, employeeStatus string
+	if err := tx.QueryRow(ctx, `
+		select
+		  (select count(*) from public.hr_job_orders j
+		    join public.hr_sample_rows r on r.row_id = j.id and r.table_name = 'hr_job_orders' and r.batch_id = $1),
+		  (select count(*) from public.hr_manpower_requests q
+		    join public.hr_sample_rows r on r.row_id = q.id and r.table_name = 'hr_manpower_requests' and r.batch_id = $1),
+		  (select count(*) from public.hr_client_time_submissions t
+		    join public.hr_sample_rows r on r.row_id = t.id and r.table_name = 'hr_client_time_submissions' and r.batch_id = $1
+		    where t.status = 'submitted' and t.accepted_hours is null and t.file_bytes is null),
+		  (select count(*) from public.hr_client_time_submissions t
+		    join public.hr_sample_rows r on r.row_id = t.id and r.table_name = 'hr_client_time_submissions' and r.batch_id = $1
+		    where t.status = 'accepted' and t.accepted_hours = 8),
+		  (select count(*) from public.hr_client_bills b
+		    join public.hr_sample_rows r on r.row_id = b.id and r.table_name = 'hr_client_bills' and r.batch_id = $1),
+		  (select coalesce(max(b.total),0)::float8 from public.hr_client_bills b
+		    join public.hr_sample_rows r on r.row_id = b.id and r.table_name = 'hr_client_bills' and r.batch_id = $1),
+		  (select count(*) from public.portal_users u
+		    join public.hr_sample_rows r on r.row_id = u.id and r.table_name = 'portal_users' and r.batch_id = $1),
+		  (select count(*) from public.portal_magic_links ml
+		    join public.hr_sample_rows r on r.row_id = ml.portal_user_id and r.table_name = 'portal_users' and r.batch_id = $1),
+		  (select count(*) from public.hr_clearances c
+		    join public.hr_sample_rows r on r.row_id = c.id and r.table_name = 'hr_clearances' and r.batch_id = $1
+		    where c.status = 'pending' and c.pay_period_id is null and c.employee_id = $2),
+		  (select count(*) from public.hr_pay_cutoffs c
+		    join public.hr_sample_rows r on r.row_id = c.id and r.table_name = 'hr_pay_cutoffs' and r.batch_id = $1),
+		  (select count(*) from public.hr_holidays h
+		    join public.hr_sample_rows r on r.row_id = h.id and r.table_name = 'hr_holidays' and r.batch_id = $1
+		    where h.holiday_date = '2099-01-01' and h.name = 'Sample Holiday'),
+		  (select count(*) from public.hr_dtr_entries d
+		    where d.tenant_id = $3 and d.holiday_id in (
+		      select row_id from public.hr_sample_rows where batch_id = $1 and table_name = 'hr_holidays'
+		    ))`, batchID, empID, tenantID).Scan(
+		&jobOrders, &requests, &submitted, &accepted, &bills, &billTotal, &portalUsers, &magicLinks,
+		&clearances, &cutoffs, &holidays, &dtrFromTime); err != nil {
+		t.Fatal(err)
+	}
+	if jobOrders != 10 || requests != 2 || submitted != 1 || accepted != 1 || bills != 1 || billTotal != 1200 ||
+		portalUsers != 5 || magicLinks != 0 || clearances != 1 || cutoffs != 2 || holidays != 1 || dtrFromTime != 0 {
+		t.Fatalf("orders=%d requests=%d submitted=%d accepted=%d bills=%d total=%v users=%d links=%d clearances=%d cutoffs=%d holidays=%d linkedDtr=%d",
+			jobOrders, requests, submitted, accepted, bills, billTotal, portalUsers, magicLinks, clearances, cutoffs, holidays, dtrFromTime)
+	}
+	if err := tx.QueryRow(ctx, `
+		select c.status, e.status
+		from public.hr_clearances c
+		join public.hr_employees e on e.id = c.employee_id
+		join public.hr_sample_rows r on r.row_id = c.id and r.table_name = 'hr_clearances' and r.batch_id = $1`,
+		batchID).Scan(&clearanceStatus, &employeeStatus); err != nil {
+		t.Fatal(err)
+	}
+	if clearanceStatus != "pending" || employeeStatus != "active" {
+		t.Fatalf("clearance %s employee %s", clearanceStatus, employeeStatus)
+	}
+	if err := tx.QueryRow(ctx, `
+		select coalesce(d.expires_on::text, '')
+		from public.hr_employee_documents d
+		join public.hr_sample_rows r on r.row_id = d.id and r.table_name = 'hr_employee_documents' and r.batch_id = $1
+		where d.title = 'Sample 201 file'`, batchID).Scan(&docExpiry); err != nil {
+		t.Fatal(err)
+	}
+	if docExpiry != "2020-01-01" {
+		t.Fatalf("document expiry %s", docExpiry)
+	}
+	var withholding float64
+	if err := tx.QueryRow(ctx, `
+		select coalesce(sum(pl.amount),0)::float8
+		from public.hr_payslip_lines pl
+		join public.hr_payslips ps on ps.id = pl.payslip_id
+		join public.hr_pay_periods pp on pp.id = ps.pay_period_id
+		join public.hr_sample_rows r on r.row_id = pp.id and r.table_name = 'hr_pay_periods' and r.batch_id = $1
+		where pl.line_code = 'WHT'
+		  and pp.period_start >= '2099-01-01' and pp.period_end <= '2099-12-31'`, batchID).Scan(&withholding); err != nil {
+		t.Fatal(err)
+	}
+	if withholding <= 0 {
+		t.Fatalf("2099 withholding %v", withholding)
+	}
+	var keeperPartner int64
+	if err := tx.QueryRow(ctx, `
+		select id from public.inv_partners
+		where tenant_id = $1 and deleted_at is null and status = 'active'
+		  and partner_kind in ('customer', 'both')
+		  and company_name not like 'Sample Client %'
+		order by id limit 1`, tenantID).Scan(&keeperPartner); err != nil {
+		t.Fatal(err)
+	}
 
 	keeperNo := fmt.Sprintf("KEEP-%d", time.Now().UnixNano())
 	var keeperID int64
@@ -277,6 +421,39 @@ func TestSampleSeedRetract(t *testing.T) {
 	}
 	if invoiceLeft != 0 {
 		t.Fatal("sample invoice remains after retract")
+	}
+	var clientsLeft, partnersLeft, keeperPartnerLeft int
+	if err := tx.QueryRow(ctx, `
+		select
+		  (select count(*) from public.hr_clients where tenant_id = $1 and name like 'Sample Client %'),
+		  (select count(*) from public.inv_partners where tenant_id = $1 and company_name like 'Sample Client %'),
+		  (select count(*) from public.inv_partners where id = $2)`, tenantID, keeperPartner).Scan(
+		&clientsLeft, &partnersLeft, &keeperPartnerLeft); err != nil {
+		t.Fatal(err)
+	}
+	if clientsLeft != 0 || partnersLeft != 0 || keeperPartnerLeft != 1 {
+		t.Fatalf("after retract clients=%d partners=%d keeperPartner=%d", clientsLeft, partnersLeft, keeperPartnerLeft)
+	}
+	var agencyLeft int
+	if err := tx.QueryRow(ctx, `
+		select
+		  (select count(*) from public.hr_job_orders j
+		    join public.hr_sample_rows r on r.row_id = j.id and r.table_name = 'hr_job_orders' and r.batch_id = $1)
+		  + (select count(*) from public.hr_client_bills b
+		    join public.hr_sample_rows r on r.row_id = b.id and r.table_name = 'hr_client_bills' and r.batch_id = $1)
+		  + (select count(*) from public.portal_users u
+		    join public.hr_sample_rows r on r.row_id = u.id and r.table_name = 'portal_users' and r.batch_id = $1)
+		  + (select count(*) from public.hr_clearances c
+		    join public.hr_sample_rows r on r.row_id = c.id and r.table_name = 'hr_clearances' and r.batch_id = $1)
+		  + (select count(*) from public.hr_pay_cutoffs c
+		    join public.hr_sample_rows r on r.row_id = c.id and r.table_name = 'hr_pay_cutoffs' and r.batch_id = $1)
+		  + (select count(*) from public.hr_holidays h
+		    join public.hr_sample_rows r on r.row_id = h.id and r.table_name = 'hr_holidays' and r.batch_id = $1)`,
+		batchID).Scan(&agencyLeft); err != nil {
+		t.Fatal(err)
+	}
+	if agencyLeft != 0 {
+		t.Fatalf("sample agency rows remain: %d", agencyLeft)
 	}
 }
 

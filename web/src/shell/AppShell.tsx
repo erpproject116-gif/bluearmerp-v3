@@ -19,6 +19,7 @@ import {
 } from "./navGroups";
 import { isSubBranchPath } from "./sub-branch-nav";
 const TaxMngtHeaderNav = lazy(() => import("./TaxMngtHeaderNav").then((m) => ({ default: m.TaxMngtHeaderNav })));
+const HrHeaderNav = lazy(() => import("./HrHeaderNav").then((m) => ({ default: m.HrHeaderNav })));
 const CollectiveInvoicingHeaderNav = lazy(() =>
   import("./CollectiveInvoicingHeaderNav").then((m) => ({ default: m.CollectiveInvoicingHeaderNav })),
 );
@@ -578,6 +579,9 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
             )}
           </Show>
           <Show when={!shell.viewport.isStandalone()}>
+            <Show when={loc.pathname === "/app/hr" || loc.pathname.startsWith("/app/hr/")}>
+              <Suspense><HrHeaderNav /></Suspense>
+            </Show>
             <MasterListHeaderNav />
             <Show when={loc.pathname.startsWith(TAX_MNGT_PREFIX)}>
               <Suspense><TaxMngtHeaderNav /></Suspense>

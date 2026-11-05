@@ -3,6 +3,7 @@ package hr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -276,6 +277,15 @@ func previewFinalPay(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+type finalPayFailure struct {
+	Status  int
+	Message string
+	Code    string
+	Fields  map[string]string
+}
+
+func (e *finalPayFailure) Error() string { return e.Message }
+
 func runFinalPay(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tu, _ := auth.FromContext(r.Context())
@@ -284,78 +294,93 @@ func runFinalPay(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"employee_id": "Required."})
 			return
 		}
-		sampleEmp, err := employeeInOpenSample(r.Context(), pool, tu.TenantID, *body.EmployeeID)
+		result, err := postFinalPay(r.Context(), pool, tu, body)
 		if err != nil {
+			var ferr *finalPayFailure
+			if errors.As(err, &ferr) && ferr.Fields != nil {
+				response.Validation(w, ferr.Fields)
+				return
+			}
+			if ferr != nil {
+				response.Err(w, ferr.Status, ferr.Message, ferr.Code)
+				return
+			}
 			response.Err(w, http.StatusInternalServerError, "Failed to run final pay.", "ERR_INTERNAL")
 			return
 		}
-		if sampleEmp {
-			response.Err(w, http.StatusBadRequest, "Sample employees cannot be included in final pay. Remove the sample data first.", "ERR_VALIDATION")
-			return
-		}
-		sep, err := parseDate(body.SeparationDate)
-		if err != nil {
-			sep = time.Now()
-		}
-		tx, err := pool.Begin(r.Context())
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to run final pay.", "ERR_INTERNAL")
-			return
-		}
-		defer tx.Rollback(r.Context())
-		row, err := computeFinalPayRow(r.Context(), tx, tu.TenantID, *body.EmployeeID, sep)
-		if err != nil {
-			response.Err(w, http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
-			return
-		}
-		unusedLeaveDays, _ := sumCashableLeaveDays(r.Context(), tx, tu.TenantID, *body.EmployeeID, sep)
-		if err := cashOutLeaveOnFinalPay(r.Context(), tx, tu.TenantID, *body.EmployeeID, tu.AppUserID, sep, unusedLeaveDays); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to cash out leave.", "ERR_INTERNAL")
-			return
-		}
-		label := strings.TrimSpace(body.PeriodLabel)
-		if label == "" {
-			label = fmt.Sprintf("Final pay — %s", row.EmployeeName)
-		}
-		var periodID int64
-		if err := tx.QueryRow(r.Context(), `
-			insert into public.hr_pay_periods (tenant_id, period_label, period_start, period_end, run_type)
-			values ($1,$2,$3,$3,'final_pay') returning id`,
-			tu.TenantID, label, sep).Scan(&periodID); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create pay period.", "ERR_INTERNAL")
-			return
-		}
-		var payslipID int64
-		if err := tx.QueryRow(r.Context(), `
-			insert into public.hr_payslips (tenant_id, pay_period_id, employee_id, gross_pay, deductions, net_pay, status)
-			values ($1,$2,$3,$4,0,$4,'draft') returning id`,
-			tu.TenantID, periodID, row.EmployeeID, row.Amount).Scan(&payslipID); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create payslip.", "ERR_INTERNAL")
-			return
-		}
-		if _, err := tx.Exec(r.Context(), `
-			insert into public.hr_payslip_lines (payslip_id, line_no, line_type, line_code, description, amount)
-			values ($1,1,'earning','FINAL_PAY',$2,$3)`,
-			payslipID, row.Notes, row.Amount); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to create payslip line.", "ERR_INTERNAL")
-			return
-		}
-		_, _ = tx.Exec(r.Context(), `update public.hr_employees set status='terminated', updated_at=now() where id=$1 and tenant_id=$2`, row.EmployeeID, tu.TenantID)
-		jeID, err := postPayrollAccrualJE(r.Context(), tx, tu.TenantID, periodID, row.Amount, 0, row.Amount, tu.AppUserID)
-		if err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to post accrual.", "ERR_INTERNAL")
-			return
-		}
-		_, _ = tx.Exec(r.Context(), `update public.hr_payslips set status='posted', journal_entry_id=$3 where pay_period_id=$1 and tenant_id=$2`, periodID, tu.TenantID, jeID)
-		_, _ = tx.Exec(r.Context(), `update public.hr_pay_periods set status='processed' where id=$1`, periodID)
-		if err := tx.Commit(r.Context()); err != nil {
-			response.Err(w, http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
-			return
-		}
-		_ = audit.Log(r.Context(), pool, tu.TenantID, tu.AppUserID, "hr.final_pay_run", "hr_pay_period", &periodID, nil, body)
-		response.OK(w, specialRunResult{
-			RunType: "final_pay", PayPeriodID: periodID, PayslipCount: 1,
-			TotalGross: row.Amount, TotalNet: row.Amount, Employees: []specialRunPreviewRow{row}, JournalEntryID: &jeID,
-		}, "Final pay posted; employee marked terminated.")
+		response.OK(w, result, "Final pay posted; employee marked terminated.")
 	}
+}
+
+func failFinalPay(status int, message, code string) (specialRunResult, error) {
+	return specialRunResult{}, &finalPayFailure{Status: status, Message: message, Code: code}
+}
+
+func postFinalPay(ctx context.Context, pool *pgxpool.Pool, tu auth.TenantUser, body specialRunBody) (specialRunResult, error) {
+	if body.EmployeeID == nil || *body.EmployeeID <= 0 {
+		return specialRunResult{}, &finalPayFailure{Status: http.StatusBadRequest, Fields: map[string]string{"employee_id": "Required."}}
+	}
+	sampleEmp, err := employeeInOpenSample(ctx, pool, tu.TenantID, *body.EmployeeID)
+	if err != nil {
+		return failFinalPay(http.StatusInternalServerError, "Failed to run final pay.", "ERR_INTERNAL")
+	}
+	if sampleEmp {
+		return failFinalPay(http.StatusBadRequest, "Sample employees cannot be included in final pay. Remove the sample data first.", "ERR_VALIDATION")
+	}
+	sep, err := parseDate(body.SeparationDate)
+	if err != nil {
+		sep = time.Now()
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return failFinalPay(http.StatusInternalServerError, "Failed to run final pay.", "ERR_INTERNAL")
+	}
+	defer tx.Rollback(ctx)
+	row, err := computeFinalPayRow(ctx, tx, tu.TenantID, *body.EmployeeID, sep)
+	if err != nil {
+		return failFinalPay(http.StatusNotFound, "Employee not found.", "ERR_NOT_FOUND")
+	}
+	unusedLeaveDays, _ := sumCashableLeaveDays(ctx, tx, tu.TenantID, *body.EmployeeID, sep)
+	if err := cashOutLeaveOnFinalPay(ctx, tx, tu.TenantID, *body.EmployeeID, tu.AppUserID, sep, unusedLeaveDays); err != nil {
+		return failFinalPay(http.StatusInternalServerError, "Failed to cash out leave.", "ERR_INTERNAL")
+	}
+	label := strings.TrimSpace(body.PeriodLabel)
+	if label == "" {
+		label = fmt.Sprintf("Final pay — %s", row.EmployeeName)
+	}
+	var periodID int64
+	if err := tx.QueryRow(ctx, `
+		insert into public.hr_pay_periods (tenant_id, period_label, period_start, period_end, run_type)
+		values ($1,$2,$3,$3,'final_pay') returning id`,
+		tu.TenantID, label, sep).Scan(&periodID); err != nil {
+		return failFinalPay(http.StatusInternalServerError, "Failed to create pay period.", "ERR_INTERNAL")
+	}
+	var payslipID int64
+	if err := tx.QueryRow(ctx, `
+		insert into public.hr_payslips (tenant_id, pay_period_id, employee_id, gross_pay, deductions, net_pay, status)
+		values ($1,$2,$3,$4,0,$4,'draft') returning id`,
+		tu.TenantID, periodID, row.EmployeeID, row.Amount).Scan(&payslipID); err != nil {
+		return failFinalPay(http.StatusInternalServerError, "Failed to create payslip.", "ERR_INTERNAL")
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into public.hr_payslip_lines (payslip_id, line_no, line_type, line_code, description, amount)
+		values ($1,1,'earning','FINAL_PAY',$2,$3)`,
+		payslipID, row.Notes, row.Amount); err != nil {
+		return failFinalPay(http.StatusInternalServerError, "Failed to create payslip line.", "ERR_INTERNAL")
+	}
+	_, _ = tx.Exec(ctx, `update public.hr_employees set status='terminated', updated_at=now() where id=$1 and tenant_id=$2`, row.EmployeeID, tu.TenantID)
+	jeID, err := postPayrollAccrualJE(ctx, tx, tu.TenantID, periodID, row.Amount, 0, row.Amount, tu.AppUserID)
+	if err != nil {
+		return failFinalPay(http.StatusInternalServerError, "Failed to post accrual.", "ERR_INTERNAL")
+	}
+	_, _ = tx.Exec(ctx, `update public.hr_payslips set status='posted', journal_entry_id=$3 where pay_period_id=$1 and tenant_id=$2`, periodID, tu.TenantID, jeID)
+	_, _ = tx.Exec(ctx, `update public.hr_pay_periods set status='processed' where id=$1`, periodID)
+	if err := tx.Commit(ctx); err != nil {
+		return failFinalPay(http.StatusInternalServerError, "Failed to save.", "ERR_INTERNAL")
+	}
+	_ = audit.Log(ctx, pool, tu.TenantID, tu.AppUserID, "hr.final_pay_run", "hr_pay_period", &periodID, nil, body)
+	return specialRunResult{
+		RunType: "final_pay", PayPeriodID: periodID, PayslipCount: 1,
+		TotalGross: row.Amount, TotalNet: row.Amount, Employees: []specialRunPreviewRow{row}, JournalEntryID: &jeID,
+	}, nil
 }

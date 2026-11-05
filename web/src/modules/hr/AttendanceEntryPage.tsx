@@ -1,4 +1,3 @@
-import { A } from "@solidjs/router";
 import { createSignal, For } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
@@ -176,10 +175,7 @@ export default function AttendanceEntryPage() {
   return (
     <HrLayout>
       <div class="mb-4">
-        <A href="/app/hr/attendance" class="text-sm text-brand-700 hover:underline">
-          ← Attendance
-        </A>
-        <h1 class="mt-1 text-2xl font-semibold">DTR entry</h1>
+        <h1 class="text-2xl font-semibold">DTR entry</h1>
         <p class="mt-1 text-sm text-text-secondary">
           Manual day rows and CSV import. Punch/import sources can fill the same table. If the date is a holiday,
           status auto-tags to holiday.

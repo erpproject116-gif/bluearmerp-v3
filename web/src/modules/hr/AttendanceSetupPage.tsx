@@ -1,4 +1,3 @@
-import { A } from "@solidjs/router";
 import { createSignal, For } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
@@ -13,6 +12,7 @@ export default function AttendanceSetupPage() {
   const toast = useToast();
   const qc = useQueryClient();
   const year = new Date().getFullYear();
+  const [holidayYear, setHolidayYear] = createSignal(String(year));
 
   const [holDate, setHolDate] = createSignal("");
   const [holName, setHolName] = createSignal("");
@@ -25,9 +25,9 @@ export default function AttendanceSetupPage() {
   );
 
   const holidays = createQuery(() => ({
-    queryKey: ["hr-holidays", year],
+    queryKey: ["hr-holidays", holidayYear()],
     queryFn: async () => {
-      const res = await apiFetch<Holiday[]>(`/api/v1/hr/holidays?year=${year}`);
+      const res = await apiFetch<Holiday[]>(`/api/v1/hr/holidays?year=${holidayYear()}`);
       if (!res.success) throw new Error(res.message ?? "Failed to load holidays");
       return res.data ?? [];
     },
@@ -108,16 +108,18 @@ export default function AttendanceSetupPage() {
   return (
     <HrLayout>
       <div class="mb-4">
-        <A href="/app/hr/attendance" class="text-sm text-brand-700 hover:underline">
-          ← Attendance
-        </A>
-        <h1 class="mt-1 text-2xl font-semibold">Attendance setup</h1>
+        <h1 class="text-2xl font-semibold">Attendance setup</h1>
         <p class="mt-1 text-sm text-text-secondary">Holidays and pay cut-offs used by DTR and payroll.</p>
       </div>
 
       <div class="grid gap-6 lg:grid-cols-2">
         <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-          <h2 class="mb-2 text-lg font-medium">Holiday calendar ({year})</h2>
+          <h2 class="mb-2 text-lg font-medium">Holiday calendar ({holidayYear()})</h2>
+          <div class="mb-3 max-w-[8rem]">
+            <Field label="Year">
+              <input class={inputClass} value={holidayYear()} onInput={(e) => setHolidayYear(e.currentTarget.value)} />
+            </Field>
+          </div>
           <p class="mb-3 text-sm text-text-secondary">
             Regular / special holidays drive DTR holiday premiums. Mark days as absent/awol to auto-deduct unpaid
             absence (daily rate) on the next payroll run.

@@ -254,7 +254,12 @@ func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error)
 		return 0, err
 	}
 
-	if err := seedSampleApplicants(s, tenantID); err != nil {
+	industryIDs, err := seedSampleApplicants(s, tenantID)
+	if err != nil {
+		return 0, err
+	}
+	siteIDs, partnerIDs, err := seedSampleClients(s, tenantID, active, industryIDs)
+	if err != nil {
 		return 0, err
 	}
 	if err := seedSamplePeopleOps(s, tenantID, emps, active, templateID); err != nil {
@@ -267,6 +272,9 @@ func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error)
 		return 0, err
 	}
 	if err := seedSampleClientBill(s, tenantID, masters); err != nil {
+		return 0, err
+	}
+	if err := seedSampleAgency(s, tenantID, siteIDs, partnerIDs, active[0]); err != nil {
 		return 0, err
 	}
 	return batchID, nil
@@ -324,7 +332,7 @@ func sampleSalesNo(batchID int64) (string, error) {
 	return no, nil
 }
 
-func seedSampleApplicants(s sampler, tenantID int64) error {
+func seedSampleApplicants(s sampler, tenantID int64) ([]int64, error) {
 	industries := []string{
 		"Sample Industry A", "Sample Industry B", "Sample Industry C",
 		"Sample Industry D", "Sample Industry E",
@@ -335,7 +343,7 @@ func seedSampleApplicants(s sampler, tenantID int64) error {
 			insert into public.hr_applicant_segments (tenant_id, kind, name)
 			values ($1,'industry',$2) returning id`, tenantID, name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		industryIDs[i] = id
 	}
@@ -346,7 +354,7 @@ func seedSampleApplicants(s sampler, tenantID int64) error {
 			insert into public.hr_applicant_segments (tenant_id, kind, name)
 			values ($1,'workplace',$2) returning id`, tenantID, name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		workplaceIDs[i] = id
 	}
@@ -364,7 +372,7 @@ func seedSampleApplicants(s sampler, tenantID int64) error {
 			values ($1,$2,$3,$4) returning id`,
 			tenantID, fullName, fmt.Sprintf("sample.%s.%d@example.test", status, s.batch), fmt.Sprintf("0900000%04d", i))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		appID, err := s.ins("hr_applications", `
 			insert into public.hr_applications (
@@ -376,31 +384,31 @@ func seedSampleApplicants(s sampler, tenantID int64) error {
 			fmt.Sprintf("0900000%04d", i),
 			industryIDs[i%len(industryIDs)], workplaceIDs[i%len(workplaceIDs)])
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if i == 0 {
 			if _, err := s.ins("hr_application_children", `
 				insert into public.hr_application_children (application_id, child_name, birth_date)
 				values ($1,'Sample Child','2018-04-02') returning id`, appID); err != nil {
-				return err
+				return nil, err
 			}
 			if _, err := s.ins("hr_application_jobs", `
 				insert into public.hr_application_jobs (application_id, company_name, position, started_on, ended_on)
 				values ($1,'Sample Previous Co','Helper','2022-01-01','2023-12-31') returning id`, appID); err != nil {
-				return err
+				return nil, err
 			}
 			if _, err := s.ins("hr_application_references", `
 				insert into public.hr_application_references (application_id, ref_name, position, company_name, contact_no)
 				values ($1,'Sample Reference','Supervisor','Sample Previous Co','09001112222') returning id`, appID); err != nil {
-				return err
+				return nil, err
 			}
 			if err := insertSampleComment(s, tenantID, appID, "Sample comment"); err != nil {
-				return err
+				return nil, err
 			}
 		}
 		if status == "hired" {
 			if err := insertSampleComment(s, tenantID, appID, "Sample hired comment"); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
@@ -409,7 +417,7 @@ func seedSampleApplicants(s sampler, tenantID int64) error {
 		values ($1,'Sample Applicant Extra',$2,'09000000009') returning id`,
 		tenantID, fmt.Sprintf("sample.extra.%d@example.test", s.batch))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	appID, err := s.ins("hr_applications", `
 		insert into public.hr_applications (
@@ -419,9 +427,142 @@ func seedSampleApplicants(s sampler, tenantID int64) error {
 		tenantID, personID, fmt.Sprintf("sample.extra.%d@example.test", s.batch),
 		industryIDs[0], workplaceIDs[0])
 	if err != nil {
+		return nil, err
+	}
+	if err := insertSampleComment(s, tenantID, appID, "Sample extra comment"); err != nil {
+		return nil, err
+	}
+	return industryIDs, nil
+}
+
+func seedSampleClients(s sampler, tenantID int64, active, industryIDs []int64) ([]int64, []int64, error) {
+	if len(active) != 20 || len(industryIDs) != 5 {
+		return nil, nil, fmt.Errorf("sample clients need 20 active employees and 5 industries")
+	}
+	sites := make([][2]int64, 5)
+	siteIDs := make([]int64, 0, 10)
+	partnerIDs := make([]int64, 0, 5)
+	for c := 0; c < 5; c++ {
+		var code string
+		if err := s.tx.QueryRow(s.ctx, `select public.allocate_tenant_code($1, 'partner')`, tenantID).Scan(&code); err != nil {
+			return nil, nil, err
+		}
+		name := fmt.Sprintf("Sample Client %d", c+1)
+		partnerID, err := s.ins("inv_partners", `
+			insert into public.inv_partners (tenant_id, partner_code, partner_kind, company_name, status)
+			values ($1,$2,'customer',$3,'active') returning id`, tenantID, code, name)
+		if err != nil {
+			return nil, nil, err
+		}
+		partnerIDs = append(partnerIDs, partnerID)
+		clientID, err := s.ins("hr_clients", `
+			insert into public.hr_clients (tenant_id, name, partner_id)
+			values ($1,$2,$3) returning id`, tenantID, name, partnerID)
+		if err != nil {
+			return nil, nil, err
+		}
+		for si := 0; si < 2; si++ {
+			siteID, err := s.ins("hr_client_sites", `
+				insert into public.hr_client_sites (tenant_id, client_id, site_name, industry_id)
+				values ($1,$2,$3,$4) returning id`,
+				tenantID, clientID, fmt.Sprintf("Sample Client %d Site %d", c+1, si+1), industryIDs[(c*2+si)%len(industryIDs)])
+			if err != nil {
+				return nil, nil, err
+			}
+			sites[c][si] = siteID
+			siteIDs = append(siteIDs, siteID)
+		}
+	}
+	for i, empID := range active {
+		_, err := s.ins("hr_assignments", `
+			insert into public.hr_assignments (tenant_id, employee_id, site_id, start_date)
+			values ($1,$2,$3,'2024-01-15') returning id`,
+			tenantID, empID, sites[i%5][(i/5)%2])
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return siteIDs, partnerIDs, nil
+}
+
+func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, employeeID int64) error {
+	if len(siteIDs) != 10 || len(partnerIDs) != 5 {
+		return fmt.Errorf("sample agency rows need 10 sites and 5 clients")
+	}
+	for _, siteID := range siteIDs {
+		if _, err := s.ins("hr_job_orders", `
+			insert into public.hr_job_orders (tenant_id, site_id, pay_rate, bill_rate)
+			values ($1,$2,100,150) returning id`, tenantID, siteID); err != nil {
+			return err
+		}
+	}
+	requests := []struct {
+		site  int64
+		count int
+		state string
+	}{
+		{siteIDs[0], 2, "open"},
+		{siteIDs[1], 1, "filled"},
+	}
+	for _, req := range requests {
+		if _, err := s.ins("hr_manpower_requests", `
+			insert into public.hr_manpower_requests (tenant_id, site_id, headcount, details, status)
+			values ($1,$2,$3,'Sample manpower request',$4) returning id`, tenantID, req.site, req.count, req.state); err != nil {
+			return err
+		}
+	}
+	if _, err := s.ins("hr_client_time_submissions", `
+		insert into public.hr_client_time_submissions
+		  (tenant_id, site_id, period_start, period_end, status, file_name)
+		values ($1,$2,'2099-01-01','2099-01-31','submitted','sample-time.txt') returning id`,
+		tenantID, siteIDs[0]); err != nil {
 		return err
 	}
-	return insertSampleComment(s, tenantID, appID, "Sample extra comment")
+	acceptedID, err := s.ins("hr_client_time_submissions", `
+		insert into public.hr_client_time_submissions
+		  (tenant_id, site_id, period_start, period_end, status, file_name, accepted_hours)
+		values ($1,$2,'2099-01-01','2099-01-31','accepted','sample-time-accepted.txt',8) returning id`,
+		tenantID, siteIDs[0])
+	if err != nil {
+		return err
+	}
+	if _, err := s.ins("hr_client_bills", `
+		insert into public.hr_client_bills
+		  (tenant_id, site_id, submission_id, period_start, period_end, total)
+		values ($1,$2,$3,'2099-01-01','2099-01-31',1200) returning id`,
+		tenantID, siteIDs[0], acceptedID); err != nil {
+		return err
+	}
+	for i, partnerID := range partnerIDs {
+		if _, err := s.ins("portal_users", `
+			insert into public.portal_users (tenant_id, partner_id, email, display_name)
+			values ($1,$2,$3,$4) returning id`,
+			tenantID, partnerID,
+			fmt.Sprintf("sample.client.%d.%d@example.test", i+1, s.batch),
+			fmt.Sprintf("Sample Client %d", i+1)); err != nil {
+			return err
+		}
+	}
+	if _, err := s.ins("hr_clearances", `
+		insert into public.hr_clearances (tenant_id, employee_id, status)
+		values ($1,$2,'pending') returning id`, tenantID, employeeID); err != nil {
+		return err
+	}
+	cutoffs := []struct{ label, start, end, pay string }{
+		{"Sample 1st quincena 2099", "2099-01-01", "2099-01-15", "2099-01-20"},
+		{"Sample 2nd quincena 2099", "2099-01-16", "2099-01-31", "2099-02-05"},
+	}
+	for _, c := range cutoffs {
+		if _, err := s.ins("hr_pay_cutoffs", `
+			insert into public.hr_pay_cutoffs (tenant_id, label, cutoff_start, cutoff_end, pay_date, status)
+			values ($1,$2,$3,$4,$5,'open') returning id`, tenantID, c.label, c.start, c.end, c.pay); err != nil {
+			return err
+		}
+	}
+	_, err = s.ins("hr_holidays", `
+		insert into public.hr_holidays (tenant_id, holiday_date, name, holiday_type, pay_multiplier)
+		values ($1,'2099-01-01','Sample Holiday','regular',2.0) returning id`, tenantID)
+	return err
 }
 
 func insertSampleComment(s sampler, tenantID, appID int64, body string) error {
@@ -531,8 +672,8 @@ func seedSamplePeopleOps(s sampler, tenantID int64, emps, active []int64, templa
 		}
 	}
 	if _, err := s.ins("hr_employee_documents", `
-		insert into public.hr_employee_documents (tenant_id, employee_id, doc_type, title)
-		values ($1,$2,'other','Sample 201 file') returning id`, tenantID, emps[0]); err != nil {
+		insert into public.hr_employee_documents (tenant_id, employee_id, doc_type, title, expires_on)
+		values ($1,$2,'other','Sample 201 file','2020-01-01') returning id`, tenantID, emps[0]); err != nil {
 		return err
 	}
 
@@ -787,8 +928,20 @@ func seedSampleClientBill(s sampler, tenantID int64, masters sampleSalesMasters)
 }
 
 var sampleRetractOrder = []string{
+	"hr_client_bills",
+	"hr_client_time_submissions",
+	"hr_job_orders",
+	"hr_manpower_requests",
+	"hr_clearances",
+	"portal_users",
+	"hr_pay_cutoffs",
+	"hr_holidays",
 	"sa_sales_lines",
 	"sa_sales",
+	"hr_assignments",
+	"hr_client_sites",
+	"hr_clients",
+	"inv_partners",
 	"hr_application_children",
 	"hr_application_jobs",
 	"hr_application_references",
@@ -842,6 +995,17 @@ func retractHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) error {
 		{"hr_pay_item_types", "hr_employee_pay_items", "pay_item_type_id"},
 		{"hr_applicant_segments", "hr_applications", "industry_id"},
 		{"hr_applicant_segments", "hr_applications", "workplace_type_id"},
+		{"hr_applicant_segments", "hr_client_sites", "industry_id"},
+		{"hr_client_sites", "hr_assignments", "site_id"},
+		{"hr_employees", "hr_assignments", "employee_id"},
+		{"hr_clients", "hr_client_sites", "client_id"},
+		{"inv_partners", "hr_clients", "partner_id"},
+		{"inv_partners", "portal_users", "partner_id"},
+		{"hr_client_sites", "hr_job_orders", "site_id"},
+		{"hr_client_sites", "hr_manpower_requests", "site_id"},
+		{"hr_client_sites", "hr_client_time_submissions", "site_id"},
+		{"hr_client_time_submissions", "hr_client_bills", "submission_id"},
+		{"hr_employees", "hr_clearances", "employee_id"},
 		{"hr_courses", "hr_learning_assignments", "course_id"},
 	}
 	for _, g := range guards {

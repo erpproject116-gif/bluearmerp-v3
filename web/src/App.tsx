@@ -244,7 +244,6 @@ import {
   HrEmployeesSettingsPage,
   PayrollRunsPage,
   RemittancesPage,
-  AttendancePage,
   AttendanceOverviewPage,
   AttendanceSetupPage,
   AttendanceEntryPage,
@@ -254,6 +253,17 @@ import {
   AbsenteeismPage,
   DisciplinePage,
   ApplicantsPage,
+  ClientsPage,
+  DeploymentsPage,
+  WorkforcePage,
+  HrContractsPage,
+  ManpowerRequestsPage,
+  ClientDtrPage,
+  ClientBillingPage,
+  PortalAccessPage,
+  OffboardingPage,
+  CompliancePage,
+  GovernmentReportsPage,
   ApplicantsSettingsPage,
   WorkplaceProblemsPage,
   RequestsPage,
@@ -1052,6 +1062,39 @@ export default function App() {
           <Route path="/hr/applicants" component={() => (
             <HrRoute><ApplicantsPage /></HrRoute>
           )} />
+          <Route path="/hr/clients/portal-access" component={() => (
+            <HrRoute><PortalAccessPage /></HrRoute>
+          )} />
+          <Route path="/hr/clients" component={() => (
+            <HrRoute><ClientsPage /></HrRoute>
+          )} />
+          <Route path="/hr/contracts" component={() => (
+            <HrRoute><HrContractsPage /></HrRoute>
+          )} />
+          <Route path="/hr/manpower-requests" component={() => (
+            <HrRoute><ManpowerRequestsPage /></HrRoute>
+          )} />
+          <Route path="/hr/attendance/client-dtr" component={() => (
+            <HrRoute><ClientDtrPage /></HrRoute>
+          )} />
+          <Route path="/hr/client-billing" component={() => (
+            <HrRoute><ClientBillingPage /></HrRoute>
+          )} />
+          <Route path="/hr/offboarding" component={() => (
+            <HrRoute><OffboardingPage /></HrRoute>
+          )} />
+          <Route path="/hr/compliance" component={() => (
+            <HrRoute><CompliancePage /></HrRoute>
+          )} />
+          <Route path="/hr/government-reports" component={() => (
+            <HrRoute><GovernmentReportsPage /></HrRoute>
+          )} />
+          <Route path="/hr/deployments" component={() => (
+            <HrRoute><DeploymentsPage /></HrRoute>
+          )} />
+          <Route path="/hr/workforce" component={() => (
+            <HrRoute><WorkforcePage /></HrRoute>
+          )} />
           <Route path="/hr/workplace-problems" component={() => (
             <HrRoute><WorkplaceProblemsPage /></HrRoute>
           )} />
@@ -1083,9 +1126,7 @@ export default function App() {
           <Route path="/hr/attendance/employees/:employeeId" component={() => (
             <HrRoute><AttendanceEmployeeDtrPage /></HrRoute>
           )} />
-          <Route path="/hr/attendance" component={() => (
-            <HrRoute><AttendancePage /></HrRoute>
-          )} />
+          <Route path="/hr/attendance" component={() => <Navigate href="/app/hr/attendance/overview" />} />
           <Route path="/hr/leave" component={() => (
             <HrRoute><LeavePage /></HrRoute>
           )} />

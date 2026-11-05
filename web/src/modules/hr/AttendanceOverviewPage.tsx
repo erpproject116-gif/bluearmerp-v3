@@ -72,10 +72,7 @@ export default function AttendanceOverviewPage() {
     <HrLayout>
       <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <A href="/app/hr/attendance" class="text-sm text-brand-700 hover:underline">
-            ← Attendance
-          </A>
-          <h1 class="mt-1 text-2xl font-semibold">Month overview</h1>
+          <h1 class="text-2xl font-semibold">Month overview</h1>
           <p class="mt-1 text-sm text-text-secondary">
             Scroll sideways for all days.{" "}
             <span class="inline-flex items-center gap-1">

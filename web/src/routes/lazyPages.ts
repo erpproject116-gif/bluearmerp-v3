@@ -252,6 +252,17 @@ export const CompanyRecordsPage = lazy(() => import("../modules/hr/CompanyRecord
 export const AbsenteeismPage = lazy(() => import("../modules/hr/AbsenteeismPage"));
 export const DisciplinePage = lazy(() => import("../modules/hr/DisciplinePage"));
 export const ApplicantsPage = lazy(() => import("../modules/hr/ApplicantsPage"));
+export const ClientsPage = lazy(() => import("../modules/hr/ClientsPage"));
+export const DeploymentsPage = lazy(() => import("../modules/hr/DeploymentsPage"));
+export const WorkforcePage = lazy(() => import("../modules/hr/WorkforcePage"));
+export const HrContractsPage = lazy(() => import("../modules/hr/ContractsPage"));
+export const ManpowerRequestsPage = lazy(() => import("../modules/hr/ManpowerRequestsPage"));
+export const ClientDtrPage = lazy(() => import("../modules/hr/ClientDtrPage"));
+export const ClientBillingPage = lazy(() => import("../modules/hr/ClientBillingPage"));
+export const PortalAccessPage = lazy(() => import("../modules/hr/PortalAccessPage"));
+export const OffboardingPage = lazy(() => import("../modules/hr/OffboardingPage"));
+export const CompliancePage = lazy(() => import("../modules/hr/CompliancePage"));
+export const GovernmentReportsPage = lazy(() => import("../modules/hr/GovernmentReportsPage"));
 export const ApplicantsSettingsPage = lazy(() => import("../modules/hr/ApplicantsSettingsPage"));
 export const WorkplaceProblemsPage = lazy(() => import("../modules/hr/WorkplaceProblemsPage"));
 export const RequestsPage = lazy(() => import("../modules/hr/RequestsPage"));

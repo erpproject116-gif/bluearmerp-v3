@@ -33,7 +33,9 @@ type PortalTicket = {
   priority: string;
 };
 
-const tabs = ["orders", "invoices", "tickets"] as const;
+type PortalSite = { site_name: string; client_name: string };
+
+const tabs = ["orders", "invoices", "tickets", "sites"] as const;
 type Tab = (typeof tabs)[number];
 
 export default function PortalDashboardPage() {
@@ -57,7 +59,9 @@ export default function PortalDashboardPage() {
           ? "/api/v1/portal/orders"
           : active === "invoices"
             ? "/api/v1/portal/invoices"
-            : "/api/v1/portal/tickets";
+            : active === "sites"
+              ? "/api/v1/portal/sites"
+              : "/api/v1/portal/tickets";
       const res = await portalFetch<unknown[]>(`${path}?pageSize=50&order=desc`);
       if (!res.ok) throw new Error(res.message ?? "Failed to load data.");
       return { rows: res.data ?? [], total: res.meta?.total ?? 0 };
@@ -124,7 +128,7 @@ export default function PortalDashboardPage() {
                   }`}
                   onClick={() => setTab(t)}
                 >
-                  {t === "orders" ? "Orders" : t === "invoices" ? "Invoices" : "Tickets"}
+                  {t === "orders" ? "Orders" : t === "invoices" ? "Invoices" : t === "sites" ? "Sites" : "Tickets"}
                 </button>
               )}
             </For>
@@ -184,6 +188,29 @@ export default function PortalDashboardPage() {
                         <td class="px-4 py-3">{row.order_date}</td>
                         <td class="px-4 py-3 capitalize">{row.status}</td>
                         <td class="px-4 py-3 text-right">{formatMoney(row.grand_total)}</td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </Show>
+
+          <Show when={!list.loading && !list.error && tab() === "sites"}>
+            <div class="overflow-hidden rounded-xl border border-stroke bg-white">
+              <table class="min-w-full text-sm">
+                <thead class="bg-surface text-left text-text-secondary">
+                  <tr>
+                    <th class="px-4 py-3">Client</th>
+                    <th class="px-4 py-3">Site</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={(list()?.rows ?? []) as PortalSite[]}>
+                    {(row) => (
+                      <tr class="border-t border-stroke/60">
+                        <td class="px-4 py-3 font-medium">{row.client_name}</td>
+                        <td class="px-4 py-3">{row.site_name}</td>
                       </tr>
                     )}
                   </For>
