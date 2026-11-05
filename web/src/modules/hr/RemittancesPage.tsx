@@ -274,7 +274,7 @@ export default function RemittancesPage() {
         </div>
       </HrTcard>
 
-      <Show when={detail.data && selectedId()}>
+      <Show when={selectedId() != null ? detail.data : undefined}>
         {(d) => (
           <section class="hr-w s12 mt-4" aria-label="Remittance lines">
             <header>
