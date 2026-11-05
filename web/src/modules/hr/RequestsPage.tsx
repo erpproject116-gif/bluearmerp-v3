@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type RequestRow = {
   id: number;
@@ -52,8 +53,7 @@ export default function RequestsPage() {
 
   return (
     <HrLayout>
-      <h1 class="text-2xl font-semibold">Requests</h1>
-      <p class="mb-4 mt-1 text-sm text-text-secondary">Loans, salary advances, pay questions, certificates, and resignations. Leave stays on the Leave page. These requests do not change pay.</p>
+      <HrPageHead title="Requests" subtitle="Loans, salary advances, pay questions, certificates, and resignations. Leave stays on the Leave page. These requests do not change pay." />
       <label class="mb-3 block text-sm">
         Kind
         <select class="ml-2 rounded border border-stroke px-2 py-1" value={kind()} onChange={(e) => setKind(e.currentTarget.value)}>

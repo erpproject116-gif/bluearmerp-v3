@@ -4,6 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type RecordKind = "policy" | "announcement" | "event";
 type CompanyRecord = {
@@ -61,8 +62,7 @@ export default function CompanyRecordsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Policies & notices</h1>
-      <p class="mb-6 text-sm text-text-secondary">These records do not change pay.</p>
+      <HrPageHead title="Policies & notices" subtitle="These records do not change pay." />
       <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setOpen(true)}>
         New record
       </button>
@@ -83,7 +83,7 @@ export default function CompanyRecordsPage() {
         </Field>
       </EntityModal>
       <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <div class="mb-3 flex items-center justify-between gap-3">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-lg font-medium">Records</h2>
           <select class={inputClass + " w-44"} value={kind()} onChange={(e) => setKind(e.currentTarget.value as RecordKind | "")}>
             <option value="">All</option>

@@ -1,8 +1,9 @@
-import { createResource, createSignal } from "solid-js";
+import { createResource, createSignal, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrEmpty, HrPageHead, HrTcard } from "./HrUi";
 
 type Assignment = {
   id: number;
@@ -30,8 +31,10 @@ export default function DeploymentsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Deployments</h1>
-      <p class="mb-4 text-sm text-text-secondary">Who is assigned to which site, and when that assignment ends. Ending it does not change employment.</p>
+      <HrPageHead title="Deployments" subtitle="Who is assigned to which site, and when that assignment ends. Ending it does not change employment." />
+      <Show when={(rows() ?? []).length === 0 && !rows.loading}>
+        <HrTcard><HrEmpty title="No deployments yet" hint="Place people from Workforce or the employee Assignment tab." /></HrTcard>
+      </Show>
       <SpreadsheetGrid
         columns={[
           { key: "employee_name", header: "Employee" },

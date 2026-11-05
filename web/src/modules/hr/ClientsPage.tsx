@@ -5,6 +5,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrEmpty, HrPageHead, HrTcard } from "./HrUi";
 
 type Person = { employee_id: number; employee_name: string; start_date: string };
 type Site = { id: number; site_name: string; industry_id: number; industry_name: string; people: Person[] };
@@ -77,15 +78,15 @@ export default function ClientsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Clients & sites</h1>
-      <p class="mb-4 text-sm text-text-secondary">Client companies, their sites, and the industry of each site.</p>
-      <div class="mb-4 overflow-x-auto rounded-xl border border-stroke bg-surface">
-        <table>
+      <HrPageHead title="Clients & sites" subtitle="Client companies, their sites, and the industry of each site." />
+      <HrTcard class="mb-4">
+        <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
           <thead>
-            <tr><th>Client</th><th>Sales customer</th><th>Sites</th><th>People on sites</th></tr>
+            <tr class="border-b border-stroke text-left text-text-secondary"><th class="px-3 py-2">Client</th><th class="px-3 py-2">Sales customer</th><th class="px-3 py-2">Sites</th><th class="px-3 py-2">People on sites</th></tr>
           </thead>
           <tbody>
-            <For each={clients() ?? []} fallback={<tr><td colspan="4">No clients yet.</td></tr>}>
+            <For each={clients() ?? []} fallback={<tr><td colSpan={4}><HrEmpty title="No clients yet" /></td></tr>}>
               {(client) => (
                 <tr>
                   <td>{client.name}</td>
@@ -97,8 +98,9 @@ export default function ClientsPage() {
             </For>
           </tbody>
         </table>
-      </div>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-2">
+        </div>
+      </HrTcard>
+      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-2">
         <Field label="Client">
           <select class={inputClass} value={source()} onChange={(e) => setSource(e.currentTarget.value as "existing" | "new")}>
             <option value="existing">Existing sales customer</option>
@@ -127,7 +129,7 @@ export default function ClientsPage() {
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white md:col-span-2" onClick={() => void createClient()}>Save client</button>
       </div>
 
-      <div class="mb-6 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-2">
+      <div class="mb-6 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-2">
         <Field label="Add a site to">
           <select class={inputClass} value={addClientId()} onChange={(e) => setAddClientId(e.currentTarget.value)}>
             <option value="">Choose</option>
@@ -153,7 +155,7 @@ export default function ClientsPage() {
               <section class="rounded-xl border border-stroke bg-surface p-4">
                 <h2 class="text-base font-semibold">{client.name}</h2>
                 <p class="mb-3 text-sm text-text-secondary">Sales customer {client.partner_name} ({client.partner_code})</p>
-                <div class="grid gap-3 md:grid-cols-2">
+                <div class="grid gap-3 grid-cols-1 min-[1024px]:grid-cols-2">
                   <For each={client.sites ?? []}>
                     {(site) => (
                       <div class="rounded-lg border border-stroke bg-panel p-3">

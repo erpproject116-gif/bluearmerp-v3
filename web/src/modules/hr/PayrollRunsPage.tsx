@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
-import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
+import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { ActivityHistoryLink } from "../../shared/ActivityHistoryLink";
 import {
   createPayslipShareLink,
@@ -17,8 +17,20 @@ import { exportPayrollRegisterCsv } from "../../shared/hrCsvImport";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav } from "./HrUi";
 import type { Cutoff } from "./attendanceShared";
 import { formatAmount, formatPeso } from "../../shared/money";
+
+const PAY_STEPS = [
+  "1. Period & group",
+  "2. Pull DTR",
+  "3. Compute",
+  "4. Review exceptions",
+  "5. Approve",
+  "6. Payslips",
+  "7. Bank file",
+  "8. Post & lock",
+];
 
 export default function PayrollRunsPage() {
   const toast = useToast();
@@ -28,6 +40,8 @@ export default function PayrollRunsPage() {
   const [periodEnd, setPeriodEnd] = createSignal("");
   const [periodLabel, setPeriodLabel] = createSignal("");
   const [cutoffId, setCutoffId] = createSignal("");
+  const [wizStep, setWizStep] = createSignal(0);
+  const [approved, setApproved] = createSignal(false);
   const cutoffs = createQuery(() => ({
     queryKey: ["hr-cutoffs"],
     queryFn: async () => {
@@ -125,91 +139,193 @@ export default function PayrollRunsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Payroll runs</h1>
-      <p class="mb-4 text-sm text-text-secondary">Compute, review and post payroll per cut-off. Pay amounts stay on this page.</p>
-      <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <h2 class="mb-3 text-lg font-medium">New payroll run</h2>
-        <p class="mb-3 text-sm text-text-secondary">
-          Gross pay includes base salary plus DTR premiums (OT at 125%, night diff 10%, holiday multipliers from the holiday calendar).
-          Import or enter DTR in Attendance before running payroll.
-          A 1st–15th cutoff does not pay the monthly salary and does not take SSS, PhilHealth, Pag-IBIG, or tax.
-          Those are paid and taken once on the 16th through the end of the month. A full-month run is unchanged.
-        </p>
-        <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRunOpen(true)}>
-          New payroll run
-        </button>
-      </section>
-      <EntityModal
-        open={runOpen()}
-        title="New payroll run"
-        wide
-        onClose={() => setRunOpen(false)}
-        onSave={() => void run()}
-        onSecondarySave={() => void runPreview()}
-        secondarySaveLabel="Preview"
-        saveLabel="Run payroll"
-        saving={running() || previewing()}
-      >
-        <Field label="Saved cut-off">
-          <select class={inputClass} value={cutoffId()} onChange={(e) => applyCutoff(e.currentTarget.value)}>
-            <option value="">Type dates</option>
-            <For each={cutoffs.data ?? []}>
-              {(c) => (
-                <option value={String(c.id)}>
-                  {c.label} ({c.cutoff_start} → {c.cutoff_end})
-                </option>
-              )}
-            </For>
-          </select>
-        </Field>
-        <Field label="Period start"><input type="date" class={inputClass} value={periodStart()} onInput={(e) => setPeriodStart(e.currentTarget.value)} /></Field>
-        <Field label="Period end"><input type="date" class={inputClass} value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} /></Field>
-        <Field label="Label (optional)"><input class={inputClass} value={periodLabel()} onInput={(e) => setPeriodLabel(e.currentTarget.value)} /></Field>
-        <div class="sm:col-span-2 lg:col-span-3">
-      <Show when={preview()}>
-        {(p) => (
-          <section class="mb-6 rounded-xl border border-stroke bg-slate-50 p-4">
-            <h3 class="mb-2 text-sm font-semibold text-text-primary">
-              Preview {p().period_start} → {p().period_end} · {p().employee_count} employee(s)
-            </h3>
-            <div class="overflow-x-auto">
-              <table class="min-w-full text-sm">
-                <thead>
-                  <tr class="border-b border-stroke text-left text-text-secondary">
-                    <th class="py-1 pr-3">Employee</th>
-                    <th class="py-1 pr-3 text-right">Basic</th>
-                    <th class="py-1 pr-3 text-right">Premiums</th>
-                    <th class="py-1 pr-3 text-right">Gross</th>
-                    <th class="py-1 pr-3 text-right">Net</th>
-                    <th class="py-1 text-right">DTR days</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={p().employees}>
-                    {(row) => (
-                      <tr class="border-b border-stroke/60">
-                        <td class="py-1 pr-3">{row.employee_name}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.base_salary)}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.premium_total)}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.gross_pay)}</td>
-                        <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.net_pay)}</td>
-                        <td class="py-1 text-right tabular-nums">{row.dtr_days}</td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+      <HrPageHead
+        title="Payroll runs"
+        subtitle="Compute, review and post payroll per cut-off. Pay amounts stay on this page."
+        actions={
+          <button
+            type="button"
+            class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white"
+            onClick={() => {
+              setWizStep(0);
+              setApproved(false);
+              setRunOpen(true);
+            }}
+          >
+            New payroll run
+          </button>
+        }
+      />
+
+      <Show when={runOpen()}>
+        <HrTcard class="mb-6">
+          <div class="p-4">
+            <HrSteps steps={PAY_STEPS} current={wizStep()} onSelect={setWizStep} />
+
+            <Show when={wizStep() === 0}>
+              <div class="grid grid-cols-1 gap-3 min-[1024px]:grid-cols-2">
+                <Field label="Saved cut-off">
+                  <select class={inputClass} value={cutoffId()} onChange={(e) => applyCutoff(e.currentTarget.value)}>
+                    <option value="">Type dates</option>
+                    <For each={cutoffs.data ?? []}>
+                      {(c) => (
+                        <option value={String(c.id)}>
+                          {c.label} ({c.cutoff_start} → {c.cutoff_end})
+                        </option>
+                      )}
+                    </For>
+                  </select>
+                </Field>
+                <Field label="Group">
+                  <select class={inputClass} disabled>
+                    <option>All employees</option>
+                    <option disabled>By client (Planned)</option>
+                  </select>
+                  <p class="mt-1 text-xs text-text-secondary">By-client run group <HrPlanned /></p>
+                </Field>
+                <Field label="Period start"><input type="date" class={inputClass} value={periodStart()} onInput={(e) => setPeriodStart(e.currentTarget.value)} /></Field>
+                <Field label="Period end"><input type="date" class={inputClass} value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} /></Field>
+                <Field label="Run name (optional)"><input class={inputClass} value={periodLabel()} onInput={(e) => setPeriodLabel(e.currentTarget.value)} /></Field>
+              </div>
+            </Show>
+
+            <Show when={wizStep() === 1}>
+              <HrNotice>
+                DTR must already be entered or imported under Attendance. Client DTR acceptance stays on the Client DTR inbox — it is not written into payslip hours here.
+              </HrNotice>
+              <p class="mt-3 text-sm">
+                <a href="/app/hr/attendance/overview" class="text-brand-700">Open attendance →</a>
+                {" · "}
+                <a href="/app/hr/attendance/client-dtr" class="text-brand-700">Client DTR inbox →</a>
+              </p>
+              <label class="mt-3 flex items-start gap-2 text-sm">
+                <input type="checkbox" disabled />
+                <span>Proceed without excluded client branches <HrPlanned /></span>
+              </label>
+            </Show>
+
+            <Show when={wizStep() === 2}>
+              <p class="mb-3 text-sm text-text-secondary">Preview uses the existing payroll compute. Amounts are not posted until you run payroll on step 5.</p>
+              <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" disabled={previewing()} onClick={() => void runPreview()}>
+                {previewing() ? "Computing…" : "Compute now"}
+              </button>
+              <Show when={preview()}>
+                {(p) => (
+                  <div class="mt-4 overflow-x-auto">
+                    <p class="mb-2 text-sm font-semibold">Preview {p().period_start} → {p().period_end} · {p().employee_count} employee(s)</p>
+                    <table class="min-w-full text-sm">
+                      <thead>
+                        <tr class="border-b border-stroke text-left text-text-secondary">
+                          <th class="py-1 pr-3">Employee</th>
+                          <th class="py-1 pr-3 text-right">Basic</th>
+                          <th class="py-1 pr-3 text-right">Premiums</th>
+                          <th class="py-1 pr-3 text-right">Gross</th>
+                          <th class="py-1 pr-3 text-right">Net</th>
+                          <th class="py-1 text-right">DTR days</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <For each={p().employees}>
+                          {(row) => (
+                            <tr class="border-b border-stroke/60">
+                              <td class="py-1 pr-3">{row.employee_name}</td>
+                              <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.base_salary)}</td>
+                              <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.premium_total)}</td>
+                              <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.gross_pay)}</td>
+                              <td class="py-1 pr-3 text-right tabular-nums">{formatAmount(row.net_pay)}</td>
+                              <td class="py-1 text-right tabular-nums">{row.dtr_days}</td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Show>
+            </Show>
+
+            <Show when={wizStep() === 3}>
+              <HrNotice>Exception review actions (defer loan, hold pay, OT approve) are <HrPlanned />. Continue after you have reviewed the compute preview.</HrNotice>
+            </Show>
+
+            <Show when={wizStep() === 4}>
+              <label class="flex items-start gap-2 text-sm">
+                <input type="checkbox" checked={approved()} onChange={(e) => setApproved(e.currentTarget.checked)} />
+                <span>Totals reviewed. Run payroll now (posts payslips and journal).</span>
+              </label>
+              <button
+                type="button"
+                class="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                disabled={!approved() || running()}
+                onClick={() => void run()}
+              >
+                {running() ? "Running…" : "Run payroll"}
+              </button>
+            </Show>
+
+            <Show when={wizStep() === 5}>
+              <p class="text-sm text-text-secondary">Select a pay period below, then use Print / PDF or Copy secure employee link on a payslip row. Share links expire after 72 hours.</p>
+            </Show>
+
+            <Show when={wizStep() === 6}>
+              <Field label="Bank format">
+                <select class={inputClass} value="generic_csv">
+                  <option value="generic_csv">Bank CSV (generic)</option>
+                  <option value="other" disabled>Other bank layouts (Planned)</option>
+                </select>
+              </Field>
+              <button
+                type="button"
+                class="mt-3 rounded-lg border border-stroke px-3 py-1.5 text-sm"
+                disabled={!selectedPeriodId()}
+                onClick={() => {
+                  const id = selectedPeriodId();
+                  if (!id) return toast.warning("Select a pay period first.");
+                  window.open(`/api/v1/hr/pay-periods/${id}/bank-export?format=generic_csv`, "_blank");
+                }}
+              >
+                Export bank file
+              </button>
+            </Show>
+
+            <Show when={wizStep() === 7}>
+              <HrNotice>Locking a period is final for edits on that run. Unlock is available for administrators when needed.</HrNotice>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                  disabled={!selectedPeriodId()}
+                  onClick={() => {
+                    const id = selectedPeriodId();
+                    if (!id) return;
+                    void apiFetch(`/api/v1/hr/pay-periods/${id}/lock`, { method: "POST", body: "{}" }).then((res) => {
+                      if (!res.success) toast.warning(res.message ?? "Lock failed.");
+                      else toast.success("Period locked.");
+                    });
+                  }}
+                >
+                  Post & lock run
+                </button>
+                <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => setRunOpen(false)}>
+                  Close wizard
+                </button>
+              </div>
+            </Show>
+
+            <HrWizardNav
+              canBack={wizStep() > 0}
+              canNext={wizStep() < PAY_STEPS.length - 1}
+              onBack={() => setWizStep(Math.max(0, wizStep() - 1))}
+              onNext={() => setWizStep(Math.min(PAY_STEPS.length - 1, wizStep() + 1))}
+            />
+          </div>
+        </HrTcard>
       </Show>
 
-        </div>
-      </EntityModal>
       <section class="mb-6">
         <h2 class="mb-2 text-lg font-medium">Pay periods</h2>
         <div class="flex flex-wrap gap-2">
-          <For each={periods.data ?? []}>
+          <For each={periods.data ?? []} fallback={<p class="text-sm text-text-secondary">No pay periods yet.</p>}>
             {(p) => (
               <button
                 type="button"

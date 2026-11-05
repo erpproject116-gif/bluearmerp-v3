@@ -5,6 +5,7 @@ import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Clearance = { id: number; employee_name: string; employee_status: string; status: string; pay_period_id: number };
 
@@ -33,9 +34,8 @@ export default function OffboardingPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Offboarding & clearance</h1>
-      <p class="mb-3 text-sm text-text-secondary">Release calls the existing final pay. Closing a resignation request does not.</p>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-2">
+      <HrPageHead title="Offboarding & clearance" subtitle="Release calls the existing final pay. Closing a resignation request does not." />
+      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-2">
         <LookupCombo label="Employee" value={empLabel} selectedId={empId} onInput={setEmpLabel} onSelect={(o) => { setEmpId(o.id); setEmpLabel(o.label); }} onClear={() => { setEmpId(null); setEmpLabel(""); }} fetchOptions={(q) => fetchEmployeeOptions(q)} placeholder="Search employees…" />
         <button type="button" class="self-end rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => void save()}>Add clearance</button>
       </div>

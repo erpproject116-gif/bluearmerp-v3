@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 import { siteChoices, type SiteChoice } from "./siteChoices";
 
 type Order = { id: number; site_name: string; client_name: string; pay_rate: number; bill_rate: number };
@@ -45,9 +46,8 @@ export default function ContractsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Contracts & job orders</h1>
-      <p class="mb-4 text-sm text-text-secondary">Job orders hold the pay rate and the bill rate. Public openings are separate and do not show rates.</p>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-4">
+      <HrPageHead title="Contracts & job orders" subtitle="Job orders hold the pay rate and the bill rate. Public openings are separate and do not show rates." />
+      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-4">
         <SiteField sites={clients() ?? []} value={siteId()} onChange={setSiteId} />
         <Field label="Pay rate"><input class={inputClass} value={pay()} onInput={(e) => setPay(e.currentTarget.value)} /></Field>
         <Field label="Bill rate"><input class={inputClass} value={bill()} onInput={(e) => setBill(e.currentTarget.value)} /></Field>
@@ -72,7 +72,7 @@ export default function ContractsPage() {
       />
       <h2 class="mb-3 mt-8 text-lg font-semibold">Public openings</h2>
       <p class="mb-3 text-sm text-text-secondary">These titles appear on the public application form. Pay rates stay on the job order above.</p>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-4">
+      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-4">
         <SiteField sites={clients() ?? []} value={siteId()} onChange={setSiteId} />
         <Field label="Title"><input class={inputClass} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} /></Field>
         <Field label="Headcount"><input class={inputClass} value={headcount()} onInput={(e) => setHeadcount(e.currentTarget.value)} /></Field>

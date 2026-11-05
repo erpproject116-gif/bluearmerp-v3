@@ -4,6 +4,7 @@ import { apiFetch } from "../../shared/api";
 import { EntityModal, Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type PayItemType = {
   id: number;
@@ -81,8 +82,7 @@ export default function PayItemsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Pay items</h1>
-      <p class="mb-4 text-sm text-text-secondary">Earnings and deductions used by payroll.</p>
+      <HrPageHead title="Pay items" subtitle="Earnings and deductions used by payroll." />
       <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-1 text-lg font-medium">Earnings & deductions catalog</h2>
         <p class="mb-3 text-sm text-text-secondary">

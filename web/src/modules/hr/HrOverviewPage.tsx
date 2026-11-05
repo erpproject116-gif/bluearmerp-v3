@@ -323,7 +323,7 @@ export default function HrOverviewPage() {
 
   return (
     <HrLayout>
-      <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div class="hr-pagehead">
         <div>
           <h1 class="text-2xl font-bold">HR Overview</h1>
           <p class="mt-1 text-sm text-text-secondary">Live counts for this company. Each number opens its list.</p>
@@ -458,7 +458,7 @@ export default function HrOverviewPage() {
 
         <Show when={mode.enabled() && shown("dep")}>
           <section class="rounded-lg border border-stroke bg-surface p-4" aria-label="Deployment by client">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Deployment by client</h2>
               <A href="/app/hr/deployments" class="text-sm text-brand-700">Roster</A>
             </div>
@@ -491,7 +491,7 @@ export default function HrOverviewPage() {
 
         <Show when={shown("fun")}>
           <section class="rounded-lg border border-stroke bg-surface p-4" aria-label="Applicant pipeline">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Applicant pipeline</h2>
               <A href="/app/hr/applicants" class="text-sm text-brand-700">Applicants</A>
             </div>
@@ -510,7 +510,7 @@ export default function HrOverviewPage() {
 
         <Show when={mode.enabled() && shown("mr")}>
           <section class="hr-span rounded-lg border border-stroke bg-surface p-4" aria-label="Open manpower requests">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Open manpower requests</h2>
               <A href="/app/hr/manpower-requests" class="text-sm text-brand-700">All requests</A>
             </div>
@@ -536,7 +536,7 @@ export default function HrOverviewPage() {
 
         <Show when={mode.enabled() && shown("dtr")}>
           <section class="rounded-lg border border-stroke bg-surface p-4" aria-label="Client time files">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Client time files</h2>
               <A href="/app/hr/attendance/client-dtr" class="text-sm text-brand-700">Client DTR</A>
             </div>
@@ -553,7 +553,7 @@ export default function HrOverviewPage() {
 
         <Show when={shown("pay")}>
           <section class="rounded-lg border border-stroke bg-surface p-4" aria-label="Latest pay period">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Latest pay period</h2>
               <A href="/app/hr/payroll-runs" class="text-sm text-brand-700">Payroll</A>
             </div>
@@ -571,7 +571,7 @@ export default function HrOverviewPage() {
 
         <Show when={mode.enabled() && shown("bill")}>
           <section class="rounded-lg border border-stroke bg-surface p-4" aria-label="Client bills">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Client bills</h2>
               <A href="/app/hr/client-billing" class="text-sm text-brand-700">Billing</A>
             </div>
@@ -590,7 +590,7 @@ export default function HrOverviewPage() {
 
         <Show when={shown("cal")}>
           <section class="rounded-lg border border-stroke bg-surface p-4" aria-label="Leave this week">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Leave this week</h2>
               <A href="/app/hr/leave" class="text-sm text-brand-700">Leave</A>
             </div>
@@ -608,7 +608,7 @@ export default function HrOverviewPage() {
 
         <Show when={shown("comp")}>
           <section class="rounded-lg border border-stroke bg-surface p-4" aria-label="Document dates">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Document dates</h2>
               <A href="/app/hr/compliance" class="text-sm text-brand-700">Documents</A>
             </div>
@@ -679,7 +679,7 @@ export default function HrOverviewPage() {
       <Show when={customize()}>
         <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Customize dashboard" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setCustomize(false); }}>
           <div class="max-h-[80vh] w-full max-w-md overflow-auto rounded-lg border border-stroke bg-surface p-4">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Customize dashboard</h2>
               <button type="button" class="text-sm" aria-label="Close" onClick={() => setCustomize(false)}>Close</button>
             </div>

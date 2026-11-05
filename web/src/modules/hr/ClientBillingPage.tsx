@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Submission = { id: number; client_name: string; site_name: string; period_start: string; period_end: string; status: string };
 type Bill = { id: number; client_name: string; site_name: string; period_start: string; period_end: string; total: number };
@@ -24,9 +25,8 @@ export default function ClientBillingPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Client billing</h1>
-      <p class="mb-3 text-sm text-text-secondary">The total is the accepted hours times that site’s latest bill rate. Employee pay is unchanged.</p>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-2">
+      <HrPageHead title="Client billing" subtitle="The total is the accepted hours times that site’s latest bill rate. Employee pay is unchanged." />
+      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-2">
         <Field label="Accepted time">
           <select class={inputClass} value={submissionId()} onChange={(e) => setSubmissionId(e.currentTarget.value)}>
             <option value="">Choose</option>

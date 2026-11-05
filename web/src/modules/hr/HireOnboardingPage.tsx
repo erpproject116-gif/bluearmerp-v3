@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type CaseRow = {
   id: number; employee_no?: string; employee_name?: string; status: string;
@@ -40,10 +41,9 @@ export default function HireOnboardingPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Hire onboarding</h1>
-      <p class="mb-6 text-sm text-text-secondary">
+      <HrPageHead title="Hire onboarding" subtitle="
         New-hire checklists (distinct from workspace ERP onboarding). Cases auto-spawn when an active employee is created.
-      </p>
+      " />
 
       <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">Board</h2>

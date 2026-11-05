@@ -240,7 +240,7 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
           )}
         </For>
       </ul>
-      <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid gap-2 grid-cols-1 min-[1024px]:grid-cols-2">
         <select class={inputClass} value={docType()} onChange={(e) => setDocType(e.currentTarget.value)}>
           <For each={DOC_TYPES}>{(t) => <option value={t}>{t}</option>}</For>
         </select>
@@ -271,7 +271,7 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
           {uploading() ? "Uploading…" : "Upload file"}
         </button>
       </div>
-      <div class="mt-2 grid gap-2 sm:grid-cols-3">
+      <div class="mt-2 grid gap-2 grid-cols-1 min-[1024px]:grid-cols-3">
         <Field label="">
           <input
             class={inputClass}
@@ -312,7 +312,7 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
             )}
           </For>
         </ul>
-        <div class="grid gap-2 sm:grid-cols-3">
+        <div class="grid gap-2 grid-cols-1 min-[1024px]:grid-cols-3">
           <select class={inputClass} value={typeId()} onChange={(e) => setTypeId(e.currentTarget.value)}>
             <option value="">Item…</option>
             <For each={types() ?? []}>

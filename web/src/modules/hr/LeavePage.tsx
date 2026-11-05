@@ -13,6 +13,7 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type LeaveType = { id: number; code: string; name: string; is_active: boolean };
 type LeaveBalance = {
@@ -153,16 +154,20 @@ export default function LeavePage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Leave</h1>
-      <p class="mb-4 text-sm text-text-secondary">Balances, requests and approval. Approved leave updates the DTR.</p>
-      <div class="mb-4 flex flex-wrap gap-2">
-      <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => void accrue()}>
-        Accrue annual credit
-      </button>
-      <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRequestOpen(true)}>
-        New request
-      </button>
-      </div>
+      <HrPageHead
+        title="Leave"
+        subtitle="Balances, requests and approval. Approved leave updates the DTR."
+        actions={
+          <>
+            <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => void accrue()}>
+              Accrue annual credit
+            </button>
+            <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRequestOpen(true)}>
+              New request
+            </button>
+          </>
+        }
+      />
       <EntityModal
         open={requestOpen()}
         title="New request"
@@ -198,7 +203,7 @@ export default function LeavePage() {
       </EntityModal>
 
       <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-        <div class="mb-3 flex items-center justify-between">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-lg font-medium">Request queue</h2>
           <select class={inputClass + " w-40"} value={statusFilter()} onChange={(e) => setStatusFilter(e.currentTarget.value)}>
             <option value="">All</option>

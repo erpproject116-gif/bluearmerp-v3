@@ -70,7 +70,7 @@ function TimeForm(props: { sites: Site[]; onSubmit: (body: Record<string, unknow
   const [end, setEnd] = createSignal("");
   const [fileName, setFileName] = createSignal("");
   return (
-    <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ site_id: Number(siteId()), period_start: start(), period_end: end(), file_name: fileName() }); }}>
+    <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 grid-cols-1 min-[1024px]:grid-cols-2" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ site_id: Number(siteId()), period_start: start(), period_end: end(), file_name: fileName() }); }}>
       <SiteSelect sites={props.sites} value={siteId()} onChange={setSiteId} />
       <input class="h-9 rounded-lg border border-stroke px-2 text-sm" type="date" value={start()} onInput={(e) => setStart(e.currentTarget.value)} />
       <input class="h-9 rounded-lg border border-stroke px-2 text-sm" type="date" value={end()} onInput={(e) => setEnd(e.currentTarget.value)} />
@@ -85,7 +85,7 @@ function RequestForm(props: { sites: Site[]; onSubmit: (body: Record<string, unk
   const [head, setHead] = createSignal("1");
   const [details, setDetails] = createSignal("");
   return (
-    <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 md:grid-cols-4" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ site_id: Number(siteId()), headcount: Number(head()) || 1, details: details() }); }}>
+    <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 grid-cols-1 min-[1024px]:grid-cols-2" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ site_id: Number(siteId()), headcount: Number(head()) || 1, details: details() }); }}>
       <SiteSelect sites={props.sites} value={siteId()} onChange={setSiteId} />
       <input class="h-9 rounded-lg border border-stroke px-2 text-sm" value={head()} onInput={(e) => setHead(e.currentTarget.value)} />
       <input class="h-9 rounded-lg border border-stroke px-2 text-sm" placeholder="Details" value={details()} onInput={(e) => setDetails(e.currentTarget.value)} />
@@ -98,7 +98,7 @@ function IncidentForm(props: { people: Person[]; onSubmit: (body: Record<string,
   const [employeeId, setEmployeeId] = createSignal("");
   const [description, setDescription] = createSignal("");
   return (
-    <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 md:grid-cols-3" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ employee_id: Number(employeeId()), description: description() }); }}>
+    <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 grid-cols-1 min-[1024px]:grid-cols-2" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ employee_id: Number(employeeId()), description: description() }); }}>
       <select class="h-9 rounded-lg border border-stroke px-2 text-sm" value={employeeId()} onChange={(e) => setEmployeeId(e.currentTarget.value)}>
         <option value="">Person</option>
         <For each={props.people}>{(person) => <option value={person.id}>{person.full_name}</option>}</For>
@@ -121,7 +121,7 @@ function SiteSelect(props: { sites: Site[]; value: string; onChange: (value: str
 function Summary(props: { data: Row | undefined }) {
   const data = () => props.data ?? {};
   return (
-    <div class="grid gap-4 sm:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 min-[1024px]:grid-cols-3">
       <Card label="People on site" value={data().people} />
       <Card label="Open requests" value={data().open_requests} />
       <Card label="Bills" value={data().bills} />
@@ -153,7 +153,7 @@ function Table(props: { tab: string; rows: Row[]; onDecision: (id: number, decis
   };
   const keys = columns[props.tab] ?? [];
   return (
-    <div class="overflow-hidden rounded-lg border border-stroke bg-white">
+    <div class="overflow-x-auto rounded-lg border border-stroke bg-white">
       <table class="min-w-full text-sm">
         <thead class="bg-surface text-left text-xs uppercase tracking-wide text-text-secondary">
           <tr>

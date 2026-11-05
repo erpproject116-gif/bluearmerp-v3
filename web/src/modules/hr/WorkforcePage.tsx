@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { KanbanBoard, type KanbanColumn } from "../../shared/KanbanBoard";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Person = { assignment_id?: number; employee_id: number; employee_name: string; start_date?: string };
 type Site = { id: number; client_name: string; site_name: string; people: Person[] };
@@ -48,8 +49,7 @@ export default function WorkforcePage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Workforce board</h1>
-      <p class="mb-3 text-sm text-text-secondary">Drag a person to a site, or back to Not assigned. That does not change employment.</p>
+      <HrPageHead title="Workforce board" subtitle="Drag a person to a site, or back to Not assigned. That does not change employment." />
       <KanbanBoard columns={columns()} getCardId={(row) => row.key} onDrop={(row, from, to) => void move(row, from, to)} renderCard={(row) => (
         <div>
           <p class="font-medium">{row.employee_name}</p>

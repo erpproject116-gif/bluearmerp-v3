@@ -6,6 +6,7 @@ import { LookupCombo } from "../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Course = { id: number; code: string; title: string; is_mandatory: boolean; pass_mark: number };
 type Assignment = {
@@ -74,8 +75,7 @@ export default function LearningPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Learning</h1>
-      <p class="mb-6 text-sm text-text-secondary">Courses, enrollments, and completion.</p>
+      <HrPageHead title="Learning" subtitle="Courses, enrollments, and completion." />
 
       <div class="mb-4 flex flex-wrap gap-2">
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCourseOpen(true)}>

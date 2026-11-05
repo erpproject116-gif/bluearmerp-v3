@@ -6,6 +6,7 @@ import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../shared/ViewModeToggle";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Application = {
   id: number;
@@ -127,21 +128,21 @@ export default function ApplicantsPage() {
 
   return (
     <HrLayout>
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 class="text-2xl font-semibold">Applicants</h1>
-          <p class="mt-1 text-sm text-text-secondary">Submissions from the public application form.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <Show when={mode() === "board"}>
-            <div class="hr-seg flex overflow-hidden rounded-lg border border-stroke">
-              <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "horizontal", "text-text-secondary": axis() !== "horizontal" }} onClick={() => chooseAxis("horizontal")}>Columns</button>
-              <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "vertical", "text-text-secondary": axis() !== "vertical" }} onClick={() => chooseAxis("vertical")}>Rows</button>
-            </div>
-          </Show>
-          <ViewModeToggle value={mode()} onChange={setMode} storageKey="hr-applicants" />
-        </div>
-      </div>
+      <HrPageHead
+        title="Applicants"
+        subtitle="Submissions from the public application form."
+        actions={
+          <>
+            <Show when={mode() === "board"}>
+              <div class="hr-seg flex overflow-hidden rounded-lg border border-stroke">
+                <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "horizontal", "text-text-secondary": axis() !== "horizontal" }} onClick={() => chooseAxis("horizontal")}>Columns</button>
+                <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "vertical", "text-text-secondary": axis() !== "vertical" }} onClick={() => chooseAxis("vertical")}>Rows</button>
+              </div>
+            </Show>
+            <ViewModeToggle value={mode()} onChange={setMode} storageKey="hr-applicants" />
+          </>
+        }
+      />
       <div class="mb-4 grid gap-2 sm:grid-cols-2">
         <Field label="Industry">
           <select class={inputClass} value={industry()} onChange={(e) => setIndustry(e.currentTarget.value)}>

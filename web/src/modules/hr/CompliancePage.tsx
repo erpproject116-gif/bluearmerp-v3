@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Doc = { id: number; employee_name: string; doc_type: string; title: string; expires_on: string; late: boolean; client_visible?: boolean };
 
@@ -32,8 +33,7 @@ export default function CompliancePage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Compliance & documents</h1>
-      <p class="mb-4 text-sm text-text-secondary">Document dates on the employee file. Showing a document to a client does not send the file.</p>
+      <HrPageHead title="Compliance & documents" subtitle="Document dates on the employee file. Showing a document to a client does not send the file." />
       <SpreadsheetGrid
         columns={[
           { key: "employee_name", header: "Employee" },

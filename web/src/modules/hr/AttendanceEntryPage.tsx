@@ -174,12 +174,14 @@ export default function AttendanceEntryPage() {
 
   return (
     <HrLayout>
-      <div class="mb-4">
-        <h1 class="text-2xl font-semibold">DTR entry</h1>
-        <p class="mt-1 text-sm text-text-secondary">
-          Manual day rows and CSV import. Punch/import sources can fill the same table. If the date is a holiday,
-          status auto-tags to holiday.
-        </p>
+      <div class="hr-pagehead">
+        <div>
+          <h1 class="text-2xl font-semibold">DTR entry</h1>
+          <p class="mt-1 text-sm text-text-secondary">
+            Manual day rows and CSV import. Punch/import sources can fill the same table. If the date is a holiday,
+            status auto-tags to holiday.
+          </p>
+        </div>
       </div>
 
       <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">

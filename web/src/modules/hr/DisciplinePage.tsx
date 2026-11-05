@@ -8,6 +8,16 @@ import { LookupCombo } from "../../shared/LookupCombo";
 import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav } from "./HrUi";
+
+const CASE_STEPS = [
+  "1. Incident",
+  "2. Notice to Explain",
+  "3. Explanation",
+  "4. Hearing",
+  "5. Decision",
+  "6. Sanction & 201 filing",
+];
 
 type CaseRow = {
   id: number; case_no: string; case_type: string; status: string; subject: string;
@@ -61,6 +71,7 @@ export default function DisciplinePage() {
     if (Number.isInteger(n) && n > 0) setSelectedId(n);
   });
   const [createOpen, setCreateOpen] = createSignal(false);
+  const [caseStep, setCaseStep] = createSignal(0);
 
   const payItems = createQuery(() => ({
     queryKey: ["hr-pay-item-types", "deduction"],
@@ -134,14 +145,15 @@ export default function DisciplinePage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Discipline</h1>
-      <p class="mb-6 text-sm text-text-secondary">
-        Case timeline and letter → 201. Have PH labor counsel review wording before claiming DOLE compliance.
-      </p>
-
-      <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCreateOpen(true)}>
-        New case
-      </button>
+      <HrPageHead
+        title="Discipline"
+        subtitle="Case timeline and letter → 201. Have PH labor counsel review wording before claiming DOLE compliance."
+        actions={
+          <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCreateOpen(true)}>
+            New case
+          </button>
+        }
+      />
       <EntityModal
         open={createOpen()}
         title="New case"
@@ -186,90 +198,140 @@ export default function DisciplinePage() {
       </EntityModal>
 
       <div class="grid gap-6 lg:grid-cols-2">
-        <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-          <h2 class="mb-3 text-lg font-medium">Cases</h2>
-          <For each={cases.data ?? []} fallback={<p class="text-sm text-text-secondary">No cases.</p>}>
-            {(c) => (
-              <button
-                type="button"
-                class="mb-1 block w-full rounded border border-transparent px-2 py-2 text-left text-sm hover:bg-panel"
-                classList={{ "border-brand-500 bg-brand-50": selectedId() === c.id }}
-                onClick={() => setSelectedId(c.id)}
-              >
-                <span class="font-medium">{c.case_no}</span> · {c.employee_name} · {c.case_type} · {c.status}
-              </button>
-            )}
-          </For>
-        </section>
-        <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
-          <h2 class="mb-3 text-lg font-medium">Detail</h2>
-          <Show when={detail.data} fallback={<p class="text-sm text-text-secondary">Select a case.</p>}>
-            {(d) => (
-              <div class="space-y-3 text-sm">
-                <p class="font-medium">{d().case.case_no} — {d().case.subject}</p>
-                <p class="text-text-secondary">
-                  Penalty {d().case.penalty_amount ?? 0}
-                  {d().case.authority_to_deduct ? " · authority to deduct recorded" : ""}
-                  . Pay is unchanged until a deduction pay item includes it.
-                </p>
-                <Show when={d().case.authority_to_deduct && (d().case.penalty_amount ?? 0) > 0}>
-                  <div class="flex flex-wrap items-end gap-2">
-                    <select class={inputClass + " w-56"} value={payItemTypeId()} onChange={(e) => setPayItemTypeId(e.currentTarget.value)}>
-                      <option value="">Deduction pay item…</option>
-                      <For each={(payItems.data ?? []).filter((t) => t.item_kind === "deduction")}>
-                        {(t) => <option value={t.id}>{t.item_code} — {t.item_name}</option>}
-                      </For>
-                    </select>
-                    <button
-                      type="button"
-                      class="rounded border border-stroke px-2 py-1 text-xs"
-                      onClick={() => {
-                        const id = selectedId();
-                        if (!id || !payItemTypeId()) return toast.warning("Choose a deduction pay item.");
-                        void apiFetch(`/api/v1/hr/discipline/cases/${id}/include-pay-item`, {
-                          method: "POST",
-                          body: JSON.stringify({ pay_item_type_id: Number(payItemTypeId()) }),
-                        }).then((res) => {
-                          if (!res.success) toast.warning(res.message ?? "Pay item was not added.");
-                          else toast.success(res.message ?? "Pay item added.");
-                        });
-                      }}
-                    >
-                      Include in pay
-                    </button>
+        <HrTcard>
+          <div class="p-4">
+            <h2 class="mb-3 text-lg font-medium">Cases</h2>
+            <For each={cases.data ?? []} fallback={<HrEmpty title="No cases" hint="Create a case to start due process." />}>
+              {(c) => (
+                <button
+                  type="button"
+                  class="mb-1 block w-full rounded border border-transparent px-2 py-2 text-left text-sm hover:bg-panel"
+                  classList={{ "border-brand-500 bg-brand-50": selectedId() === c.id }}
+                  onClick={() => { setSelectedId(c.id); setCaseStep(0); }}
+                >
+                  <span class="font-medium">{c.case_no}</span> · {c.employee_name} · {c.case_type}{" "}
+                  <HrBadge tone={c.status === "closed" ? "neutral" : "warning"}>{c.status}</HrBadge>
+                </button>
+              )}
+            </For>
+          </div>
+        </HrTcard>
+        <HrTcard>
+          <div class="p-4">
+            <h2 class="mb-3 text-lg font-medium">Case detail</h2>
+            <Show when={detail.data} fallback={<HrEmpty title="Select a case" />}>
+              {(d) => (
+                <div class="space-y-3 text-sm">
+                  <p class="font-medium">{d().case.case_no} — {d().case.subject}</p>
+                  <HrSteps steps={CASE_STEPS} current={caseStep()} onSelect={setCaseStep} />
+
+                  <Show when={caseStep() === 0}>
+                    <p class="text-text-secondary">Type: {d().case.case_type}</p>
+                    <p class="text-text-secondary">
+                      Penalty {d().case.penalty_amount ?? 0}
+                      {d().case.authority_to_deduct ? " · authority to deduct recorded" : ""}
+                      . Pay is unchanged until a deduction pay item includes it.
+                    </p>
+                  </Show>
+
+                  <Show when={caseStep() === 1}>
+                    <div class="rounded-lg border border-stroke bg-panel p-3">
+                      <p class="font-semibold">NOTICE TO EXPLAIN</p>
+                      <p class="mt-1 text-xs text-text-secondary">Generate the letter and store it in the 201 file with the button below.</p>
+                    </div>
+                    <button type="button" class="rounded bg-brand-600 px-2 py-1 text-xs text-white" onClick={() => void renderLetter()}>Letter → 201</button>
+                  </Show>
+
+                  <Show when={caseStep() === 2}>
+                    <p class="text-text-secondary">Advance to under review when the explanation period is handled.</p>
+                    <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("under_review")}>Under review</button>
+                    <div>
+                      <p class="mb-1 font-medium">Attach explanation / files</p>
+                      <input
+                        class={inputClass}
+                        type="file"
+                        onChange={(e) => {
+                          const chosen = e.currentTarget.files?.[0];
+                          e.currentTarget.value = "";
+                          if (chosen) void addFile(chosen);
+                        }}
+                      />
+                    </div>
+                  </Show>
+
+                  <Show when={caseStep() === 3}>
+                    <HrNotice>Hearing date, attendees, and minutes are <HrPlanned />. Use events below for notes until those fields exist.</HrNotice>
+                    <label class="block text-sm font-medium">Hearing date <HrPlanned /></label>
+                    <input type="datetime-local" class={inputClass} disabled />
+                    <label class="block text-sm font-medium">Attendees <HrPlanned /></label>
+                    <input class={inputClass} disabled />
+                    <label class="block text-sm font-medium">Minutes <HrPlanned /></label>
+                    <textarea class={inputClass} rows={3} disabled />
+                  </Show>
+
+                  <Show when={caseStep() === 4}>
+                    <div class="flex flex-wrap gap-2">
+                      <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("decide")}>Decide</button>
+                    </div>
+                  </Show>
+
+                  <Show when={caseStep() === 5}>
+                    <Show when={d().case.authority_to_deduct && (d().case.penalty_amount ?? 0) > 0}>
+                      <div class="flex flex-wrap items-end gap-2">
+                        <select class={inputClass + " w-56"} value={payItemTypeId()} onChange={(e) => setPayItemTypeId(e.currentTarget.value)}>
+                          <option value="">Deduction pay item…</option>
+                          <For each={(payItems.data ?? []).filter((t) => t.item_kind === "deduction")}>
+                            {(t) => <option value={t.id}>{t.item_code} — {t.item_name}</option>}
+                          </For>
+                        </select>
+                        <button
+                          type="button"
+                          class="rounded border border-stroke px-2 py-1 text-xs"
+                          onClick={() => {
+                            const id = selectedId();
+                            if (!id || !payItemTypeId()) return toast.warning("Choose a deduction pay item.");
+                            void apiFetch(`/api/v1/hr/discipline/cases/${id}/include-pay-item`, {
+                              method: "POST",
+                              body: JSON.stringify({ pay_item_type_id: Number(payItemTypeId()) }),
+                            }).then((res) => {
+                              if (!res.success) toast.warning(res.message ?? "Pay item was not added.");
+                              else toast.success(res.message ?? "Pay item added.");
+                            });
+                          }}
+                        >
+                          Include in pay
+                        </button>
+                      </div>
+                    </Show>
+                    <div class="flex flex-wrap gap-2">
+                      <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("close")}>Close</button>
+                      <button type="button" class="rounded bg-brand-600 px-2 py-1 text-xs text-white" onClick={() => void renderLetter()}>Issue decision & file to 201</button>
+                    </div>
+                  </Show>
+
+                  <Show when={!d().case.has_real_file}>
+                    <p class="text-amber-800">Attach a stored file before Under review, Decide, or Close. A generated letter does not count.</p>
+                  </Show>
+                  <div>
+                    <p class="mb-1 font-medium">Files</p>
+                    <For each={d().files ?? []} fallback={<p class="text-text-secondary">No stored file yet.</p>}>
+                      {(f) => <p>{f.file_name || f.title}</p>}
+                    </For>
                   </div>
-                </Show>
-                <Show when={!d().case.has_real_file}>
-                  <p class="text-amber-800">Attach a stored file before Under review, Decide, or Close. A generated letter does not count.</p>
-                </Show>
-                <div class="flex flex-wrap gap-2">
-                  <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("under_review")}>Under review</button>
-                  <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("decide")}>Decide</button>
-                  <button type="button" class="rounded border border-stroke px-2 py-1 text-xs" onClick={() => void advance("close")}>Close</button>
-                  <button type="button" class="rounded bg-brand-600 px-2 py-1 text-xs text-white" onClick={() => void renderLetter()}>Letter → 201</button>
-                </div>
-                <div>
-                  <p class="mb-1 font-medium">Files</p>
-                  <For each={d().files ?? []} fallback={<p class="text-text-secondary">No stored file yet.</p>}>
-                    {(f) => <p>{f.file_name || f.title}</p>}
-                  </For>
-                  <input
-                    class={`${inputClass} mt-2`}
-                    type="file"
-                    onChange={(e) => {
-                      const chosen = e.currentTarget.files?.[0];
-                      e.currentTarget.value = "";
-                      if (chosen) void addFile(chosen);
-                    }}
+                  <ul class="space-y-1 border-t border-stroke pt-2">
+                    <For each={d().events}>{(ev) => <li><span class="font-medium">{ev.event_type}</span> · {ev.notes}</li>}</For>
+                  </ul>
+                  <HrWizardNav
+                    canBack={caseStep() > 0}
+                    canNext={caseStep() < CASE_STEPS.length - 1}
+                    onBack={() => setCaseStep(Math.max(0, caseStep() - 1))}
+                    onNext={() => setCaseStep(Math.min(CASE_STEPS.length - 1, caseStep() + 1))}
                   />
                 </div>
-                <ul class="space-y-1 border-t border-stroke pt-2">
-                  <For each={d().events}>{(ev) => <li><span class="font-medium">{ev.event_type}</span> · {ev.notes}</li>}</For>
-                </ul>
-              </div>
-            )}
-          </Show>
-        </section>
+              )}
+            </Show>
+          </div>
+        </HrTcard>
       </div>
       <ClientViolations />
     </HrLayout>

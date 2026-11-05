@@ -23,6 +23,7 @@ import { DRAFT_ENTITY, HR_ENTITY, HR_SETTINGS_HREF } from "../../shared/entityTy
 import { useMasterLifecycle } from "../../shared/masterLifecycle";
 import { HrLayout } from "./HrLayout";
 import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
+import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
 import { HrMappedImportModal } from "./HrMappedImportModal";
 import { UserSearchModal, type UserSearchRow } from "../purchase-request/purchase-request/UserSearchModal";
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
@@ -146,7 +147,7 @@ export default function HrEmployeesPage() {
   const [saving, setSaving] = createSignal(false);
   const [importing, setImporting] = createSignal(false);
   const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
-  const [formSection, setFormSection] = createSignal<"employment" | "statutory" | "documents">("employment");
+  const [formSection, setFormSection] = createSignal<"employment" | "statutory" | "assignment" | "documents">("employment");
   const toast = useToast();
   const invalidate = useInvalidateEmployees();
   const qc = useQueryClient();
@@ -536,7 +537,7 @@ export default function HrEmployeesPage() {
 
   return (
     <HrLayout>
-      <div class="mb-4 flex flex-wrap items-end justify-between gap-4">
+      <div class="hr-pagehead">
         <div>
           <h1 class="text-2xl font-semibold">Employees</h1>
           <p class="mt-1 text-sm text-text-secondary">Employee master records.</p>
@@ -673,6 +674,18 @@ export default function HrEmployeesPage() {
             type="button"
             class="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
             classList={{
+              "bg-brand-600 text-white": formSection() === "assignment",
+              "text-text-secondary hover:bg-panel": formSection() !== "assignment",
+            }}
+            disabled={!selected()?.id}
+            onClick={() => setFormSection("assignment")}
+          >
+            Assignment
+          </button>
+          <button
+            type="button"
+            class="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+            classList={{
               "bg-brand-600 text-white": formSection() === "documents",
               "text-text-secondary hover:bg-panel": formSection() !== "documents",
             }}
@@ -682,6 +695,14 @@ export default function HrEmployeesPage() {
             201 — documents
           </button>
         </div>
+        <nav class="hr-section-nav col-span-full">
+          <a href="#hr-emp-personal" onClick={(e) => { e.preventDefault(); setFormSection("employment"); }}>Personal</a>
+          <a href="#hr-emp-contact" onClick={(e) => { e.preventDefault(); setFormSection("employment"); }}>Contact</a>
+          <a href="#hr-emp-gov" onClick={(e) => { e.preventDefault(); setFormSection("statutory"); }}>Government IDs</a>
+          <a href="#hr-emp-pay" onClick={(e) => { e.preventDefault(); setFormSection("employment"); }}>Pay</a>
+          <a href="#hr-emp-assign" onClick={(e) => { e.preventDefault(); if (selected()?.id) setFormSection("assignment"); }}>Assignment</a>
+          <a href="#hr-emp-docs" onClick={(e) => { e.preventDefault(); if (selected()?.id) setFormSection("documents"); }}>Documents</a>
+        </nav>
 
         <Show when={formSection() === "employment"}>
           <Show when={!selected()}>
@@ -858,6 +879,9 @@ export default function HrEmployeesPage() {
           </Field>
         </Show>
 
+        <Show when={formSection() === "assignment" && selected()?.id}>
+          {(id) => <EmployeeAssignmentPanel employeeId={id()} />}
+        </Show>
         <Show when={formSection() === "documents" && selected()?.id}>
           {(id) => <EmployeeExtrasPanel employeeId={id()} />}
         </Show>

@@ -95,7 +95,7 @@ function EssSelfServiceView() {
 
   return (
     <HrLayout>
-    <div class="mx-auto max-w-3xl p-6">
+    <div class="mx-auto min-w-0 max-w-3xl px-4 py-6 sm:px-6">
       <h1 class="mb-1 text-2xl font-semibold text-text-primary">My HR</h1>
       <p class="mb-6 text-sm text-text-secondary">Profile, payslips, leave, learning, discipline, and onboarding.</p>
 

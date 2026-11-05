@@ -9,6 +9,8 @@ import {
   portalFetch,
 } from "../../shared/portal-api";
 import { PortalHrTab } from "./PortalHrTab";
+import "../hr/hr-surface.css";
+import { HrBadge } from "../hr/HrUi";
 
 type PortalOrder = {
   id: number;
@@ -96,7 +98,10 @@ export default function PortalDashboardPage() {
         <header class="border-b border-stroke bg-white px-6 py-4">
           <div class="mx-auto flex max-w-5xl items-center justify-between gap-4">
             <div>
-              <h1 class="text-lg font-semibold text-text-primary">Client portal</h1>
+              <div class="flex flex-wrap items-center gap-2">
+                <h1 class="text-lg font-semibold text-text-primary">Client portal</h1>
+                <HrBadge tone="brand">Client</HrBadge>
+              </div>
               <Show when={session()}>
                 <p class="text-sm text-text-secondary">
                   {session()!.display_name || session()!.email}
@@ -114,7 +119,7 @@ export default function PortalDashboardPage() {
           </div>
         </header>
 
-        <main class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:px-6">
+        <main class="mx-auto flex min-w-0 max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:px-6">
           <Show when={session.state === "ready" && !session()}>
             <p class="text-sm text-red-600">
               Your link has expired.{" "}
@@ -124,12 +129,12 @@ export default function PortalDashboardPage() {
             </p>
           </Show>
 
-          <nav class="flex gap-1 overflow-x-auto md:w-48 md:shrink-0 md:flex-col" aria-label="Client portal">
+          <nav class="flex max-w-full gap-1 overflow-x-auto md:w-48 md:shrink-0 md:flex-col" aria-label="Client portal">
             <For each={tabs}>
               {(t) => (
                 <button
                   type="button"
-                  class={`rounded-lg px-4 py-2 text-sm font-medium ${
+                  class={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium md:w-full ${
                     tab() === t
                       ? "bg-brand-600 text-white"
                       : "border border-stroke bg-white text-text-primary hover:bg-surface"
@@ -155,7 +160,7 @@ export default function PortalDashboardPage() {
           </Show>
 
           <Show when={classic.has(tab()) && !list.loading && !list.error && tab() === "orders"}>
-            <div class="overflow-hidden rounded-xl border border-stroke bg-white">
+            <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface text-left text-text-secondary">
                   <tr>
@@ -182,7 +187,7 @@ export default function PortalDashboardPage() {
           </Show>
 
           <Show when={classic.has(tab()) && !list.loading && !list.error && tab() === "invoices"}>
-            <div class="overflow-hidden rounded-xl border border-stroke bg-white">
+            <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface text-left text-text-secondary">
                   <tr>
@@ -209,7 +214,7 @@ export default function PortalDashboardPage() {
           </Show>
 
           <Show when={classic.has(tab()) && !list.loading && !list.error && tab() === "sites"}>
-            <div class="overflow-hidden rounded-xl border border-stroke bg-white">
+            <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface text-left text-text-secondary">
                   <tr>
@@ -232,7 +237,7 @@ export default function PortalDashboardPage() {
           </Show>
 
           <Show when={classic.has(tab()) && !list.loading && !list.error && tab() === "tickets"}>
-            <div class="overflow-hidden rounded-xl border border-stroke bg-white">
+            <div class="overflow-x-auto rounded-xl border border-stroke bg-white">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface text-left text-text-secondary">
                   <tr>

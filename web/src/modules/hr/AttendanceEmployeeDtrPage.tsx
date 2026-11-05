@@ -99,7 +99,7 @@ export default function AttendanceEmployeeDtrPage() {
 
       <Show when={log.data?.totals}>
         {(t) => (
-          <div class="mb-4 grid gap-3 sm:grid-cols-4">
+          <div class="mb-4 grid gap-3 grid-cols-1 min-[1024px]:grid-cols-2">
             <div class="rounded-xl border border-stroke bg-surface p-3 shadow-sm">
               <p class="text-xs text-text-secondary">Hours</p>
               <p class="text-lg font-semibold tabular-nums">{t().hours_worked_sum}</p>

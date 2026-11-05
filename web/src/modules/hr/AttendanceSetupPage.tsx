@@ -107,9 +107,11 @@ export default function AttendanceSetupPage() {
 
   return (
     <HrLayout>
-      <div class="mb-4">
-        <h1 class="text-2xl font-semibold">Attendance setup</h1>
-        <p class="mt-1 text-sm text-text-secondary">Holidays and pay cut-offs used by DTR and payroll.</p>
+      <div class="hr-pagehead">
+        <div>
+          <h1 class="text-2xl font-semibold">Attendance setup</h1>
+          <p class="mt-1 text-sm text-text-secondary">Holidays and pay cut-offs used by DTR and payroll.</p>
+        </div>
       </div>
 
       <div class="grid gap-6 lg:grid-cols-2">
@@ -125,7 +127,7 @@ export default function AttendanceSetupPage() {
             absence (daily rate) on the next payroll run.
           </p>
           <holidayDraft.DraftBanner />
-          <div class="mb-3 grid gap-3 sm:grid-cols-3">
+          <div class="mb-3 grid gap-3 grid-cols-1 min-[1024px]:grid-cols-3">
             <Field label="Date">
               <input type="date" class={inputClass} value={holDate()} onInput={(e) => setHolDate(e.currentTarget.value)} />
             </Field>
@@ -166,7 +168,7 @@ export default function AttendanceSetupPage() {
         <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
           <h2 class="mb-2 text-lg font-medium">Pay cut-offs</h2>
           <p class="mb-3 text-sm text-text-secondary">Defines the attendance window that should feed the next payroll run.</p>
-          <div class="mb-3 grid gap-3 sm:grid-cols-3">
+          <div class="mb-3 grid gap-3 grid-cols-1 min-[1024px]:grid-cols-3">
             <Field label="Start date">
               <input
                 type="date"

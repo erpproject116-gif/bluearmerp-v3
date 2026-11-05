@@ -6,6 +6,7 @@ import { Modal } from "../../shared/Modal";
 import { SignaturePad } from "../../shared/SignaturePad";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Cycle = { id: number; name: string; period_start: string; period_end: string; status: string };
 type Review = {
@@ -112,8 +113,7 @@ export default function PerformancePage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Evaluations</h1>
-      <p class="mb-6 text-sm text-text-secondary">Review cycles and client evaluations. A score does not change pay, assignment, or status.</p>
+      <HrPageHead title="Evaluations" subtitle="Review cycles and client evaluations. A score does not change pay, assignment, or status." />
 
       <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCycleOpen(true)}>
         New cycle

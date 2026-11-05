@@ -4,6 +4,7 @@ import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type ReportRow = {
   case_no: string;
@@ -35,8 +36,7 @@ export default function HrReportsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">HR reports</h1>
-      <p class="mb-3 text-sm text-text-secondary">Choose the dates and read the discipline cases opened in that period.</p>
+      <HrPageHead title="HR reports" subtitle="Choose the dates and read the discipline cases opened in that period." />
       <p class="mb-6 flex flex-wrap gap-4 text-sm">
         <A href="/app/hr/government-reports" class="text-brand-700">Government reports</A>
         <A href="/app/hr/compliance" class="text-brand-700">Compliance documents</A>

@@ -3,6 +3,8 @@ import { createEffect, createResource, createSignal, For, onCleanup, onMount, Sh
 import { apiBase } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { SignaturePad } from "../../shared/SignaturePad";
+import "./hr-surface.css";
+import { HrSteps, HrTcard } from "./HrUi";
 
 type CustomField = { field_key: string; label: string; field_type: string; is_required: boolean; options?: { value: string; label: string }[] | string };
 type Row = Record<string, string>;
@@ -181,7 +183,7 @@ export default function ApplyPage() {
         <ul class="mb-6 grid gap-2">
           <For each={openings() ?? []}>
             {(row) => (
-              <li class="rounded-lg border border-stroke bg-white p-3">
+              <li class="hr-tcard p-3">
                 <p class="font-semibold">{row.title}</p>
                 <p class="text-text-secondary">{row.site_name} · {row.headcount} {row.headcount === 1 ? "place" : "places"}</p>
               </li>
@@ -191,18 +193,13 @@ export default function ApplyPage() {
       </Show>
       <h1 class="mb-1 text-2xl font-bold">Application form</h1>
       <p class="mb-2 text-sm text-text-secondary">Step {step() + 1} of {STEPS.length}</p>
-      <div class="mb-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
-        <div class="h-full bg-brand-600" style={{ width: `${((step() + 1) / STEPS.length) * 100}%` }} />
-      </div>
-      <ol class="mb-4 hidden justify-between gap-2 text-[11px] text-text-secondary sm:flex">
-        <For each={STEPS}>
-          {(label, index) => <li classList={{ "font-bold text-brand-700": step() === index() }}>{label}</li>}
-        </For>
-      </ol>
+      <HrSteps steps={STEPS.map((label, i) => `${i + 1}. ${label}`)} current={step()} onSelect={setStep} />
+      <HrTcard class="mb-4">
+      <div class="p-4">
       <Show when={form()?.unavailable}><p class="mb-3">This application form is not available.</p></Show>
       <section class={step() === 0 ? "" : "hidden"}>
         <h2 class="mb-3 text-base font-semibold">{STEPS[0]}</h2>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-3 min-[1024px]:grid-cols-2">
           <For each={textFields}>
             {(field) => (
               <Field label={field.label} span={field.wide ? "full" : undefined}>
@@ -291,6 +288,8 @@ export default function ApplyPage() {
           <button type="button" class="min-h-11 flex-1 rounded-lg bg-brand-600 px-4 py-2 text-white" onClick={goNext}>Next</button>
         </Show>
       </div>
+      </div>
+      </HrTcard>
     </main>
   );
 }

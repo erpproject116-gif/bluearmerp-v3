@@ -185,7 +185,7 @@ export function HrMappedImportModal(props: Props) {
           <div class="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-stroke p-3">
             <For each={fields()}>
               {(field) => (
-                <div class="grid grid-cols-2 items-center gap-2 text-sm">
+                <div class="grid grid-cols-1 items-center gap-2 text-sm min-[640px]:grid-cols-2">
                   <span class="font-medium text-text-primary">{field}</span>
                   <select
                     class={inputClass}

@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 import { siteChoices } from "./siteChoices";
 
 type RequestRow = { id: number; client_name: string; site_name: string; headcount: number; details: string; status: string };
@@ -35,9 +36,8 @@ export default function ManpowerRequestsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Manpower requests</h1>
-      <p class="mb-4 text-sm text-text-secondary">Headcount requests from a client or from HR. Filling a request does not hire anyone.</p>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-4">
+      <HrPageHead title="Manpower requests" subtitle="Headcount requests from a client or from HR. Filling a request does not hire anyone." />
+      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-4">
         <Field label="Site">
           <select class={inputClass} value={siteId()} onChange={(e) => setSiteId(e.currentTarget.value)}>
             <option value="">Choose</option>

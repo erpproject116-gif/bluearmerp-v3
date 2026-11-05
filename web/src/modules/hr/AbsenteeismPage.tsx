@@ -5,6 +5,7 @@ import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/active
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Alert = {
   id: number; employee_id: number; employee_no?: string; employee_name?: string;
@@ -107,8 +108,7 @@ export default function AbsenteeismPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Absenteeism</h1>
-      <p class="mb-6 text-sm text-text-secondary">Checks DTR against your absence rules and creates alerts.</p>
+      <HrPageHead title="Absenteeism" subtitle="Checks DTR against your absence rules and creates alerts." />
       <button type="button" class="mb-4 rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white" onClick={() => void evaluate()}>
         Evaluate thresholds
       </button>
@@ -141,6 +141,7 @@ export default function AbsenteeismPage() {
           <Field label="From"><input type="date" class={inputClass} value={from()} onInput={(e) => setFrom(e.currentTarget.value)} /></Field>
           <Field label="To"><input type="date" class={inputClass} value={to()} onInput={(e) => setTo(e.currentTarget.value)} /></Field>
         </div>
+        <div class="overflow-x-auto">
         <table class="min-w-full text-left text-sm">
           <thead><tr class="border-b border-stroke text-text-secondary">
             <th class="py-2 pr-3">Employee</th><th class="py-2 pr-3">Dept</th><th class="py-2 pr-3">Absent</th>
@@ -161,6 +162,7 @@ export default function AbsenteeismPage() {
             </For>
           </tbody>
         </table>
+        </div>
       </section>
     </HrLayout>
   );

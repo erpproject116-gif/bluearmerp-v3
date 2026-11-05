@@ -3,6 +3,7 @@ import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 import { siteChoices } from "./siteChoices";
 
 type Submission = { id: number; client_name: string; site_name: string; period_start: string; period_end: string; status: string; file_name: string; accepted_hours: number };
@@ -47,9 +48,8 @@ export default function ClientDtrPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Client DTR inbox</h1>
-      <p class="mb-3 text-sm text-text-secondary">Accepted hours stay here. They are not written into attendance.</p>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-5">
+      <HrPageHead title="Client DTR inbox" subtitle="Accepted hours stay here. They are not written into attendance." />
+      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-2">
         <Field label="Site">
           <select class={inputClass} value={siteId()} onChange={(e) => setSiteId(e.currentTarget.value)}>
             <option value="">Choose</option>

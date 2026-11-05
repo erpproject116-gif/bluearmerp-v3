@@ -3,6 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { HrPageHead } from "./HrUi";
 
 type Client = { id: number; name: string };
 type Access = { id: number; client_name: string; email: string; display_name: string; is_active: boolean; login_url: string };
@@ -30,9 +31,8 @@ export default function PortalAccessPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Portal access</h1>
-      <p class="mb-3 text-sm text-text-secondary">This login opens the customer portal. It does not open HR pages, and it does not show pay.</p>
-      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-4">
+      <HrPageHead title="Portal access" subtitle="This login opens the customer portal. It does not open HR pages, and it does not show pay." />
+      <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-4">
         <Field label="Client">
           <select class={inputClass} value={clientId()} onChange={(e) => setClientId(e.currentTarget.value)}>
             <option value="">Choose</option>
