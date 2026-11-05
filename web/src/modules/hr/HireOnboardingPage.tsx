@@ -4,7 +4,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, type HrBadgeTone } from "./HrUi";
 
 type CaseRow = {
   id: number;

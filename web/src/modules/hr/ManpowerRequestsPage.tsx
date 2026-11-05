@@ -3,7 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { siteChoices } from "./siteChoices";
 
 type RequestRow = { id: number; client_name: string; site_name: string; headcount: number; details: string; status: string };

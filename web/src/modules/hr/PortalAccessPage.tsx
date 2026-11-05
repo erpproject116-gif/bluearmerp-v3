@@ -3,7 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrNotice, HrPageHead } from "./HrUi";
+import { HrBadge, HrPageHead } from "./HrUi";
 
 type Client = { id: number; name: string };
 type Access = { id: number; client_name: string; email: string; display_name: string; is_active: boolean; login_url: string };

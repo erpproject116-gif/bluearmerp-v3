@@ -4,7 +4,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrPayrollTabs } from "./HrPayrollTabs";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 import { formatPeso } from "../../shared/money";
 
 type Submission = { id: number; client_name: string; site_name: string; period_start: string; period_end: string; status: string };

@@ -6,7 +6,7 @@ import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, type HrBadgeTone } from "./HrUi";
 
 type Clearance = {
   id: number;
@@ -201,11 +201,7 @@ export default function OffboardingPage() {
               header: "Clearance",
               sortable: false,
               render: (row) => (
-                <span class="tabular-nums">
-                  {row.status === "released" ? "5 / 5" : "— / 5"}{" "}
-                  <Show when={row.status !== "released"}>
-                  </Show>
-                </span>
+                <span class="tabular-nums">{row.status === "released" ? "5 / 5" : "— / 5"}</span>
               ),
               exportValue: (row) => (row.status === "released" ? "5/5" : ""),
             },
@@ -279,7 +275,6 @@ export default function OffboardingPage() {
                     onClick={() => setStatusFilter(chip.value)}
                   >
                     {chip.label}
-                    <Show when={chip.planned}>{" "}</Show>
                   </button>
                 )}
               </For>
@@ -298,8 +293,6 @@ export default function OffboardingPage() {
         <header>
           <h3>Final pay</h3>
           <span class="grow" />
-          <Show when={!selectedRow() || selectedRow()!.status !== "released"}>
-          </Show>
         </header>
         <Show
           when={selectedRow()?.status === "released" && selectedRow()!.pay_period_id > 0}

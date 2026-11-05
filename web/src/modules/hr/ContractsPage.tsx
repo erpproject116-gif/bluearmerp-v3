@@ -4,7 +4,7 @@ import { formatAmount } from "../../shared/money";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { siteChoices, type SiteChoice } from "./siteChoices";
 
 type Order = { id: number; site_name: string; client_name: string; pay_rate: number; bill_rate: number };
