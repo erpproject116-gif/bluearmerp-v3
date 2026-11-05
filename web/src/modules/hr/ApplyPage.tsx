@@ -278,6 +278,8 @@ export default function ApplyPage() {
     data.set("jobs_json", JSON.stringify(jobs().filter((row) => row.company.trim() || row.position.trim())));
     data.set("references_json", JSON.stringify(refs().filter((row) => row.name.trim())));
     data.set("custom_values", JSON.stringify(custom()));
+    const posting = jobId();
+    if (posting) data.set("job_posting_id", String(posting));
     if (selfie()) data.set("selfie", selfie()!);
     for (const file of ids()) data.append("id_photos", file);
     if (resume()) data.set("resume", resume()!);

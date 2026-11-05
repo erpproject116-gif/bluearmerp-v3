@@ -38,6 +38,7 @@ func registerAgencyRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/manpower-requests", listManpowerRequests(pool))
 	r.With(write).Post("/manpower-requests", createManpowerRequest(pool))
 	r.With(write).Patch("/manpower-requests/{id}", patchManpowerRequest(pool))
+	r.With(write).Post("/manpower-requests/{id}/publish-opening", publishOpeningFromRequest(pool))
 	r.Get("/client-time", listClientTime(pool))
 	r.With(write).Post("/client-time", createClientTime(pool))
 	r.With(write).Post("/client-time/{id}/accept", acceptClientTime(pool))
@@ -384,19 +385,28 @@ func createClientBill(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Validation(w, map[string]string{"submission_id": "Choose an accepted submission."})
 			return
 		}
-		var siteID int64
+		tx, err := pool.Begin(r.Context())
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save the bill.", "ERR_INTERNAL")
+			return
+		}
+		defer tx.Rollback(r.Context())
+
+		var siteID, partnerID int64
 		var start, end string
 		var hours, rate float64
-		err := pool.QueryRow(r.Context(), `
-			select t.site_id, t.period_start::text, t.period_end::text, t.accepted_hours::float8, j.bill_rate::float8
+		err = tx.QueryRow(r.Context(), `
+			select t.site_id, c.partner_id, t.period_start::text, t.period_end::text, t.accepted_hours::float8, j.bill_rate::float8
 			from public.hr_client_time_submissions t
+			join public.hr_client_sites s on s.id = t.site_id and s.tenant_id = t.tenant_id
+			join public.hr_clients c on c.id = s.client_id and c.tenant_id = t.tenant_id
 			join public.hr_job_orders j on j.id = (
 			  select id from public.hr_job_orders
 			  where tenant_id = t.tenant_id and site_id = t.site_id
 			  order by id desc limit 1
 			)
 			where t.id = $1 and t.tenant_id = $2 and t.status = 'accepted' and t.accepted_hours is not null`,
-			body.SubmissionID, tu.TenantID).Scan(&siteID, &start, &end, &hours, &rate)
+			body.SubmissionID, tu.TenantID).Scan(&siteID, &partnerID, &start, &end, &hours, &rate)
 		if errors.Is(err, pgx.ErrNoRows) {
 			response.Validation(w, map[string]string{"submission_id": "Accept the time and save a bill rate for the site first."})
 			return
@@ -405,12 +415,66 @@ func createClientBill(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save the bill.", "ERR_INTERNAL")
 			return
 		}
+
+		var locationID, currencyID, taxTypeID int64
+		if err := tx.QueryRow(r.Context(), `
+			select id from public.inv_locations where tenant_id = $1 and deleted_at is null order by id limit 1`, tu.TenantID).Scan(&locationID); err != nil {
+			response.Validation(w, map[string]string{"location_id": "Add a stock location before invoicing."})
+			return
+		}
+		if err := tx.QueryRow(r.Context(), `
+			select id from public.quo_currencies
+			where tenant_id = $1 and deleted_at is null and status = 'active'
+			order by is_default desc, id limit 1`, tu.TenantID).Scan(&currencyID); err != nil {
+			response.Validation(w, map[string]string{"currency_id": "Add a currency before invoicing."})
+			return
+		}
+		if err := tx.QueryRow(r.Context(), `
+			select id from public.quo_tax_types
+			where tenant_id = $1 and deleted_at is null and status = 'active'
+			order by id limit 1`, tu.TenantID).Scan(&taxTypeID); err != nil {
+			response.Validation(w, map[string]string{"tax_type_id": "Add a tax type before invoicing."})
+			return
+		}
+
 		total := roundMoney(hours * rate)
+		orderDate := end
+		var dateSeq int
+		var salesNo string
+		if err := tx.QueryRow(r.Context(),
+			`select date_seq, sales_no from public.allocate_sales_sequences($1, $2::date)`,
+			tu.TenantID, orderDate).Scan(&dateSeq, &salesNo); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to allocate sales number.", "ERR_INTERNAL")
+			return
+		}
+		var salesID int64
+		err = tx.QueryRow(r.Context(), `
+			insert into public.sa_sales (
+			  tenant_id, order_date, date_seq, sales_no, tax_type_id, currency_id, partner_id, location_id,
+			  progress_status, invoicing_status, subtotal, tax_total, grand_total, notes, created_by_user_id
+			) values ($1,$2::date,$3,$4,$5,$6,$7,$8,'unconfirmed',false,$9,0,$9,$10,$11)
+			returning id`,
+			tu.TenantID, orderDate, dateSeq, salesNo, taxTypeID, currencyID, partnerID, locationID,
+			total, "HR client time bill #"+strconv.FormatInt(body.SubmissionID, 10), tu.AppUserID).Scan(&salesID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create sales invoice.", "ERR_INTERNAL")
+			return
+		}
+		if _, err := tx.Exec(r.Context(), `
+			insert into public.sa_sales_lines (
+			  sales_id, line_no, item_code, item_name, qty, unit_non_vat, non_vat_total,
+			  tax_amount, unit_vat_inc, line_total, discount_amount, discounted_unit_non_vat, discounted_unit_vat_inc
+			) values ($1,1,'','Manpower services',$2,$3,$4,0,0,$4,0,$3,0)`,
+			salesID, hours, rate, total); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create sales line.", "ERR_INTERNAL")
+			return
+		}
+
 		var id int64
-		err = pool.QueryRow(r.Context(), `
-			insert into public.hr_client_bills (tenant_id, site_id, submission_id, period_start, period_end, total)
-			values ($1,$2,$3,$4::date,$5::date,$6) returning id`,
-			tu.TenantID, siteID, body.SubmissionID, start, end, total).Scan(&id)
+		err = tx.QueryRow(r.Context(), `
+			insert into public.hr_client_bills (tenant_id, site_id, submission_id, period_start, period_end, total, sales_id)
+			values ($1,$2,$3,$4::date,$5::date,$6,$7) returning id`,
+			tu.TenantID, siteID, body.SubmissionID, start, end, total, salesID).Scan(&id)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -420,7 +484,11 @@ func createClientBill(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save the bill.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, map[string]any{"id": id, "total": total}, "Created.")
+		if err := tx.Commit(r.Context()); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save the bill.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"id": id, "total": total, "sales_id": salesID, "sales_no": salesNo}, "Created.")
 	}
 }
 
@@ -752,7 +820,7 @@ func listJobPostings(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		rows, err := pool.Query(r.Context(), `
-			select p.id, s.site_name, c.name, p.title, p.headcount, p.status
+			select p.id, p.site_id, s.site_name, c.name, p.title, p.headcount, p.status, p.manpower_request_id
 			from public.hr_job_postings p
 			join public.hr_client_sites s on s.id = p.site_id and s.tenant_id = p.tenant_id
 			join public.hr_clients c on c.id = s.client_id and c.tenant_id = p.tenant_id
@@ -765,14 +833,18 @@ func listJobPostings(pool *pgxpool.Pool) http.HandlerFunc {
 		defer rows.Close()
 		out := []map[string]any{}
 		for rows.Next() {
-			var id int64
+			var id, siteID int64
 			var site, client, title, status string
 			var head int
-			if err := rows.Scan(&id, &site, &client, &title, &head, &status); err != nil {
+			var reqID *int64
+			if err := rows.Scan(&id, &siteID, &site, &client, &title, &head, &status, &reqID); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load postings.", "ERR_INTERNAL")
 				return
 			}
-			out = append(out, map[string]any{"id": id, "site_name": site, "client_name": client, "title": title, "headcount": head, "status": status})
+			out = append(out, map[string]any{
+				"id": id, "site_id": siteID, "site_name": site, "client_name": client, "title": title,
+				"headcount": head, "status": status, "manpower_request_id": reqID,
+			})
 		}
 		response.OK(w, out, "OK")
 	}
@@ -786,9 +858,10 @@ func createJobPosting(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var body struct {
-			SiteID    int64  `json:"site_id"`
-			Title     string `json:"title"`
-			Headcount int    `json:"headcount"`
+			SiteID             int64  `json:"site_id"`
+			Title              string `json:"title"`
+			Headcount          int    `json:"headcount"`
+			ManpowerRequestID  int64  `json:"manpower_request_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.SiteID == 0 || strings.TrimSpace(body.Title) == "" || body.Headcount < 1 {
 			response.Validation(w, map[string]string{"title": "Choose a site, a title, and a headcount."})
@@ -798,15 +871,79 @@ func createJobPosting(pool *pgxpool.Pool) http.HandlerFunc {
 			writeAgencyErr(w, err)
 			return
 		}
+		var reqArg any
+		if body.ManpowerRequestID > 0 {
+			var reqSite int64
+			err := pool.QueryRow(r.Context(), `
+				select site_id from public.hr_manpower_requests where id = $1 and tenant_id = $2`,
+				body.ManpowerRequestID, tu.TenantID).Scan(&reqSite)
+			if err != nil || reqSite != body.SiteID {
+				response.Validation(w, map[string]string{"manpower_request_id": "Request must belong to the same site."})
+				return
+			}
+			reqArg = body.ManpowerRequestID
+		}
 		var id int64
 		err := pool.QueryRow(r.Context(), `
-			insert into public.hr_job_postings (tenant_id, site_id, title, headcount)
-			values ($1,$2,$3,$4) returning id`, tu.TenantID, body.SiteID, strings.TrimSpace(body.Title), body.Headcount).Scan(&id)
+			insert into public.hr_job_postings (tenant_id, site_id, title, headcount, manpower_request_id)
+			values ($1,$2,$3,$4,$5) returning id`, tu.TenantID, body.SiteID, strings.TrimSpace(body.Title), body.Headcount, reqArg).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to save the posting.", "ERR_INTERNAL")
 			return
 		}
 		response.OK(w, map[string]any{"id": id}, "Created.")
+	}
+}
+
+func publishOpeningFromRequest(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		reqID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		if err != nil || reqID <= 0 {
+			response.Validation(w, map[string]string{"id": "Invalid request."})
+			return
+		}
+		var body struct {
+			Title string `json:"title"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		var siteID int64
+		var headcount int
+		var details string
+		err = pool.QueryRow(r.Context(), `
+			select site_id, headcount, details from public.hr_manpower_requests
+			where id = $1 and tenant_id = $2`, reqID, tu.TenantID).Scan(&siteID, &headcount, &details)
+		if errors.Is(err, pgx.ErrNoRows) {
+			response.Err(w, http.StatusNotFound, "Request not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load request.", "ERR_INTERNAL")
+			return
+		}
+		title := strings.TrimSpace(body.Title)
+		if title == "" {
+			title = strings.TrimSpace(details)
+		}
+		if title == "" {
+			title = "Open role"
+		}
+		if headcount < 1 {
+			headcount = 1
+		}
+		var id int64
+		err = pool.QueryRow(r.Context(), `
+			insert into public.hr_job_postings (tenant_id, site_id, title, headcount, manpower_request_id)
+			values ($1,$2,$3,$4,$5) returning id`, tu.TenantID, siteID, title, headcount, reqID).Scan(&id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to publish opening.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"id": id, "manpower_request_id": reqID, "site_id": siteID}, "Opening published.")
 	}
 }
 

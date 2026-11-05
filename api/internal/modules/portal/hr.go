@@ -438,7 +438,7 @@ func portalSummary(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusUnauthorized, "Portal token required.", "ERR_UNAUTHORIZED")
 			return
 		}
-		var people, requests, bills int
+		var people, requests, bills, openings, hired int
 		err := pool.QueryRow(r.Context(), `
 			select
 			  (select count(distinct a.employee_id) from public.hr_assignments a
@@ -452,13 +452,32 @@ func portalSummary(pool *pgxpool.Pool) http.HandlerFunc {
 			  (select count(*) from public.hr_client_bills b
 			    join public.hr_client_sites s on s.id = b.site_id and s.tenant_id = b.tenant_id
 			    join public.hr_clients c on c.id = s.client_id and c.tenant_id = b.tenant_id
-			    where b.tenant_id = $1 and c.partner_id = $2)
-		`, pu.TenantID, pu.PartnerID).Scan(&people, &requests, &bills)
+			    where b.tenant_id = $1 and c.partner_id = $2),
+			  (select count(*) from public.hr_job_postings p
+			    join public.hr_client_sites s on s.id = p.site_id and s.tenant_id = p.tenant_id
+			    join public.hr_clients c on c.id = s.client_id and c.tenant_id = p.tenant_id
+			    where p.tenant_id = $1 and c.partner_id = $2 and p.status = 'open'),
+			  (select count(*) from public.hr_applications a
+			    join public.hr_job_postings p on p.id = a.job_posting_id and p.tenant_id = a.tenant_id
+			    join public.hr_client_sites s on s.id = p.site_id and s.tenant_id = p.tenant_id
+			    join public.hr_clients c on c.id = s.client_id and c.tenant_id = p.tenant_id
+			    where a.tenant_id = $1 and c.partner_id = $2 and a.status = 'hired')
+		`, pu.TenantID, pu.PartnerID).Scan(&people, &requests, &bills, &openings, &hired)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load the summary.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, map[string]any{"people": people, "open_requests": requests, "bills": bills}, "OK")
+		pipeline := []map[string]any{
+			{"step": "request", "label": "Open requests", "count": requests},
+			{"step": "opening", "label": "Open openings", "count": openings},
+			{"step": "hired", "label": "Hired from openings", "count": hired},
+			{"step": "deployed", "label": "Deployed people", "count": people},
+			{"step": "bills", "label": "Bills", "count": bills},
+		}
+		response.OK(w, map[string]any{
+			"people": people, "open_requests": requests, "bills": bills,
+			"open_openings": openings, "hired_from_openings": hired, "pipeline": pipeline,
+		}, "OK")
 	}
 }
 

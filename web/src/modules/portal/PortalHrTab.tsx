@@ -120,11 +120,27 @@ function SiteSelect(props: { sites: Site[]; value: string; onChange: (value: str
 
 function Summary(props: { data: Row | undefined }) {
   const data = () => props.data ?? {};
+  const pipeline = () => {
+    const raw = data().pipeline;
+    return Array.isArray(raw) ? (raw as { label?: string; count?: number }[]) : [];
+  };
   return (
-    <div class="grid grid-cols-1 gap-4 min-[1024px]:grid-cols-3">
-      <Card label="People on site" value={data().people} />
-      <Card label="Open requests" value={data().open_requests} />
-      <Card label="Bills" value={data().bills} />
+    <div class="space-y-4">
+      <div class="grid grid-cols-1 gap-4 min-[1024px]:grid-cols-3">
+        <Card label="People on site" value={data().people} />
+        <Card label="Open requests" value={data().open_requests} />
+        <Card label="Bills" value={data().bills} />
+      </div>
+      <Show when={pipeline().length > 0}>
+        <div class="rounded-lg border border-stroke bg-white p-4">
+          <p class="mb-3 text-sm font-semibold">Request → hire progress</p>
+          <div class="grid grid-cols-2 gap-3 min-[1024px]:grid-cols-5">
+            <For each={pipeline()}>
+              {(step) => <Card label={String(step.label ?? "")} value={step.count} />}
+            </For>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }

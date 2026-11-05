@@ -26,6 +26,22 @@ export type Employee = {
   emergency_contact_name?: string;
   emergency_contact_address?: string;
   emergency_contact_phone?: string;
+  source_application_id?: number | null;
+  gender?: string;
+  civil_status?: string;
+  cellphone?: string;
+  city_address?: string;
+  provincial_address?: string;
+  birthplace?: string;
+  citizenship?: string;
+  height?: string;
+  weight?: string;
+  religion?: string;
+  spouse_name?: string;
+  spouse_occupation?: string;
+  special_skills?: string;
+  signature_data_url?: string;
+  has_signature?: boolean;
   custom_values?: Record<string, unknown>;
 };
 

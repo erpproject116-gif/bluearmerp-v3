@@ -18,6 +18,8 @@ type ApplicationDetail = {
   email: string;
   cellphone: string;
   has_signature: boolean;
+  job_posting_id?: number | null;
+  job_posting_title?: string;
   children: Child[];
   jobs: Job[];
   references: Reference[];
@@ -31,7 +33,7 @@ const FLOW = [
   { key: "final_interview", label: "4. Final interview" },
   { key: "hired", label: "5. Hire" },
   { key: "onboarding", label: "6. Onboarding checklist" },
-  { key: "create_employee", label: "7. Create employee", planned: true },
+  { key: "create_employee", label: "7. Convert to employee" },
 ] as const;
 
 const STATUSES = [
@@ -89,6 +91,24 @@ export default function ApplicantDetailPage() {
     return true;
   };
 
+  const convertHire = async () => {
+    const res = await apiFetch<{ employee_id?: number; onboarding_case_id?: number; idempotent?: boolean }>(
+      `/api/v1/hr/applications/${params.id}/convert-hire`,
+      { method: "POST", body: "{}" },
+    );
+    if (!res.success) {
+      toast.error(res.message ?? "Could not convert to employee.");
+      return;
+    }
+    setStatus("hired");
+    toast.success(
+      res.data?.idempotent
+        ? `Already linked to employee #${res.data.employee_id}.`
+        : `Employee #${res.data?.employee_id} created${res.data?.onboarding_case_id ? " and onboarding started" : ""}.`,
+    );
+    void refetch();
+  };
+
   const download = async (file: AppFile) => {
     const token = await getAccessToken();
     const res = await fetch(`${apiBase}/api/v1/hr/applications/${params.id}/files/${file.id}`, {
@@ -115,6 +135,10 @@ export default function ApplicantDetailPage() {
       setStep(1);
       return;
     }
+    if (cur.key === "create_employee") {
+      await convertHire();
+      return;
+    }
     const ok = await saveStatus(cur.key);
     if (!ok) return;
     if (step() < FLOW.length - 1) setStep(step() + 1);
@@ -134,6 +158,9 @@ export default function ApplicantDetailPage() {
               actions={
                 <div class="flex flex-wrap items-center gap-2">
                   <HrBadge tone="brand">{STATUSES.find((s) => s[0] === status())?.[1] ?? status()}</HrBadge>
+                  <Show when={row().job_posting_title}>
+                    <HrBadge tone="info">Opening: {row().job_posting_title}</HrBadge>
+                  </Show>
                   <Show when={row().has_signature}><HrBadge tone="success">Signature on file</HrBadge></Show>
                 </div>
               }
@@ -234,28 +261,31 @@ export default function ApplicantDetailPage() {
 
                 <Show when={step() === 4}>
                   <div class="space-y-3">
-                    <p class="text-sm text-text-secondary">Sets status to Hired. This does not create an employee record.</p>
-                    <label class="block text-sm font-medium">Start date</label>
-                    <input type="date" class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled />
-                    <label class="block text-sm font-medium">Assign to site</label>
-                    <input class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled placeholder="Use Deployments after the employee exists" />
-                    <HrNotice>Hired status updates the application only. Create the employee from Employees or Hire onboarding.</HrNotice>
+                    <p class="text-sm text-text-secondary">Sets status to Hired only. Use Convert to employee to create the roster record.</p>
+                    <HrNotice>Status alone never creates an employee. Use Convert hire below.</HrNotice>
                   </div>
                 </Show>
 
                 <Show when={step() === 5}>
                   <div class="space-y-3">
-                    <p class="text-sm text-text-secondary">Sets status to Onboarding. Checklist lives on Hire onboarding.</p>
+                    <p class="text-sm text-text-secondary">Sets status to Onboarding. Checklist lives on Hire onboarding after convert.</p>
                     <A href="/app/hr/hire-onboarding" class="text-sm text-brand-700">Open hire onboarding →</A>
                   </div>
                 </Show>
 
                 <Show when={step() === 6}>
                   <div class="space-y-3">
-                    <p class="text-sm font-medium">Create employee</p>
+                    <p class="text-sm font-medium">Convert to employee</p>
                     <HrNotice>
-                      Creating an employee from this application is not enabled. Open Employees to add the person, or Hire onboarding for checklist work.
+                      Creates an active employee linked to this application, copies 201 PIS fields, starts hire onboarding, and sets status to Hired.
                     </HrNotice>
+                    <button
+                      type="button"
+                      class="hr-btn hr-btn-primary"
+                      onClick={() => void convertHire()}
+                    >
+                      Convert to employee
+                    </button>
                     <div class="flex flex-wrap gap-3">
                       <A href="/app/hr/employees" class="text-sm text-brand-700">Employees →</A>
                       <A href="/app/hr/hire-onboarding" class="text-sm text-brand-700">Hire onboarding →</A>

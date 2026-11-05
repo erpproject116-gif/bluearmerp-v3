@@ -2,6 +2,7 @@ import { createSignal, For, Show, createResource } from "solid-js";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { SignaturePad } from "../../shared/SignaturePad";
 import { useToast } from "../../shared/toast";
 import { formatPeso } from "../../shared/money";
 
@@ -78,7 +79,12 @@ function PayHistory(props: { employeeId: number }) {
   );
 }
 
-export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?: boolean }) {
+export function EmployeeExtrasPanel(props: {
+  employeeId: number;
+  documentsOnly?: boolean;
+  signatureDataUrl?: string;
+  onSignatureSaved?: (url: string) => void;
+}) {
   const toast = useToast();
   const [typeId, setTypeId] = createSignal("");
   const [amount, setAmount] = createSignal("");
@@ -86,6 +92,8 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
   const [docTitle, setDocTitle] = createSignal("");
   const [docUrl, setDocUrl] = createSignal("");
   const [uploading, setUploading] = createSignal(false);
+  const [sigUrl, setSigUrl] = createSignal<string | null>(null);
+  const [savingSig, setSavingSig] = createSignal(false);
   let fileInput: HTMLInputElement | undefined;
 
   const [payItems, { refetch: refetchPay }] = createResource(
@@ -207,9 +215,44 @@ export function EmployeeExtrasPanel(props: { employeeId: number; documentsOnly?:
     void refetchDocs();
   };
 
+  const saveSignature = async () => {
+    if (!sigUrl()) {
+      toast.warning("Draw a signature first.");
+      return;
+    }
+    setSavingSig(true);
+    const res = await apiFetch(`/api/v1/hr/employees/${props.employeeId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ signature_data_url: sigUrl() }),
+    });
+    setSavingSig(false);
+    if (!res.success) {
+      toast.warning(res.message ?? "Could not save signature.");
+      return;
+    }
+    props.onSignatureSaved?.(sigUrl()!);
+    toast.success("Signature saved on employee 201.");
+  };
+
   const docsSection = (
     <section class="col-span-full">
       <h3 class="mb-2 text-sm font-semibold text-text-primary">201 — documents</h3>
+      <div class="mb-4 rounded-lg border border-stroke bg-panel/40 p-3">
+        <p class="mb-2 text-sm font-medium">Employee / contract signature</p>
+        <Show when={props.signatureDataUrl}>
+          <p class="mb-2 text-xs text-text-secondary">Signature on file — draw again to replace.</p>
+          <img src={props.signatureDataUrl} alt="Stored signature" class="mb-2 max-h-24 rounded border border-stroke bg-white" />
+        </Show>
+        <SignaturePad onChange={setSigUrl} />
+        <button
+          type="button"
+          class="hr-btn hr-btn-sm mt-2"
+          disabled={savingSig()}
+          onClick={() => void saveSignature()}
+        >
+          {savingSig() ? "Saving…" : "Save signature"}
+        </button>
+      </div>
       <ul class="mb-2 space-y-1 text-sm">
         <For each={docs() ?? []}>
           {(d) => (

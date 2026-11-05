@@ -121,7 +121,7 @@ func postSampleData(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
-		batchID, err := seedHRSample(r.Context(), tx, tu.TenantID)
+		batchID, err := seedHRSample(r.Context(), tx, tu.TenantID, tu.AppUserID)
 		if err != nil {
 			writeSampleErr(w, err, "Failed to add sample data.")
 			return
@@ -205,7 +205,7 @@ func (s sampler) ins(table, sql string, args ...any) (int64, error) {
 	return id, err
 }
 
-func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error) {
+func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID, appUserID int64) (int64, error) {
 	var openID int64
 	err := tx.QueryRow(ctx, `
 		select id from public.hr_sample_batches
@@ -309,10 +309,7 @@ func seedHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error)
 	if err := seedSamplePay(s, tenantID); err != nil {
 		return 0, err
 	}
-	if err := seedSampleClientBill(s, tenantID, masters); err != nil {
-		return 0, err
-	}
-	if err := seedSampleAgency(s, tenantID, siteIDs, partnerIDs, active[0]); err != nil {
+	if err := seedSampleAgency(s, tenantID, siteIDs, partnerIDs, active[0], appUserID, masters); err != nil {
 		return 0, err
 	}
 	return batchID, nil
@@ -557,7 +554,7 @@ func seedSampleClients(s sampler, tenantID int64, active, industryIDs []int64) (
 	return siteIDs, partnerIDs, nil
 }
 
-func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, employeeID int64) error {
+func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, employeeID, appUserID int64, masters sampleSalesMasters) error {
 	if len(siteIDs) != 10 || len(partnerIDs) != 5 {
 		return fmt.Errorf("sample agency rows need 10 sites and 5 clients")
 	}
@@ -568,20 +565,22 @@ func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, em
 			return err
 		}
 	}
-	requests := []struct {
-		site  int64
-		count int
-		state string
-	}{
-		{siteIDs[0], 2, "open"},
-		{siteIDs[1], 1, "filled"},
+	var firstJobOrder int64
+	if err := s.tx.QueryRow(s.ctx, `
+		select id from public.hr_job_orders
+		where tenant_id = $1 and site_id = $2 order by id desc limit 1`, tenantID, siteIDs[0]).Scan(&firstJobOrder); err != nil {
+		return err
 	}
-	for _, req := range requests {
-		if _, err := s.ins("hr_manpower_requests", `
-			insert into public.hr_manpower_requests (tenant_id, site_id, headcount, details, status)
-			values ($1,$2,$3,'Sample manpower request',$4) returning id`, tenantID, req.site, req.count, req.state); err != nil {
-			return err
-		}
+	openReqID, err := s.ins("hr_manpower_requests", `
+		insert into public.hr_manpower_requests (tenant_id, site_id, headcount, details, status)
+		values ($1,$2,2,'Sample manpower request','open') returning id`, tenantID, siteIDs[0])
+	if err != nil {
+		return err
+	}
+	if _, err := s.ins("hr_manpower_requests", `
+		insert into public.hr_manpower_requests (tenant_id, site_id, headcount, details, status)
+		values ($1,$2,1,'Sample manpower request','filled') returning id`, tenantID, siteIDs[1]); err != nil {
+		return err
 	}
 	if _, err := s.ins("hr_client_time_submissions", `
 		insert into public.hr_client_time_submissions
@@ -598,21 +597,63 @@ func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, em
 	if err != nil {
 		return err
 	}
-	if _, err := s.ins("hr_client_bills", `
-		insert into public.hr_client_bills
-		  (tenant_id, site_id, submission_id, period_start, period_end, total)
-		values ($1,$2,$3,'2099-01-01','2099-01-31',1200) returning id`,
-		tenantID, siteIDs[0], acceptedID); err != nil {
+	salesID, err := seedSampleClientBillForPartner(s, tenantID, partnerIDs[0], masters)
+	if err != nil {
 		return err
 	}
-	if _, err := s.ins("hr_job_postings", `
-		insert into public.hr_job_postings (tenant_id, site_id, title, headcount)
-		values ($1,$2,'Sample Security Guard',3) returning id`, tenantID, siteIDs[0]); err != nil {
+	if _, err := s.ins("hr_client_bills", `
+		insert into public.hr_client_bills
+		  (tenant_id, site_id, submission_id, period_start, period_end, total, sales_id)
+		values ($1,$2,$3,'2099-01-01','2099-01-31',1200,$4) returning id`,
+		tenantID, siteIDs[0], acceptedID, salesID); err != nil {
+		return err
+	}
+	postingID, err := s.ins("hr_job_postings", `
+		insert into public.hr_job_postings (tenant_id, site_id, title, headcount, manpower_request_id)
+		values ($1,$2,'Sample Security Guard',3,$3) returning id`, tenantID, siteIDs[0], openReqID)
+	if err != nil {
 		return err
 	}
 	if _, err := s.ins("hr_job_postings", `
 		insert into public.hr_job_postings (tenant_id, site_id, title, headcount)
 		values ($1,$2,'Sample Housekeeping',2) returning id`, tenantID, siteIDs[1]); err != nil {
+		return err
+	}
+	if _, err := s.tx.Exec(s.ctx, `
+		update public.hr_applications
+		set job_posting_id = $1
+		where tenant_id = $2 and status = 'hired'
+		  and id = (
+		    select a.id from public.hr_applications a
+		    join public.hr_sample_rows r on r.row_id = a.id and r.table_name = 'hr_applications' and r.batch_id = $3
+		    where a.tenant_id = $2 and a.status = 'hired'
+		    order by a.id limit 1
+		  )`, postingID, tenantID, s.batch); err != nil {
+		return err
+	}
+	if _, err := s.tx.Exec(s.ctx, `
+		update public.hr_employees
+		set source_application_id = (
+		  select a.id from public.hr_applications a
+		  join public.hr_sample_rows r on r.row_id = a.id and r.table_name = 'hr_applications' and r.batch_id = $2
+		  where a.tenant_id = $1 and a.job_posting_id = $3
+		  order by a.id limit 1
+		),
+		gender = coalesce(nullif(gender,''), 'Male'),
+		cellphone = coalesce(nullif(cellphone,''), '09170000001'),
+		user_id = case when $5::bigint > 0 then $5 else user_id end
+		where tenant_id = $1 and employee_no = $4`,
+		tenantID, s.batch, postingID, fmt.Sprintf("SEEDHR-%d-01", s.batch), appUserID); err != nil {
+		return err
+	}
+	if _, err := s.tx.Exec(s.ctx, `
+		update public.hr_assignments
+		set job_order_id = $1
+		where tenant_id = $2 and site_id = $3 and end_date is null
+		  and employee_id = (
+		    select id from public.hr_employees
+		    where tenant_id = $2 and employee_no = $4
+		  )`, firstJobOrder, tenantID, siteIDs[0], fmt.Sprintf("SEEDHR-%d-01", s.batch)); err != nil {
 		return err
 	}
 	for i, partnerID := range partnerIDs {
@@ -1103,34 +1144,36 @@ func insertDraftPayslip(s sampler, tenantID, periodID, employeeID int64, employe
 	return nil
 }
 
-func seedSampleClientBill(s sampler, tenantID int64, masters sampleSalesMasters) error {
+func seedSampleClientBillForPartner(s sampler, tenantID, partnerID int64, masters sampleSalesMasters) (int64, error) {
 	salesNo, err := sampleSalesNo(s.batch)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	var dateSeq int
 	if err := s.tx.QueryRow(s.ctx, `
 		select coalesce(max(date_seq), 0) + 1
 		from public.sa_sales
 		where tenant_id = $1 and order_date = '2099-01-31'`, tenantID).Scan(&dateSeq); err != nil {
-		return err
+		return 0, err
 	}
 	salesID, err := s.ins("sa_sales", `
 		insert into public.sa_sales (
 		  tenant_id, order_date, date_seq, sales_no, tax_type_id, currency_id, partner_id, location_id,
 		  progress_status, invoicing_status, subtotal, tax_total, grand_total, notes
-		) values ($1,'2099-01-31',$2,$3,$4,$5,$6,$7,'unconfirmed',false,10000,0,10000,'Sample HR client bill')
+		) values ($1,'2099-01-31',$2,$3,$4,$5,$6,$7,'unconfirmed',false,1200,0,1200,'Sample HR client bill')
 		returning id`,
-		tenantID, dateSeq, salesNo, masters.taxTypeID, masters.currencyID, masters.partnerID, masters.locationID)
+		tenantID, dateSeq, salesNo, masters.taxTypeID, masters.currencyID, partnerID, masters.locationID)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	_, err = s.ins("sa_sales_lines", `
+	if _, err = s.ins("sa_sales_lines", `
 		insert into public.sa_sales_lines (
 		  sales_id, line_no, item_code, item_name, qty, unit_non_vat, non_vat_total,
 		  tax_amount, unit_vat_inc, line_total, discount_amount, discounted_unit_non_vat, discounted_unit_vat_inc
-		) values ($1,1,'','Sample manpower service',1,10000,10000,0,0,10000,0,10000,0) returning id`, salesID)
-	return err
+		) values ($1,1,'','Sample manpower service',8,150,1200,0,0,1200,0,150,0) returning id`, salesID); err != nil {
+		return 0, err
+	}
+	return salesID, nil
 }
 
 var sampleRetractOrder = []string{
@@ -1201,7 +1244,8 @@ func buildSamplePasteCard(ctx context.Context, q interface {
 		Hints: []string{
 			"Attendance overview and Client DTR use the current quincena (also previous half is seeded).",
 			"Payroll sample periods and withholding stay in 2099; sample employees are excluded from live pay runs.",
-			"ESS (My HR) still needs an employee linked to your login — link Sample Active 01 on the employee record for that test.",
+			"ESS (My HR): Sample Active 01 is linked to the user who ran Seed when that login is available.",
+			"Client time accept does not write DTR; client_decision=approve is not claimed by this seed.",
 		},
 	}
 	var batchID int64
@@ -1236,11 +1280,11 @@ func buildSamplePasteCard(ctx context.Context, q interface {
 			Note: "Open careers, then apply; openings include Sample Security Guard.",
 		},
 		samplePersona{
-			Role:  "Agency employee (roster)",
+			Role:  "Agency employee / ESS",
 			Name:  "Sample Active 01",
 			Email: "",
-			Path:  "/app/hr/employees",
-			Note:  fmt.Sprintf("Employee no SEEDHR-%d-01 · DTR seeded for current cut-off", batchID),
+			Path:  "/app/hr/ess",
+			Note:  fmt.Sprintf("Employee no SEEDHR-%d-01 · DTR seeded · ESS user_id linked when Seed was run logged-in", batchID),
 		},
 	)
 
@@ -1263,7 +1307,7 @@ func buildSamplePasteCard(ctx context.Context, q interface {
 			Role:  "Client portal",
 			Name:  name,
 			Email: email,
-			URL:   "/portal/dashboard?token=" + token,
+			URL:   "/app/hr/client-portal?token=" + token,
 			Note:  "Paste URL or open Portal access and use the sign-in link.",
 		})
 	}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -44,6 +45,7 @@ func registerApplicationRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/applications/{id}", getApplication(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Patch("/applications/{id}", patchApplication(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/applications/{id}/comments", addApplicationComment(pool))
+	registerConvertHireRoute(r, pool)
 	r.Get("/applicant-segments", listApplicantSegments(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/applicant-segments", createApplicantSegment(pool))
 	r.With(auth.RequirePermission("hr.employees", auth.AccessWrite)).Post("/applicant-segments/{id}/actions/delete", deleteApplicantSegment(pool))
@@ -97,6 +99,7 @@ type applyForm struct {
 	JobsJSON          string `json:"jobs_json"`
 	ReferencesJSON    string `json:"references_json"`
 	CustomValues      string `json:"custom_values"`
+	JobPostingID      string `json:"job_posting_id"`
 }
 
 func tenantByCompanyCode(ctx context.Context, pool *pgxpool.Pool, code string) (int64, error) {
@@ -291,6 +294,22 @@ func submitPublicApplication(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Could not save the application.", "ERR_INTERNAL")
 			return
 		}
+		var postingID *int64
+		if id, perr := strconv.ParseInt(strings.TrimSpace(form.JobPostingID), 10, 64); perr == nil && id > 0 {
+			var okSite bool
+			_ = tx.QueryRow(r.Context(), `
+				select exists(select 1 from public.hr_job_postings where id = $1 and tenant_id = $2 and status = 'open')`,
+				id, tenantID).Scan(&okSite)
+			if okSite {
+				postingID = &id
+				if form.PositionDesired == "" {
+					var title string
+					if terr := tx.QueryRow(r.Context(), `select title from public.hr_job_postings where id = $1`, id).Scan(&title); terr == nil {
+						form.PositionDesired = title
+					}
+				}
+			}
+		}
 		var appID int64
 		err = tx.QueryRow(r.Context(), `
 			insert into public.hr_applications (
@@ -299,18 +318,18 @@ func submitPublicApplication(pool *pgxpool.Pool) http.HandlerFunc {
 			  spouse_name, spouse_occupation, father_name, father_occupation, mother_name, mother_occupation, languages,
 			  emergency_name, emergency_address, emergency_phone, elementary_school, elementary_year, high_school, high_school_year,
 			  college, college_year, degree_received, special_skills, res_cert_no, res_cert_issued_at, res_cert_issued_on,
-			  sss_no, tin, nbi_no, passport_no, certified, signature_data_url
+			  sss_no, tin, nbi_no, passport_no, certified, signature_data_url, job_posting_id
 			) values (
 			  $1,$2,$3,nullif($4,'')::date,$5,$6,$7,$8,$9,$10,nullif($11,'')::date,$12,$13,$14,$15,$16,$17,
 			  $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,nullif($38,'')::date,
-			  $39,$40,$41,$42,$43,$44
+			  $39,$40,$41,$42,$43,$44,$45
 			) returning id`,
 			tenantID, personID, form.PositionDesired, form.ApplicationDate, form.Gender, form.CityAddress, form.ProvincialAddress,
 			form.Telephone, form.Cellphone, form.Email, form.BirthDate, form.Birthplace, form.CivilStatus, form.Citizenship, form.Height, form.Weight, form.Religion,
 			form.SpouseName, form.SpouseOccupation, form.FatherName, form.FatherOccupation, form.MotherName, form.MotherOccupation, form.Languages,
 			form.EmergencyName, form.EmergencyAddress, form.EmergencyPhone, form.ElementarySchool, form.ElementaryYear, form.HighSchool, form.HighSchoolYear,
 			form.College, form.CollegeYear, form.DegreeReceived, form.SpecialSkills, form.ResCertNo, form.ResCertIssuedAt, form.ResCertIssuedOn,
-			form.SSSNo, form.TIN, form.NBINo, form.PassportNo, form.Certified, form.SignatureDataURL,
+			form.SSSNo, form.TIN, form.NBINo, form.PassportNo, form.Certified, form.SignatureDataURL, postingID,
 		).Scan(&appID)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Could not save the application.", "ERR_INTERNAL")
@@ -361,6 +380,7 @@ func applyFormFromRequest(r *http.Request) applyForm {
 	g := func(k string) string { return strings.TrimSpace(r.FormValue(k)) }
 	return applyForm{
 		PositionDesired: g("position_desired"), ApplicationDate: g("application_date"), FullName: g("full_name"), Gender: g("gender"),
+		JobPostingID: g("job_posting_id"),
 		CityAddress: g("city_address"), ProvincialAddress: g("provincial_address"), Telephone: g("telephone"), Cellphone: g("cellphone"), Email: g("email"),
 		BirthDate: g("birth_date"), Birthplace: g("birthplace"), CivilStatus: g("civil_status"), Citizenship: g("citizenship"), Height: g("height"), Weight: g("weight"), Religion: g("religion"),
 		SpouseName: g("spouse_name"), SpouseOccupation: g("spouse_occupation"), FatherName: g("father_name"), FatherOccupation: g("father_occupation"),
@@ -512,11 +532,13 @@ func listApplications(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		rows, err := pool.Query(r.Context(), `
 			select a.id, p.full_name, a.status, a.position_desired, coalesce(a.email,''), coalesce(a.cellphone,''),
-			       coalesce(ind.name,''), coalesce(wp.name,''), a.industry_id, a.workplace_type_id, a.created_at::text
+			       coalesce(ind.name,''), coalesce(wp.name,''), a.industry_id, a.workplace_type_id, a.created_at::text,
+			       a.job_posting_id, coalesce(jp.title,'')
 			from public.hr_applications a
 			join public.hr_applicant_people p on p.id = a.person_id
 			left join public.hr_applicant_segments ind on ind.id = a.industry_id
 			left join public.hr_applicant_segments wp on wp.id = a.workplace_type_id
+			left join public.hr_job_postings jp on jp.id = a.job_posting_id and jp.tenant_id = a.tenant_id
 			where `+where+` order by a.created_at desc limit 500`, args...)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to load applications.", "ERR_INTERNAL")
@@ -526,15 +548,16 @@ func listApplications(pool *pgxpool.Pool) http.HandlerFunc {
 		out := []map[string]any{}
 		for rows.Next() {
 			var id int64
-			var name, status, position, email, mobile, industry, workplace, created string
-			var industryID, workplaceID *int64
-			if err := rows.Scan(&id, &name, &status, &position, &email, &mobile, &industry, &workplace, &industryID, &workplaceID, &created); err != nil {
+			var name, status, position, email, mobile, industry, workplace, created, postingTitle string
+			var industryID, workplaceID, postingID *int64
+			if err := rows.Scan(&id, &name, &status, &position, &email, &mobile, &industry, &workplace, &industryID, &workplaceID, &created, &postingID, &postingTitle); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load applications.", "ERR_INTERNAL")
 				return
 			}
 			out = append(out, map[string]any{
 				"id": id, "full_name": name, "status": status, "position_desired": position, "email": email, "cellphone": mobile,
 				"industry": industry, "workplace": workplace, "industry_id": industryID, "workplace_type_id": workplaceID, "created_at": created,
+				"job_posting_id": postingID, "job_posting_title": postingTitle,
 			})
 		}
 		response.OK(w, out, "OK")
@@ -551,9 +574,14 @@ func getApplication(pool *pgxpool.Pool) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 		var raw []byte
 		err := pool.QueryRow(r.Context(), `
-			select to_jsonb(a) - 'signature_data_url' || jsonb_build_object('full_name', p.full_name, 'has_signature', a.signature_data_url <> '')
+			select to_jsonb(a) - 'signature_data_url' || jsonb_build_object(
+			  'full_name', p.full_name,
+			  'has_signature', a.signature_data_url <> '',
+			  'job_posting_title', coalesce(jp.title, '')
+			)
 			from public.hr_applications a
 			join public.hr_applicant_people p on p.id = a.person_id
+			left join public.hr_job_postings jp on jp.id = a.job_posting_id and jp.tenant_id = a.tenant_id
 			where a.id = $1 and a.tenant_id = $2`, id, tu.TenantID).Scan(&raw)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Application not found.", "ERR_NOT_FOUND")

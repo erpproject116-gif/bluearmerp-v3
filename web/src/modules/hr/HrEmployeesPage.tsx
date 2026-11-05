@@ -25,6 +25,7 @@ import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { HrLayout } from "./HrLayout";
 import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
 import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
+import { downloadEmployeeRecordPdf } from "./employeeRecordPdf";
 import { HrMappedImportModal } from "./HrMappedImportModal";
 import { UserSearchModal, type UserSearchRow } from "../purchase-request/purchase-request/UserSearchModal";
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
@@ -157,6 +158,21 @@ export default function HrEmployeesPage() {
   const [emergencyName, setEmergencyName] = createSignal("");
   const [emergencyAddress, setEmergencyAddress] = createSignal("");
   const [emergencyPhone, setEmergencyPhone] = createSignal("");
+  const [gender, setGender] = createSignal("");
+  const [civilStatus, setCivilStatus] = createSignal("");
+  const [cellphone, setCellphone] = createSignal("");
+  const [cityAddress, setCityAddress] = createSignal("");
+  const [provincialAddress, setProvincialAddress] = createSignal("");
+  const [birthplace, setBirthplace] = createSignal("");
+  const [citizenship, setCitizenship] = createSignal("");
+  const [height, setHeight] = createSignal("");
+  const [weight, setWeight] = createSignal("");
+  const [religion, setReligion] = createSignal("");
+  const [spouseName, setSpouseName] = createSignal("");
+  const [spouseOccupation, setSpouseOccupation] = createSignal("");
+  const [specialSkills, setSpecialSkills] = createSignal("");
+  const [signatureDataUrl, setSignatureDataUrl] = createSignal("");
+  const [sourceApplicationId, setSourceApplicationId] = createSignal<number | null>(null);
   const [photoFile, setPhotoFile] = createSignal<File | null>(null);
   const [employeeDocs, setEmployeeDocs] = createSignal<EmployeeDoc[]>([]);
   const [stagedGovIds, setStagedGovIds] = createSignal<Record<string, File>>({});
@@ -167,7 +183,7 @@ export default function HrEmployeesPage() {
   const [saving, setSaving] = createSignal(false);
   const [importing, setImporting] = createSignal(false);
   const [mappedImportOpen, setMappedImportOpen] = createSignal(false);
-  const [formSection, setFormSection] = createSignal<"employment" | "statutory" | "assignment" | "documents">("employment");
+  const [formSection, setFormSection] = createSignal<"employment" | "pis" | "statutory" | "assignment" | "documents">("employment");
   const [statusFilter, setStatusFilter] = createSignal("");
   const [deptFilter, setDeptFilter] = createSignal("");
   const [showAmounts, setShowAmounts] = createSignal(false);
@@ -328,10 +344,43 @@ export default function HrEmployeesPage() {
     setEmergencyName("");
     setEmergencyAddress("");
     setEmergencyPhone("");
+    setGender("");
+    setCivilStatus("");
+    setCellphone("");
+    setCityAddress("");
+    setProvincialAddress("");
+    setBirthplace("");
+    setCitizenship("");
+    setHeight("");
+    setWeight("");
+    setReligion("");
+    setSpouseName("");
+    setSpouseOccupation("");
+    setSpecialSkills("");
+    setSignatureDataUrl("");
+    setSourceApplicationId(null);
     setPhotoFile(null);
     setStagedGovIds({});
     setEmployeeDocs([]);
     loadCustom({});
+  };
+
+  const applyEmployeeProfile = (row: Employee) => {
+    setGender(row.gender ?? "");
+    setCivilStatus(row.civil_status ?? "");
+    setCellphone(row.cellphone ?? "");
+    setCityAddress(row.city_address ?? "");
+    setProvincialAddress(row.provincial_address ?? "");
+    setBirthplace(row.birthplace ?? "");
+    setCitizenship(row.citizenship ?? "");
+    setHeight(row.height ?? "");
+    setWeight(row.weight ?? "");
+    setReligion(row.religion ?? "");
+    setSpouseName(row.spouse_name ?? "");
+    setSpouseOccupation(row.spouse_occupation ?? "");
+    setSpecialSkills(row.special_skills ?? "");
+    setSignatureDataUrl(row.signature_data_url ?? "");
+    setSourceApplicationId(row.source_application_id ?? null);
   };
 
   const openNew = () => {
@@ -367,12 +416,17 @@ export default function HrEmployeesPage() {
     setEmergencyName(row.emergency_contact_name ?? "");
     setEmergencyAddress(row.emergency_contact_address ?? "");
     setEmergencyPhone(row.emergency_contact_phone ?? "");
+    applyEmployeeProfile(row);
     setPhotoFile(null);
     loadCustom(row.custom_values ?? {});
     setFormSection("employment");
     setModalOpen(true);
     void apiFetch<Employee>(`/api/v1/hr/employees/${row.id}`).then((res) => {
-      if (res.success && res.data) loadCustom(res.data.custom_values ?? {});
+      if (res.success && res.data) {
+        applyEmployeeProfile(res.data);
+        loadCustom(res.data.custom_values ?? {});
+        setSelected(res.data);
+      }
     });
   };
 
@@ -401,6 +455,20 @@ export default function HrEmployeesPage() {
     emergency_contact_name: emergencyName(),
     emergency_contact_address: emergencyAddress(),
     emergency_contact_phone: emergencyPhone(),
+    gender: gender(),
+    civil_status: civilStatus(),
+    cellphone: cellphone(),
+    city_address: cityAddress(),
+    provincial_address: provincialAddress(),
+    birthplace: birthplace(),
+    citizenship: citizenship(),
+    height: height(),
+    weight: weight(),
+    religion: religion(),
+    spouse_name: spouseName(),
+    spouse_occupation: spouseOccupation(),
+    special_skills: specialSkills(),
+    signature_data_url: signatureDataUrl(),
     custom_values: customValues(),
   });
 
@@ -429,6 +497,20 @@ export default function HrEmployeesPage() {
     setEmergencyName(payload.emergency_contact_name);
     setEmergencyAddress(payload.emergency_contact_address);
     setEmergencyPhone(payload.emergency_contact_phone);
+    setGender(payload.gender);
+    setCivilStatus(payload.civil_status);
+    setCellphone(payload.cellphone);
+    setCityAddress(payload.city_address);
+    setProvincialAddress(payload.provincial_address);
+    setBirthplace(payload.birthplace);
+    setCitizenship(payload.citizenship);
+    setHeight(payload.height);
+    setWeight(payload.weight);
+    setReligion(payload.religion);
+    setSpouseName(payload.spouse_name);
+    setSpouseOccupation(payload.spouse_occupation);
+    setSpecialSkills(payload.special_skills);
+    setSignatureDataUrl(payload.signature_data_url);
     loadCustom(payload.custom_values ?? {});
   };
 
@@ -445,6 +527,48 @@ export default function HrEmployeesPage() {
     setUserId(row.id);
     setUserLabel(`${row.full_name}${row.email ? ` (${row.email})` : ""}`);
     setUserSearchOpen(false);
+  };
+
+  const downloadSelectedPdf = async () => {
+    const id = selected()?.id;
+    if (!id) return;
+    const empRes = await apiFetch<Employee>(`/api/v1/hr/employees/${id}`);
+    if (!empRes.success || !empRes.data) {
+      toast.warning(empRes.message ?? "Could not load employee for PDF.");
+      return;
+    }
+    const emp = empRes.data;
+    const [assignRes, docsRes] = await Promise.all([
+      apiFetch<{ employee_id: number; client_name?: string; site_name?: string; start_date?: string; end_date?: string }[]>(
+        "/api/v1/hr/assignments",
+      ),
+      apiFetch<EmployeeDoc[]>(`/api/v1/hr/employees/${id}/documents`),
+    ]);
+    downloadEmployeeRecordPdf({
+      employee: {
+        ...emp,
+        gender: emp.gender || gender(),
+        civil_status: emp.civil_status || civilStatus(),
+        cellphone: emp.cellphone || cellphone(),
+        city_address: emp.city_address || cityAddress(),
+        provincial_address: emp.provincial_address || provincialAddress(),
+        birthplace: emp.birthplace || birthplace(),
+        citizenship: emp.citizenship || citizenship(),
+        height: emp.height || height(),
+        weight: emp.weight || weight(),
+        religion: emp.religion || religion(),
+        spouse_name: emp.spouse_name || spouseName(),
+        spouse_occupation: emp.spouse_occupation || spouseOccupation(),
+        special_skills: emp.special_skills || specialSkills(),
+      },
+      assignments: (assignRes.data ?? []).filter((a) => a.employee_id === id),
+      documents: (docsRes.data ?? []).map((d) => ({
+        title: d.title,
+        doc_type: d.doc_type,
+        file_name: d.file_name,
+      })),
+    });
+    toast.success("PDF downloaded.");
   };
 
   const save = async () => {
@@ -503,6 +627,20 @@ export default function HrEmployeesPage() {
       emergency_contact_name: emergencyName().trim(),
       emergency_contact_address: emergencyAddress().trim(),
       emergency_contact_phone: emergencyPhone().trim(),
+      gender: gender().trim(),
+      civil_status: civilStatus().trim(),
+      cellphone: cellphone().trim(),
+      city_address: cityAddress().trim(),
+      provincial_address: provincialAddress().trim(),
+      birthplace: birthplace().trim(),
+      citizenship: citizenship().trim(),
+      height: height().trim(),
+      weight: weight().trim(),
+      religion: religion().trim(),
+      spouse_name: spouseName().trim(),
+      spouse_occupation: spouseOccupation().trim(),
+      special_skills: specialSkills().trim(),
+      signature_data_url: signatureDataUrl(),
       custom_values: customValues(),
     };
     const row = selected();
@@ -775,7 +913,7 @@ export default function HrEmployeesPage() {
       >
         <ModalFormGuide guideId="hr_employee" spanFull />
         <draft.DraftBanner />
-        <div class="col-span-full mb-2 flex flex-wrap gap-1 border-b border-stroke pb-2">
+        <div class="col-span-full mb-2 flex flex-wrap items-center gap-1 border-b border-stroke pb-2">
           <button
             type="button"
             class="rounded-md px-3 py-1.5 text-sm font-medium"
@@ -791,6 +929,17 @@ export default function HrEmployeesPage() {
             type="button"
             class="rounded-md px-3 py-1.5 text-sm font-medium"
             classList={{
+              "bg-brand-600 text-white": formSection() === "pis",
+              "text-text-secondary hover:bg-panel": formSection() !== "pis",
+            }}
+            onClick={() => setFormSection("pis")}
+          >
+            201 — PIS
+          </button>
+          <button
+            type="button"
+            class="rounded-md px-3 py-1.5 text-sm font-medium"
+            classList={{
               "bg-brand-600 text-white": formSection() === "statutory",
               "text-text-secondary hover:bg-panel": formSection() !== "statutory",
             }}
@@ -798,6 +947,15 @@ export default function HrEmployeesPage() {
           >
             201 — statutory
           </button>
+          <Show when={selected()?.id}>
+            <button
+              type="button"
+              class="hr-btn hr-btn-sm ml-auto"
+              onClick={() => void downloadSelectedPdf()}
+            >
+              Download PDF
+            </button>
+          </Show>
           <button
             type="button"
             class="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
@@ -987,6 +1145,53 @@ export default function HrEmployeesPage() {
           </Field>
         </Show>
 
+        <Show when={formSection() === "pis"}>
+          <Show when={sourceApplicationId()}>
+            <p class="col-span-full text-xs text-text-secondary">
+              Linked application #{sourceApplicationId()} — PIS fields copied on convert-hire; edit here for the employee master.
+            </p>
+          </Show>
+          <Field label="Gender">
+            <input class={inputClass} value={gender()} onInput={(e) => setGender(e.currentTarget.value)} />
+          </Field>
+          <Field label="Civil status">
+            <input class={inputClass} value={civilStatus()} onInput={(e) => setCivilStatus(e.currentTarget.value)} />
+          </Field>
+          <Field label="Cellphone">
+            <input class={inputClass} value={cellphone()} onInput={(e) => setCellphone(e.currentTarget.value)} />
+          </Field>
+          <Field label="Citizenship">
+            <input class={inputClass} value={citizenship()} onInput={(e) => setCitizenship(e.currentTarget.value)} />
+          </Field>
+          <Field label="Birthplace">
+            <input class={inputClass} value={birthplace()} onInput={(e) => setBirthplace(e.currentTarget.value)} />
+          </Field>
+          <Field label="Religion">
+            <input class={inputClass} value={religion()} onInput={(e) => setReligion(e.currentTarget.value)} />
+          </Field>
+          <Field label="Height">
+            <input class={inputClass} value={height()} onInput={(e) => setHeight(e.currentTarget.value)} />
+          </Field>
+          <Field label="Weight">
+            <input class={inputClass} value={weight()} onInput={(e) => setWeight(e.currentTarget.value)} />
+          </Field>
+          <Field label="City address">
+            <input class={inputClass} value={cityAddress()} onInput={(e) => setCityAddress(e.currentTarget.value)} />
+          </Field>
+          <Field label="Provincial address">
+            <input class={inputClass} value={provincialAddress()} onInput={(e) => setProvincialAddress(e.currentTarget.value)} />
+          </Field>
+          <Field label="Spouse name">
+            <input class={inputClass} value={spouseName()} onInput={(e) => setSpouseName(e.currentTarget.value)} />
+          </Field>
+          <Field label="Spouse occupation">
+            <input class={inputClass} value={spouseOccupation()} onInput={(e) => setSpouseOccupation(e.currentTarget.value)} />
+          </Field>
+          <Field label="Special skills">
+            <textarea class={inputClass} rows={2} value={specialSkills()} onInput={(e) => setSpecialSkills(e.currentTarget.value)} />
+          </Field>
+        </Show>
+
         <Show when={formSection() === "statutory"}>
           <Field label="Bank name">
             <input class={inputClass} value={bankName()} onInput={(e) => setBankName(e.currentTarget.value)} />
@@ -1019,7 +1224,16 @@ export default function HrEmployeesPage() {
           {(id) => <EmployeeAssignmentPanel employeeId={id()} />}
         </Show>
         <Show when={formSection() === "documents" && selected()?.id}>
-          {(id) => <EmployeeExtrasPanel employeeId={id()} />}
+          {(id) => (
+            <EmployeeExtrasPanel
+              employeeId={id()}
+              signatureDataUrl={signatureDataUrl()}
+              onSignatureSaved={(url) => {
+                setSignatureDataUrl(url);
+                setSelected((cur) => (cur ? { ...cur, signature_data_url: url, has_signature: !!url } : cur));
+              }}
+            />
+          )}
         </Show>
         <CustomFieldsSection
           entityType={HR_ENTITY.employee}

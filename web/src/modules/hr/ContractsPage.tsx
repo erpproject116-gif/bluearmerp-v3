@@ -8,7 +8,16 @@ import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { siteChoices, type SiteChoice } from "./siteChoices";
 
 type Order = { id: number; site_name: string; client_name: string; pay_rate: number; bill_rate: number };
-type Posting = { id: number; site_name: string; client_name: string; title: string; headcount: number; status: string };
+type Posting = {
+  id: number;
+  site_name: string;
+  client_name: string;
+  title: string;
+  headcount: number;
+  status: string;
+  manpower_request_id?: number | null;
+};
+type RequestRow = { id: number; site_id: number; site_name: string; client_name: string; details: string; status: string };
 
 function postingTone(status: string): HrBadgeTone {
   const s = status.toLowerCase();
@@ -25,6 +34,7 @@ export default function ContractsPage() {
   const [bill, setBill] = createSignal("");
   const [title, setTitle] = createSignal("");
   const [headcount, setHeadcount] = createSignal("1");
+  const [requestId, setRequestId] = createSignal("");
   const [selected, setSelected] = createSignal<number | null>(null);
   const [innerTab, setInnerTab] = createSignal<"orders" | "openings">("orders");
   const [search, setSearch] = createSignal("");
@@ -33,6 +43,7 @@ export default function ContractsPage() {
   const [clients] = createResource(siteChoices);
   const [rows, { refetch }] = createResource(async () => (await apiFetch<Order[]>("/api/v1/hr/job-orders")).data ?? []);
   const [postings, { refetch: refetchPostings }] = createResource(async () => (await apiFetch<Posting[]>("/api/v1/hr/job-postings")).data ?? []);
+  const [requests] = createResource(async () => (await apiFetch<RequestRow[]>("/api/v1/hr/manpower-requests")).data ?? []);
 
   const filteredOrders = createMemo(() => {
     const q = search().trim().toLowerCase();
@@ -68,7 +79,20 @@ export default function ContractsPage() {
   };
 
   const savePosting = async () => {
-    if (!siteId() || !title().trim()) return toast.warning("Choose a site and a title.");
+    const req = Number(requestId()) || 0;
+    if (req > 0) {
+      const res = await apiFetch(`/api/v1/hr/manpower-requests/${req}/publish-opening`, {
+        method: "POST",
+        body: JSON.stringify({ title: title().trim() || undefined }),
+      });
+      if (!res.success) return toast.warning(res.message ?? "Could not publish opening.");
+      setTitle("");
+      setRequestId("");
+      void refetchPostings();
+      toast.success("Opening published from manpower request.");
+      return;
+    }
+    if (!siteId() || !title().trim()) return toast.warning("Choose a site and a title, or pick a manpower request.");
     const res = await apiFetch("/api/v1/hr/job-postings", {
       method: "POST",
       body: JSON.stringify({ site_id: Number(siteId()), title: title().trim(), headcount: Number(headcount()) || 1 }),
@@ -163,16 +187,40 @@ export default function ContractsPage() {
       </Show>
 
       <Show when={innerTab() === "openings"}>
-        <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-4">
+        <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-5">
+          <Field label="From manpower request">
+            <select
+              class={inputClass}
+              value={requestId()}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setRequestId(v);
+                const row = (requests() ?? []).find((r) => String(r.id) === v);
+                if (row) {
+                  setSiteId(String(row.site_id));
+                  if (!title().trim()) setTitle(row.details || "");
+                }
+              }}
+            >
+              <option value="">Manual (no request)</option>
+              <For each={requests() ?? []}>
+                {(r) => (
+                  <option value={r.id}>
+                    #{r.id} · {r.client_name} · {r.site_name} · {r.status}
+                  </option>
+                )}
+              </For>
+            </select>
+          </Field>
           <SiteField sites={clients() ?? []} value={siteId()} onChange={setSiteId} />
           <Field label="Title">
             <input class={inputClass} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
           </Field>
           <Field label="Headcount">
-            <input class={inputClass} value={headcount()} onInput={(e) => setHeadcount(e.currentTarget.value)} />
+            <input class={inputClass} value={headcount()} onInput={(e) => setHeadcount(e.currentTarget.value)} disabled={!!requestId()} />
           </Field>
           <button type="button" class="hr-btn hr-btn-primary self-end" onClick={() => void savePosting()}>
-            Save opening
+            {requestId() ? "Publish from request" : "Save opening"}
           </button>
         </div>
         <SpreadsheetGrid
@@ -181,6 +229,11 @@ export default function ContractsPage() {
             { key: "client_name", header: "Client" },
             { key: "site_name", header: "Site" },
             { key: "headcount", header: "Headcount" },
+            {
+              key: "manpower_request_id",
+              header: "Request",
+              render: (row) => (row.manpower_request_id ? `#${row.manpower_request_id}` : "—"),
+            },
             {
               key: "status",
               header: "Status",

@@ -44,6 +44,22 @@ type Employee struct {
 	EmergencyContactName    string         `json:"emergency_contact_name,omitempty"`
 	EmergencyContactAddress string         `json:"emergency_contact_address,omitempty"`
 	EmergencyContactPhone   string         `json:"emergency_contact_phone,omitempty"`
+	SourceApplicationID     *int64         `json:"source_application_id,omitempty"`
+	Gender                  string         `json:"gender,omitempty"`
+	CivilStatus             string         `json:"civil_status,omitempty"`
+	Cellphone               string         `json:"cellphone,omitempty"`
+	CityAddress             string         `json:"city_address,omitempty"`
+	ProvincialAddress       string         `json:"provincial_address,omitempty"`
+	Birthplace              string         `json:"birthplace,omitempty"`
+	Citizenship             string         `json:"citizenship,omitempty"`
+	Height                  string         `json:"height,omitempty"`
+	Weight                  string         `json:"weight,omitempty"`
+	Religion                string         `json:"religion,omitempty"`
+	SpouseName              string         `json:"spouse_name,omitempty"`
+	SpouseOccupation        string         `json:"spouse_occupation,omitempty"`
+	SpecialSkills           string         `json:"special_skills,omitempty"`
+	SignatureDataURL        string         `json:"signature_data_url,omitempty"`
+	HasSignature            bool           `json:"has_signature,omitempty"`
 	CustomValues            map[string]any `json:"custom_values,omitempty"`
 }
 
@@ -71,6 +87,20 @@ type employeeBody struct {
 	EmergencyContactName    *string        `json:"emergency_contact_name"`
 	EmergencyContactAddress *string        `json:"emergency_contact_address"`
 	EmergencyContactPhone   *string        `json:"emergency_contact_phone"`
+	Gender                  *string        `json:"gender"`
+	CivilStatus             *string        `json:"civil_status"`
+	Cellphone               *string        `json:"cellphone"`
+	CityAddress             *string        `json:"city_address"`
+	ProvincialAddress       *string        `json:"provincial_address"`
+	Birthplace              *string        `json:"birthplace"`
+	Citizenship             *string        `json:"citizenship"`
+	Height                  *string        `json:"height"`
+	Weight                  *string        `json:"weight"`
+	Religion                *string        `json:"religion"`
+	SpouseName              *string        `json:"spouse_name"`
+	SpouseOccupation        *string        `json:"spouse_occupation"`
+	SpecialSkills           *string        `json:"special_skills"`
+	SignatureDataURL        *string        `json:"signature_data_url"`
 	CustomValues            map[string]any `json:"custom_values"`
 }
 
@@ -97,6 +127,20 @@ type employeePatch struct {
 	EmergencyContactName    *string        `json:"emergency_contact_name"`
 	EmergencyContactAddress *string        `json:"emergency_contact_address"`
 	EmergencyContactPhone   *string        `json:"emergency_contact_phone"`
+	Gender                  *string        `json:"gender"`
+	CivilStatus             *string        `json:"civil_status"`
+	Cellphone               *string        `json:"cellphone"`
+	CityAddress             *string        `json:"city_address"`
+	ProvincialAddress       *string        `json:"provincial_address"`
+	Birthplace              *string        `json:"birthplace"`
+	Citizenship             *string        `json:"citizenship"`
+	Height                  *string        `json:"height"`
+	Weight                  *string        `json:"weight"`
+	Religion                *string        `json:"religion"`
+	SpouseName              *string        `json:"spouse_name"`
+	SpouseOccupation        *string        `json:"spouse_occupation"`
+	SpecialSkills           *string        `json:"special_skills"`
+	SignatureDataURL        *string        `json:"signature_data_url"`
 	CustomValues            map[string]any `json:"custom_values"`
 }
 
@@ -246,8 +290,11 @@ func createEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			insert into public.hr_employees (
 			  tenant_id, employee_no, full_name, department, department_id, job_title, hire_date, status, base_salary, user_id, email, notes,
 			  tin, sss_no, philhealth_no, pagibig_no, tax_status, bank_name, bank_account_no,
-			  birthdate, national_id, emergency_contact_name, emergency_contact_address, emergency_contact_phone
-			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) returning id`,
+			  birthdate, national_id, emergency_contact_name, emergency_contact_address, emergency_contact_phone,
+			  gender, civil_status, cellphone, city_address, provincial_address, birthplace, citizenship,
+			  height, weight, religion, spouse_name, spouse_occupation, special_skills, signature_data_url
+			) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,
+			  $25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38) returning id`,
 			tu.TenantID, strings.TrimSpace(body.EmployeeNo), strings.TrimSpace(body.FullName),
 			deptName, body.DepartmentID, strings.TrimSpace(body.JobTitle), hireDate,
 			normalizeEmployeeStatus(body.Status), body.BaseSalary, body.UserID, body.Email, body.Notes,
@@ -255,6 +302,11 @@ func createEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 			normalizeTaxStatus(strPtrVal(body.TaxStatus)), strPtrVal(body.BankName), strPtrVal(body.BankAccountNo),
 			birthdate, strPtrVal(body.NationalID), strPtrVal(body.EmergencyContactName),
 			strPtrVal(body.EmergencyContactAddress), strPtrVal(body.EmergencyContactPhone),
+			strPtrVal(body.Gender), strPtrVal(body.CivilStatus), strPtrVal(body.Cellphone),
+			strPtrVal(body.CityAddress), strPtrVal(body.ProvincialAddress), strPtrVal(body.Birthplace),
+			strPtrVal(body.Citizenship), strPtrVal(body.Height), strPtrVal(body.Weight), strPtrVal(body.Religion),
+			strPtrVal(body.SpouseName), strPtrVal(body.SpouseOccupation), strPtrVal(body.SpecialSkills),
+			strPtrVal(body.SignatureDataURL),
 		).Scan(&id)
 		if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to create employee.", "ERR_INTERNAL")
@@ -424,6 +476,32 @@ func patchEmployee(pool *pgxpool.Pool) http.HandlerFunc {
 		if body.EmergencyContactPhone != nil {
 			sets = append(sets, fmt.Sprintf("emergency_contact_phone = $%d", n))
 			args = append(args, strings.TrimSpace(*body.EmergencyContactPhone))
+			n++
+		}
+		patchEmpStr := func(col string, p *string) {
+			if p == nil {
+				return
+			}
+			sets = append(sets, fmt.Sprintf("%s = $%d", col, n))
+			args = append(args, strings.TrimSpace(*p))
+			n++
+		}
+		patchEmpStr("gender", body.Gender)
+		patchEmpStr("civil_status", body.CivilStatus)
+		patchEmpStr("cellphone", body.Cellphone)
+		patchEmpStr("city_address", body.CityAddress)
+		patchEmpStr("provincial_address", body.ProvincialAddress)
+		patchEmpStr("birthplace", body.Birthplace)
+		patchEmpStr("citizenship", body.Citizenship)
+		patchEmpStr("height", body.Height)
+		patchEmpStr("weight", body.Weight)
+		patchEmpStr("religion", body.Religion)
+		patchEmpStr("spouse_name", body.SpouseName)
+		patchEmpStr("spouse_occupation", body.SpouseOccupation)
+		patchEmpStr("special_skills", body.SpecialSkills)
+		if body.SignatureDataURL != nil {
+			sets = append(sets, fmt.Sprintf("signature_data_url = $%d", n))
+			args = append(args, strings.TrimSpace(*body.SignatureDataURL))
 			n++
 		}
 		tx, err := pool.Begin(r.Context())
@@ -704,20 +782,31 @@ func applyEmployeeRestore(ctx context.Context, pool *pgxpool.Pool, tu auth.Tenan
 func loadEmployee(ctx context.Context, pool *pgxpool.Pool, tenantID, id int64) (Employee, error) {
 	var row Employee
 	var notes *string
+	var sig string
 	err := pool.QueryRow(ctx, `
 		select id, employee_no, full_name, department, department_id, job_title, hire_date::text,
 		  status, base_salary::float8, user_id, coalesce(email,''), notes,
 		  coalesce(tin,''), coalesce(sss_no,''), coalesce(philhealth_no,''), coalesce(pagibig_no,''),
 		  coalesce(tax_status,'S'), coalesce(bank_name,''), coalesce(bank_account_no,''),
 		  coalesce(birthdate::text,''), coalesce(national_id,''), coalesce(emergency_contact_name,''),
-		  coalesce(emergency_contact_address,''), coalesce(emergency_contact_phone,'')
+		  coalesce(emergency_contact_address,''), coalesce(emergency_contact_phone,''),
+		  source_application_id, coalesce(gender,''), coalesce(civil_status,''), coalesce(cellphone,''),
+		  coalesce(city_address,''), coalesce(provincial_address,''), coalesce(birthplace,''),
+		  coalesce(citizenship,''), coalesce(height,''), coalesce(weight,''), coalesce(religion,''),
+		  coalesce(spouse_name,''), coalesce(spouse_occupation,''), coalesce(special_skills,''),
+		  coalesce(signature_data_url,'')
 		from public.hr_employees where id = $1 and tenant_id = $2 and deleted_at is null`, id, tenantID).Scan(
 		&row.ID, &row.EmployeeNo, &row.FullName, &row.Department, &row.DepartmentID, &row.JobTitle, &row.HireDate,
 		&row.Status, &row.BaseSalary, &row.UserID, &row.Email, &notes,
 		&row.TIN, &row.SSSNo, &row.PhilHealthNo, &row.PagibigNo, &row.TaxStatus,
 		&row.BankName, &row.BankAccountNo,
-		&row.Birthdate, &row.NationalID, &row.EmergencyContactName, &row.EmergencyContactAddress, &row.EmergencyContactPhone)
+		&row.Birthdate, &row.NationalID, &row.EmergencyContactName, &row.EmergencyContactAddress, &row.EmergencyContactPhone,
+		&row.SourceApplicationID, &row.Gender, &row.CivilStatus, &row.Cellphone,
+		&row.CityAddress, &row.ProvincialAddress, &row.Birthplace, &row.Citizenship,
+		&row.Height, &row.Weight, &row.Religion, &row.SpouseName, &row.SpouseOccupation, &row.SpecialSkills, &sig)
 	row.Notes = notes
+	row.SignatureDataURL = sig
+	row.HasSignature = strings.TrimSpace(sig) != ""
 	if err != nil {
 		return row, err
 	}

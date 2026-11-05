@@ -19,6 +19,8 @@ type Application = {
   workplace: string;
   industry_id: number | null;
   workplace_type_id: number | null;
+  job_posting_id?: number | null;
+  job_posting_title?: string;
 };
 type Segment = { id: number; kind: "industry" | "workplace"; name: string };
 
@@ -174,6 +176,9 @@ export default function ApplicantsPage() {
         <b class="truncate">{row.full_name}</b>
       </div>
       <p class="text-text-secondary">{row.position_desired || "No position"}</p>
+      <Show when={row.job_posting_title}>
+        <p class="text-xs text-brand-700">Opening: {row.job_posting_title}</p>
+      </Show>
       <p class="text-xs text-text-secondary">{row.industry || "No industry"} · {row.workplace || "No workplace"}</p>
       <div class="mt-2 flex flex-wrap items-center gap-1">
         <HrBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</HrBadge>
@@ -296,6 +301,12 @@ export default function ApplicantsPage() {
                 exportValue: (row) => row.full_name,
               },
               { key: "position_desired", header: "Position desired" },
+              {
+                key: "job_posting_title",
+                header: "Opening",
+                render: (row) => row.job_posting_title || "—",
+                exportValue: (row) => row.job_posting_title || "",
+              },
               {
                 key: "status",
                 header: "Status",

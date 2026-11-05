@@ -95,7 +95,7 @@ func TestSampleSeedRetract(t *testing.T) {
 	if err := tx.QueryRow(ctx, `select count(*) from public.fin_journal_entries`).Scan(&journalsBefore); err != nil {
 		t.Fatal(err)
 	}
-	batchID, err := seedHRSample(ctx, tx, tenantID)
+	batchID, err := seedHRSample(ctx, tx, tenantID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,8 +241,33 @@ func TestSampleSeedRetract(t *testing.T) {
 		batchID).Scan(&invoiceCount, &invoiceTotal, &invoiceStatus); err != nil {
 		t.Fatal(err)
 	}
-	if invoiceCount != 1 || invoiceTotal != 10000 || invoiceStatus != "unconfirmed" {
+	if invoiceCount != 1 || invoiceTotal != 1200 || invoiceStatus != "unconfirmed" {
 		t.Fatalf("invoice count=%d total=%v status=%s", invoiceCount, invoiceTotal, invoiceStatus)
+	}
+	var fkPosting, fkSource, fkBillPartner, fkAssignOrder int
+	if err := tx.QueryRow(ctx, `
+		select
+		  (select count(*) from public.hr_job_postings p
+		    join public.hr_sample_rows r on r.row_id = p.id and r.table_name = 'hr_job_postings' and r.batch_id = $1
+		    where p.manpower_request_id is not null),
+		  (select count(*) from public.hr_employees e
+		    where e.tenant_id = $2 and e.employee_no = $3 and e.source_application_id is not null),
+		  (select count(*) from public.hr_client_bills b
+		    join public.hr_sample_rows br on br.row_id = b.id and br.table_name = 'hr_client_bills' and br.batch_id = $1
+		    join public.sa_sales s on s.id = b.sales_id and s.tenant_id = b.tenant_id
+		    join public.hr_client_sites cs on cs.id = b.site_id and cs.tenant_id = b.tenant_id
+		    join public.hr_clients c on c.id = cs.client_id and c.tenant_id = b.tenant_id
+		    where s.partner_id = c.partner_id),
+		  (select count(*) from public.hr_assignments a
+		    join public.hr_employees e on e.id = a.employee_id
+		    where e.tenant_id = $2 and e.employee_no = $3 and a.job_order_id is not null and a.end_date is null)`,
+		batchID, tenantID, fmt.Sprintf("SEEDHR-%d-01", batchID)).Scan(
+		&fkPosting, &fkSource, &fkBillPartner, &fkAssignOrder); err != nil {
+		t.Fatal(err)
+	}
+	if fkPosting < 1 || fkSource != 1 || fkBillPartner != 1 || fkAssignOrder != 1 {
+		t.Fatalf("fk loop posting=%d source=%d billPartner=%d assignOrder=%d",
+			fkPosting, fkSource, fkBillPartner, fkAssignOrder)
 	}
 	var clientCount, siteCount, assignCount, bareSites, unlinked, terminatedAssigned int
 	if err := tx.QueryRow(ctx, `

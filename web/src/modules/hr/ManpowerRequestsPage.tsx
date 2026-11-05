@@ -69,6 +69,18 @@ export default function ManpowerRequestsPage() {
     void refetch();
   };
 
+  const publishOpening = async (row: RequestRow) => {
+    const title = window.prompt("Opening title", row.details || "Open role")?.trim();
+    if (title === undefined) return;
+    const res = await apiFetch(`/api/v1/hr/manpower-requests/${row.id}/publish-opening`, {
+      method: "POST",
+      body: JSON.stringify({ title: title || row.details || "Open role" }),
+    });
+    if (!res.success) return toast.warning(res.message ?? "Could not publish opening.");
+    toast.success("Opening published on Contracts → Public openings.");
+    void refetch();
+  };
+
   return (
     <HrLayout>
       <HrPageHead
@@ -159,6 +171,9 @@ export default function ManpowerRequestsPage() {
                     onClick={() => toast.warning("Applicant shortlist needs backend.")}
                   >
                     Shortlist
+                  </button>
+                  <button type="button" class="menu-item" onClick={() => void publishOpening(row)}>
+                    Publish opening
                   </button>
                   <Show when={row.status === "open"}>
                     <button type="button" class="menu-item" onClick={() => void setStatus(row, "filled")}>
