@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
+import { hasPermission, isRolePreviewActive, useAuth } from "../../shared/auth-context";
 import { formatAmount } from "../../shared/money";
 import { useToast } from "../../shared/toast";
 import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
@@ -204,18 +205,25 @@ function donutSlices(rows: { name: string; count: number }[]) {
 
 export default function HrOverviewPage() {
   const toast = useToast();
+  const auth = useAuth();
   const qc = useQueryClient();
   const mode = useManpowerMode();
   const today = manilaToday();
   const week = weekBounds(today);
   const soon = addDays(today, 30);
   const [busy, setBusy] = createSignal(false);
-  const [confirmRemove, setConfirmRemove] = createSignal(false);
+  const [sampleActionError, setSampleActionError] = createSignal("");
   const [customize, setCustomize] = createSignal(false);
+  const canWriteSample = createMemo(
+    () => hasPermission(auth.me, "hr.sample_data", "write") && !isRolePreviewActive(auth.me),
+  );
   const sampleStatus = createQuery(() => ({
-    queryKey: ["hr-sample-status"],
-    queryFn: async () =>
-      (await apiFetch<SamplePasteCard>("/api/v1/hr/sample-data/status", {}, { silent: true })).data ?? null,
+    queryKey: ["hr-sample-status", auth.me?.tenant?.id ?? 0],
+    queryFn: async () => {
+      const res = await apiFetch<SamplePasteCard>("/api/v1/hr/sample-data/status", {}, { silent: true });
+      if (!res.success) throw new Error(res.message || "Could not load sample status.");
+      return res.data ?? null;
+    },
   }));
   const [queueFilter, setQueueFilter] = createSignal("");
   const [clientId, setClientId] = createSignal("");
@@ -529,35 +537,86 @@ export default function HrOverviewPage() {
   };
 
   const runSample = async (path: string, ok: string) => {
-    setBusy(true);
-    const res = await apiFetch<{ batch_id?: number; paste_card?: SamplePasteCard; removed?: boolean }>(
-      path,
-      { method: "POST", body: "{}" },
-      { silent: true },
-    );
-    setBusy(false);
-    if (!res.success) {
-      toast.warning(res.message ?? "Could not update sample data.");
+    if (!canWriteSample()) {
+      const msg = isRolePreviewActive(auth.me)
+        ? "Exit role preview to seed or remove sample data."
+        : "You need HR sample-data write permission (store admin / owner).";
+      setSampleActionError(msg);
+      toast.error(msg);
       return;
     }
-    toast.success(ok);
-    void qc.invalidateQueries({ queryKey: ["hr-overview"] });
-    void qc.invalidateQueries({ queryKey: ["hr-sample-status"] });
-    void qc.invalidateQueries({ queryKey: ["hr-dtr-month-overview"] });
-    refresh();
+    setBusy(true);
+    setSampleActionError("");
+    try {
+      const res = await apiFetch<{ batch_id?: number; paste_card?: SamplePasteCard; removed?: boolean }>(
+        path,
+        { method: "POST", body: "{}" },
+        { silent: true },
+      );
+      if (!res.success) {
+        const msg = res.message ?? "Could not update sample data.";
+        setSampleActionError(msg);
+        toast.error(msg);
+        return;
+      }
+      toast.success(ok);
+      void qc.invalidateQueries({ queryKey: ["hr-overview"] });
+      void qc.invalidateQueries({ queryKey: ["hr-sample-status"] });
+      void qc.invalidateQueries({ queryKey: ["hr-dtr-month-overview"] });
+      refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not update sample data.";
+      setSampleActionError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeSample = () => {
+    if (!sampleStatus.data?.open) {
+      const msg = "No sample batch is loaded.";
+      setSampleActionError(msg);
+      toast.warning(msg);
+      return;
+    }
+    if (!window.confirm("Remove the sample HR batch? This deletes only that batch.")) return;
+    void runSample("/api/v1/hr/sample-data/retract", "Sample HR data removed.");
   };
 
   const copyPasteCard = async () => {
     const text = sampleStatus.data?.paste_text?.trim();
     if (!text) {
-      toast.warning("Nothing to copy yet — seed sample data first.");
+      const msg = "Nothing to copy yet — seed sample data first.";
+      setSampleActionError(msg);
+      toast.warning(msg);
       return;
     }
     try {
       await navigator.clipboard.writeText(text);
+      setSampleActionError("");
+      toast.success("Paste card copied.");
+      return;
+    } catch {
+      /* fall through to textarea fallback */
+    }
+    try {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.left = "-9999px";
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(area);
+      if (!ok) throw new Error("copy failed");
+      setSampleActionError("");
       toast.success("Paste card copied.");
     } catch {
-      toast.warning("Could not copy — select the text below instead.");
+      const msg = "Could not copy — select the text below instead.";
+      setSampleActionError(msg);
+      toast.warning(msg);
     }
   };
 
@@ -1248,43 +1307,62 @@ export default function HrOverviewPage() {
           Reversible demo batch for product walkthroughs. Current + previous quincena DTR is seeded so attendance matrices work immediately.
           Payroll / withholding samples stay in 2099; sample employees stay out of live pay runs. Remove deletes only this batch.
         </p>
+        <Show when={sampleStatus.isError}>
+          <p class="mt-2 text-sm text-red-700" role="alert">
+            {(sampleStatus.error as Error)?.message || "Could not load sample status."}
+          </p>
+        </Show>
+        <Show when={sampleStatus.data?.open}>
+          <p class="mt-2 text-sm text-amber-800">
+            Sample batch #{sampleStatus.data?.batch_id} is already loaded — Seed stays off until you remove it.
+          </p>
+        </Show>
+        <Show when={!canWriteSample()}>
+          <p class="mt-2 text-sm text-amber-800">
+            {isRolePreviewActive(auth.me)
+              ? "Role preview is read-only — exit preview to seed or remove sample data."
+              : "Your role can view this card but cannot seed or remove it (needs hr.sample_data write)."}
+          </p>
+        </Show>
+        <Show when={sampleActionError()}>
+          <p class="mt-2 text-sm text-red-700" role="alert">
+            {sampleActionError()}
+          </p>
+        </Show>
         <div class="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             class="hr-btn hr-btn-primary"
-            disabled={busy() || sampleStatus.data?.open === true}
+            title={
+              sampleStatus.data?.open
+                ? "Sample data is already loaded — remove it first"
+                : !canWriteSample()
+                  ? "Write permission required"
+                  : "Add reversible sample HR data"
+            }
+            disabled={busy() || sampleStatus.data?.open === true || !canWriteSample()}
             onClick={() => void runSample("/api/v1/hr/sample-data", "Sample HR data added.")}
           >
-            Seed
+            {sampleStatus.data?.open ? "Already seeded" : "Seed"}
           </button>
-          <button type="button" class="hr-btn" disabled={busy() || !sampleStatus.data?.open} onClick={() => setConfirmRemove(true)}>
+          <button
+            type="button"
+            class="hr-btn"
+            title={!sampleStatus.data?.open ? "Nothing to remove" : !canWriteSample() ? "Write permission required" : "Remove sample batch"}
+            disabled={busy() || !sampleStatus.data?.open || !canWriteSample()}
+            onClick={removeSample}
+          >
             Remove sample data
           </button>
-          <button type="button" class="hr-btn" disabled={!sampleStatus.data?.paste_text} onClick={() => void copyPasteCard()}>
+          <button
+            type="button"
+            class="hr-btn"
+            disabled={!sampleStatus.data?.paste_text}
+            onClick={() => void copyPasteCard()}
+          >
             Copy paste card
           </button>
         </div>
-        <Show when={confirmRemove()}>
-          <div class="mt-3 rounded-lg border border-stroke p-3">
-            <p class="text-sm">Remove the sample HR batch? This deletes only that batch.</p>
-            <div class="mt-2 flex gap-2">
-              <button type="button" class="hr-btn" onClick={() => setConfirmRemove(false)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                class="hr-btn hr-btn-primary"
-                disabled={busy()}
-                onClick={() => {
-                  setConfirmRemove(false);
-                  void runSample("/api/v1/hr/sample-data/retract", "Sample HR data removed.");
-                }}
-              >
-                Remove sample data
-              </button>
-            </div>
-          </div>
-        </Show>
         <Show when={sampleStatus.data}>
           {(card) => (
             <div class="mt-4 rounded-lg border border-dashed border-stroke bg-panel/40 p-3">
