@@ -34,6 +34,24 @@ type Holiday = { holiday_date: string; name: string; holiday_type: string };
 type Cutoff = { label: string; cutoff_start: string; cutoff_end: string; pay_date?: string; status: string };
 type PayPeriod = { id: number; period_label: string; period_start: string; period_end: string; status: string };
 
+type SamplePersona = {
+  role: string;
+  name: string;
+  email?: string;
+  path?: string;
+  url?: string;
+  note?: string;
+};
+
+type SamplePasteCard = {
+  open: boolean;
+  batch_id?: number;
+  company_code: string;
+  personas: SamplePersona[];
+  hints: string[];
+  paste_text: string;
+};
+
 type Overview = {
   active_employees: number;
   open_discipline_cases: number;
@@ -194,6 +212,11 @@ export default function HrOverviewPage() {
   const [busy, setBusy] = createSignal(false);
   const [confirmRemove, setConfirmRemove] = createSignal(false);
   const [customize, setCustomize] = createSignal(false);
+  const sampleStatus = createQuery(() => ({
+    queryKey: ["hr-sample-status"],
+    queryFn: async () =>
+      (await apiFetch<SamplePasteCard>("/api/v1/hr/sample-data/status", {}, { silent: true })).data ?? null,
+  }));
   const [queueFilter, setQueueFilter] = createSignal("");
   const [clientId, setClientId] = createSignal("");
   const [updated, setUpdated] = createSignal(manilaClock());
@@ -507,7 +530,11 @@ export default function HrOverviewPage() {
 
   const runSample = async (path: string, ok: string) => {
     setBusy(true);
-    const res = await apiFetch(path, { method: "POST", body: "{}" }, { silent: true });
+    const res = await apiFetch<{ batch_id?: number; paste_card?: SamplePasteCard; removed?: boolean }>(
+      path,
+      { method: "POST", body: "{}" },
+      { silent: true },
+    );
     setBusy(false);
     if (!res.success) {
       toast.warning(res.message ?? "Could not update sample data.");
@@ -515,7 +542,23 @@ export default function HrOverviewPage() {
     }
     toast.success(ok);
     void qc.invalidateQueries({ queryKey: ["hr-overview"] });
+    void qc.invalidateQueries({ queryKey: ["hr-sample-status"] });
+    void qc.invalidateQueries({ queryKey: ["hr-dtr-month-overview"] });
     refresh();
+  };
+
+  const copyPasteCard = async () => {
+    const text = sampleStatus.data?.paste_text?.trim();
+    if (!text) {
+      toast.warning("Nothing to copy yet — seed sample data first.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Paste card copied.");
+    } catch {
+      toast.warning("Could not copy — select the text below instead.");
+    }
   };
 
   const deployedPct = () => {
@@ -1202,22 +1245,101 @@ export default function HrOverviewPage() {
       <section class="mt-6 rounded-lg border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="text-lg font-medium">Sample HR data</h2>
         <p class="mt-1 text-sm text-text-secondary">
-          Sample employees are excluded from a real payroll run while the batch exists. Remove deletes only the sample batch.
-          Sample attendance, payroll, and withholding are in 2099. Set the attendance month to 2099-01 and the government report year to 2099.
-          The first client portal login is listed on Portal access.
+          Reversible demo batch for product walkthroughs. Current + previous quincena DTR is seeded so attendance matrices work immediately.
+          Payroll / withholding samples stay in 2099; sample employees stay out of live pay runs. Remove deletes only this batch.
         </p>
         <div class="mt-3 flex flex-wrap gap-2">
-          <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => void runSample("/api/v1/hr/sample-data", "Sample HR data added.")}>Seed</button>
-          <button type="button" class="hr-btn" disabled={busy()} onClick={() => setConfirmRemove(true)}>Remove sample data</button>
+          <button
+            type="button"
+            class="hr-btn hr-btn-primary"
+            disabled={busy() || sampleStatus.data?.open === true}
+            onClick={() => void runSample("/api/v1/hr/sample-data", "Sample HR data added.")}
+          >
+            Seed
+          </button>
+          <button type="button" class="hr-btn" disabled={busy() || !sampleStatus.data?.open} onClick={() => setConfirmRemove(true)}>
+            Remove sample data
+          </button>
+          <button type="button" class="hr-btn" disabled={!sampleStatus.data?.paste_text} onClick={() => void copyPasteCard()}>
+            Copy paste card
+          </button>
         </div>
         <Show when={confirmRemove()}>
           <div class="mt-3 rounded-lg border border-stroke p-3">
             <p class="text-sm">Remove the sample HR batch? This deletes only that batch.</p>
             <div class="mt-2 flex gap-2">
-              <button type="button" class="hr-btn" onClick={() => setConfirmRemove(false)}>Cancel</button>
-              <button type="button" class="hr-btn hr-btn-primary" disabled={busy()} onClick={() => { setConfirmRemove(false); void runSample("/api/v1/hr/sample-data/retract", "Sample HR data removed."); }}>Remove sample data</button>
+              <button type="button" class="hr-btn" onClick={() => setConfirmRemove(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="hr-btn hr-btn-primary"
+                disabled={busy()}
+                onClick={() => {
+                  setConfirmRemove(false);
+                  void runSample("/api/v1/hr/sample-data/retract", "Sample HR data removed.");
+                }}
+              >
+                Remove sample data
+              </button>
             </div>
           </div>
+        </Show>
+        <Show when={sampleStatus.data}>
+          {(card) => (
+            <div class="mt-4 rounded-lg border border-dashed border-stroke bg-panel/40 p-3">
+              <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                <span class="font-medium">{card().open ? `Batch #${card().batch_id} open` : "No sample batch"}</span>
+                <Show when={card().company_code}>
+                  <span class="text-text-secondary">· company code {card().company_code}</span>
+                </Show>
+              </div>
+              <Show when={card().open && card().personas?.length}>
+                <ul class="mb-3 space-y-2 text-sm">
+                  <For each={card().personas}>
+                    {(p) => (
+                      <li class="rounded border border-stroke bg-surface px-3 py-2">
+                        <div class="font-medium">
+                          {p.role} — {p.name}
+                        </div>
+                        <Show when={p.email}>
+                          <div class="text-text-secondary">{p.email}</div>
+                        </Show>
+                        <Show when={p.url}>
+                          <A class="text-brand-700 break-all hover:underline" href={p.url!} target="_blank" rel="noopener noreferrer">
+                            {p.url}
+                          </A>
+                        </Show>
+                        <Show when={p.path && !p.url}>
+                          <A class="text-brand-700 hover:underline" href={p.path!}>
+                            {p.path}
+                          </A>
+                        </Show>
+                        <Show when={p.path && p.url}>
+                          <div>
+                            <A class="text-brand-700 hover:underline" href={p.path!}>
+                              {p.path}
+                            </A>
+                          </div>
+                        </Show>
+                        <Show when={p.note}>
+                          <div class="text-xs text-text-secondary">{p.note}</div>
+                        </Show>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
+              <pre class="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-stroke bg-surface p-2 text-xs text-text-secondary">
+                {card().paste_text}
+              </pre>
+              <Show when={card().hints?.length}>
+                <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-text-secondary">
+                  <For each={card().hints}>{(h) => <li>{h}</li>}</For>
+                </ul>
+              </Show>
+            </div>
+          )}
         </Show>
       </section>
 

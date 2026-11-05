@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -76,8 +77,39 @@ func employeeInOpenSample(ctx context.Context, q rowQuery, tenantID, employeeID 
 }
 
 func registerSampleDataRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.With(auth.RequirePermission("hr.sample_data", auth.AccessRead)).Get("/sample-data/status", getSampleDataStatus(pool))
 	r.With(auth.RequirePermission("hr.sample_data", auth.AccessWrite)).Post("/sample-data", postSampleData(pool))
 	r.With(auth.RequirePermission("hr.sample_data", auth.AccessWrite)).Post("/sample-data/retract", postRetractSampleData(pool))
+}
+
+type samplePersona struct {
+	Role  string `json:"role"`
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"`
+	Path  string `json:"path,omitempty"`
+	URL   string `json:"url,omitempty"`
+	Note  string `json:"note,omitempty"`
+}
+
+type samplePasteCard struct {
+	Open        bool            `json:"open"`
+	BatchID     int64           `json:"batch_id,omitempty"`
+	CompanyCode string          `json:"company_code"`
+	Personas    []samplePersona `json:"personas"`
+	Hints       []string        `json:"hints"`
+	PasteText   string          `json:"paste_text"`
+}
+
+func getSampleDataStatus(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		card, err := buildSamplePasteCard(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load sample status.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, card, "")
+	}
 }
 
 func postSampleData(pool *pgxpool.Pool) http.HandlerFunc {
@@ -98,7 +130,12 @@ func postSampleData(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to add sample data.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, map[string]any{"batch_id": batchID}, "Sample HR data added.")
+		card, err := buildSamplePasteCard(r.Context(), pool, tu.TenantID)
+		if err != nil {
+			response.OK(w, map[string]any{"batch_id": batchID}, "Sample HR data added.")
+			return
+		}
+		response.OK(w, map[string]any{"batch_id": batchID, "paste_card": card}, "Sample HR data added.")
 	}
 }
 
@@ -568,6 +605,16 @@ func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, em
 		tenantID, siteIDs[0], acceptedID); err != nil {
 		return err
 	}
+	if _, err := s.ins("hr_job_postings", `
+		insert into public.hr_job_postings (tenant_id, site_id, title, headcount)
+		values ($1,$2,'Sample Security Guard',3) returning id`, tenantID, siteIDs[0]); err != nil {
+		return err
+	}
+	if _, err := s.ins("hr_job_postings", `
+		insert into public.hr_job_postings (tenant_id, site_id, title, headcount)
+		values ($1,$2,'Sample Housekeeping',2) returning id`, tenantID, siteIDs[1]); err != nil {
+		return err
+	}
 	for i, partnerID := range partnerIDs {
 		userID, err := s.ins("portal_users", `
 			insert into public.portal_users (tenant_id, partner_id, email, display_name)
@@ -578,13 +625,15 @@ func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, em
 		if err != nil {
 			return err
 		}
+		token := fmt.Sprintf("samplehr%d-c%d", s.batch, i+1)
 		if i == 0 {
-			if _, err := s.ins("portal_magic_links", `
-				insert into public.portal_magic_links (portal_user_id, token, expires_at)
-				values ($1,$2,'2099-12-31 00:00:00+00') returning id`,
-				userID, fmt.Sprintf("samplehr%d", s.batch)); err != nil {
-				return err
-			}
+			token = fmt.Sprintf("samplehr%d", s.batch)
+		}
+		if _, err := s.ins("portal_magic_links", `
+			insert into public.portal_magic_links (portal_user_id, token, expires_at)
+			values ($1,$2,'2099-12-31 00:00:00+00') returning id`,
+			userID, token); err != nil {
+			return err
 		}
 	}
 	if _, err := s.ins("hr_clearances", `
@@ -596,7 +645,33 @@ func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, em
 		{"Sample 1st quincena 2099", "2099-01-01", "2099-01-15", "2099-01-20"},
 		{"Sample 2nd quincena 2099", "2099-01-16", "2099-01-31", "2099-02-05"},
 	}
+	prevStart, prevEnd, curStart, curEnd := sampleQuincenaWindows(time.Now().UTC())
+	cutoffs = append(cutoffs,
+		struct{ label, start, end, pay string }{
+			fmt.Sprintf("Sample live prev · batch %d", s.batch),
+			prevStart.Format("2006-01-02"),
+			prevEnd.Format("2006-01-02"),
+			prevEnd.AddDate(0, 0, 1).Format("2006-01-02"),
+		},
+		struct{ label, start, end, pay string }{
+			fmt.Sprintf("Sample live current · batch %d", s.batch),
+			curStart.Format("2006-01-02"),
+			curEnd.Format("2006-01-02"),
+			curEnd.AddDate(0, 0, 1).Format("2006-01-02"),
+		},
+	)
 	for _, c := range cutoffs {
+		var exists bool
+		if err := s.tx.QueryRow(s.ctx, `
+			select exists(
+			  select 1 from public.hr_pay_cutoffs
+			  where tenant_id = $1 and cutoff_start = $2::date and cutoff_end = $3::date
+			)`, tenantID, c.start, c.end).Scan(&exists); err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
 		if _, err := s.ins("hr_pay_cutoffs", `
 			insert into public.hr_pay_cutoffs (tenant_id, label, cutoff_start, cutoff_end, pay_date, status)
 			values ($1,$2,$3,$4,$5,'open') returning id`, tenantID, c.label, c.start, c.end, c.pay); err != nil {
@@ -608,6 +683,7 @@ func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, em
 		values ($1,'2099-01-01','Sample Holiday','regular',2.0) returning id`, tenantID)
 	return err
 }
+
 
 func insertSampleComment(s sampler, tenantID, appID int64, body string) error {
 	_, err := s.ins("hr_application_comments", `
@@ -760,22 +836,73 @@ func reuseOrInsert(s sampler, table, lookup, insert string, tenantID int64) (int
 }
 
 func seedSampleAttendance(s sampler, tenantID int64, active []int64) error {
-	start := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2099, 3, 31, 0, 0, 0, 0, time.UTC)
+	// Archive window for payroll / gov-report demos (2099).
+	if err := seedDtrWindow(s, tenantID, active, time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2099, 3, 31, 0, 0, 0, 0, time.UTC), true); err != nil {
+		return err
+	}
+	// Current + previous quincena so attendance overview / client DTR work without jumping months.
+	prevStart, prevEnd, curStart, curEnd := sampleQuincenaWindows(time.Now().UTC())
+	if err := seedDtrWindow(s, tenantID, active, prevStart, prevEnd, false); err != nil {
+		return err
+	}
+	return seedDtrWindow(s, tenantID, active, curStart, curEnd, false)
+}
+
+func sampleQuincenaWindows(now time.Time) (prevStart, prevEnd, curStart, curEnd time.Time) {
+	y, m, d := now.Date()
+	loc := time.UTC
+	first := time.Date(y, m, 1, 0, 0, 0, 0, loc)
+	mid := time.Date(y, m, 15, 0, 0, 0, 0, loc)
+	last := time.Date(y, m+1, 0, 0, 0, 0, 0, loc)
+	if d <= 15 {
+		curStart, curEnd = first, mid
+		prevMonthLast := first.AddDate(0, 0, -1)
+		prevStart = time.Date(prevMonthLast.Year(), prevMonthLast.Month(), 16, 0, 0, 0, 0, loc)
+		prevEnd = prevMonthLast
+		return
+	}
+	curStart = time.Date(y, m, 16, 0, 0, 0, 0, loc)
+	curEnd = last
+	prevStart, prevEnd = first, mid
+	return
+}
+
+func seedDtrWindow(s sampler, tenantID int64, active []int64, start, end time.Time, archivePattern bool) error {
+	if end.Before(start) {
+		return nil
+	}
 	var firstWeekday time.Time
 	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+		wk := d.Weekday() == time.Saturday || d.Weekday() == time.Sunday
+		if archivePattern && wk {
 			continue
 		}
-		if firstWeekday.IsZero() {
+		if !wk && firstWeekday.IsZero() {
 			firstWeekday = d
 		}
 		for i, empID := range active {
 			status := "present"
 			hours := 8.0
-			if i == 0 && d.Equal(firstWeekday) {
-				status = "absent"
+			if wk {
+				status = "rest"
 				hours = 0
+			} else if archivePattern {
+				if i == 0 && d.Equal(firstWeekday) {
+					status = "absent"
+					hours = 0
+				}
+			} else {
+				// Varied “needs a look” mix for demos on live months.
+				switch {
+				case i == 0 && d.Equal(firstWeekday):
+					status, hours = "absent", 0
+				case i == 1 && d.Equal(firstWeekday):
+					status, hours = "present", 4
+				case i == 2 && d.Equal(firstWeekday):
+					status, hours = "leave", 0
+				case i == 3 && d.Day()%7 == 3:
+					status, hours = "present", 9
+				}
 			}
 			if _, err := s.ins("hr_dtr_entries", `
 				insert into public.hr_dtr_entries (tenant_id, employee_id, work_date, source, status, hours_worked)
@@ -1010,6 +1137,7 @@ var sampleRetractOrder = []string{
 	"hr_client_bills",
 	"portal_magic_links",
 	"hr_client_time_submissions",
+	"hr_job_postings",
 	"hr_job_orders",
 	"hr_manpower_requests",
 	"hr_clearances",
@@ -1058,6 +1186,118 @@ var sampleRetractOrder = []string{
 	"hr_courses",
 }
 
+func buildSamplePasteCard(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}, tenantID int64) (samplePasteCard, error) {
+	var code string
+	if err := q.QueryRow(ctx, `
+		select coalesce(company_code, '') from public.tenants where id = $1`, tenantID).Scan(&code); err != nil {
+		return samplePasteCard{}, err
+	}
+	card := samplePasteCard{
+		CompanyCode: code,
+		Personas:    nil,
+		Hints: []string{
+			"Attendance overview and Client DTR use the current quincena (also previous half is seeded).",
+			"Payroll sample periods and withholding stay in 2099; sample employees are excluded from live pay runs.",
+			"ESS (My HR) still needs an employee linked to your login — link Sample Active 01 on the employee record for that test.",
+		},
+	}
+	var batchID int64
+	err := q.QueryRow(ctx, `
+		select id from public.hr_sample_batches
+		where tenant_id = $1 and retracted_at is null`, tenantID).Scan(&batchID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		card.PasteText = fmt.Sprintf(
+			"Bluearm HR sample — no batch open\nCompany code: %s\nClick Seed on HR Overview to load demo data.",
+			code,
+		)
+		return card, nil
+	}
+	if err != nil {
+		return samplePasteCard{}, err
+	}
+	card.Open = true
+	card.BatchID = batchID
+
+	careers := "/careers/" + code
+	apply := "/apply/" + code
+	if code == "" {
+		careers = "/careers/<company_code>"
+		apply = "/apply/<company_code>"
+	}
+	card.Personas = append(card.Personas,
+		samplePersona{
+			Role: "Public careers / apply",
+			Name: "Job board",
+			Path: careers,
+			URL:  apply,
+			Note: "Open careers, then apply; openings include Sample Security Guard.",
+		},
+		samplePersona{
+			Role:  "Agency employee (roster)",
+			Name:  "Sample Active 01",
+			Email: "",
+			Path:  "/app/hr/employees",
+			Note:  fmt.Sprintf("Employee no SEEDHR-%d-01 · DTR seeded for current cut-off", batchID),
+		},
+	)
+
+	rows, err := q.Query(ctx, `
+		select u.display_name, u.email, ml.token
+		from public.portal_users u
+		join public.hr_sample_rows r on r.row_id = u.id and r.table_name = 'portal_users' and r.batch_id = $1
+		join public.portal_magic_links ml on ml.portal_user_id = u.id
+		order by u.email`, batchID)
+	if err != nil {
+		return samplePasteCard{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, email, token string
+		if err := rows.Scan(&name, &email, &token); err != nil {
+			return samplePasteCard{}, err
+		}
+		card.Personas = append(card.Personas, samplePersona{
+			Role:  "Client portal",
+			Name:  name,
+			Email: email,
+			URL:   "/portal/dashboard?token=" + token,
+			Note:  "Paste URL or open Portal access and use the sign-in link.",
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return samplePasteCard{}, err
+	}
+
+	var b strings.Builder
+	b.WriteString("Bluearm HR sample paste card\n")
+	b.WriteString(fmt.Sprintf("Batch: %d · Company code: %s\n\n", batchID, code))
+	for _, p := range card.Personas {
+		b.WriteString(fmt.Sprintf("• %s — %s\n", p.Role, p.Name))
+		if p.Email != "" {
+			b.WriteString(fmt.Sprintf("  email: %s\n", p.Email))
+		}
+		if p.URL != "" {
+			b.WriteString(fmt.Sprintf("  url: %s\n", p.URL))
+		}
+		if p.Path != "" {
+			b.WriteString(fmt.Sprintf("  path: %s\n", p.Path))
+		}
+		if p.Note != "" {
+			b.WriteString(fmt.Sprintf("  note: %s\n", p.Note))
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("Hints:\n")
+	for _, h := range card.Hints {
+		b.WriteString("- " + h + "\n")
+	}
+	card.PasteText = b.String()
+	return card, nil
+}
+
 func retractHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) error {
 	var batchID int64
 	err := tx.QueryRow(ctx, `
@@ -1084,6 +1324,7 @@ func retractHRSample(ctx context.Context, tx pgx.Tx, tenantID int64) error {
 		{"inv_partners", "portal_users", "partner_id"},
 		{"hr_client_sites", "hr_job_orders", "site_id"},
 		{"hr_client_sites", "hr_manpower_requests", "site_id"},
+		{"hr_client_sites", "hr_job_postings", "site_id"},
 		{"hr_client_sites", "hr_client_time_submissions", "site_id"},
 		{"hr_client_time_submissions", "hr_client_bills", "submission_id"},
 		{"hr_employees", "hr_clearances", "employee_id"},

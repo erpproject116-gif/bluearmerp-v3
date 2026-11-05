@@ -396,7 +396,7 @@ func TestSampleSeedRetract(t *testing.T) {
 		t.Fatal(err)
 	}
 	if jobOrders != 10 || requests != 2 || submitted != 1 || accepted != 1 || bills != 1 || billTotal != 1200 ||
-		portalUsers != 5 || magicLinks != 1 || clearances != 1 || cutoffs != 2 || holidays != 1 || dtrFromTime != 0 {
+		portalUsers != 5 || magicLinks != 5 || clearances != 1 || cutoffs < 2 || holidays != 1 || dtrFromTime != 0 {
 		t.Fatalf("orders=%d requests=%d submitted=%d accepted=%d bills=%d total=%v users=%d links=%d clearances=%d cutoffs=%d holidays=%d linkedDtr=%d",
 			jobOrders, requests, submitted, accepted, bills, billTotal, portalUsers, magicLinks, clearances, cutoffs, holidays, dtrFromTime)
 	}
