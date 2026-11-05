@@ -317,6 +317,55 @@ export default function HrRoadmapPage() {
             <Show when={stuckOpen()}>
               <p class="hr-jb-stuck">{data().stuck}</p>
             </Show>
+            <section class="hr-jb-demo-note" aria-labelledby="hr-jb-demo-note-title">
+              <h3 id="hr-jb-demo-note-title">
+                {t("How to walk this guide faster", "Paano mas mabilis na lakarin ang gabay na ito")}
+              </h3>
+              <p>
+                {t(
+                  "Planned (not live yet): a gated Fill demo control on persona forms. Each click loads a different fake person, job, or files so you can walk the journey without typing everything by hand. You still Save or Submit yourself.",
+                  "Nakaplano (hindi pa live): gated Fill demo sa mga form ng persona. Bawat click ay maglo-load ng ibang pekeng tao, trabaho, o files para makalakad sa journey nang hindi lahat ay tinatype. Ikaw pa rin ang magse-Save o Submit.",
+                )}
+              </p>
+              <ul>
+                <li>
+                  {t(
+                    "HR staff — Applicants, Jobs, Interviews, Onboarding, and related HR modals.",
+                    "HR staff — Applicants, Jobs, Interviews, Onboarding, at mga kaugnay na HR modal.",
+                  )}
+                </li>
+                <li>
+                  {t(
+                    "Client / Employer — client portal request and hiring forms.",
+                    "Client / Employer — mga form ng request at hiring sa client portal.",
+                  )}
+                </li>
+                <li>
+                  {t(
+                    "Employee / Contractor — Apply and ESS / self-service forms.",
+                    "Employee / Contractor — Apply at ESS / self-service forms.",
+                  )}
+                </li>
+              </ul>
+              <p>
+                {t(
+                  "When Fill ships, turn it on with ?demo=1 on the page URL, or set localStorage.hrDemoFill=1. The control is not available on forms yet.",
+                  "Kapag naka-ship na ang Fill, i-on ito gamit ang ?demo=1 sa URL, o localStorage.hrDemoFill=1. Wala pa ang control sa mga form.",
+                )}
+              </p>
+              <p>
+                {t(
+                  "Overview Seed / Remove = bulk sample rows on the board. Fill demo = interactive forms only (planned).",
+                  "Overview Seed / Remove = maraming sample rows sa board. Fill demo = interactive forms lang (nakaplano).",
+                )}
+              </p>
+              <p>
+                {t(
+                  "Warning: Save / Submit still creates real tenant rows until you delete them. Prefer a demo tenant when practicing.",
+                  "Babala: ang Save / Submit ay gumagawa pa rin ng totoong tenant rows hanggang tanggalin. Mas mainam gumamit ng demo tenant kapag nagsasanay.",
+                )}
+              </p>
+            </section>
             <p class="noprint">
               <button type="button" class="hr-btn" onClick={() => window.print()}>
                 Print / Save as PDF
