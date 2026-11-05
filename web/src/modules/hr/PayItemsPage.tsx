@@ -81,6 +81,7 @@ export default function PayItemsPage() {
 
   return (
     <HrLayout>
+      <h1 class="mb-4 text-2xl font-semibold">Pay items</h1>
       <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-1 text-lg font-medium">Earnings & deductions catalog</h2>
         <p class="mb-3 text-sm text-text-secondary">

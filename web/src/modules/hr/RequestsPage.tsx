@@ -52,7 +52,8 @@ export default function RequestsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Requests</h1>
+      <h1 class="text-2xl font-semibold">Requests</h1>
+      <p class="mb-4 mt-1 text-sm text-text-secondary">Loans, salary advances, pay questions, certificates and resignations. Leave is on the Leave page.</p>
       <label class="mb-3 block text-sm">
         Kind
         <select class="ml-2 rounded border border-stroke px-2 py-1" value={kind()} onChange={(e) => setKind(e.currentTarget.value)}>

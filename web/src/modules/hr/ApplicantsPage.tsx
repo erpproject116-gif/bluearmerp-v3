@@ -118,7 +118,10 @@ export default function ApplicantsPage() {
   return (
     <HrLayout>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 class="text-2xl font-semibold">Applicants</h1>
+        <div>
+          <h1 class="text-2xl font-semibold">Applicants</h1>
+          <p class="mt-1 text-sm text-text-secondary">Submissions from the public application form.</p>
+        </div>
         <ViewModeToggle value={mode()} onChange={setMode} storageKey="hr-applicants" />
       </div>
       <div class="mb-4 grid gap-2 sm:grid-cols-2">

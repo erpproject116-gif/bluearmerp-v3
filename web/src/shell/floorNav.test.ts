@@ -237,6 +237,28 @@ describe("HOME_SIDEBAR_AREAS document area landings", () => {
   });
 });
 
+describe("HR sidebar groups", () => {
+  it("lists the HR groups under HR & Payroll in the main sidebar", () => {
+    const hr = findArea("hr");
+    expect(hr?.children?.map((c) => c.label)).toEqual([
+      "Overview",
+      "People",
+      "Clients",
+      "Deployments",
+      "Time and leave",
+      "Cases",
+      "Requests",
+      "Evaluations and learnings",
+      "Payroll",
+      "Report",
+      "Policies",
+      "My HR",
+    ]);
+    expect(hr?.children?.find((c) => c.id === "hr_report")?.href).toBe("/app/hr/reports");
+    expect(hr?.children?.every((c) => c.moduleId === "hr")).toBe(true);
+  });
+});
+
 describe("shouldShowFloorBottomNav", () => {
   it("always shows in standalone", () => {
     expect(shouldShowFloorBottomNav(true, false, me())).toBe(true);

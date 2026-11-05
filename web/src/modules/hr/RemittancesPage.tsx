@@ -130,6 +130,8 @@ export default function RemittancesPage() {
 
   return (
     <HrLayout>
+      <h1 class="mb-1 text-2xl font-semibold">Remittances</h1>
+      <p class="mb-4 text-sm text-text-secondary">Agency files built from posted payslips (SSS, PhilHealth, Pag-IBIG, BIR).</p>
       <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-2 text-lg font-medium">Build remittance batch</h2>
         <p class="mb-3 text-sm text-text-secondary">

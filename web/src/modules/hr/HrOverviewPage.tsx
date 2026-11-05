@@ -28,16 +28,19 @@ const attentionCards = [
   { key: "requests_waiting", label: "Requests waiting", href: "/app/hr/requests" },
 ] as const;
 
-const otherCards = [
+const workforceCards = [
   { key: "active_employees", label: "Active employees", href: "/app/hr/employees" },
-  { key: "open_discipline_cases", label: "Open discipline cases", href: "/app/hr/discipline" },
-  { key: "pending_leave", label: "Pending leave", href: "/app/hr/leave" },
-  { key: "open_absence_alerts", label: "Open absenteeism alerts", href: "/app/hr/absenteeism" },
   { key: "applicants", label: "Applicants", href: "/app/hr/applicants" },
+] as const;
+
+const queueCards = [
   { key: "open_workplace_problems", label: "Open problems", href: "/app/hr/workplace-problems" },
-  { key: "problems_closed_this_month", label: "Problems closed this month", href: "/app/hr/workplace-problems" },
+  { key: "open_discipline_cases", label: "Open discipline cases", href: "/app/hr/discipline" },
+  { key: "open_absence_alerts", label: "Open absenteeism alerts", href: "/app/hr/absenteeism" },
+  { key: "pending_leave", label: "Pending leave", href: "/app/hr/leave" },
   { key: "loans_waiting", label: "Loans waiting", href: "/app/hr/requests" },
   { key: "pay_questions_waiting", label: "Pay questions waiting", href: "/app/hr/requests" },
+  { key: "problems_closed_this_month", label: "Problems closed this month", href: "/app/hr/workplace-problems" },
 ] as const;
 
 export default function HrOverviewPage() {
@@ -64,29 +67,57 @@ export default function HrOverviewPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">HR</h1>
+      <h1 class="mb-1 text-2xl font-semibold">HR Overview</h1>
       <p class="mb-6 text-sm text-text-secondary">
         Headcount and open work. Pay amounts stay on Payroll.
       </p>
-      <div class="grid gap-3 sm:grid-cols-2">
+      <h2 class="mb-2 text-sm font-medium text-text-secondary">Needs attention</h2>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <For each={attentionCards}>
-          {(card) => (
-            <A href={card.href} class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel">
-              <p class="text-sm text-text-secondary">{card.label}</p>
-              <p class="mt-1 text-2xl font-semibold">{overview.data?.[card.key] ?? "—"}</p>
-            </A>
-          )}
+          {(card) => {
+            const value = () => overview.data?.[card.key] ?? 0;
+            const alert = () => card.key === "late_workplace_problems" && value() > 0;
+            const warn = () => card.key !== "late_workplace_problems" && value() > 0;
+            return (
+              <A
+                href={card.href}
+                class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel"
+                classList={{ "border-l-4 border-l-red-600": alert(), "border-l-4 border-l-amber-600": warn() }}
+              >
+                <p class="text-2xl font-semibold" classList={{ "text-slate-300": value() === 0 }}>{overview.data ? value() : "—"}</p>
+                <p class="text-sm text-text-secondary">{card.label}</p>
+              </A>
+            );
+          }}
         </For>
       </div>
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        <For each={otherCards}>
-          {(card) => (
-            <A href={card.href} class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel">
-              <p class="text-sm text-text-secondary">{card.label}</p>
-              <p class="mt-1 text-2xl font-semibold">{overview.data?.[card.key] ?? "—"}</p>
-            </A>
-          )}
-        </For>
+      <div class="mt-6 grid gap-6 lg:grid-cols-2">
+        <section>
+          <h2 class="mb-2 text-sm font-medium text-text-secondary">Workforce</h2>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <For each={workforceCards}>
+              {(card) => (
+                <A href={card.href} class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel">
+                  <p class="text-2xl font-semibold" classList={{ "text-slate-300": (overview.data?.[card.key] ?? 0) === 0 }}>{overview.data?.[card.key] ?? "—"}</p>
+                  <p class="text-sm text-text-secondary">{card.label}</p>
+                </A>
+              )}
+            </For>
+          </div>
+        </section>
+        <section>
+          <h2 class="mb-2 text-sm font-medium text-text-secondary">Queues</h2>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <For each={queueCards}>
+              {(card) => (
+                <A href={card.href} class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel">
+                  <p class="text-2xl font-semibold" classList={{ "text-slate-300": (overview.data?.[card.key] ?? 0) === 0 }}>{overview.data?.[card.key] ?? "—"}</p>
+                  <p class="text-sm text-text-secondary">{card.label}</p>
+                </A>
+              )}
+            </For>
+          </div>
+        </section>
       </div>
       <A href="/app/hr/reports" class="mt-4 inline-block text-sm text-brand-700 hover:underline">
         Discipline report

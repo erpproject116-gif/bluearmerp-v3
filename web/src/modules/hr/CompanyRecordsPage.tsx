@@ -61,7 +61,7 @@ export default function CompanyRecordsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Policies, announcements, and events</h1>
+      <h1 class="mb-1 text-2xl font-semibold">Policies & notices</h1>
       <p class="mb-6 text-sm text-text-secondary">These records do not change pay.</p>
       <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setOpen(true)}>
         New record

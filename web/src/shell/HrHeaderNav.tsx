@@ -118,26 +118,10 @@ export function HrHeaderNav() {
   const onHr = () => loc.pathname === "/app/hr" || loc.pathname.startsWith("/app/hr/");
   const activeGroup = () => groups.find((group) => groupActive(loc.pathname, group));
   return (
-    <Show when={onHr()}>
-      <nav class="erp-header-features mt-3" aria-label="HR and Payroll">
-        <For each={groups}>
-          {(group) => (
-            <A
-              href={group.href}
-              class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
-              classList={{
-                "bg-brand-50 text-brand-700": groupActive(loc.pathname, group),
-                "text-text-secondary hover:erp-panel hover:text-text-primary": !groupActive(loc.pathname, group),
-              }}
-            >
-              {group.label}
-            </A>
-          )}
-        </For>
-      </nav>
+    <Show when={onHr() && activeGroup()?.pages}>
       <Show when={activeGroup()?.pages}>
         {(pages) => (
-          <nav class="erp-header-features mt-2" aria-label="HR and Payroll pages">
+          <nav class="erp-header-features mt-3" aria-label="HR and Payroll pages">
             <For each={pages()}>
               {(page) => (
                 <A

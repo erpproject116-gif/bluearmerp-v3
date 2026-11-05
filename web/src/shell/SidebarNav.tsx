@@ -738,9 +738,35 @@ export function SidebarNav() {
     if (area.id === "reports") return pathStarts(p, ["/app/reports"]);
     if (area.id === "support") return pathStarts(p, ["/app/support"]);
     if (area.id === "pos") return pathStarts(p, ["/app/pos"]);
-    if (area.id === "hr") {
-      return pathStarts(p, ["/app/hr"]) && !p.startsWith("/app/hr/payroll-runs");
+    if (area.id === "hr") return false;
+    if (area.id === "hr_overview") return p === "/app/hr";
+    if (area.id === "hr_people") {
+      return pathStarts(p, ["/app/hr/employees", "/app/hr/applicants", "/app/hr/hire-onboarding", "/app/hr/offboarding"]);
     }
+    if (area.id === "hr_clients") {
+      return pathStarts(p, ["/app/hr/clients", "/app/hr/contracts", "/app/hr/manpower-requests"]);
+    }
+    if (area.id === "hr_deployments") return pathStarts(p, ["/app/hr/deployments", "/app/hr/workforce"]);
+    if (area.id === "hr_time") return pathStarts(p, ["/app/hr/attendance", "/app/hr/leave"]);
+    if (area.id === "hr_cases") {
+      return pathStarts(p, ["/app/hr/workplace-problems", "/app/hr/discipline", "/app/hr/absenteeism"]);
+    }
+    if (area.id === "hr_requests") return pathStarts(p, ["/app/hr/requests"]);
+    if (area.id === "hr_evaluations") return pathStarts(p, ["/app/hr/evaluations", "/app/hr/learning"]);
+    if (area.id === "hr_payroll") {
+      return pathStarts(p, [
+        "/app/hr/payroll-runs",
+        "/app/hr/pay-items",
+        "/app/hr/remittances",
+        "/app/hr/special-runs",
+        "/app/hr/client-billing",
+      ]);
+    }
+    if (area.id === "hr_report") {
+      return pathStarts(p, ["/app/hr/reports", "/app/hr/government-reports", "/app/hr/compliance"]);
+    }
+    if (area.id === "hr_policies") return pathStarts(p, ["/app/hr/records"]);
+    if (area.id === "hr_my") return pathStarts(p, ["/app/hr/ess"]);
     if (area.id === "activity_logs") return pathStarts(p, ["/app/activity-logs"]);
     if (area.id === "documentation") return pathStarts(p, ["/app/documentation"]);
     if (area.id === "user_management") {
