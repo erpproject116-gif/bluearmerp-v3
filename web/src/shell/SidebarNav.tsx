@@ -743,7 +743,7 @@ export function SidebarNav() {
     if (area.id === "support") return pathStarts(p, ["/app/support"]);
     if (area.id === "pos") return pathStarts(p, ["/app/pos"]);
     if (area.id === "hr") return false;
-    if (area.id === "hr_overview") return p === "/app/hr";
+    if (area.id === "hr_overview") return p === "/app/hr" || pathStarts(p, ["/app/hr/roadmap"]);
     if (area.id === "hr_people") {
       return pathStarts(p, ["/app/hr/employees", "/app/hr/applicants", "/app/hr/hire-onboarding", "/app/hr/offboarding"]);
     }

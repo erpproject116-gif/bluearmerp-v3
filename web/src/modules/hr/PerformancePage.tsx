@@ -387,7 +387,7 @@ export default function PerformancePage() {
       </div>
 
       <Show when={cycleOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New review cycle">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New review cycle">
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">New review cycle</h2>
@@ -419,7 +419,7 @@ export default function PerformancePage() {
       </Show>
 
       <Show when={clientOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Add client evaluation">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Add client evaluation">
           <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Add client evaluation</h2>
@@ -470,7 +470,7 @@ export default function PerformancePage() {
 
       <Show when={editId() != null}>
         <div
-          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Evaluation · LMSI_5"
@@ -519,7 +519,7 @@ export default function PerformancePage() {
 
       <Show when={ackId() != null}>
         <div
-          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Acknowledge with signature"

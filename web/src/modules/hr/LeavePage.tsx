@@ -518,7 +518,7 @@ export default function LeavePage() {
 
       <Show when={requestOpen()}>
         <div
-          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="New leave request"
@@ -607,7 +607,7 @@ export default function LeavePage() {
 
       <Show when={accrueOpen()}>
         <div
-          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Accrue annual credit?"
@@ -641,7 +641,7 @@ export default function LeavePage() {
       <Show when={reviewOpen() && reviewRow()}>
         {(row) => (
           <div
-            class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
             role="dialog"
             aria-modal="true"
             aria-label={`${labelize(reviewAction())} leave`}

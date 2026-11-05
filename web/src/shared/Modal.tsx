@@ -5,6 +5,13 @@ import { Portal } from "solid-js/web";
 /** Text dismiss control for modal headers (not full-width form inputs). */
 export const modalDismissClass = "text-sm text-text-secondary hover:text-text-primary";
 
+/**
+ * Shell stacking (keep overlays above the fixed sidebar at z-50):
+ * drawer backdrop z-[45] → sidebar z-50 → modals z-[60] → stacked z-[70] → command palette z-[100].
+ */
+export const modalOverlayZ = "z-[60]";
+export const modalStackedZ = "z-[70]";
+
 type Props = {
   open: boolean;
   title: string;
@@ -38,7 +45,7 @@ function ModalPanel(props: Props) {
 
   return (
     <div
-      class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6 ${props.stacked ? "z-[70]" : "z-50"}`}
+      class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-6 ${props.stacked ? modalStackedZ : modalOverlayZ}`}
       role="dialog"
       aria-modal="true"
       aria-label={props.title}

@@ -516,6 +516,7 @@ export const appModules: AppModule[] = [
     basePath: "/app/hr",
     features: [
       { label: "Overview", href: "/app/hr", settingsHref: "/app/hr", headerHidden: true },
+      { label: "Userflow Guides", href: "/app/hr/roadmap", settingsHref: "/app/hr/roadmap" },
       { label: "Employees", href: "/app/hr/employees", settingsHref: "/app/hr/employees/settings", headerHidden: true },
       { label: "Applicants", href: "/app/hr/applicants", settingsHref: "/app/hr/applicants/settings", headerHidden: true },
       { label: "Clients & sites", href: "/app/hr/clients", settingsHref: "/app/hr/clients", headerHidden: true },

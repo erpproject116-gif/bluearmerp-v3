@@ -1422,7 +1422,7 @@ export default function HrOverviewPage() {
       </section>
 
       <Show when={customize()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Customize dashboard" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setCustomize(false); }}>
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Customize dashboard" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setCustomize(false); }}>
           <div class="max-h-[80vh] w-full max-w-md overflow-auto rounded-lg border border-stroke bg-surface p-4">
             <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Customize dashboard</h2>

@@ -317,7 +317,7 @@ export default function OffboardingPage() {
 
       <Show when={startOpen()}>
         <div
-          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Start offboarding"
@@ -391,7 +391,7 @@ export default function OffboardingPage() {
       <Show when={checklistOpen() && activeRow()}>
         {(row) => (
           <div
-            class="fixed inset-0 z-40 flex justify-end bg-black/30"
+            class="fixed inset-0 z-[60] flex justify-end bg-black/30"
             role="dialog"
             aria-modal="true"
             aria-label={`Clearance checklist · ${row().employee_name}`}
@@ -455,7 +455,7 @@ export default function OffboardingPage() {
       <Show when={finalPayOpen() && activeRow()}>
         {(row) => (
           <div
-            class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
             role="dialog"
             aria-modal="true"
             aria-label="Compute final pay"
@@ -506,7 +506,7 @@ export default function OffboardingPage() {
       <Show when={coeOpen() && activeRow()}>
         {(row) => (
           <div
-            class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
             role="dialog"
             aria-modal="true"
             aria-label="Certificate of employment"

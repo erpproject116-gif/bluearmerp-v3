@@ -1430,7 +1430,7 @@ export default function TeamChatPage() {
       </section>
 
       <Show when={showCreate()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true">
           <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
             <Show when={showCreate() === "channel" || showCreate() === "group"}>
               <h3 class="mb-3 text-base font-semibold">{showCreate() === "group" ? "New group" : "New channel"}</h3>
@@ -1534,7 +1534,7 @@ export default function TeamChatPage() {
       </Show>
 
       <Show when={addMembersOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Add members">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Add members">
           <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
             <h3 class="mb-1 text-base font-semibold">Add members</h3>
             <p class="mb-3 text-xs text-text-secondary">
@@ -1614,7 +1614,7 @@ export default function TeamChatPage() {
       </Show>
 
       <Show when={forwardMsg()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Forward message">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Forward message">
           <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
             <h3 class="mb-3 text-base font-semibold">Forward message</h3>
             <select
@@ -1647,7 +1647,7 @@ export default function TeamChatPage() {
       </Show>
 
       <Show when={reminderOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Schedule reminder">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Schedule reminder">
           <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
             <h3 class="mb-3 text-base font-semibold">Schedule reminder</h3>
             <label class="mb-1 block text-xs font-medium text-text-secondary" for="chat-rem-title">
@@ -1694,7 +1694,7 @@ export default function TeamChatPage() {
       </Show>
 
       <Show when={remindersOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Scheduled reminders">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Scheduled reminders">
           <div class="w-full max-w-md rounded-xl border border-stroke bg-white p-4 shadow-lg">
             <h3 class="mb-3 text-base font-semibold">Scheduled reminders</h3>
             <div class="mb-3 max-h-64 space-y-2 overflow-y-auto">

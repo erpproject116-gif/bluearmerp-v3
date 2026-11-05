@@ -225,7 +225,7 @@ export default function ManpowerRequestsPage() {
 
       <Show when={modalOpen()}>
         <div
-          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="New manpower request"

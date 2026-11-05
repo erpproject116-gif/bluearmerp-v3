@@ -316,7 +316,7 @@ export default function RemittancesPage() {
       </Show>
 
       <Show when={buildOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Generate remittance">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Generate remittance">
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Generate remittance</h2>
@@ -362,7 +362,7 @@ export default function RemittancesPage() {
 
       <Show when={payOpen() && payTarget()}>
         {(batch) => (
-          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Mark filed">
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Mark filed">
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">Mark filed?</h2>

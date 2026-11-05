@@ -862,7 +862,7 @@ export function EntityModal(props: {
     <Show when={props.open}>
       <Portal>
         <div
-          class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-3 sm:p-6 ${props.stacked ? "z-[70]" : "z-50"}`}
+          class={`fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-3 sm:p-6 ${props.stacked ? "z-[70]" : "z-[60]"}`}
           style={{ "padding-bottom": "max(1rem, env(safe-area-inset-bottom))" }}
           role="presentation"
         >

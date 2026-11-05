@@ -51,7 +51,7 @@ function lookupCodeQuery(text: string): string {
 }
 
 const MENU_MAX_H = 192; // max-h-48
-/** Above EntityModal (z-50) and stacked EntityModal (z-[70]). */
+/** Above EntityModal (z-[60]) and stacked EntityModal (z-[70]). */
 const MENU_Z = "z-[80]";
 
 export function LookupCombo(props: Props) {

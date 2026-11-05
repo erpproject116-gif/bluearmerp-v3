@@ -321,7 +321,7 @@ export default function HrReportsPage() {
 
       <Show when={runOpen()}>
         <div
-          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Run report"
@@ -367,7 +367,7 @@ export default function HrReportsPage() {
 
       <Show when={schOpen()}>
         <div
-          class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+          class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Schedule report"

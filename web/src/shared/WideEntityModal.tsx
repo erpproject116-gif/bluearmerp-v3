@@ -25,7 +25,7 @@ export function WideEntityModal(props: {
   return (
     <Show when={props.open}>
       <Portal>
-        <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-3 sm:p-6" style={{ "padding-bottom": "max(1rem, env(safe-area-inset-bottom))" }} role="presentation">
+        <div class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/40 p-3 sm:p-6" style={{ "padding-bottom": "max(1rem, env(safe-area-inset-bottom))" }} role="presentation">
           <div
             class="my-2 flex max-h-[min(100dvh,100svh)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-stroke bg-surface shadow-xl sm:my-4"
             role="dialog"

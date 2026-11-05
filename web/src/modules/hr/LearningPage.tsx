@@ -318,7 +318,7 @@ export default function LearningPage() {
       </Show>
 
       <Show when={courseOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New course">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New course">
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">New course</h2>
@@ -360,7 +360,7 @@ export default function LearningPage() {
       </Show>
 
       <Show when={assignOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Enroll employees">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Enroll employees">
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Enroll employees</h2>

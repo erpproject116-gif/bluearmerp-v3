@@ -268,6 +268,7 @@ import {
   WorkplaceProblemsPage,
   RequestsPage,
   HrOverviewPage,
+  HrRoadmapPage,
   HrReportsPage,
   HireOnboardingPage,
   PerformancePage,
@@ -1161,6 +1162,9 @@ export default function App() {
           )} />
           <Route path="/hr/reports" component={() => (
             <HrRoute><HrReportsPage /></HrRoute>
+          )} />
+          <Route path="/hr/roadmap" component={() => (
+            <HrRoute><HrRoadmapPage /></HrRoute>
           )} />
           <Route path="/hr" component={() => (
             <HrRoute><HrOverviewPage /></HrRoute>

@@ -14,6 +14,8 @@ export type KanbanColumn<T> = {
   id: string;
   label: string;
   items: T[];
+  color?: string;
+  icon?: string;
 };
 
 type BoardInnerProps<T> = {
@@ -25,6 +27,7 @@ type BoardInnerProps<T> = {
   orientation?: "horizontal" | "vertical";
   collapsedIds?: string[];
   onToggleColumn?: (id: string) => void;
+  class?: string;
 };
 
 function DraggableCard(props: { id: string; children: JSX.Element }) {
@@ -32,10 +35,10 @@ function DraggableCard(props: { id: string; children: JSX.Element }) {
   return <div ref={draggable.ref}>{props.children}</div>;
 }
 
-function DroppableColumn(props: { id: string; children: JSX.Element }) {
+function DroppableColumn(props: { id: string; children: JSX.Element; class?: string }) {
   const droppable = createDroppable(props.id);
   return (
-    <div ref={droppable.ref} class="min-h-[8rem] flex-1">
+    <div ref={droppable.ref} class={props.class ?? "min-h-[8rem] flex-1"}>
       {props.children}
     </div>
   );
@@ -70,12 +73,69 @@ function KanbanBoardInner<T>(props: BoardInnerProps<T>) {
 
   const vertical = () => props.orientation === "vertical";
   const collapsed = (id: string) => (props.collapsedIds ?? []).includes(id);
+  const styled = () => props.columns.some((c) => !!c.color);
 
   return (
-    <div class={vertical() ? "flex flex-col gap-3" : "flex gap-4 overflow-x-auto pb-2"}>
+    <div
+      class={
+        props.class ??
+        (vertical()
+          ? "hr-kb-board hr-kb-vertical"
+          : "hr-kb-board hr-kb-horizontal")
+      }
+      classList={{
+        "flex flex-col gap-3": vertical() && !styled(),
+        "flex gap-4 overflow-x-auto pb-2": !vertical() && !styled(),
+      }}
+    >
       <For each={props.columns}>
         {(col) => {
           const shut = () => !!props.onToggleColumn && collapsed(col.id);
+          const color = () => col.color || "#64748B";
+          if (styled()) {
+            return (
+              <section
+                class="hr-kb-lane"
+                classList={{ "hr-kb-lane-col": shut() }}
+                style={{ "--c": color() }}
+                aria-label={`${col.label} lane, ${col.items.length} cards`}
+              >
+                <header class="hr-kb-lh">
+                  <span class="hr-kb-dot" aria-hidden="true" />
+                  <Show when={col.icon}>
+                    <span class="hr-kb-ic" aria-hidden="true">
+                      {col.icon}
+                    </span>
+                  </Show>
+                  <span class="hr-kb-badge">{col.label}</span>
+                  <span class="hr-kb-cnt">{col.items.length}</span>
+                  <Show when={props.onToggleColumn}>
+                    <button
+                      type="button"
+                      class="hr-btn hr-btn-sm hr-btn-ghost hr-kb-col"
+                      aria-expanded={!shut()}
+                      aria-label={`${shut() ? "Expand" : "Collapse"} ${col.label}`}
+                      onClick={() => props.onToggleColumn?.(col.id)}
+                    >
+                      {shut() ? "▸" : "▾"}
+                    </button>
+                  </Show>
+                </header>
+                <Show when={!shut()}>
+                  <DroppableColumn id={col.id} class="hr-kb-list">
+                    <Show when={props.loading}>
+                      <LoadingText class="py-4 text-center text-xs text-text-secondary" as="p" />
+                    </Show>
+                    <For each={col.items}>
+                      {(item) => (
+                        <DraggableCard id={String(props.getCardId(item))}>{props.renderCard(item)}</DraggableCard>
+                      )}
+                    </For>
+                  </DroppableColumn>
+                </Show>
+              </section>
+            );
+          }
           return (
             <div
               class="flex flex-col rounded-xl border border-stroke bg-slate-50"

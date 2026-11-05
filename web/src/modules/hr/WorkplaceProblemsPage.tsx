@@ -427,7 +427,7 @@ export default function WorkplaceProblemsPage() {
       </p>
 
       <Show when={modal() === "new"}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New problem">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New problem">
           <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">New problem</h2>
@@ -507,7 +507,7 @@ export default function WorkplaceProblemsPage() {
 
       <Show when={modal() === "assign" && active()}>
         {(row) => (
-          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Assign owner">
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Assign owner">
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">Assign owner</h2>
@@ -547,7 +547,7 @@ export default function WorkplaceProblemsPage() {
 
       <Show when={modal() === "next" && active()}>
         {(row) => (
-          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Log next step">
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Log next step">
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">Log next step</h2>
@@ -582,7 +582,7 @@ export default function WorkplaceProblemsPage() {
 
       <Show when={modal() === "close" && active()}>
         {(row) => (
-          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Close problem">
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Close problem">
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">Close problem</h2>
@@ -620,7 +620,7 @@ export default function WorkplaceProblemsPage() {
 
       <Show when={modal() === "open" && active()}>
         {(row) => (
-          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Problem detail">
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Problem detail">
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">

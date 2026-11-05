@@ -267,6 +267,7 @@ export const ApplicantsSettingsPage = lazy(() => import("../modules/hr/Applicant
 export const WorkplaceProblemsPage = lazy(() => import("../modules/hr/WorkplaceProblemsPage"));
 export const RequestsPage = lazy(() => import("../modules/hr/RequestsPage"));
 export const HrOverviewPage = lazy(() => import("../modules/hr/HrOverviewPage"));
+export const HrRoadmapPage = lazy(() => import("../modules/hr/HrRoadmapPage"));
 export const HrReportsPage = lazy(() => import("../modules/hr/HrReportsPage"));
 export const HireOnboardingPage = lazy(() => import("../modules/hr/HireOnboardingPage"));
 export const PerformancePage = lazy(() => import("../modules/hr/PerformancePage"));

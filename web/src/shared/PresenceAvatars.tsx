@@ -200,7 +200,7 @@ export function PresenceAvatars(props: { compact?: boolean } = {}) {
         </div>
         <button
           type="button"
-          class="fixed inset-0 z-40 cursor-default"
+          class="fixed inset-0 z-[60] cursor-default"
           aria-label="Close online panel"
           onClick={() => setOpen(false)}
         />

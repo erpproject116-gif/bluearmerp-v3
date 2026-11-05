@@ -623,7 +623,7 @@ export default function PayrollRunsPage() {
       </Show>
 
       <Show when={postOpen()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Post and lock payroll run?">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Post and lock payroll run?">
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Post and lock payroll run?</h2>

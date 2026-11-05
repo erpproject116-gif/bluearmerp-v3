@@ -318,7 +318,7 @@ export default function RequestsPage() {
 
       <Show when={mode() === "approve" && active()}>
         {(row) => (
-          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Approve request?">
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Approve request?">
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">Approve request?</h2>
@@ -350,7 +350,7 @@ export default function RequestsPage() {
 
       <Show when={mode() === "reject" && active()}>
         {(row) => (
-          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Reject request?">
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Reject request?">
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">Reject request?</h2>
@@ -391,7 +391,7 @@ export default function RequestsPage() {
       <Show when={mode() === "kind" && active()}>
         {(row) => (
           <div
-            class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
             role="dialog"
             aria-modal="true"
             aria-label={`${kindLabel(row().kind)} request · ${row().employee_name}`}

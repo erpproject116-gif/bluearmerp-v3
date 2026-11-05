@@ -233,7 +233,7 @@ export default function HireOnboardingPage() {
 
       <Show when={caseId() != null}>
         <div
-          class="fixed inset-0 z-40 flex justify-end bg-black/30"
+          class="fixed inset-0 z-[60] flex justify-end bg-black/30"
           role="dialog"
           aria-modal="true"
           aria-label="Onboarding checklist"

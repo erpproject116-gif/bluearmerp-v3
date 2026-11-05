@@ -245,7 +245,7 @@ export default function PayItemsPage() {
       </HrTcard>
 
       <Show when={open()}>
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New pay item">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="New pay item">
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">New pay item</h2>
@@ -287,7 +287,7 @@ export default function PayItemsPage() {
 
       <Show when={editRow()}>
         {(row) => (
-          <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Edit pay item">
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Edit pay item">
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">Edit · {row().item_code}</h2>

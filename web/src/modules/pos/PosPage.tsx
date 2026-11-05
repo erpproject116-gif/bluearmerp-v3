@@ -1528,7 +1528,7 @@ export default function PosPage() {
             </div>
 
             <Show when={cartSheetOpen()}>
-              <div class="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true">
+              <div class="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true">
                 <button
                   type="button"
                   class="absolute inset-0 bg-slate-900/40"

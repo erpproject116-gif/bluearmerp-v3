@@ -533,7 +533,9 @@ func listApplications(pool *pgxpool.Pool) http.HandlerFunc {
 		rows, err := pool.Query(r.Context(), `
 			select a.id, p.full_name, a.status, a.position_desired, coalesce(a.email,''), coalesce(a.cellphone,''),
 			       coalesce(ind.name,''), coalesce(wp.name,''), a.industry_id, a.workplace_type_id, a.created_at::text,
-			       a.job_posting_id, coalesce(jp.title,'')
+			       a.updated_at::text, a.job_posting_id, coalesce(jp.title,''),
+			       a.signature_data_url <> '',
+			       (select count(*)::int from public.hr_application_files f where f.application_id = a.id and f.tenant_id = a.tenant_id)
 			from public.hr_applications a
 			join public.hr_applicant_people p on p.id = a.person_id
 			left join public.hr_applicant_segments ind on ind.id = a.industry_id
@@ -548,16 +550,20 @@ func listApplications(pool *pgxpool.Pool) http.HandlerFunc {
 		out := []map[string]any{}
 		for rows.Next() {
 			var id int64
-			var name, status, position, email, mobile, industry, workplace, created, postingTitle string
+			var name, status, position, email, mobile, industry, workplace, created, updated, postingTitle string
 			var industryID, workplaceID, postingID *int64
-			if err := rows.Scan(&id, &name, &status, &position, &email, &mobile, &industry, &workplace, &industryID, &workplaceID, &created, &postingID, &postingTitle); err != nil {
+			var hasSig bool
+			var fileCount int
+			if err := rows.Scan(&id, &name, &status, &position, &email, &mobile, &industry, &workplace, &industryID, &workplaceID, &created, &updated, &postingID, &postingTitle, &hasSig, &fileCount); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load applications.", "ERR_INTERNAL")
 				return
 			}
 			out = append(out, map[string]any{
 				"id": id, "full_name": name, "status": status, "position_desired": position, "email": email, "cellphone": mobile,
-				"industry": industry, "workplace": workplace, "industry_id": industryID, "workplace_type_id": workplaceID, "created_at": created,
+				"industry": industry, "workplace": workplace, "industry_id": industryID, "workplace_type_id": workplaceID,
+				"created_at": created, "updated_at": updated,
 				"job_posting_id": postingID, "job_posting_title": postingTitle,
+				"has_signature": hasSig, "file_count": fileCount,
 			})
 		}
 		response.OK(w, out, "OK")
