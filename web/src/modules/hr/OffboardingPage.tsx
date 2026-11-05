@@ -19,10 +19,10 @@ type Clearance = {
 
 type StatusFilter = "" | "in_clearance" | "final_pay" | "released";
 
-const STATUS_CHIPS: { value: StatusFilter; label: string; planned?: boolean }[] = [
+const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
   { value: "", label: "All" },
   { value: "in_clearance", label: "In clearance" },
-  { value: "final_pay", label: "Final pay computing", planned: true },
+  { value: "final_pay", label: "Final pay computing" },
   { value: "released", label: "Released" },
 ];
 
