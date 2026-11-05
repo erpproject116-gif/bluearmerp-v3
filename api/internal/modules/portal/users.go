@@ -1,7 +1,9 @@
 package portal
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,6 +17,11 @@ import (
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/httputil"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
+)
+
+var (
+	errNotElevatedStaff = errors.New("not elevated staff")
+	errNoPortalPartner  = errors.New("no portal partner")
 )
 
 type portalUserRow struct {
@@ -207,10 +214,22 @@ func requestMagicLink(pool *pgxpool.Pool) http.HandlerFunc {
 			where email = $1 and is_active = true
 			limit 1`, email).Scan(&portalUserID)
 		if err == pgx.ErrNoRows {
-			response.OK(w, map[string]string{"message": "If an account exists, a sign-in link has been sent."}, "OK")
-			return
-		}
-		if err != nil {
+			// Owners / product owners are ERP staff, not portal_users. Issue a
+			// short-lived staff preview session so /portal/login still works.
+			portalUserID, err = ensureStaffPortalPreviewUser(r.Context(), pool, email)
+			if err != nil {
+				if errors.Is(err, errNotElevatedStaff) {
+					response.OK(w, map[string]string{"message": "If an account exists, a sign-in link has been sent."}, "OK")
+					return
+				}
+				if errors.Is(err, errNoPortalPartner) {
+					response.Err(w, http.StatusBadRequest, "No client partner is available for portal preview. Add an HR client first.", "ERR_BAD_REQUEST")
+					return
+				}
+				response.Err(w, http.StatusInternalServerError, "Failed to request link.", "ERR_INTERNAL")
+				return
+			}
+		} else if err != nil {
 			response.Err(w, http.StatusInternalServerError, "Failed to request link.", "ERR_INTERNAL")
 			return
 		}
@@ -262,4 +281,107 @@ func parseID(s string) (int64, error) {
 		return 0, fmt.Errorf("invalid id")
 	}
 	return id, nil
+}
+
+// ensureStaffPortalPreviewUser creates or reuses a staff-preview portal user when
+// the email belongs to a product owner, platform superadmin, or tenant owner.
+func ensureStaffPortalPreviewUser(ctx context.Context, pool *pgxpool.Pool, email string) (int64, error) {
+	tenantID, displayName, ok, err := lookupElevatedStaffTenant(ctx, pool, email)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, errNotElevatedStaff
+	}
+	partnerID, err := lookupPortalPreviewPartner(ctx, pool, tenantID)
+	if err != nil {
+		return 0, err
+	}
+	previewEmail := "staff-preview+tenant" + strconv.FormatInt(tenantID, 10) + "@bluearm.internal"
+	if displayName == "" {
+		displayName = "Staff preview"
+	} else {
+		displayName = "Staff preview — " + displayName
+	}
+	var portalUserID int64
+	err = pool.QueryRow(ctx, `
+		insert into public.portal_users (tenant_id, partner_id, email, display_name)
+		values ($1,$2,$3,$4)
+		on conflict (tenant_id, email) do update
+		  set partner_id = excluded.partner_id,
+		      display_name = excluded.display_name,
+		      is_active = true
+		returning id`,
+		tenantID, partnerID, previewEmail, displayName).Scan(&portalUserID)
+	if err != nil {
+		return 0, err
+	}
+	return portalUserID, nil
+}
+
+func lookupElevatedStaffTenant(ctx context.Context, pool *pgxpool.Pool, email string) (tenantID int64, displayName string, ok bool, err error) {
+	elevated := auth.IsPlatformConsoleEmail(email)
+	var isOwner, isSuper bool
+	err = pool.QueryRow(ctx, `
+		select u.tenant_id,
+		       coalesce(nullif(trim(u.full_name), ''), u.email),
+		       (t.owner_user_id = u.id),
+		       (coalesce(pu.is_active, false) and pu.role = 'superadmin')
+		from public.users u
+		join public.tenants t on t.id = u.tenant_id
+		left join public.platform_users pu on pu.auth_user_id = u.auth_user_id
+		where lower(u.email) = $1
+		  and u.status = 'active'
+		  and t.status not in ('suspended', 'cancelled', 'pending_approval')
+		order by
+		  (coalesce(pu.is_active, false) and pu.role = 'superadmin') desc,
+		  (t.owner_user_id = u.id) desc,
+		  u.id asc
+		limit 1`, email).Scan(&tenantID, &displayName, &isOwner, &isSuper)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if !elevated {
+			return 0, "", false, nil
+		}
+		// Console email with no user row yet — try BLUEARM operator tenant.
+		err = pool.QueryRow(ctx, `
+			select id from public.tenants
+			where upper(company_code) = 'BLUEARM'
+			order by id asc limit 1`).Scan(&tenantID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, "", false, nil
+		}
+		if err != nil {
+			return 0, "", false, err
+		}
+		return tenantID, email, true, nil
+	}
+	if err != nil {
+		return 0, "", false, err
+	}
+	if elevated || isOwner || isSuper {
+		return tenantID, displayName, true, nil
+	}
+	return 0, "", false, nil
+}
+
+func lookupPortalPreviewPartner(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (int64, error) {
+	var partnerID int64
+	err := pool.QueryRow(ctx, `
+		select c.partner_id from public.hr_clients c
+		where c.tenant_id = $1
+		order by c.id asc limit 1`, tenantID).Scan(&partnerID)
+	if err == nil {
+		return partnerID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return 0, err
+	}
+	err = pool.QueryRow(ctx, `
+		select id from public.inv_partners
+		where tenant_id = $1
+		order by id asc limit 1`, tenantID).Scan(&partnerID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, errNoPortalPartner
+	}
+	return partnerID, err
 }

@@ -36,10 +36,17 @@ export default function PortalLoginPage() {
     const token = res.data?.token;
     if (token) {
       setPortalToken(token);
-      navigate("/app/hr/client-portal", { replace: true });
+      navigate(`/app/hr/client-portal?token=${encodeURIComponent(token)}`, { replace: true });
       return;
     }
-    if (url) setLinkUrl(url);
+    if (url) {
+      setLinkUrl(url);
+      return;
+    }
+    // Privacy-preserving empty success (unknown email) — give staff a clear next step.
+    setError(
+      "No active portal user for that email. Client reps need an invite from HR → Portal access. Owners can also use Preview portal there.",
+    );
   };
 
   return (
