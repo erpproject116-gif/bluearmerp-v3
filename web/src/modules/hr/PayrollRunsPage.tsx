@@ -130,6 +130,8 @@ export default function PayrollRunsPage() {
         <p class="mb-3 text-sm text-text-secondary">
           Gross pay includes base salary plus DTR premiums (OT at 125%, night diff 10%, holiday multipliers from the holiday calendar).
           Import or enter DTR in Attendance before running payroll.
+          A 1st–15th cutoff does not pay the monthly salary and does not take SSS, PhilHealth, Pag-IBIG, or tax.
+          Those are paid and taken once on the 16th through the end of the month. A full-month run is unchanged.
         </p>
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRunOpen(true)}>
           New payroll run

@@ -13,8 +13,8 @@ import (
 const (
 	workingDaysPerMonth = 22.0
 	hoursPerDay         = 8.0
-	otRateMultiplier    = 1.25  // 125% of hourly (25% premium)
-	nightDiffRate       = 0.10  // 10% of hourly on night-diff hours
+	otRateMultiplier    = 1.25 // 125% of hourly (25% premium)
+	nightDiffRate       = 0.10 // 10% of hourly on night-diff hours
 )
 
 type dtrPremiumResult struct {
@@ -24,13 +24,13 @@ type dtrPremiumResult struct {
 }
 
 type dtrPremiumRow struct {
-	workDate        time.Time
-	status          string
-	hoursWorked     float64
-	otHours         float64
-	nightDiffHours  float64
-	payMultiplier   float64
-	holidayType     string
+	workDate       time.Time
+	status         string
+	hoursWorked    float64
+	otHours        float64
+	nightDiffHours float64
+	payMultiplier  float64
+	holidayType    string
 }
 
 func hourlyRate(monthlyBasic float64) float64 {
@@ -253,7 +253,54 @@ func buildEmployeePayslipDraft(
 		out.NetPay = 0
 	}
 	out.EmployerShare = stat.EmployerShare
+	if isFirstQuincena(periodStart, periodEnd) {
+		out = omitFirstQuincenaSalary(out)
+	}
 	return out, nil
+}
+
+// isFirstQuincena is the 1st through the 15th of one month.
+// A full month, or the 16th through the last day, is not the first range.
+func isFirstQuincena(start, end time.Time) bool {
+	sy, sm, sd := start.Date()
+	ey, em, ed := end.Date()
+	return sy == ey && sm == em && sd == 1 && ed == 15
+}
+
+func omitFirstQuincenaSalary(in employeePayslipDraft) employeePayslipDraft {
+	skip := map[string]bool{
+		"SSS_EE": true, "SSS_ER": true, "SSS_EC": true,
+		"PHIC_EE": true, "PHIC_ER": true,
+		"HDMF_EE": true, "HDMF_ER": true,
+		"WHT": true,
+	}
+	lines := make([]draftPayslipLine, 0, len(in.Lines))
+	var deductions, employer float64
+	for _, ln := range in.Lines {
+		if skip[ln.LineCode] {
+			continue
+		}
+		if ln.LineCode == "BASIC" {
+			ln.Amount = 0
+		}
+		ln.LineNo = len(lines) + 1
+		lines = append(lines, ln)
+		switch ln.LineType {
+		case "deduction":
+			deductions += ln.Amount
+		case "employer_share":
+			employer += ln.Amount
+		}
+	}
+	in.Lines = lines
+	in.GrossPay = roundMoney(in.PremiumTotal + in.CatalogEarn)
+	in.Deductions = roundMoney(deductions)
+	in.NetPay = roundMoney(in.GrossPay - in.Deductions)
+	if in.NetPay < 0 {
+		in.NetPay = 0
+	}
+	in.EmployerShare = roundMoney(employer)
+	return in
 }
 
 func insertPremiumLinesAfterBasic(lines []draftPayslipLine, premiums []draftPayslipLine) []draftPayslipLine {

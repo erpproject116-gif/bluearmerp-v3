@@ -1,5 +1,6 @@
 import { A, useLocation } from "@solidjs/router";
 import { For, Show } from "solid-js";
+import { isAgencyPath, useManpowerMode } from "../modules/hr/manpowerMode";
 
 type PageLink = { label: string; href: string; exact?: boolean };
 
@@ -115,14 +116,17 @@ function pageActive(pathname: string, page: PageLink): boolean {
 
 export function HrHeaderNav() {
   const loc = useLocation();
+  const mode = useManpowerMode();
   const onHr = () => loc.pathname === "/app/hr" || loc.pathname.startsWith("/app/hr/");
   const activeGroup = () => groups.find((group) => groupActive(loc.pathname, group));
+  const pages = () =>
+    (activeGroup()?.pages ?? []).filter((page) => mode.enabled() || !isAgencyPath(page.href));
   return (
-    <Show when={onHr() && activeGroup()?.pages}>
-      <Show when={activeGroup()?.pages}>
-        {(pages) => (
+    <Show when={onHr() && pages().length > 0}>
+      <Show when={pages()}>
+        {(list) => (
           <nav class="erp-header-features mt-3" aria-label="HR and Payroll pages">
-            <For each={pages()}>
+            <For each={list()}>
               {(page) => (
                 <A
                   href={page.href}

@@ -36,6 +36,54 @@ func TestQuincenaRanges(t *testing.T) {
 	}
 }
 
+func TestFirstQuincenaOmitsSalaryAndStatutory(t *testing.T) {
+	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, time.January, 15, 0, 0, 0, 0, time.UTC)
+	if !isFirstQuincena(start, end) {
+		t.Fatal("1–15 should be the first range")
+	}
+	fullStart := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	fullEnd := time.Date(2026, time.January, 31, 0, 0, 0, 0, time.UTC)
+	if isFirstQuincena(fullStart, fullEnd) {
+		t.Fatal("a full month is not the first range")
+	}
+	secondStart := time.Date(2026, time.January, 16, 0, 0, 0, 0, time.UTC)
+	if isFirstQuincena(secondStart, fullEnd) {
+		t.Fatal("16–31 is not the first range")
+	}
+	out := omitFirstQuincenaSalary(employeePayslipDraft{
+		PremiumTotal: 100,
+		CatalogEarn:  50,
+		Lines: []draftPayslipLine{
+			{LineType: "earning", LineCode: "BASIC", Amount: 20000},
+			{LineType: "earning", LineCode: "OT", Amount: 100},
+			{LineType: "deduction", LineCode: "SSS_EE", Amount: 500},
+			{LineType: "employer_share", LineCode: "SSS_ER", Amount: 1000},
+			{LineType: "deduction", LineCode: "PHIC_EE", Amount: 250},
+			{LineType: "employer_share", LineCode: "PHIC_ER", Amount: 250},
+			{LineType: "deduction", LineCode: "HDMF_EE", Amount: 200},
+			{LineType: "employer_share", LineCode: "HDMF_ER", Amount: 200},
+			{LineType: "deduction", LineCode: "WHT", Amount: 800},
+			{LineType: "deduction", LineCode: "ABSENCE", Amount: 10},
+		},
+	})
+	if out.GrossPay != 150 {
+		t.Fatalf("gross = %v", out.GrossPay)
+	}
+	if out.Deductions != 10 || out.EmployerShare != 0 || out.NetPay != 140 {
+		t.Fatalf("deduct %v employer %v net %v", out.Deductions, out.EmployerShare, out.NetPay)
+	}
+	for _, ln := range out.Lines {
+		if ln.LineCode == "BASIC" && ln.Amount != 0 {
+			t.Fatalf("basic = %v", ln.Amount)
+		}
+		switch ln.LineCode {
+		case "SSS_EE", "SSS_ER", "PHIC_EE", "PHIC_ER", "HDMF_EE", "HDMF_ER", "WHT":
+			t.Fatalf("kept %s", ln.LineCode)
+		}
+	}
+}
+
 func TestStatutoryPackageError(t *testing.T) {
 	err := statutoryPackageError{Agency: "SSS"}
 	if err.Error() != "SSS statutory package is missing for this period end." {

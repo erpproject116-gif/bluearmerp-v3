@@ -38,6 +38,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool) {
 			registerClientRoutes(admin, pool)
 			registerAssignmentRoutes(admin, pool)
 			registerAgencyRoutes(admin, pool)
+			registerManpowerModeRoutes(admin, pool)
 			registerSampleDataRoutes(admin, pool)
 		})
 	})
