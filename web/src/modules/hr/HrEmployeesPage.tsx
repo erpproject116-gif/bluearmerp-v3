@@ -25,7 +25,9 @@ import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { HrLayout } from "./HrLayout";
 import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
 import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
+import { DemoFillButton } from "./DemoFillButton";
 import { downloadEmployeeRecordPdf } from "./employeeRecordPdf";
+import { buildEmployeeDemoFill } from "./hrDemoFill";
 import { HrMappedImportModal } from "./HrMappedImportModal";
 import { UserSearchModal, type UserSearchRow } from "../purchase-request/purchase-request/UserSearchModal";
 import { buildRequiredChecks, useFormFieldSettings } from "../../shared/useFormFieldSettings";
@@ -39,6 +41,12 @@ import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/active
 import { LookupCombo, type LookupOption } from "../../shared/LookupCombo";
 import { QuickDepartmentModal } from "../../shared/QuickDepartmentModal";
 import { hasPermission, useAuth } from "../../shared/auth-context";
+import { useBranding } from "../../shared/branding/BrandingProvider";
+import {
+  resolvePrintCompanyName,
+  resolvePrintFooterText,
+  resolvePrintHeaderText,
+} from "../../shared/branding/receiptBranding";
 
 function employeeInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -79,7 +87,41 @@ const GOV_ID_UPLOADS = [
   { docType: "id_gov", label: "Other government ID" },
 ] as const;
 
-type EmployeeDoc = { id: number; doc_type: string; title: string; file_name?: string; has_file?: boolean };
+type EmployeeDoc = {
+  id: number;
+  doc_type: string;
+  title: string;
+  file_name?: string;
+  mime_type?: string;
+  has_file?: boolean;
+  created_at?: string;
+};
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read file."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function urlToDataUrl(url: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return undefined;
+    return await blobToDataUrl(await res.blob());
+  } catch {
+    return undefined;
+  }
+}
+
+function isImageMime(mime?: string, fileName?: string) {
+  const m = (mime || "").toLowerCase();
+  if (m.startsWith("image/")) return true;
+  const n = (fileName || "").toLowerCase();
+  return /\.(png|jpe?g|gif|webp|bmp)$/.test(n);
+}
 
 async function employeeDocHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
@@ -187,10 +229,12 @@ export default function HrEmployeesPage() {
   const [statusFilter, setStatusFilter] = createSignal("");
   const [deptFilter, setDeptFilter] = createSignal("");
   const [showAmounts, setShowAmounts] = createSignal(false);
+  const [pdfBusy, setPdfBusy] = createSignal(false);
   const toast = useToast();
   const invalidate = useInvalidateEmployees();
   const qc = useQueryClient();
   const depts = useHrDepartments();
+  const branding = useBranding();
   const { fields, activeCustomFields } = useFormFieldSettings(HR_ENTITY.employee);
   const { customValues, setCustom, loadCustom } = useCustomValues();
 
@@ -531,44 +575,120 @@ export default function HrEmployeesPage() {
 
   const downloadSelectedPdf = async () => {
     const id = selected()?.id;
-    if (!id) return;
-    const empRes = await apiFetch<Employee>(`/api/v1/hr/employees/${id}`);
-    if (!empRes.success || !empRes.data) {
-      toast.warning(empRes.message ?? "Could not load employee for PDF.");
-      return;
+    if (!id || pdfBusy()) return;
+    setPdfBusy(true);
+    try {
+      const empRes = await apiFetch<Employee>(`/api/v1/hr/employees/${id}`);
+      if (!empRes.success || !empRes.data) {
+        toast.warning(empRes.message ?? "Could not load employee for PDF.");
+        return;
+      }
+      const emp = empRes.data;
+      const [assignRes, docsRes, payRes] = await Promise.all([
+        apiFetch<{ employee_id: number; client_name?: string; site_name?: string; start_date?: string; end_date?: string }[]>(
+          "/api/v1/hr/assignments",
+        ),
+        apiFetch<EmployeeDoc[]>(`/api/v1/hr/employees/${id}/documents`),
+        apiFetch<{ item_code: string; item_name: string; item_kind: string; amount: number; is_active: boolean }[]>(
+          `/api/v1/hr/employees/${id}/pay-items`,
+        ),
+      ]);
+
+      const listed = docsRes.data ?? [];
+      const headers = await employeeDocHeaders();
+      const documents = await Promise.all(
+        listed.map(async (d) => {
+          let imageDataUrl: string | undefined;
+          if (d.has_file && isImageMime(d.mime_type, d.file_name)) {
+            try {
+              const res = await fetch(`${apiBase}/api/v1/hr/employees/${id}/documents/${d.id}/download`, { headers });
+              if (res.ok) imageDataUrl = await blobToDataUrl(await res.blob());
+            } catch {
+              /* keep index row even if image fails */
+            }
+          }
+          return {
+            id: d.id,
+            title: d.title,
+            doc_type: d.doc_type,
+            file_name: d.file_name,
+            mime_type: d.mime_type,
+            has_file: d.has_file,
+            created_at: d.created_at,
+            imageDataUrl,
+          };
+        }),
+      );
+
+      const settings = branding.settings();
+      const companyName = resolvePrintCompanyName(undefined, settings, auth.me?.tenant.company_name);
+      const headerText = resolvePrintHeaderText(undefined, settings, companyName);
+      const footerText = resolvePrintFooterText(undefined, settings);
+      let logoDataUrl: string | undefined;
+      const logoUrl = branding.logoPreviewUrl();
+      if (logoUrl) logoDataUrl = await urlToDataUrl(logoUrl);
+
+      const customFields: [string, string][] = activeCustomFields().map((f) => {
+        const raw = customValues()[f.field_key];
+        return [f.label || f.field_key, raw == null ? "" : String(raw)];
+      });
+
+      downloadEmployeeRecordPdf({
+        employee: {
+          ...emp,
+          employee_no: employeeNo() || emp.employee_no,
+          full_name: fullName() || emp.full_name,
+          department: department() || emp.department,
+          job_title: jobTitle() || emp.job_title,
+          hire_date: hireDate() || emp.hire_date,
+          status: status() || emp.status,
+          base_salary: Number(baseSalary()) || emp.base_salary,
+          email: email() || emp.email,
+          notes: notes() || emp.notes,
+          tin: tin() || emp.tin,
+          sss_no: sssNo() || emp.sss_no,
+          philhealth_no: philhealthNo() || emp.philhealth_no,
+          pagibig_no: pagibigNo() || emp.pagibig_no,
+          tax_status: taxStatus() || emp.tax_status,
+          bank_name: bankName() || emp.bank_name,
+          bank_account_no: bankAccountNo() || emp.bank_account_no,
+          birthdate: birthdate() || emp.birthdate,
+          national_id: nationalId() || emp.national_id,
+          emergency_contact_name: emergencyName() || emp.emergency_contact_name,
+          emergency_contact_address: emergencyAddress() || emp.emergency_contact_address,
+          emergency_contact_phone: emergencyPhone() || emp.emergency_contact_phone,
+          gender: gender() || emp.gender,
+          civil_status: civilStatus() || emp.civil_status,
+          cellphone: cellphone() || emp.cellphone,
+          city_address: cityAddress() || emp.city_address,
+          provincial_address: provincialAddress() || emp.provincial_address,
+          birthplace: birthplace() || emp.birthplace,
+          citizenship: citizenship() || emp.citizenship,
+          height: height() || emp.height,
+          weight: weight() || emp.weight,
+          religion: religion() || emp.religion,
+          spouse_name: spouseName() || emp.spouse_name,
+          spouse_occupation: spouseOccupation() || emp.spouse_occupation,
+          special_skills: specialSkills() || emp.special_skills,
+          source_application_id: sourceApplicationId() ?? emp.source_application_id,
+          user_id: userId() ?? emp.user_id,
+        },
+        assignments: (assignRes.data ?? []).filter((a) => a.employee_id === id),
+        documents,
+        payItems: payRes.data ?? [],
+        customFields,
+        signatureDataUrl: signatureDataUrl() || emp.signature_data_url || undefined,
+        branding: {
+          companyName,
+          headerText,
+          footerText,
+          logoDataUrl,
+        },
+      });
+      toast.success("201 PDF downloaded.");
+    } finally {
+      setPdfBusy(false);
     }
-    const emp = empRes.data;
-    const [assignRes, docsRes] = await Promise.all([
-      apiFetch<{ employee_id: number; client_name?: string; site_name?: string; start_date?: string; end_date?: string }[]>(
-        "/api/v1/hr/assignments",
-      ),
-      apiFetch<EmployeeDoc[]>(`/api/v1/hr/employees/${id}/documents`),
-    ]);
-    downloadEmployeeRecordPdf({
-      employee: {
-        ...emp,
-        gender: emp.gender || gender(),
-        civil_status: emp.civil_status || civilStatus(),
-        cellphone: emp.cellphone || cellphone(),
-        city_address: emp.city_address || cityAddress(),
-        provincial_address: emp.provincial_address || provincialAddress(),
-        birthplace: emp.birthplace || birthplace(),
-        citizenship: emp.citizenship || citizenship(),
-        height: emp.height || height(),
-        weight: emp.weight || weight(),
-        religion: emp.religion || religion(),
-        spouse_name: emp.spouse_name || spouseName(),
-        spouse_occupation: emp.spouse_occupation || spouseOccupation(),
-        special_skills: emp.special_skills || specialSkills(),
-      },
-      assignments: (assignRes.data ?? []).filter((a) => a.employee_id === id),
-      documents: (docsRes.data ?? []).map((d) => ({
-        title: d.title,
-        doc_type: d.doc_type,
-        file_name: d.file_name,
-      })),
-    });
-    toast.success("PDF downloaded.");
   };
 
   const save = async () => {
@@ -910,6 +1030,40 @@ export default function HrEmployeesPage() {
         saving={saving()}
         onClose={() => setModalOpen(false)}
         onSave={() => void save()}
+        headerActions={
+          <div class="flex flex-wrap items-center gap-2">
+            <DemoFillButton
+              onFill={() => {
+                const packed = buildEmployeeDemoFill();
+                setFullName(packed.fullName);
+                setJobTitle(packed.jobTitle);
+                setEmail(packed.email);
+                setCellphone(packed.cellphone);
+                setHireDate(packed.hireDate);
+                setBaseSalary(packed.baseSalary);
+                setGender(packed.gender);
+                setCivilStatus(packed.civilStatus);
+                setCityAddress(packed.cityAddress);
+                setTin(packed.tin);
+                setSssNo(packed.sssNo);
+                setFormSection("employment");
+                toast.success("Demo fill loaded — review tabs, then Save.");
+              }}
+            />
+            <Show when={selected()?.id}>
+              <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-lg border-2 border-brand-600 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100 disabled:cursor-wait disabled:opacity-60"
+                disabled={pdfBusy()}
+                title="Download the full Employee 201 file as PDF (all tabs + attachments)"
+                onClick={() => void downloadSelectedPdf()}
+              >
+                <span aria-hidden="true">📄</span>
+                {pdfBusy() ? "Preparing 201 PDF…" : "Download 201 PDF"}
+              </button>
+            </Show>
+          </div>
+        }
       >
         <ModalFormGuide guideId="hr_employee" spanFull />
         <draft.DraftBanner />
@@ -947,15 +1101,6 @@ export default function HrEmployeesPage() {
           >
             201 — statutory
           </button>
-          <Show when={selected()?.id}>
-            <button
-              type="button"
-              class="hr-btn hr-btn-sm ml-auto"
-              onClick={() => void downloadSelectedPdf()}
-            >
-              Download PDF
-            </button>
-          </Show>
           <button
             type="button"
             class="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"

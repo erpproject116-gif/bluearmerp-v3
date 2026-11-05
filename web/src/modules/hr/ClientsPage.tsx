@@ -5,6 +5,8 @@ import { LookupCombo } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
+import { DemoFillButton } from "./DemoFillButton";
+import { buildClientDemoFill } from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrEmpty, HrPageHead, HrTcard } from "./HrUi";
 
@@ -438,14 +440,25 @@ export default function ClientsPage() {
           <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">New client</h2>
-              <button
-                type="button"
-                class="hr-btn hr-btn-sm"
-                aria-label="Close"
-                onClick={() => setModalOpen(false)}
-              >
-                ✕
-              </button>
+              <div class="flex items-center gap-2">
+                <DemoFillButton
+                  onFill={() => {
+                    const packed = buildClientDemoFill();
+                    setSource("new");
+                    setName(packed.name);
+                    setSiteName(packed.siteName);
+                    setStartDate(packed.startDate);
+                  }}
+                />
+                <button
+                  type="button"
+                  class="hr-btn hr-btn-sm"
+                  aria-label="Close"
+                  onClick={() => setModalOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
               <Field label="Client source">

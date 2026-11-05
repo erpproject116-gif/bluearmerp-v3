@@ -2,6 +2,8 @@ import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { DemoFillButton } from "./DemoFillButton";
+import { buildManpowerDemoFill, pick } from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { siteChoices } from "./siteChoices";
@@ -237,9 +239,20 @@ export default function ManpowerRequestsPage() {
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">New manpower request</h2>
-              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setModalOpen(false)}>
-                ✕
-              </button>
+              <div class="flex items-center gap-2">
+                <DemoFillButton
+                  onFill={() => {
+                    const packed = buildManpowerDemoFill();
+                    const list = sites() ?? [];
+                    if (list.length) setSiteId(String(pick(list).id));
+                    setHeadcount(packed.headcount);
+                    setDetails(packed.details);
+                  }}
+                />
+                <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setModalOpen(false)}>
+                  ✕
+                </button>
+              </div>
             </div>
             <div class="grid gap-3">
               <Field label="Site">

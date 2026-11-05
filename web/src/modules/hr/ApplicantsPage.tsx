@@ -185,7 +185,10 @@ export default function ApplicantsPage() {
         aria-label={`${row.full_name}, ${stage.label}`}
         onClick={() => setSelected(row.id)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") window.location.assign(`/app/hr/applicants/${row.id}`);
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setSelected(row.id);
+          }
           if (e.key === "m" || e.key === "M") {
             e.preventDefault();
             setMenuFor(menuFor() === row.id ? null : row.id);
@@ -412,7 +415,7 @@ export default function ApplicantsPage() {
                         Open record
                       </A>
                       <button type="button" class="menu-item" onClick={() => setSelected(row.id)}>
-                        Comment
+                        Open details
                       </button>
                       <For each={STAGES.filter((s) => s.id !== row.status)}>
                         {(s) => (
@@ -456,47 +459,135 @@ export default function ApplicantsPage() {
         {(id) => {
           const row = () => (applications() ?? []).find((item) => item.id === id());
           const stage = () => stageOf(row()?.status || "");
+          const age = () => daysSince(row()?.updated_at || row()?.created_at);
+          const files = () => row()?.file_count ?? 0;
           return (
-            <section class="mt-4 rounded-xl border border-stroke bg-surface p-4" style={{ "border-top": `4px solid ${stage().color}` }}>
-              <div class="mb-2 flex flex-wrap items-center gap-2">
-                <div class="hr-who">
-                  <div class="hr-kb-av" style={{ background: stage().color }} aria-hidden="true">
-                    {initials(row()?.full_name || "?")}
+            <div
+              class="fixed inset-0 z-[60] flex justify-end bg-black/30"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Applicant · ${row()?.full_name ?? "details"}`}
+              tabIndex={-1}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setSelected(null);
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelected(null);
+              }}
+            >
+              <div
+                class="hr-side-panel flex h-full w-full max-w-md flex-col border-l border-stroke bg-surface shadow-xl"
+                style={{ "border-top": `4px solid ${stage().color}` }}
+              >
+                <header class="flex items-start justify-between gap-2 border-b border-stroke px-4 py-3">
+                  <div class="hr-who min-w-0">
+                    <div class="hr-kb-av" style={{ background: stage().color }} aria-hidden="true">
+                      {initials(row()?.full_name || "?")}
+                    </div>
+                    <div class="min-w-0">
+                      <h3 class="truncate text-sm font-semibold">{row()?.full_name}</h3>
+                      <span class="hr-kb-stage-pill" style={{ "--c": stage().color }}>
+                        {stage().icon} {stage().label}
+                      </span>
+                    </div>
                   </div>
-                  <h2 class="font-medium">{row()?.full_name}</h2>
+                  <button type="button" class="hr-btn hr-btn-sm shrink-0" aria-label="Close" onClick={() => setSelected(null)}>
+                    ✕
+                  </button>
+                </header>
+
+                <div class="min-h-0 flex-1 overflow-y-auto p-4">
+                  <dl class="mb-4 grid gap-3 text-sm">
+                    <div>
+                      <dt class="text-xs text-text-secondary">Position · opening</dt>
+                      <dd>{[row()?.position_desired, row()?.job_posting_title].filter(Boolean).join(" · ") || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-text-secondary">Email</dt>
+                      <dd class="break-all">{row()?.email || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-text-secondary">Cellphone</dt>
+                      <dd>{row()?.cellphone || "—"}</dd>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <dt class="text-xs text-text-secondary">Age</dt>
+                        <dd>{age() === null ? "—" : `${age()}d since update`}</dd>
+                      </div>
+                      <div>
+                        <dt class="text-xs text-text-secondary">Files</dt>
+                        <dd>
+                          {files() > 0 ? `${files()} file${files() === 1 ? "" : "s"}` : "No files yet"}
+                          <Show when={row()?.has_signature}>
+                            <span class="hr-kb-flag hr-kb-flag-sig ml-2">Signature</span>
+                          </Show>
+                        </dd>
+                      </div>
+                    </div>
+                  </dl>
+
+                  <div class="mb-4 grid gap-2">
+                    <Field label="Industry">
+                      <select
+                        class={inputClass}
+                        value={row()?.industry_id ?? ""}
+                        onChange={(e) => row() && void saveSegments(row()!, e.currentTarget.value, "")}
+                      >
+                        <option value="">None</option>
+                        <For each={(segments() ?? []).filter((s) => s.kind === "industry")}>{(s) => <option value={s.id}>{s.name}</option>}</For>
+                      </select>
+                    </Field>
+                    <Field label="Workplace">
+                      <select
+                        class={inputClass}
+                        value={row()?.workplace_type_id ?? ""}
+                        onChange={(e) => row() && void saveSegments(row()!, "", e.currentTarget.value)}
+                      >
+                        <option value="">None</option>
+                        <For each={(segments() ?? []).filter((s) => s.kind === "workplace")}>{(s) => <option value={s.id}>{s.name}</option>}</For>
+                      </select>
+                    </Field>
+                  </div>
+
+                  <Field label="Comment">
+                    <textarea class={inputClass} rows={3} value={comment()} onInput={(e) => setComment(e.currentTarget.value)} />
+                  </Field>
+                  <input id="applicant-comment-file" class={`${inputClass} mt-2`} type="file" />
+                  <button type="button" class="hr-btn hr-btn-primary mt-2 w-full" onClick={() => void addComment()}>
+                    Save comment
+                  </button>
+
+                  <div class="mt-4">
+                    <p class="mb-2 text-xs font-medium text-text-secondary">Move to stage</p>
+                    <div class="flex flex-wrap gap-1.5">
+                      <For each={STAGES.filter((s) => s.id !== row()?.status)}>
+                        {(s) => (
+                          <button
+                            type="button"
+                            class="hr-btn hr-btn-sm"
+                            onClick={() => row() && void move(row()!, row()!.status, s.id)}
+                          >
+                            <span class="hr-kb-stage-pill" style={{ "--c": s.color }}>
+                              {s.icon} {s.label}
+                            </span>
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                  </div>
                 </div>
-                <span class="hr-kb-stage-pill" style={{ "--c": stage().color }}>
-                  {stage().icon} {stage().label}
-                </span>
-                <A href={`/app/hr/applicants/${id()}`} class="ml-auto text-sm text-brand-700">
-                  Full applicant flow →
-                </A>
-                <button type="button" class="hr-btn hr-btn-sm" onClick={() => setSelected(null)}>
-                  Close
-                </button>
+
+                <footer class="flex flex-wrap items-center justify-between gap-2 border-t border-stroke px-4 py-3">
+                  <A href={`/app/hr/applicants/${id()}`} class="text-sm font-medium text-brand-700">
+                    Full applicant flow →
+                  </A>
+                  <button type="button" class="hr-btn" onClick={() => setSelected(null)}>
+                    Close
+                  </button>
+                </footer>
               </div>
-              <div class="grid gap-2 sm:grid-cols-2">
-                <Field label="Industry">
-                  <select class={inputClass} value={row()?.industry_id ?? ""} onChange={(e) => row() && void saveSegments(row()!, e.currentTarget.value, "")}>
-                    <option value="">None</option>
-                    <For each={(segments() ?? []).filter((s) => s.kind === "industry")}>{(s) => <option value={s.id}>{s.name}</option>}</For>
-                  </select>
-                </Field>
-                <Field label="Workplace">
-                  <select class={inputClass} value={row()?.workplace_type_id ?? ""} onChange={(e) => row() && void saveSegments(row()!, "", e.currentTarget.value)}>
-                    <option value="">None</option>
-                    <For each={(segments() ?? []).filter((s) => s.kind === "workplace")}>{(s) => <option value={s.id}>{s.name}</option>}</For>
-                  </select>
-                </Field>
-              </div>
-              <Field label="Comment">
-                <textarea class={inputClass} value={comment()} onInput={(e) => setComment(e.currentTarget.value)} />
-              </Field>
-              <input id="applicant-comment-file" class={`${inputClass} mt-2`} type="file" />
-              <button type="button" class="hr-btn hr-btn-primary mt-2" onClick={() => void addComment()}>
-                Save comment
-              </button>
-            </section>
+            </div>
           );
         }}
       </Show>

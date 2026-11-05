@@ -2,6 +2,12 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { portalFetch } from "../../shared/portal-api";
 import { formatMoney } from "../../shared/money";
 import { LoadingText } from "../../shared/LoadingText";
+import { DemoFillButton } from "../hr/DemoFillButton";
+import {
+  buildPortalIncidentDemoFill,
+  buildPortalRequestDemoFill,
+  buildPortalTimeDemoFill,
+} from "../hr/hrDemoFill";
 
 type Site = { id: number; site_name: string; client_name: string };
 type Person = { id: number; full_name: string };
@@ -69,8 +75,18 @@ function TimeForm(props: { sites: Site[]; onSubmit: (body: Record<string, unknow
   const [start, setStart] = createSignal("");
   const [end, setEnd] = createSignal("");
   const [fileName, setFileName] = createSignal("");
+  const fill = () => {
+    const packed = buildPortalTimeDemoFill(props.sites.map((s) => String(s.id)));
+    if (packed.siteId) setSiteId(packed.siteId);
+    setStart(packed.start);
+    setEnd(packed.end);
+    setFileName(packed.fileName);
+  };
   return (
     <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 grid-cols-1 min-[1024px]:grid-cols-2" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ site_id: Number(siteId()), period_start: start(), period_end: end(), file_name: fileName() }); }}>
+      <div class="col-span-full flex justify-end">
+        <DemoFillButton onFill={fill} />
+      </div>
       <SiteSelect sites={props.sites} value={siteId()} onChange={setSiteId} />
       <input class="h-9 rounded-lg border border-stroke px-2 text-sm" type="date" value={start()} onInput={(e) => setStart(e.currentTarget.value)} />
       <input class="h-9 rounded-lg border border-stroke px-2 text-sm" type="date" value={end()} onInput={(e) => setEnd(e.currentTarget.value)} />
@@ -84,8 +100,17 @@ function RequestForm(props: { sites: Site[]; onSubmit: (body: Record<string, unk
   const [siteId, setSiteId] = createSignal("");
   const [head, setHead] = createSignal("1");
   const [details, setDetails] = createSignal("");
+  const fill = () => {
+    const packed = buildPortalRequestDemoFill(props.sites.map((s) => String(s.id)));
+    if (packed.siteId) setSiteId(packed.siteId);
+    setHead(packed.head);
+    setDetails(packed.details);
+  };
   return (
     <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 grid-cols-1 min-[1024px]:grid-cols-2" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ site_id: Number(siteId()), headcount: Number(head()) || 1, details: details() }); }}>
+      <div class="col-span-full flex justify-end">
+        <DemoFillButton onFill={fill} />
+      </div>
       <SiteSelect sites={props.sites} value={siteId()} onChange={setSiteId} />
       <input class="h-9 rounded-lg border border-stroke px-2 text-sm" value={head()} onInput={(e) => setHead(e.currentTarget.value)} />
       <input class="h-9 rounded-lg border border-stroke px-2 text-sm" placeholder="Details" value={details()} onInput={(e) => setDetails(e.currentTarget.value)} />
@@ -97,8 +122,16 @@ function RequestForm(props: { sites: Site[]; onSubmit: (body: Record<string, unk
 function IncidentForm(props: { people: Person[]; onSubmit: (body: Record<string, unknown>) => void }) {
   const [employeeId, setEmployeeId] = createSignal("");
   const [description, setDescription] = createSignal("");
+  const fill = () => {
+    const packed = buildPortalIncidentDemoFill(props.people.map((p) => String(p.id)));
+    if (packed.employeeId) setEmployeeId(packed.employeeId);
+    setDescription(packed.description);
+  };
   return (
     <form class="grid gap-2 rounded-lg border border-stroke bg-white p-4 grid-cols-1 min-[1024px]:grid-cols-2" onSubmit={(e) => { e.preventDefault(); props.onSubmit({ employee_id: Number(employeeId()), description: description() }); }}>
+      <div class="col-span-full flex justify-end">
+        <DemoFillButton onFill={fill} />
+      </div>
       <select class="h-9 rounded-lg border border-stroke px-2 text-sm" value={employeeId()} onChange={(e) => setEmployeeId(e.currentTarget.value)}>
         <option value="">Person</option>
         <For each={props.people}>{(person) => <option value={person.id}>{person.full_name}</option>}</For>

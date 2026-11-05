@@ -323,8 +323,8 @@ export default function HrRoadmapPage() {
               </h3>
               <p>
                 {t(
-                  "Planned (not live yet): a gated Fill demo control on persona forms. Each click loads a different fake person, job, or files so you can walk the journey without typing everything by hand. You still Save or Submit yourself.",
-                  "Nakaplano (hindi pa live): gated Fill demo sa mga form ng persona. Bawat click ay maglo-load ng ibang pekeng tao, trabaho, o files para makalakad sa journey nang hindi lahat ay tinatype. Ikaw pa rin ang magse-Save o Submit.",
+                  "Live: a gated Fill demo control on persona forms. Each click loads a different fake person, job, or files so you can walk the journey without typing everything by hand. You still Save or Submit yourself.",
+                  "Live: gated Fill demo sa mga form ng persona. Bawat click ay maglo-load ng ibang pekeng tao, trabaho, o files para makalakad sa journey nang hindi lahat ay tinatype. Ikaw pa rin ang magse-Save o Submit.",
                 )}
               </p>
               <ul>
@@ -349,14 +349,14 @@ export default function HrRoadmapPage() {
               </ul>
               <p>
                 {t(
-                  "When Fill ships, turn it on with ?demo=1 on the page URL, or set localStorage.hrDemoFill=1. The control is not available on forms yet.",
-                  "Kapag naka-ship na ang Fill, i-on ito gamit ang ?demo=1 sa URL, o localStorage.hrDemoFill=1. Wala pa ang control sa mga form.",
+                  "Turn it on with ?demo=1 on the page URL, or set localStorage.hrDemoFill=1. In local Vite DEV it also shows by default. Look for the amber Fill demo button on Apply, My HR, client portal, Clients, Manpower, and Employees.",
+                  "I-on gamit ang ?demo=1 sa URL, o localStorage.hrDemoFill=1. Sa local Vite DEV, default itong makikita. Hanapin ang amber Fill demo sa Apply, My HR, client portal, Clients, Manpower, at Employees.",
                 )}
               </p>
               <p>
                 {t(
-                  "Overview Seed / Remove = bulk sample rows on the board. Fill demo = interactive forms only (planned).",
-                  "Overview Seed / Remove = maraming sample rows sa board. Fill demo = interactive forms lang (nakaplano).",
+                  "Overview Seed / Remove = bulk sample rows on the board. Fill demo = interactive forms only.",
+                  "Overview Seed / Remove = maraming sample rows sa board. Fill demo = interactive forms lang.",
                 )}
               </p>
               <p>

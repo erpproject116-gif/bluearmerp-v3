@@ -5,6 +5,13 @@ import { ProtectedRoute } from "../../shared/ProtectedRoute";
 import { formatPeso } from "../../shared/money";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { DemoFillButton } from "./DemoFillButton";
+import {
+  buildCorrDemoFill,
+  buildEssRequestDemoFill,
+  buildLeaveDemoFill,
+  buildOtDemoFill,
+} from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, type HrBadgeTone } from "./HrUi";
 import "./ess-surface.css";
@@ -224,6 +231,38 @@ function EssSelfServiceView() {
   const [otFrom, setOtFrom] = createSignal("14:00");
   const [otTo, setOtTo] = createSignal("16:00");
   const [otReason, setOtReason] = createSignal("");
+
+  const fillLeaveDemo = () => {
+    const packed = buildLeaveDemoFill((leaveTypes() ?? []).map((t) => String(t.id)));
+    if (packed.typeId) setTypeId(packed.typeId);
+    setFrom(packed.from);
+    setTo(packed.to);
+    setReason(packed.reason);
+    setLvStep(3);
+    toast.success("Demo fill loaded — review, then Submit leave.");
+  };
+  const fillCorrDemo = () => {
+    const packed = buildCorrDemoFill();
+    setCorrDate(packed.corrDate);
+    setCorrIn(packed.corrIn);
+    setCorrOut(packed.corrOut);
+    setCorrReason(packed.corrReason);
+    toast.success("Demo fill loaded — review, then Submit correction.");
+  };
+  const fillOtDemo = () => {
+    const packed = buildOtDemoFill();
+    setOtDate(packed.otDate);
+    setOtFrom(packed.otFrom);
+    setOtTo(packed.otTo);
+    setOtReason(packed.otReason);
+    toast.success("Demo fill loaded — review, then Submit OT.");
+  };
+  const fillReqDemo = (kind?: string) => {
+    const packed = buildEssRequestDemoFill(kind || reqKind());
+    setReqKind(packed.reqKind);
+    setReqDetails(packed.reqDetails);
+    toast.success("Demo fill loaded — review, then Submit.");
+  };
 
   const go = (s: Screen) => {
     setScreen(s);
@@ -638,6 +677,9 @@ function EssSelfServiceView() {
                   </Show>
 
                   <Show when={screen() === "corr"}>
+                    <div class="mb-2 flex justify-end">
+                      <DemoFillButton onFill={fillCorrDemo} />
+                    </div>
                     <div class="grid gap-3">
                       <Field label="Date">
                         <input class={inputClass} type="date" value={corrDate()} onInput={(ev) => setCorrDate(ev.currentTarget.value)} />
@@ -669,6 +711,9 @@ function EssSelfServiceView() {
                   </Show>
 
                   <Show when={screen() === "ot"}>
+                    <div class="mb-2 flex justify-end">
+                      <DemoFillButton onFill={fillOtDemo} />
+                    </div>
                     <div class="grid gap-3">
                       <Field label="Date">
                         <input class={inputClass} type="date" value={otDate()} onInput={(ev) => setOtDate(ev.currentTarget.value)} />
@@ -748,6 +793,9 @@ function EssSelfServiceView() {
                   </Show>
 
                   <Show when={screen() === "lvw"}>
+                    <div class="mb-2 flex justify-end">
+                      <DemoFillButton onFill={fillLeaveDemo} />
+                    </div>
                     <HrSteps steps={["Type", "Dates", "Reason", "Review"]} current={lvStep()} onSelect={setLvStep} />
                     <Show when={lvStep() === 0}>
                       <Field label="Leave type">
@@ -1016,6 +1064,9 @@ function EssSelfServiceView() {
                   </Show>
 
                   <Show when={["loan", "adv", "disp", "coe", "resg"].includes(screen())}>
+                    <div class="mb-2 flex justify-end">
+                      <DemoFillButton onFill={() => fillReqDemo(reqKind())} />
+                    </div>
                     <div class="grid gap-3">
                       <Field label="Type">
                         <select class={inputClass} value={reqKind()} onChange={(ev) => setReqKind(ev.currentTarget.value)} disabled>

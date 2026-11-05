@@ -5,6 +5,8 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { SignaturePad } from "../../shared/SignaturePad";
 import "../careers/careers-surface.css";
 import "./hr-surface.css";
+import { DemoFillButton } from "./DemoFillButton";
+import { buildApplyDemoFill } from "./hrDemoFill";
 import { HrSteps, HrTcard } from "./HrUi";
 
 type SchemaField = {
@@ -257,6 +259,22 @@ export default function ApplyPage() {
   const setRow = (list: Row[], index: number, key: string, value: string) =>
     list.map((row, i) => (i === index ? { ...row, [key]: value } : row));
 
+  const fillDemo = () => {
+    const packed = buildApplyDemoFill({ openings: openings() ?? [] });
+    setValues({ ...values(), ...packed.values });
+    setCustom({ ...custom(), ...packed.custom });
+    setChildren(packed.children);
+    setJobs(packed.jobs);
+    setRefs(packed.refs);
+    setCertified(true);
+    setSignature(packed.signature);
+    setSelfie(packed.selfie);
+    setIds(packed.ids);
+    setResume(packed.resume);
+    setMessage("Demo fill loaded — review steps, then Submit application.");
+    setStep(0);
+  };
+
   const fieldValue = (field: SchemaField) =>
     isCustomKind(field) ? (custom()[field.field_key] ?? "") : (values()[field.field_key] ?? "");
 
@@ -316,7 +334,7 @@ export default function ApplyPage() {
           <div class="text-xs text-text-secondary hide-sm">Applicant self-service · BluearmERP</div>
         </div>
         <span class="grow" />
-        <nav class="flex flex-wrap gap-3 text-sm" aria-label="Application">
+        <nav class="flex flex-wrap items-center gap-3 text-sm" aria-label="Application">
           <A href={`/careers/${encodeURIComponent(code())}`}>Job board</A>
           <A href={`#track`} class="text-text-secondary" onClick={(e) => e.preventDefault()}>
             Track
@@ -324,6 +342,7 @@ export default function ApplyPage() {
           <button type="button" class="text-text-secondary hover:underline" onClick={resumeDraftLocal}>
             Resume draft
           </button>
+          <DemoFillButton onFill={fillDemo} />
         </nav>
       </header>
 
