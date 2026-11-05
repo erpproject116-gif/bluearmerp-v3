@@ -9,6 +9,7 @@ import {
   useInvalidatePayroll,
   usePayPeriods,
   usePayslips,
+  type PayPeriod,
   type Payslip,
   type PayrollPreviewResult,
 } from "../../shared/useHr";
@@ -333,6 +334,39 @@ export default function PayrollRunsPage() {
           total={(payslips.data ?? []).length}
         />
       </Show>
+      <ClientPayrollReport periods={periods.data ?? []} />
     </HrLayout>
+  );
+}
+
+function ClientPayrollReport(props: { periods: PayPeriod[] }) {
+  const [periodId, setPeriodId] = createSignal("");
+  const report = createQuery(() => ({
+    queryKey: ["hr-payroll-by-client", periodId()],
+    enabled: periodId() !== "",
+    queryFn: async () => {
+      const res = await apiFetch<{ groups: { client_name: string; people: number; gross_pay: number; deductions: number; net_pay: number }[] }>(
+        `/api/v1/hr/payroll-by-client?period_id=${periodId()}`,
+      );
+      if (!res.success) throw new Error(res.message ?? "Could not load the client report.");
+      return res.data?.groups ?? [];
+    },
+  }));
+  return (
+    <section class="mt-8 rounded-xl border border-stroke bg-surface p-4">
+      <h2 class="text-lg font-semibold">By client</h2>
+      <p class="mb-3 text-sm text-text-secondary">Posted payslip totals grouped by the assignment that covers the period start. This does not create another payroll run.</p>
+      <select class={inputClass + " mb-3 w-full max-w-sm"} value={periodId()} onChange={(e) => setPeriodId(e.currentTarget.value)}>
+        <option value="">Choose a period</option>
+        <For each={props.periods}>{(period) => <option value={period.id}>{period.period_label}</option>}</For>
+      </select>
+      <For each={report.data ?? []} fallback={<p class="text-sm text-text-secondary">Choose a period to see the groups.</p>}>
+        {(row) => (
+          <p class="border-t border-stroke py-2 text-sm">
+            {row.client_name} · {row.people} · gross {formatAmount(row.gross_pay)} · deductions {formatAmount(row.deductions)} · net {formatAmount(row.net_pay)}
+          </p>
+        )}
+      </For>
+    </section>
   );
 }

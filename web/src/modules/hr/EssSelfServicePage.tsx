@@ -1,4 +1,4 @@
-import { createSignal, createResource, For, Show } from "solid-js";
+import { createSignal, createResource, For, onCleanup, onMount, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import { apiFetch } from "../../shared/api";
 import { ProtectedRoute } from "../../shared/ProtectedRoute";
@@ -223,9 +223,89 @@ function EssSelfServiceView() {
         </For>
       </section>
 
+      <EssPunch />
       <EssRequests />
     </div>
     </HrLayout>
+  );
+}
+
+function EssPunch() {
+  const toast = useToast();
+  const [pin, setPin] = createSignal("");
+  const [newPin, setNewPin] = createSignal("");
+  const [currentPin, setCurrentPin] = createSignal("");
+  const [selfieName, setSelfieName] = createSignal("");
+  const [selfie, setSelfie] = createSignal("");
+  const [rows, { refetch }] = createResource(async () => (await apiFetch<{ id: number; punched_at: string; has_selfie: boolean }[]>("/api/v1/hr/ess/punches")).data ?? []);
+  const sendPunch = async (body: { idempotency_key: string; pin: string; selfie_name: string; selfie_base64: string }) => {
+    localStorage.setItem("hr-punch-pending", JSON.stringify(body));
+    try {
+      const res = await apiFetch("/api/v1/hr/ess/punches", { method: "POST", body: JSON.stringify(body) });
+      if (!res.success) {
+        localStorage.removeItem("hr-punch-pending");
+        toast.warning(res.message ?? "Could not save the punch.");
+        return;
+      }
+      localStorage.removeItem("hr-punch-pending");
+      toast.success("Punch saved.");
+      void refetch();
+    } catch {
+      toast.warning("Saved on this phone. It will send when the connection returns.");
+    }
+  };
+  onMount(() => {
+    const retry = () => {
+      const raw = localStorage.getItem("hr-punch-pending");
+      if (!raw) return;
+      void sendPunch(JSON.parse(raw));
+    };
+    window.addEventListener("online", retry);
+    onCleanup(() => window.removeEventListener("online", retry));
+  });
+  const punch = async () => {
+    const pending = localStorage.getItem("hr-punch-pending");
+    const body = pending
+      ? JSON.parse(pending) as { idempotency_key: string; pin: string; selfie_name: string; selfie_base64: string }
+      : { idempotency_key: crypto.randomUUID(), pin: pin(), selfie_name: selfieName(), selfie_base64: selfie() };
+    await sendPunch(body);
+  };
+  const savePin = async () => {
+    const res = await apiFetch("/api/v1/hr/ess/punch-pin", {
+      method: "PUT",
+      body: JSON.stringify({ current_pin: currentPin(), pin: newPin() }),
+    });
+    if (!res.success) return toast.warning(res.message ?? "Could not save the PIN.");
+    toast.success("PIN saved.");
+  };
+  return (
+    <section class="rounded-xl border border-stroke bg-surface p-4 shadow-sm">
+      <h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-text-secondary">Clock-in</h2>
+      <p class="mb-3 text-sm text-text-secondary">A punch is stored for you. It does not change attendance or pay. If the phone is offline, press Clock in again when you are back; the same key is sent once.</p>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <input class={inputClass + " w-32"} type="password" placeholder="PIN" value={pin()} onInput={(e) => setPin(e.currentTarget.value)} />
+        <input type="file" accept="image/*" onChange={(e) => {
+          const file = e.currentTarget.files?.[0];
+          if (!file) return;
+          setSelfieName(file.name);
+          const reader = new FileReader();
+          reader.onload = () => {
+            const text = String(reader.result ?? "");
+            setSelfie(text.includes(",") ? text.split(",")[1] : text);
+          };
+          reader.readAsDataURL(file);
+        }} />
+        <button type="button" class="rounded-lg bg-brand-600 px-3 py-2 text-sm text-white" onClick={() => void punch()}>Clock in</button>
+      </div>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <input class={inputClass + " w-32"} type="password" placeholder="Current PIN" value={currentPin()} onInput={(e) => setCurrentPin(e.currentTarget.value)} />
+        <input class={inputClass + " w-32"} type="password" placeholder="New PIN" value={newPin()} onInput={(e) => setNewPin(e.currentTarget.value)} />
+        <button type="button" class="rounded-lg border border-stroke px-3 py-2 text-sm" onClick={() => void savePin()}>Save PIN</button>
+      </div>
+      <For each={rows() ?? []} fallback={<p class="text-sm text-text-secondary">No punches yet.</p>}>
+        {(row) => <p class="text-sm">{row.punched_at}{row.has_selfie ? " · selfie" : ""}</p>}
+      </For>
+    </section>
   );
 }
 

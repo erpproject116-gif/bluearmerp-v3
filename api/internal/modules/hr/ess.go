@@ -2,6 +2,10 @@ package hr
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -31,6 +35,9 @@ func registerESSRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/ess/reviews", essReviews(pool))
 	r.Patch("/ess/reviews/{id}", essPatchReview(pool))
 	r.Get("/ess/documents", essDocuments(pool))
+	r.Get("/ess/punches", essListPunches(pool))
+	r.Post("/ess/punches", essCreatePunch(pool))
+	r.Put("/ess/punch-pin", essSetPunchPin(pool))
 	r.Get("/ess/tax-certificate", essTaxCertificate(pool))
 	registerESSRequestRoutes(r, pool)
 }
@@ -474,5 +481,150 @@ func essTaxCertificate(pool *pgxpool.Pool) http.HandlerFunc {
 			"employee_no": no, "full_name": name, "tin": tin, "tax_status": taxStatus,
 			"gross_ytd": gross, "deductions_ytd": ded, "net_ytd": net, "withholding_tax_ytd": wht,
 		}, "Tax certificate pack (not certified eFPS).")
+	}
+}
+
+func pinDigest(pin string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(pin)))
+	return hex.EncodeToString(sum[:])
+}
+
+func essListPunches(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		empID, ok := essLinkedEmployeeID(w, r, pool)
+		if !ok {
+			return
+		}
+		tu, _ := auth.FromContext(r.Context())
+		rows, err := pool.Query(r.Context(), `
+			select id, punched_at::text, selfie_name <> ''
+			from public.hr_time_punches
+			where tenant_id = $1 and employee_id = $2
+			order by id desc limit 30`, tu.TenantID, empID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load punches.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		out := []map[string]any{}
+		for rows.Next() {
+			var id int64
+			var at string
+			var selfie bool
+			if err := rows.Scan(&id, &at, &selfie); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load punches.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, map[string]any{"id": id, "punched_at": at, "has_selfie": selfie})
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+func essCreatePunch(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		empID, ok := essLinkedEmployeeID(w, r, pool)
+		if !ok {
+			return
+		}
+		tu, _ := auth.FromContext(r.Context())
+		var body struct {
+			IdempotencyKey string `json:"idempotency_key"`
+			Pin            string `json:"pin"`
+			PunchedAt      string `json:"punched_at"`
+			SelfieName     string `json:"selfie_name"`
+			SelfieBase64   string `json:"selfie_base64"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.IdempotencyKey) == "" {
+			response.Validation(w, map[string]string{"idempotency_key": "A punch key is required."})
+			return
+		}
+		var stored string
+		var fails int
+		if err := pool.QueryRow(r.Context(), `
+			select coalesce(punch_pin_hash, ''), punch_pin_fails
+			from public.hr_employees where id = $1 and tenant_id = $2`, empID, tu.TenantID).Scan(&stored, &fails); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save the punch.", "ERR_INTERNAL")
+			return
+		}
+		if fails >= 5 {
+			response.Err(w, http.StatusTooManyRequests, "Punch PIN is locked. Set a new PIN to continue.", "ERR_LOCKED")
+			return
+		}
+		if stored != "" {
+			got := pinDigest(body.Pin)
+			if subtle.ConstantTimeCompare([]byte(stored), []byte(got)) != 1 {
+				_, _ = pool.Exec(r.Context(), `
+					update public.hr_employees set punch_pin_fails = punch_pin_fails + 1
+					where id = $1 and tenant_id = $2`, empID, tu.TenantID)
+				response.Err(w, http.StatusUnauthorized, "PIN does not match.", "ERR_UNAUTHORIZED")
+				return
+			}
+			_, _ = pool.Exec(r.Context(), `
+				update public.hr_employees set punch_pin_fails = 0
+				where id = $1 and tenant_id = $2`, empID, tu.TenantID)
+		}
+		var selfie []byte
+		if strings.TrimSpace(body.SelfieBase64) != "" {
+			decoded, err := base64.StdEncoding.DecodeString(body.SelfieBase64)
+			if err != nil || len(decoded) > 2<<20 {
+				response.Validation(w, map[string]string{"selfie_base64": "Selfie must be valid and under 2 MB."})
+				return
+			}
+			selfie = decoded
+		}
+		when := strings.TrimSpace(body.PunchedAt)
+		var id int64
+		err := pool.QueryRow(r.Context(), `
+			insert into public.hr_time_punches
+			  (tenant_id, employee_id, punched_at, selfie_name, selfie_bytes, idempotency_key)
+			values ($1, $2, coalesce(nullif($3, '')::timestamptz, now()), $4, $5, $6)
+			on conflict (tenant_id, employee_id, idempotency_key)
+			do update set idempotency_key = excluded.idempotency_key
+			returning id`,
+			tu.TenantID, empID, when, strings.TrimSpace(body.SelfieName), selfie, strings.TrimSpace(body.IdempotencyKey)).Scan(&id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save the punch.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"id": id}, "Saved.")
+	}
+}
+
+func essSetPunchPin(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		empID, ok := essLinkedEmployeeID(w, r, pool)
+		if !ok {
+			return
+		}
+		tu, _ := auth.FromContext(r.Context())
+		var body struct {
+			CurrentPin string `json:"current_pin"`
+			Pin        string `json:"pin"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(strings.TrimSpace(body.Pin)) < 4 {
+			response.Validation(w, map[string]string{"pin": "Use at least 4 characters."})
+			return
+		}
+		var stored string
+		if err := pool.QueryRow(r.Context(), `
+			select coalesce(punch_pin_hash, '') from public.hr_employees
+			where id = $1 and tenant_id = $2`, empID, tu.TenantID).Scan(&stored); err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save the PIN.", "ERR_INTERNAL")
+			return
+		}
+		if stored != "" && subtle.ConstantTimeCompare([]byte(stored), []byte(pinDigest(body.CurrentPin))) != 1 {
+			response.Err(w, http.StatusUnauthorized, "Current PIN does not match.", "ERR_UNAUTHORIZED")
+			return
+		}
+		_, err := pool.Exec(r.Context(), `
+			update public.hr_employees
+			set punch_pin_hash = $3, punch_pin_fails = 0, updated_at = now()
+			where id = $1 and tenant_id = $2`, empID, tu.TenantID, pinDigest(body.Pin))
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save the PIN.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"ok": true}, "Saved.")
 	}
 }

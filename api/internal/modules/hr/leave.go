@@ -52,23 +52,24 @@ type LeaveBalance struct {
 }
 
 type LeaveRequest struct {
-	ID           int64          `json:"id"`
-	EmployeeID   int64          `json:"employee_id"`
-	EmployeeNo   string         `json:"employee_no,omitempty"`
-	EmployeeName string         `json:"employee_name,omitempty"`
-	LeaveTypeID  int64          `json:"leave_type_id"`
-	LeaveCode    string         `json:"leave_code,omitempty"`
-	LeaveName    string         `json:"leave_name,omitempty"`
-	DateFrom     string         `json:"date_from"`
-	DateTo       string         `json:"date_to"`
-	Days         float64        `json:"days"`
-	Status       string         `json:"status"`
-	Reason       string         `json:"reason"`
-	Notes        string         `json:"notes"`
-	FileCount    int            `json:"file_count"`
-	ReviewNotes  *string        `json:"review_notes,omitempty"`
-	ReviewedAt   *string        `json:"reviewed_at,omitempty"`
-	CustomValues map[string]any `json:"custom_values,omitempty"`
+	ID             int64          `json:"id"`
+	EmployeeID     int64          `json:"employee_id"`
+	EmployeeNo     string         `json:"employee_no,omitempty"`
+	EmployeeName   string         `json:"employee_name,omitempty"`
+	LeaveTypeID    int64          `json:"leave_type_id"`
+	LeaveCode      string         `json:"leave_code,omitempty"`
+	LeaveName      string         `json:"leave_name,omitempty"`
+	DateFrom       string         `json:"date_from"`
+	DateTo         string         `json:"date_to"`
+	Days           float64        `json:"days"`
+	Status         string         `json:"status"`
+	ClientDecision string         `json:"client_decision"`
+	Reason         string         `json:"reason"`
+	Notes          string         `json:"notes"`
+	FileCount      int            `json:"file_count"`
+	ReviewNotes    *string        `json:"review_notes,omitempty"`
+	ReviewedAt     *string        `json:"reviewed_at,omitempty"`
+	CustomValues   map[string]any `json:"custom_values,omitempty"`
 }
 
 func registerLeaveRoutes(r chi.Router, pool *pgxpool.Pool) {
@@ -415,7 +416,7 @@ func listLeaveRequests(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		rows, err := pool.Query(r.Context(), fmt.Sprintf(`
 			select lr.id, lr.employee_id, e.employee_no, e.full_name, lr.leave_type_id, lt.code, lt.name,
-			  lr.date_from::text, lr.date_to::text, lr.days::float8, lr.status, lr.reason, lr.notes,
+			  lr.date_from::text, lr.date_to::text, lr.days::float8, lr.status, lr.client_decision, lr.reason, lr.notes,
 			  (select count(*)::int from public.hr_leave_request_files f where f.leave_request_id = lr.id),
 			  lr.review_notes, lr.reviewed_at::text,
 			  count(*) over() as total
@@ -436,7 +437,7 @@ func listLeaveRequests(pool *pgxpool.Pool) http.HandlerFunc {
 			var row LeaveRequest
 			var notes, reviewed sql.NullString
 			if err := rows.Scan(&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.LeaveTypeID, &row.LeaveCode, &row.LeaveName,
-				&row.DateFrom, &row.DateTo, &row.Days, &row.Status, &row.Reason, &row.Notes, &row.FileCount, &notes, &reviewed, &total); err != nil {
+				&row.DateFrom, &row.DateTo, &row.Days, &row.Status, &row.ClientDecision, &row.Reason, &row.Notes, &row.FileCount, &notes, &reviewed, &total); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to read request.", "ERR_INTERNAL")
 				return
 			}
@@ -464,7 +465,7 @@ func getLeaveRequest(pool *pgxpool.Pool) http.HandlerFunc {
 		var notes, reviewed sql.NullString
 		err = pool.QueryRow(r.Context(), `
 			select lr.id, lr.employee_id, e.employee_no, e.full_name, lr.leave_type_id, lt.code, lt.name,
-			  lr.date_from::text, lr.date_to::text, lr.days::float8, lr.status, lr.reason, lr.notes,
+			  lr.date_from::text, lr.date_to::text, lr.days::float8, lr.status, lr.client_decision, lr.reason, lr.notes,
 			  (select count(*)::int from public.hr_leave_request_files f where f.leave_request_id = lr.id),
 			  lr.review_notes, lr.reviewed_at::text
 			from public.hr_leave_requests lr
@@ -472,7 +473,7 @@ func getLeaveRequest(pool *pgxpool.Pool) http.HandlerFunc {
 			join public.hr_leave_types lt on lt.id=lr.leave_type_id
 			where lr.tenant_id=$1 and lr.id=$2`, tu.TenantID, id).Scan(
 			&row.ID, &row.EmployeeID, &row.EmployeeNo, &row.EmployeeName, &row.LeaveTypeID, &row.LeaveCode, &row.LeaveName,
-			&row.DateFrom, &row.DateTo, &row.Days, &row.Status, &row.Reason, &row.Notes, &row.FileCount, &notes, &reviewed,
+			&row.DateFrom, &row.DateTo, &row.Days, &row.Status, &row.ClientDecision, &row.Reason, &row.Notes, &row.FileCount, &notes, &reviewed,
 		)
 		if err != nil {
 			response.Err(w, http.StatusNotFound, "Leave request not found.", "ERR_NOT_FOUND")

@@ -1,0 +1,80 @@
+/* Maps mockup measurements onto existing HR pages. Colors stay on tenant tokens. */
+
+.hr-surface h1 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.hr-surface .rounded-xl {
+  border-radius: 8px;
+}
+
+.hr-surface button.bg-brand-600,
+.hr-surface a.bg-brand-600 {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: var(--color-brand-700);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hr-surface button.border-stroke,
+.hr-surface a.border-stroke,
+.hr-surface label.border-stroke {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.hr-surface input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.hr-surface select {
+  min-height: 36px;
+  border-radius: 8px;
+}
+
+.hr-surface textarea {
+  border-radius: 8px;
+}
+
+.hr-surface input:focus,
+.hr-surface select:focus,
+.hr-surface textarea:focus {
+  border-color: var(--color-brand-600);
+  box-shadow: 0 0 0 3px var(--color-brand-100);
+  outline: none;
+}
+
+.hr-surface .erp-grid thead th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--color-panel);
+}
+
+.hr-surface .w-80.shrink-0 {
+  width: 250px;
+  flex-basis: 250px;
+  border-radius: 10px;
+  background: var(--color-panel);
+}
+
+.hr-surface .hr-seg button {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .hr-surface h1 {
+    font-size: 20px;
+  }
+}

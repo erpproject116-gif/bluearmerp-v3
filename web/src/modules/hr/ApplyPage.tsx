@@ -1,5 +1,5 @@
 import { useParams } from "@solidjs/router";
-import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { apiBase } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { SignaturePad } from "../../shared/SignaturePad";
@@ -75,6 +75,43 @@ export default function ApplyPage() {
     window.scrollTo(0, 0);
   });
 
+  const [openings] = createResource(async () => {
+    const res = await fetch(`${apiBase}/api/v1/hr/apply/${encodeURIComponent(params.code ?? "")}/openings`);
+    const body = await res.json().catch(() => ({}));
+    return (body.data ?? []) as { title: string; site_name: string; headcount: number }[];
+  });
+
+  onMount(() => {
+    const token = localStorage.getItem(`apply-draft:${params.code ?? ""}`);
+    if (!token) return;
+    void fetch(`${apiBase}/api/v1/hr/apply/${encodeURIComponent(params.code ?? "")}/draft?token=${encodeURIComponent(token)}`)
+      .then((res) => res.json())
+      .then((body) => {
+        const form = body.data?.form;
+        if (form && typeof form === "object") setValues({ ...values(), ...(form as Record<string, string>) });
+      })
+      .catch(() => undefined);
+  });
+
+  createEffect(() => {
+    const snapshot = { ...values() };
+    const code = params.code ?? "";
+    const handle = window.setTimeout(() => {
+      if (!snapshot.full_name) return;
+      localStorage.setItem(`apply-draft-json:${code}`, JSON.stringify(snapshot));
+      const token = localStorage.getItem(`apply-draft:${code}`) ?? "";
+      void fetch(`${apiBase}/api/v1/hr/apply/${encodeURIComponent(code)}/draft`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, form: snapshot }),
+      }).then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (body.data?.token) localStorage.setItem(`apply-draft:${code}`, body.data.token);
+      }).catch(() => undefined);
+    }, 800);
+    onCleanup(() => window.clearTimeout(handle));
+  });
+
   const [form] = createResource(async () => {
     const res = await fetch(`${apiBase}/api/v1/hr/apply/${encodeURIComponent(params.code ?? "")}`);
     const text = await res.text();
@@ -139,8 +176,21 @@ export default function ApplyPage() {
 
   return (
     <main class="mx-auto min-h-screen w-full max-w-3xl bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 text-sm">
-      <h1 class="mb-1 text-xl font-semibold">Application form</h1>
-      <p class="mb-4 text-text-secondary">Step {step() + 1} of {STEPS.length}</p>
+      <Show when={(openings() ?? []).length > 0}>
+        <ul class="mb-4 space-y-1 text-sm">
+          <For each={openings() ?? []}>{(row) => <li>{row.title} · {row.site_name} · {row.headcount}</li>}</For>
+        </ul>
+      </Show>
+      <h1 class="mb-1 text-2xl font-bold">Application form</h1>
+      <p class="mb-2 text-sm text-text-secondary">Step {step() + 1} of {STEPS.length}</p>
+      <div class="mb-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+        <div class="h-full bg-brand-600" style={{ width: `${((step() + 1) / STEPS.length) * 100}%` }} />
+      </div>
+      <ol class="mb-4 hidden justify-between gap-2 text-[11px] text-text-secondary sm:flex">
+        <For each={STEPS}>
+          {(label, index) => <li classList={{ "font-bold text-brand-700": step() === index() }}>{label}</li>}
+        </For>
+      </ol>
       <Show when={form()?.unavailable}><p class="mb-3">This application form is not available.</p></Show>
       <section class={step() === 0 ? "" : "hidden"}>
         <h2 class="mb-3 text-base font-semibold">{STEPS[0]}</h2>

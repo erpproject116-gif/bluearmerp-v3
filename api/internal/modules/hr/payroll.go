@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,6 +74,7 @@ type payrollRunResult struct {
 func registerPayrollRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessRead)).Get("/pay-periods", listPayPeriods(pool))
 	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessRead)).Get("/payslips", listPayslips(pool))
+	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessRead)).Get("/payroll-by-client", payrollByClient(pool))
 	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessRead)).Post("/payroll-runs/preview", previewPayroll(pool))
 	r.With(auth.RequirePermission("hr.payroll_runs", auth.AccessWrite)).Post("/payroll-runs", runPayroll(pool))
 	registerPayrollCSVRoutes(r, pool)
@@ -539,6 +541,82 @@ func roundMoney(v float64) float64 {
 
 func periodsOverlap(aStart, aEnd, bStart, bEnd time.Time) bool {
 	return !aStart.After(bEnd) && !bStart.After(aEnd)
+}
+
+func payrollByClient(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, _ := auth.FromContext(r.Context())
+		periodID, err := strconv.ParseInt(r.URL.Query().Get("period_id"), 10, 64)
+		if err != nil || periodID <= 0 {
+			response.Validation(w, map[string]string{"period_id": "Choose a pay period."})
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select coalesce(c.name, 'Unassigned'), e.full_name,
+			       ps.gross_pay::float8, ps.deductions::float8, ps.net_pay::float8
+			from public.hr_payslips ps
+			join public.hr_pay_periods pp on pp.id = ps.pay_period_id and pp.tenant_id = ps.tenant_id
+			join public.hr_employees e on e.id = ps.employee_id and e.tenant_id = ps.tenant_id
+			left join lateral (
+			  select a.site_id
+			  from public.hr_assignments a
+			  where a.tenant_id = ps.tenant_id and a.employee_id = ps.employee_id
+			    and a.start_date <= pp.period_start
+			    and (a.end_date is null or a.end_date >= pp.period_start)
+			  order by a.start_date desc
+			  limit 1
+			) placed on true
+			left join public.hr_client_sites s on s.id = placed.site_id and s.tenant_id = ps.tenant_id
+			left join public.hr_clients c on c.id = s.client_id and c.tenant_id = ps.tenant_id
+			where ps.tenant_id = $1 and ps.pay_period_id = $2
+			order by 1, e.full_name`, tu.TenantID, periodID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load the client report.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		lines := []map[string]any{}
+		type group struct {
+			Client     string
+			Gross      float64
+			Deductions float64
+			Net        float64
+			People     int
+		}
+		groups := map[string]*group{}
+		order := []string{}
+		for rows.Next() {
+			var client, name string
+			var gross, deductions, net float64
+			if err := rows.Scan(&client, &name, &gross, &deductions, &net); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load the client report.", "ERR_INTERNAL")
+				return
+			}
+			lines = append(lines, map[string]any{
+				"client_name": client, "employee_name": name,
+				"gross_pay": gross, "deductions": deductions, "net_pay": net,
+			})
+			g, ok := groups[client]
+			if !ok {
+				g = &group{Client: client}
+				groups[client] = g
+				order = append(order, client)
+			}
+			g.Gross += gross
+			g.Deductions += deductions
+			g.Net += net
+			g.People++
+		}
+		grouped := []map[string]any{}
+		for _, name := range order {
+			g := groups[name]
+			grouped = append(grouped, map[string]any{
+				"client_name": g.Client, "people": g.People,
+				"gross_pay": g.Gross, "deductions": g.Deductions, "net_pay": g.Net,
+			})
+		}
+		response.OK(w, map[string]any{"lines": lines, "groups": grouped}, "OK")
+	}
 }
 
 func writePayslipComputeErr(w http.ResponseWriter, err error, fallback string) {

@@ -16,7 +16,7 @@ func listPortalSites(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		rows, err := pool.Query(r.Context(), `
-			select s.site_name, c.name
+			select s.id, s.site_name, c.name
 			from public.hr_client_sites s
 			join public.hr_clients c on c.id = s.client_id and c.tenant_id = s.tenant_id
 			where s.tenant_id = $1 and c.partner_id = $2
@@ -28,12 +28,13 @@ func listPortalSites(pool *pgxpool.Pool) http.HandlerFunc {
 		defer rows.Close()
 		out := []map[string]any{}
 		for rows.Next() {
+			var id int64
 			var site, client string
-			if err := rows.Scan(&site, &client); err != nil {
+			if err := rows.Scan(&id, &site, &client); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load sites.", "ERR_INTERNAL")
 				return
 			}
-			out = append(out, map[string]any{"site_name": site, "client_name": client})
+			out = append(out, map[string]any{"id": id, "site_name": site, "client_name": client})
 		}
 		response.OK(w, out, "OK")
 	}

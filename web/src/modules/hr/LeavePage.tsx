@@ -21,7 +21,7 @@ type LeaveBalance = {
 };
 type LeaveRequest = {
   id: number; employee_no?: string; employee_name?: string; leave_code?: string;
-  date_from: string; date_to: string; days: number; status: string; reason: string;
+  date_from: string; date_to: string; days: number; status: string; client_decision?: string; reason: string;
   notes?: string; file_count?: number;
 };
 
@@ -210,10 +210,10 @@ export default function LeavePage() {
           <table class="min-w-full text-left text-sm">
             <thead><tr class="border-b border-stroke text-text-secondary">
               <th class="py-2 pr-3">Employee</th><th class="py-2 pr-3">Type</th><th class="py-2 pr-3">Dates</th>
-              <th class="py-2 pr-3">Days</th><th class="py-2 pr-3">Notes</th><th class="py-2 pr-3">Files</th><th class="py-2 pr-3">Status</th><th class="py-2">Actions</th>
+              <th class="py-2 pr-3">Days</th><th class="py-2 pr-3">Notes</th><th class="py-2 pr-3">Files</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Client</th><th class="py-2">Actions</th>
             </tr></thead>
             <tbody>
-              <For each={requests.data ?? []} fallback={<tr><td colSpan={8} class="py-3 text-text-secondary">No requests.</td></tr>}>
+              <For each={requests.data ?? []} fallback={<tr><td colSpan={9} class="py-3 text-text-secondary">No requests.</td></tr>}>
                 {(r) => (
                   <tr class="border-b border-slate-100">
                     <td class="py-2 pr-3">{r.employee_no} — {r.employee_name}</td>
@@ -223,6 +223,7 @@ export default function LeavePage() {
                     <td class="py-2 pr-3">{r.notes || r.reason || "—"}</td>
                     <td class="py-2 pr-3">{r.file_count ?? 0}</td>
                     <td class="py-2 pr-3">{r.status}</td>
+                    <td class="py-2 pr-3">{r.client_decision || "pending"}</td>
                     <td class="py-2">
                       <ActivityHistoryLink module="hr" targetType="hr_leave_request" targetId={r.id} class="mr-2 text-xs" />
                       <Show when={r.status === "submitted"}>

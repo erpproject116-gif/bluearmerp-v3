@@ -8,6 +8,7 @@ import {
   getPortalToken,
   portalFetch,
 } from "../../shared/portal-api";
+import { PortalHrTab } from "./PortalHrTab";
 
 type PortalOrder = {
   id: number;
@@ -35,8 +36,15 @@ type PortalTicket = {
 
 type PortalSite = { site_name: string; client_name: string };
 
-const tabs = ["orders", "invoices", "tickets", "sites"] as const;
+const tabs = ["orders", "invoices", "tickets", "sites", "time", "requests", "evaluations", "incidents", "bills", "documents", "summary", "users", "notices", "activity", "leave"] as const;
 type Tab = (typeof tabs)[number];
+const classic = new Set<Tab>(["orders", "invoices", "tickets", "sites"]);
+const labels: Record<Tab, string> = {
+  orders: "Orders", invoices: "Invoices", tickets: "Tickets", sites: "Sites",
+  time: "Time", requests: "Requests", evaluations: "Evaluations", incidents: "Incidents",
+  bills: "Bills", documents: "Documents", summary: "Summary", users: "Users",
+  notices: "Notices", activity: "Activity", leave: "Leave",
+};
 
 export default function PortalDashboardPage() {
   const navigate = useNavigate();
@@ -53,7 +61,7 @@ export default function PortalDashboardPage() {
   const [list] = createResource(
     () => ({ tab: tab(), ready: session.state === "ready" && !!session() }),
     async ({ tab: active, ready }) => {
-      if (!ready || !token) return { rows: [] as unknown[], total: 0 };
+      if (!ready || !token || !classic.has(active as Tab)) return { rows: [] as unknown[], total: 0 };
       const path =
         active === "orders"
           ? "/api/v1/portal/orders"
@@ -116,7 +124,7 @@ export default function PortalDashboardPage() {
             </p>
           </Show>
 
-          <nav class="mb-6 flex gap-2">
+          <nav class="mb-6 flex flex-wrap gap-2">
             <For each={tabs}>
               {(t) => (
                 <button
@@ -128,21 +136,25 @@ export default function PortalDashboardPage() {
                   }`}
                   onClick={() => setTab(t)}
                 >
-                  {t === "orders" ? "Orders" : t === "invoices" ? "Invoices" : t === "sites" ? "Sites" : "Tickets"}
+                  {labels[t]}
                 </button>
               )}
             </For>
           </nav>
 
-          <Show when={list.loading}>
+          <Show when={!classic.has(tab())}>
+            <PortalHrTab tab={tab()} />
+          </Show>
+
+          <Show when={classic.has(tab()) && list.loading}>
             <LoadingText class="text-sm text-text-secondary" as="p" />
           </Show>
 
-          <Show when={list.error}>
+          <Show when={classic.has(tab()) && list.error}>
             <p class="text-sm text-red-600">{(list.error as Error).message}</p>
           </Show>
 
-          <Show when={!list.loading && !list.error && tab() === "orders"}>
+          <Show when={classic.has(tab()) && !list.loading && !list.error && tab() === "orders"}>
             <div class="overflow-hidden rounded-xl border border-stroke bg-white">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface text-left text-text-secondary">
@@ -169,7 +181,7 @@ export default function PortalDashboardPage() {
             </div>
           </Show>
 
-          <Show when={!list.loading && !list.error && tab() === "invoices"}>
+          <Show when={classic.has(tab()) && !list.loading && !list.error && tab() === "invoices"}>
             <div class="overflow-hidden rounded-xl border border-stroke bg-white">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface text-left text-text-secondary">
@@ -196,7 +208,7 @@ export default function PortalDashboardPage() {
             </div>
           </Show>
 
-          <Show when={!list.loading && !list.error && tab() === "sites"}>
+          <Show when={classic.has(tab()) && !list.loading && !list.error && tab() === "sites"}>
             <div class="overflow-hidden rounded-xl border border-stroke bg-white">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface text-left text-text-secondary">
@@ -219,7 +231,7 @@ export default function PortalDashboardPage() {
             </div>
           </Show>
 
-          <Show when={!list.loading && !list.error && tab() === "tickets"}>
+          <Show when={classic.has(tab()) && !list.loading && !list.error && tab() === "tickets"}>
             <div class="overflow-hidden rounded-xl border border-stroke bg-white">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface text-left text-text-secondary">

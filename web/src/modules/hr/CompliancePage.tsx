@@ -4,7 +4,7 @@ import { inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 
-type Doc = { id: number; employee_name: string; doc_type: string; title: string; expires_on: string; late: boolean };
+type Doc = { id: number; employee_name: string; doc_type: string; title: string; expires_on: string; late: boolean; client_visible?: boolean };
 
 export default function CompliancePage() {
   const toast = useToast();
@@ -18,6 +18,15 @@ export default function CompliancePage() {
       body: JSON.stringify({ expires_on: dates()[row.id] ?? row.expires_on }),
     });
     if (!res.success) return toast.warning(res.message ?? "Could not save the expiry.");
+    void refetch();
+  };
+
+  const showToClient = async (row: Doc) => {
+    const res = await apiFetch(`/api/v1/hr/employee-documents/${row.id}/visibility`, {
+      method: "PATCH",
+      body: JSON.stringify({ client_visible: !row.client_visible }),
+    });
+    if (!res.success) return toast.warning(res.message ?? "Could not update visibility.");
     void refetch();
   };
 
@@ -36,6 +45,9 @@ export default function CompliancePage() {
             </span>
           ) },
           { key: "late", header: "Late", render: (row) => row.late ? "Late" : "" },
+          { key: "client_visible", header: "Client", render: (row) => (
+            <button type="button" class="text-sm text-brand-700" onClick={() => void showToClient(row)}>{row.client_visible ? "Visible" : "Hidden"}</button>
+          ) },
         ]}
         rows={rows() ?? []}
         loading={rows.loading}

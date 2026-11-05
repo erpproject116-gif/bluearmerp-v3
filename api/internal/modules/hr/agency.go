@@ -33,6 +33,8 @@ func registerAgencyRoutes(r chi.Router, pool *pgxpool.Pool) {
 	write := auth.RequirePermission("hr.employees", auth.AccessWrite)
 	r.Get("/job-orders", listJobOrders(pool))
 	r.With(write).Post("/job-orders", createJobOrder(pool))
+	r.Get("/job-postings", listJobPostings(pool))
+	r.With(write).Post("/job-postings", createJobPosting(pool))
 	r.Get("/manpower-requests", listManpowerRequests(pool))
 	r.With(write).Post("/manpower-requests", createManpowerRequest(pool))
 	r.With(write).Patch("/manpower-requests/{id}", patchManpowerRequest(pool))
@@ -48,6 +50,7 @@ func registerAgencyRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.With(write).Post("/clearances/{id}/release", releaseClearance(pool))
 	r.Get("/compliance-documents", listComplianceDocuments(pool))
 	r.With(write).Patch("/employee-documents/{id}/expiry", setDocumentExpiry(pool))
+	r.With(write).Patch("/employee-documents/{id}/visibility", setDocumentVisibility(pool))
 	r.Get("/government-reports/withholding", listWithholdingReport(pool))
 }
 
@@ -659,7 +662,7 @@ func listComplianceDocuments(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		rows, err := pool.Query(r.Context(), `
 			select d.id, d.employee_id, e.full_name, d.doc_type, d.title, coalesce(d.expires_on::text, ''),
-			       (d.expires_on is not null and d.expires_on < current_date)
+			       (d.expires_on is not null and d.expires_on < current_date), d.client_visible
 			from public.hr_employee_documents d
 			join public.hr_employees e on e.id = d.employee_id and e.tenant_id = d.tenant_id
 			where d.tenant_id = $1
@@ -674,14 +677,14 @@ func listComplianceDocuments(pool *pgxpool.Pool) http.HandlerFunc {
 		for rows.Next() {
 			var id, empID int64
 			var name, docType, title, expires string
-			var late bool
-			if err := rows.Scan(&id, &empID, &name, &docType, &title, &expires, &late); err != nil {
+			var late, visible bool
+			if err := rows.Scan(&id, &empID, &name, &docType, &title, &expires, &late, &visible); err != nil {
 				response.Err(w, http.StatusInternalServerError, "Failed to load documents.", "ERR_INTERNAL")
 				return
 			}
 			out = append(out, map[string]any{
 				"id": id, "employee_id": empID, "employee_name": name, "doc_type": docType,
-				"title": title, "expires_on": expires, "late": late,
+				"title": title, "expires_on": expires, "late": late, "client_visible": visible,
 			})
 		}
 		response.OK(w, out, "OK")
@@ -712,6 +715,98 @@ func setDocumentExpiry(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		response.OK(w, map[string]any{"ok": true}, "Updated.")
+	}
+}
+
+func setDocumentVisibility(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		var body struct {
+			ClientVisible bool `json:"client_visible"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Err(w, http.StatusBadRequest, "Invalid JSON.", "ERR_BAD_REQUEST")
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			update public.hr_employee_documents
+			set client_visible = $3, updated_at = now()
+			where id = $1 and tenant_id = $2`, chi.URLParam(r, "id"), tu.TenantID, body.ClientVisible)
+		if err != nil || tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Document not found.", "ERR_NOT_FOUND")
+			return
+		}
+		response.OK(w, map[string]any{"client_visible": body.ClientVisible}, "Updated.")
+	}
+}
+
+func listJobPostings(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select p.id, s.site_name, c.name, p.title, p.headcount, p.status
+			from public.hr_job_postings p
+			join public.hr_client_sites s on s.id = p.site_id and s.tenant_id = p.tenant_id
+			join public.hr_clients c on c.id = s.client_id and c.tenant_id = p.tenant_id
+			where p.tenant_id = $1
+			order by p.id desc limit 200`, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load postings.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		out := []map[string]any{}
+		for rows.Next() {
+			var id int64
+			var site, client, title, status string
+			var head int
+			if err := rows.Scan(&id, &site, &client, &title, &head, &status); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load postings.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, map[string]any{"id": id, "site_name": site, "client_name": client, "title": title, "headcount": head, "status": status})
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+func createJobPosting(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		var body struct {
+			SiteID    int64  `json:"site_id"`
+			Title     string `json:"title"`
+			Headcount int    `json:"headcount"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.SiteID == 0 || strings.TrimSpace(body.Title) == "" || body.Headcount < 1 {
+			response.Validation(w, map[string]string{"title": "Choose a site, a title, and a headcount."})
+			return
+		}
+		if err := requireSite(r, pool, tu.TenantID, body.SiteID); err != nil {
+			writeAgencyErr(w, err)
+			return
+		}
+		var id int64
+		err := pool.QueryRow(r.Context(), `
+			insert into public.hr_job_postings (tenant_id, site_id, title, headcount)
+			values ($1,$2,$3,$4) returning id`, tu.TenantID, body.SiteID, strings.TrimSpace(body.Title), body.Headcount).Scan(&id)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save the posting.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"id": id}, "Created.")
 	}
 }
 

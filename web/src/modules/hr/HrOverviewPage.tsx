@@ -95,7 +95,7 @@ export default function HrOverviewPage() {
         Headcount and open work. Pay amounts stay on Payroll.
       </p>
       <h2 class="mb-2 text-sm font-medium text-text-secondary">Needs attention</h2>
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <For each={attentionCards}>
           {(card) => {
             const value = () => overview.data?.[card.key] ?? 0;
@@ -104,11 +104,12 @@ export default function HrOverviewPage() {
             return (
               <A
                 href={card.href}
-                class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel"
-                classList={{ "border-l-4 border-l-red-600": alert(), "border-l-4 border-l-amber-600": warn() }}
+                class="block rounded-lg border border-stroke bg-surface px-4 py-3.5 shadow-sm transition hover:border-brand-500"
+                classList={{ "border-l-[3px] border-l-red-600": alert(), "border-l-[3px] border-l-amber-600": warn() }}
               >
-                <p class="text-2xl font-semibold" classList={{ "text-slate-300": value() === 0 }}>{overview.data ? value() : "—"}</p>
+                <p class="text-2xl font-bold tabular-nums" classList={{ "text-slate-300": value() === 0, "text-red-700": alert() }}>{overview.data ? value() : "—"}</p>
                 <p class="text-sm text-text-secondary">{card.label}</p>
+                <p class="mt-1.5 text-xs" classList={{ "text-slate-400": value() === 0, "text-brand-700": value() !== 0 }}>Open</p>
               </A>
             );
           }}
@@ -117,12 +118,13 @@ export default function HrOverviewPage() {
       <div class="mt-6 grid gap-6 lg:grid-cols-2">
         <section>
           <h2 class="mb-2 text-sm font-medium text-text-secondary">Workforce</h2>
-          <div class="grid gap-3 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2">
             <For each={workforceCards}>
               {(card) => (
-                <A href={card.href} class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel">
-                  <p class="text-2xl font-semibold" classList={{ "text-slate-300": (overview.data?.[card.key] ?? 0) === 0 }}>{overview.data?.[card.key] ?? "—"}</p>
+                <A href={card.href} class="block rounded-lg border border-stroke bg-surface px-4 py-3.5 shadow-sm transition hover:border-brand-500">
+                  <p class="text-2xl font-bold tabular-nums" classList={{ "text-slate-300": (overview.data?.[card.key] ?? 0) === 0 }}>{overview.data?.[card.key] ?? "—"}</p>
                   <p class="text-sm text-text-secondary">{card.label}</p>
+                  <p class="mt-1.5 text-xs" classList={{ "text-slate-400": (overview.data?.[card.key] ?? 0) === 0, "text-brand-700": (overview.data?.[card.key] ?? 0) !== 0 }}>Open</p>
                 </A>
               )}
             </For>
@@ -130,12 +132,13 @@ export default function HrOverviewPage() {
         </section>
         <section>
           <h2 class="mb-2 text-sm font-medium text-text-secondary">Queues</h2>
-          <div class="grid gap-3 sm:grid-cols-2">
+          <div class="grid gap-4 sm:grid-cols-2">
             <For each={queueCards}>
               {(card) => (
-                <A href={card.href} class="rounded-xl border border-stroke bg-surface p-4 shadow-sm hover:bg-panel">
-                  <p class="text-2xl font-semibold" classList={{ "text-slate-300": (overview.data?.[card.key] ?? 0) === 0 }}>{overview.data?.[card.key] ?? "—"}</p>
+                <A href={card.href} class="block rounded-lg border border-stroke bg-surface px-4 py-3.5 shadow-sm transition hover:border-brand-500">
+                  <p class="text-2xl font-bold tabular-nums" classList={{ "text-slate-300": (overview.data?.[card.key] ?? 0) === 0 }}>{overview.data?.[card.key] ?? "—"}</p>
                   <p class="text-sm text-text-secondary">{card.label}</p>
+                  <p class="mt-1.5 text-xs" classList={{ "text-slate-400": (overview.data?.[card.key] ?? 0) === 0, "text-brand-700": (overview.data?.[card.key] ?? 0) !== 0 }}>Open</p>
                 </A>
               )}
             </For>

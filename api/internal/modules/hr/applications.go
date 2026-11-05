@@ -2,6 +2,9 @@ package hr
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,6 +29,9 @@ var applicationStatuses = map[string]struct{}{
 }
 
 func registerPublicApplyRoutes(r chi.Router, pool *pgxpool.Pool) {
+	r.Get("/hr/apply/{code}/openings", listPublicOpenings(pool))
+	r.Get("/hr/apply/{code}/draft", getPublicDraft(pool))
+	r.Put("/hr/apply/{code}/draft", savePublicDraft(pool))
 	r.Get("/hr/apply/{code}", getPublicApplyForm(pool))
 	r.Post("/hr/apply/{code}", submitPublicApplication(pool))
 }
@@ -98,6 +104,107 @@ func tenantByCompanyCode(ctx context.Context, pool *pgxpool.Pool, code string) (
 		select id from public.tenants
 		where lower(company_code) = lower($1) and status = 'active'`, strings.TrimSpace(code)).Scan(&id)
 	return id, err
+}
+
+func listPublicOpenings(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tenantID, err := tenantByCompanyCode(r.Context(), pool, chi.URLParam(r, "code"))
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Company not found.", "ERR_NOT_FOUND")
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select p.title, s.site_name, p.headcount
+			from public.hr_job_postings p
+			join public.hr_client_sites s on s.id = p.site_id and s.tenant_id = p.tenant_id
+			where p.tenant_id = $1 and p.status = 'open'
+			order by p.id desc`, tenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load openings.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		out := []map[string]any{}
+		for rows.Next() {
+			var title, site string
+			var head int
+			if err := rows.Scan(&title, &site, &head); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load openings.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, map[string]any{"title": title, "site_name": site, "headcount": head})
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+func getPublicDraft(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tenantID, err := tenantByCompanyCode(r.Context(), pool, chi.URLParam(r, "code"))
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Company not found.", "ERR_NOT_FOUND")
+			return
+		}
+		token := strings.TrimSpace(r.URL.Query().Get("token"))
+		if token == "" {
+			response.OK(w, map[string]any{"form": nil}, "OK")
+			return
+		}
+		sum := sha256.Sum256([]byte(token))
+		var form []byte
+		err = pool.QueryRow(r.Context(), `
+			select form_json from public.hr_application_drafts
+			where tenant_id = $1 and token_hash = $2 and expires_at > now()`,
+			tenantID, hex.EncodeToString(sum[:])).Scan(&form)
+		if err != nil {
+			response.OK(w, map[string]any{"form": nil}, "OK")
+			return
+		}
+		response.OK(w, map[string]any{"form": json.RawMessage(form)}, "OK")
+	}
+}
+
+func savePublicDraft(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tenantID, err := tenantByCompanyCode(r.Context(), pool, chi.URLParam(r, "code"))
+		if err != nil {
+			response.Err(w, http.StatusNotFound, "Company not found.", "ERR_NOT_FOUND")
+			return
+		}
+		var body struct {
+			Token string          `json:"token"`
+			Form  json.RawMessage `json:"form"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			response.Err(w, http.StatusBadRequest, "Invalid JSON.", "ERR_BAD_REQUEST")
+			return
+		}
+		token := strings.TrimSpace(body.Token)
+		if token == "" {
+			buf := make([]byte, 16)
+			if _, err := rand.Read(buf); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to save the draft.", "ERR_INTERNAL")
+				return
+			}
+			token = hex.EncodeToString(buf)
+		}
+		form := body.Form
+		if len(form) == 0 {
+			form = []byte("{}")
+		}
+		sum := sha256.Sum256([]byte(token))
+		_, err = pool.Exec(r.Context(), `
+			insert into public.hr_application_drafts (tenant_id, token_hash, form_json, expires_at)
+			values ($1, $2, $3, now() + interval '30 days')
+			on conflict (tenant_id, token_hash) do update
+			set form_json = excluded.form_json, expires_at = excluded.expires_at`,
+			tenantID, hex.EncodeToString(sum[:]), form)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to save the draft.", "ERR_INTERNAL")
+			return
+		}
+		response.OK(w, map[string]any{"token": token}, "Saved.")
+	}
 }
 
 func getPublicApplyForm(pool *pgxpool.Pool) http.HandlerFunc {

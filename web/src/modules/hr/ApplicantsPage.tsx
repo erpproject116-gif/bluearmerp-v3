@@ -134,7 +134,7 @@ export default function ApplicantsPage() {
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <Show when={mode() === "board"}>
-            <div class="flex rounded-lg border border-stroke">
+            <div class="hr-seg flex overflow-hidden rounded-lg border border-stroke">
               <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "horizontal", "text-text-secondary": axis() !== "horizontal" }} onClick={() => chooseAxis("horizontal")}>Columns</button>
               <button type="button" class="px-3 py-1.5 text-sm" classList={{ "bg-brand-600 text-white": axis() === "vertical", "text-text-secondary": axis() !== "vertical" }} onClick={() => chooseAxis("vertical")}>Rows</button>
             </div>

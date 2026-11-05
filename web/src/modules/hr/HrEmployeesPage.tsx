@@ -536,11 +536,12 @@ export default function HrEmployeesPage() {
 
   return (
     <HrLayout>
-      <div class="mb-4">
-        <h1 class="text-2xl font-semibold">Employees</h1>
-        <p class="mt-1 text-sm text-text-secondary">People on the payroll. Import, export, and new employee stay on this page.</p>
-      </div>
-      <div class="mb-3 flex flex-wrap gap-2">
+      <div class="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-semibold">Employees</h1>
+          <p class="mt-1 text-sm text-text-secondary">People on the payroll. Import, export, and new employee stay on this page.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
           class="rounded-lg border border-stroke px-3 py-1.5 text-sm text-text-secondary hover:erp-panel"
@@ -578,6 +579,7 @@ export default function HrEmployeesPage() {
         >
           Export CSV
         </button>
+        </div>
       </div>
       <SpreadsheetGrid
         columns={[

@@ -23,6 +23,7 @@ func RegisterRoutes(r chi.Router, pool *pgxpool.Pool, supabaseURL, jwtSecret str
 			cr.Get("/tickets", listPortalTickets(pool))
 			cr.Get("/sites", listPortalSites(pool))
 			cr.Get("/vendor/purchase-orders", listVendorPurchaseOrders(pool))
+			registerPortalHRRoutes(cr, pool)
 		})
 
 		pr.Group(func(ar chi.Router) {
