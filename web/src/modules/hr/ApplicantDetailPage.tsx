@@ -3,7 +3,7 @@ import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, HrTcard, HrWizardNav } from "./HrUi";
 
 type Child = { child_name: string; birth_date?: string | null };
 type Job = { company_name: string; position: string; started_on?: string | null; ended_on?: string | null };
@@ -196,11 +196,11 @@ export default function ApplicantDetailPage() {
                 <Show when={step() === 1}>
                   <div class="space-y-3">
                     <p class="text-sm text-text-secondary">Sets status to Initial interview. Scheduling fields are not stored yet.</p>
-                    <label class="block text-sm font-medium">Interview date & time <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Interview date & time</label>
                     <input type="datetime-local" class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled />
-                    <label class="block text-sm font-medium">Interviewer <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Interviewer</label>
                     <input class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled placeholder="—" />
-                    <label class="block text-sm font-medium">Mode <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Mode</label>
                     <select class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled>
                       <option>On-site</option>
                       <option>Video</option>
@@ -211,9 +211,9 @@ export default function ApplicantDetailPage() {
                 <Show when={step() === 2}>
                   <div class="space-y-3">
                     <p class="text-sm text-text-secondary">Sets status to Exam. Score fields are not stored yet.</p>
-                    <label class="block text-sm font-medium">Exam score (0–100) <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Exam score (0–100)</label>
                     <input type="number" class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled />
-                    <label class="block text-sm font-medium">Remarks <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Remarks</label>
                     <textarea class="w-full max-w-lg rounded border border-stroke px-2 py-1.5" rows={3} disabled />
                   </div>
                 </Show>
@@ -221,13 +221,13 @@ export default function ApplicantDetailPage() {
                 <Show when={step() === 3}>
                   <div class="space-y-3">
                     <p class="text-sm text-text-secondary">Sets status to Final interview.</p>
-                    <label class="block text-sm font-medium">Result <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Result</label>
                     <select class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled>
                       <option>Passed</option>
                       <option>Failed</option>
                       <option>On hold</option>
                     </select>
-                    <label class="block text-sm font-medium">Interviewer notes <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Interviewer notes</label>
                     <textarea class="w-full max-w-lg rounded border border-stroke px-2 py-1.5" rows={3} disabled />
                   </div>
                 </Show>
@@ -235,9 +235,9 @@ export default function ApplicantDetailPage() {
                 <Show when={step() === 4}>
                   <div class="space-y-3">
                     <p class="text-sm text-text-secondary">Sets status to Hired. This does not create an employee record.</p>
-                    <label class="block text-sm font-medium">Start date <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Start date</label>
                     <input type="date" class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled />
-                    <label class="block text-sm font-medium">Assign to site <HrPlanned /></label>
+                    <label class="block text-sm font-medium">Assign to site</label>
                     <input class="w-full max-w-sm rounded border border-stroke px-2 py-1.5" disabled placeholder="Use Deployments after the employee exists" />
                     <HrNotice>Hired status updates the application only. Create the employee from Employees or Hire onboarding.</HrNotice>
                   </div>
@@ -252,7 +252,7 @@ export default function ApplicantDetailPage() {
 
                 <Show when={step() === 6}>
                   <div class="space-y-3">
-                    <p class="text-sm font-medium">Create employee <HrPlanned /></p>
+                    <p class="text-sm font-medium">Create employee</p>
                     <HrNotice>
                       Creating an employee from this application is not enabled. Open Employees to add the person, or Hire onboarding for checklist work.
                     </HrNotice>

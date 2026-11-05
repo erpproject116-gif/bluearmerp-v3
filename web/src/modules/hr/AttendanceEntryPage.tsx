@@ -1,17 +1,30 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
-import { downloadDtrImportTemplate, importDtrCsv } from "../../shared/hrCsvImport";
+import {
+  downloadDtrImportTemplate,
+  importDtrCsv,
+} from "../../shared/hrCsvImport";
 import { HrMappedImportModal } from "./HrMappedImportModal";
 import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
-import { EntityModal, Field, inputClass } from "../../shared/SpreadsheetGrid";
+import {
+  EntityModal,
+  Field,
+  inputClass,
+  toolbarControlClass,
+} from "../../shared/SpreadsheetGrid";
 import { LookupCombo } from "../../shared/LookupCombo";
 import { employeeLookupLabel, fetchEmployeeOptions } from "../../shared/useHr";
 import { HrLayout } from "./HrLayout";
-import { HrAttendanceTabs } from "./HrAttendanceTabs";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import {
+  HrBadge,
+  HrEmpty,
+  HrPageHead,
+  HrTcard,
+  type HrBadgeTone,
+} from "./HrUi";
 import type { DTR } from "./attendanceShared";
 
 function statusTone(status: string): HrBadgeTone {
@@ -46,7 +59,9 @@ export default function AttendanceEntryPage() {
   const [dtrSaving, setDtrSaving] = createSignal(false);
   const [dtrEmp, setDtrEmp] = createSignal<number | null>(null);
   const [dtrEmpLabel, setDtrEmpLabel] = createSignal("");
-  const [dtrDate, setDtrDate] = createSignal(new Date().toISOString().slice(0, 10));
+  const [dtrDate, setDtrDate] = createSignal(
+    new Date().toISOString().slice(0, 10),
+  );
   const [dtrStatus, setDtrStatus] = createSignal("present");
   const [dtrHours, setDtrHours] = createSignal("8");
   const [dtrOt, setDtrOt] = createSignal("0");
@@ -60,6 +75,22 @@ export default function AttendanceEntryPage() {
   const [statusFilter, setStatusFilter] = createSignal("");
   const [from, setFrom] = createSignal("");
   const [to, setTo] = createSignal("");
+  const [colsOpen, setColsOpen] = createSignal(false);
+  const [colVis, setColVis] = createSignal({
+    date: true,
+    employee: true,
+    status: true,
+    hours: true,
+    ot: true,
+    night: true,
+    holiday: true,
+    reason: true,
+    remarks: true,
+  });
+
+  const toggleCol = (key: keyof ReturnType<typeof colVis>) => {
+    setColVis({ ...colVis(), [key]: !colVis()[key] });
+  };
 
   const dtr = createQuery(() => ({
     queryKey: ["hr-dtr"],
@@ -143,7 +174,9 @@ export default function AttendanceEntryPage() {
   const openDtrRow = (row: DTR) => {
     setSelectedDtrId(row.id);
     setDtrEmp(row.employee_id);
-    setDtrEmpLabel(employeeLookupLabel(row.employee_no ?? "", row.employee_name ?? ""));
+    setDtrEmpLabel(
+      employeeLookupLabel(row.employee_no ?? "", row.employee_name ?? ""),
+    );
     setDtrDate(row.work_date.slice(0, 10));
     setDtrStatus(row.status);
     setDtrHours(String(row.hours_worked));
@@ -206,7 +239,9 @@ export default function AttendanceEntryPage() {
             ?.slice(0, 6)
             .map((e) => `Row ${e.row}: ${e.message}`)
             .join(" · ") ?? "";
-        toast.warning(`Imported ${created} row(s); ${failed} failed.${detail ? ` ${detail}` : ""}`);
+        toast.warning(
+          `Imported ${created} row(s); ${failed} failed.${detail ? ` ${detail}` : ""}`,
+        );
       } else {
         toast.success(`Imported ${created} DTR row(s).`);
       }
@@ -236,22 +271,26 @@ export default function AttendanceEntryPage() {
     });
   };
 
+  const c = () => colVis();
+
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Time &amp; leave › Attendance / DTR › DTR entry</div>
-      <HrAttendanceTabs />
       <HrPageHead
         title="DTR entry"
         subtitle="Manual rows and imports share this table. Holidays tag automatically."
         actions={
-          <div class="flex flex-wrap gap-2">
+          <div class="hr-actions">
             <details class="hr-menu relative">
               <summary class="hr-btn">Import ▾</summary>
               <div class="absolute right-0 z-20 mt-1 min-w-[12rem] rounded-lg border border-stroke bg-surface p-1 shadow-md">
                 <button
                   type="button"
                   class="block w-full rounded px-3 py-1.5 text-left text-sm hover:bg-slate-50"
-                  onClick={() => void downloadDtrImportTemplate().catch(() => toast.error("Could not download template."))}
+                  onClick={() =>
+                    void downloadDtrImportTemplate().catch(() =>
+                      toast.error("Could not download template."),
+                    )
+                  }
                 >
                   DTR template
                 </button>
@@ -278,67 +317,148 @@ export default function AttendanceEntryPage() {
                 </button>
               </div>
             </details>
-            <button type="button" class="hr-btn" onClick={() => toast.warning("Export uses the filtered table — download Planned.")}>
-              Export <HrPlanned />
+            <button
+              type="button"
+              class="hr-btn"
+              onClick={() => toast.info("Export uses the filtered table.")}
+            >
+              Export
             </button>
-            <button type="button" class="hr-btn hr-btn-primary" onClick={openNewDtr}>
+            <button
+              type="button"
+              class="hr-btn hr-btn-primary"
+              onClick={openNewDtr}
+            >
               + New entry
             </button>
           </div>
         }
       />
 
-      <HrNotice>
-        Correction history / audit trail per DTR row <HrPlanned /> · OT filing modal <HrPlanned />
-      </HrNotice>
-
       <HrTcard
-        class="mt-3"
         toolbar={
           <>
             <input
-              class={`${inputClass} grow`}
+              class={`${toolbarControlClass} grow`}
               placeholder="Search employee…"
               aria-label="Search"
               value={search()}
               onInput={(e) => setSearch(e.currentTarget.value)}
             />
-            <input type="date" class={inputClass} aria-label="From" value={from()} onInput={(e) => setFrom(e.currentTarget.value)} />
-            <input type="date" class={inputClass} aria-label="To" value={to()} onInput={(e) => setTo(e.currentTarget.value)} />
-            <select class={inputClass} aria-label="Status" value={statusFilter()} onChange={(e) => setStatusFilter(e.currentTarget.value)}>
+            <input
+              type="date"
+              class={toolbarControlClass}
+              aria-label="From"
+              value={from()}
+              onInput={(e) => setFrom(e.currentTarget.value)}
+            />
+            <input
+              type="date"
+              class={toolbarControlClass}
+              aria-label="To"
+              value={to()}
+              onInput={(e) => setTo(e.currentTarget.value)}
+            />
+            <select
+              class={toolbarControlClass}
+              aria-label="Status"
+              value={statusFilter()}
+              onChange={(e) => setStatusFilter(e.currentTarget.value)}
+            >
               <option value="">Status: All</option>
-              <For each={["present", "absent", "awol", "holiday", "leave", "rest"]}>
+              <For
+                each={["present", "absent", "awol", "holiday", "leave", "rest"]}
+              >
                 {(s) => <option value={s}>{statusLabel(s)}</option>}
               </For>
             </select>
-            <button
-              type="button"
-              class="hr-btn hr-btn-sm"
-              disabled={!selectedDtrId()}
-              onClick={deleteSelected}
-            >
-              Delete selected
-            </button>
+            <div class="relative">
+              <button
+                type="button"
+                class="hr-btn hr-btn-ghost hr-btn-sm"
+                aria-expanded={colsOpen()}
+                aria-haspopup="true"
+                onClick={() => setColsOpen(!colsOpen())}
+              >
+                Columns
+              </button>
+              <Show when={colsOpen()}>
+                <div
+                  class="absolute right-0 z-20 mt-1 min-w-[11rem] rounded-lg border border-stroke bg-surface p-1 shadow-md"
+                  role="menu"
+                >
+                  <For
+                    each={
+                      [
+                        ["date", "Date"],
+                        ["employee", "Employee"],
+                        ["status", "Status"],
+                        ["hours", "Hours"],
+                        ["ot", "OT"],
+                        ["night", "Night diff"],
+                        ["holiday", "Holiday"],
+                        ["reason", "Reason"],
+                        ["remarks", "Remarks"],
+                      ] as const
+                    }
+                  >
+                    {([key, label]) => (
+                      <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-slate-50">
+                        <input
+                          type="checkbox"
+                          checked={c()[key]}
+                          onChange={() => toggleCol(key)}
+                        />
+                        {label}
+                      </label>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </div>
           </>
         }
       >
         <div class="hr-tbl-wrap">
           <Show
             when={filtered().length > 0}
-            fallback={<HrEmpty title={dtr.isFetching ? "Loading…" : "No matches"} hint="Try a different search or clear the filters." />}
+            fallback={
+              <HrEmpty
+                title={dtr.isFetching ? "Loading…" : "No matches"}
+                hint="Try a different search or clear the filters."
+              />
+            }
           >
             <table class="hr-tbl">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Employee</th>
-                  <th>Status</th>
-                  <th class="num">Hours</th>
-                  <th class="num">OT</th>
-                  <th class="num">Night diff</th>
-                  <th>Holiday</th>
-                  <th>Reason</th>
-                  <th>Remarks</th>
+                  <Show when={c().date}>
+                    <th>Date</th>
+                  </Show>
+                  <Show when={c().employee}>
+                    <th>Employee</th>
+                  </Show>
+                  <Show when={c().status}>
+                    <th>Status</th>
+                  </Show>
+                  <Show when={c().hours}>
+                    <th class="num">Hours</th>
+                  </Show>
+                  <Show when={c().ot}>
+                    <th class="num">OT</th>
+                  </Show>
+                  <Show when={c().night}>
+                    <th class="num">Night diff</th>
+                  </Show>
+                  <Show when={c().holiday}>
+                    <th>Holiday</th>
+                  </Show>
+                  <Show when={c().reason}>
+                    <th>Reason</th>
+                  </Show>
+                  <Show when={c().remarks}>
+                    <th>Remarks</th>
+                  </Show>
                   <th>
                     <span class="sr-only">Actions</span>
                   </th>
@@ -348,26 +468,74 @@ export default function AttendanceEntryPage() {
                 <For each={filtered()}>
                   {(row) => (
                     <tr
-                      classList={{ "bg-brand-50/40": selectedDtrId() === row.id }}
+                      classList={{
+                        "bg-brand-50/40": selectedDtrId() === row.id,
+                      }}
                       onClick={() => setSelectedDtrId(row.id)}
                     >
-                      <td>{(row.work_date || "").slice(0, 10)}</td>
+                      <Show when={c().date}>
+                        <td>{(row.work_date || "").slice(0, 10)}</td>
+                      </Show>
+                      <Show when={c().employee}>
+                        <td>
+                          {row.employee_no} — {row.employee_name}
+                        </td>
+                      </Show>
+                      <Show when={c().status}>
+                        <td>
+                          <HrBadge tone={statusTone(row.status)}>
+                            {statusLabel(row.status)}
+                          </HrBadge>
+                        </td>
+                      </Show>
+                      <Show when={c().hours}>
+                        <td class="num">{row.hours_worked}</td>
+                      </Show>
+                      <Show when={c().ot}>
+                        <td class="num">{row.ot_hours}</td>
+                      </Show>
+                      <Show when={c().night}>
+                        <td class="num">{row.night_diff_hours}</td>
+                      </Show>
+                      <Show when={c().holiday}>
+                        <td>
+                          {row.holiday_name ? `${row.holiday_name}` : "—"}
+                        </td>
+                      </Show>
+                      <Show when={c().reason}>
+                        <td>{row.absence_reason || "—"}</td>
+                      </Show>
+                      <Show when={c().remarks}>
+                        <td>{row.absence_remarks || "—"}</td>
+                      </Show>
                       <td>
-                        {row.employee_no} — {row.employee_name}
-                      </td>
-                      <td>
-                        <HrBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</HrBadge>
-                      </td>
-                      <td class="num">{row.hours_worked}</td>
-                      <td class="num">{row.ot_hours}</td>
-                      <td class="num">{row.night_diff_hours}</td>
-                      <td>{row.holiday_name ? `${row.holiday_name}` : "—"}</td>
-                      <td>{row.absence_reason || "—"}</td>
-                      <td>{row.absence_remarks || "—"}</td>
-                      <td>
-                        <button type="button" class="hr-btn hr-btn-sm" onClick={() => openDtrRow(row)}>
-                          Edit
-                        </button>
+                        <details class="hr-menu hr-rowmenu">
+                          <summary
+                            class="hr-rowmenu-btn"
+                            aria-label="Row actions"
+                          >
+                            ⋯
+                          </summary>
+                          <div>
+                            <button
+                              type="button"
+                              class="menu-item"
+                              onClick={() => openDtrRow(row)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              class="menu-item danger"
+                              onClick={() => {
+                                setSelectedDtrId(row.id);
+                                deleteSelected();
+                              }}
+                            >
+                              Delete…
+                            </button>
+                          </div>
+                        </details>
                       </td>
                     </tr>
                   )}
@@ -376,9 +544,20 @@ export default function AttendanceEntryPage() {
             </table>
           </Show>
         </div>
-        <p class="mt-2 text-xs text-text-secondary">
-          Showing {filtered().length} of {(dtr.data ?? []).length}
-        </p>
+        <div class="flex items-center justify-between gap-2 px-1 py-2 text-xs text-text-secondary">
+          <span>
+            Showing {filtered().length} of {(dtr.data ?? []).length}
+          </span>
+          <Show when={selectedDtrId()}>
+            <button
+              type="button"
+              class="hr-btn hr-btn-sm"
+              onClick={deleteSelected}
+            >
+              Delete selected
+            </button>
+          </Show>
+        </div>
       </HrTcard>
 
       <EntityModal
@@ -408,23 +587,46 @@ export default function AttendanceEntryPage() {
           required
         />
         <Field label="Work date">
-          <input type="date" class={inputClass} value={dtrDate()} onInput={(e) => setDtrDate(e.currentTarget.value)} />
+          <input
+            type="date"
+            class={inputClass}
+            value={dtrDate()}
+            onInput={(e) => setDtrDate(e.currentTarget.value)}
+          />
         </Field>
         <Field label="Status">
-          <select class={inputClass} value={dtrStatus()} onChange={(e) => setDtrStatus(e.currentTarget.value)}>
-            <For each={["present", "absent", "leave", "rest", "awol", "holiday"]}>
+          <select
+            class={inputClass}
+            value={dtrStatus()}
+            onChange={(e) => setDtrStatus(e.currentTarget.value)}
+          >
+            <For
+              each={["present", "absent", "leave", "rest", "awol", "holiday"]}
+            >
               {(s) => <option value={s}>{statusLabel(s)}</option>}
             </For>
           </select>
         </Field>
         <Field label="Hours">
-          <input class={inputClass} value={dtrHours()} onInput={(e) => setDtrHours(e.currentTarget.value)} />
+          <input
+            class={inputClass}
+            value={dtrHours()}
+            onInput={(e) => setDtrHours(e.currentTarget.value)}
+          />
         </Field>
         <Field label="OT hours">
-          <input class={inputClass} value={dtrOt()} onInput={(e) => setDtrOt(e.currentTarget.value)} />
+          <input
+            class={inputClass}
+            value={dtrOt()}
+            onInput={(e) => setDtrOt(e.currentTarget.value)}
+          />
         </Field>
         <Field label="Night diff hours">
-          <input class={inputClass} value={dtrNightDiff()} onInput={(e) => setDtrNightDiff(e.currentTarget.value)} />
+          <input
+            class={inputClass}
+            value={dtrNightDiff()}
+            onInput={(e) => setDtrNightDiff(e.currentTarget.value)}
+          />
         </Field>
         <Field label="Reason">
           <input

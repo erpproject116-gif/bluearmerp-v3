@@ -155,7 +155,6 @@ export default function RemittancesPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Payroll › Remittances</div>
       <HrPayrollTabs />
       <HrPageHead
         title="Remittances"

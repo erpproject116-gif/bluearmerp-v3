@@ -18,7 +18,7 @@ import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrPayrollTabs } from "./HrPayrollTabs";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
 import type { Cutoff } from "./attendanceShared";
 import { formatAmount, formatPeso } from "../../shared/money";
 
@@ -196,7 +196,6 @@ export default function PayrollRunsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Payroll › Payroll runs</div>
       <HrPayrollTabs />
       <HrPageHead
         title="Payroll runs"
@@ -222,7 +221,7 @@ export default function PayrollRunsPage() {
       />
 
       <HrNotice>
-        Payroll by client / pay group <HrPlanned /> — today one run covers the company.
+        Payroll by client / pay group — today one run covers the company.
       </HrNotice>
 
       <Show when={runOpen()}>
@@ -253,9 +252,9 @@ export default function PayrollRunsPage() {
                 <Field label="Group">
                   <select class={inputClass} disabled>
                     <option>All employees</option>
-                    <option disabled>By client (Planned)</option>
+                    <option disabled>By client</option>
                   </select>
-                  <p class="mt-1 text-xs text-text-secondary">By-client run group <HrPlanned /></p>
+                  <p class="mt-1 text-xs text-text-secondary">By-client run group</p>
                 </Field>
                 <Field label="Period start"><input type="date" class={inputClass} value={periodStart()} onInput={(e) => setPeriodStart(e.currentTarget.value)} /></Field>
                 <Field label="Period end"><input type="date" class={inputClass} value={periodEnd()} onInput={(e) => setPeriodEnd(e.currentTarget.value)} /></Field>
@@ -274,7 +273,7 @@ export default function PayrollRunsPage() {
               </p>
               <label class="mt-3 flex items-start gap-2 text-sm">
                 <input type="checkbox" disabled />
-                <span>Proceed without excluded client branches <HrPlanned /></span>
+                <span>Proceed without excluded client branches</span>
               </label>
             </Show>
 
@@ -319,7 +318,7 @@ export default function PayrollRunsPage() {
             </Show>
 
             <Show when={wizStep() === 3}>
-              <HrNotice>Exception review actions (defer loan, hold pay, OT approve) are <HrPlanned />. Continue after you have reviewed the compute preview.</HrNotice>
+              <HrNotice>Continue after you have reviewed the compute preview.</HrNotice>
             </Show>
 
             <Show when={wizStep() === 4}>
@@ -345,7 +344,7 @@ export default function PayrollRunsPage() {
               <Field label="Bank format">
                 <select class={inputClass} value="generic_csv">
                   <option value="generic_csv">Bank CSV (generic)</option>
-                  <option value="other" disabled>Other bank layouts (Planned)</option>
+                  <option value="other" disabled>Other bank layouts</option>
                 </select>
               </Field>
               <button
@@ -673,8 +672,7 @@ function ClientPayrollReport(props: { periods: PayPeriod[] }) {
         <h3>By client</h3>
       </header>
       <p class="px-3 text-sm text-text-secondary">
-        Posted payslip totals grouped by assignment. This does not create another payroll run. Bank file + by-client groups as separate runs{" "}
-        <HrPlanned />.
+        Posted payslip totals grouped by assignment. This does not create another payroll run. Bank file + by-client groups as separate runs{" "}.
       </p>
       <div class="p-3">
         <select class={inputClass + " mb-3 w-full max-w-sm"} value={periodId()} onChange={(e) => setPeriodId(e.currentTarget.value)}>

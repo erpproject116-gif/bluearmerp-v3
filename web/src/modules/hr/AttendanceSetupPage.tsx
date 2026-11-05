@@ -6,8 +6,7 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
-import { HrAttendanceTabs } from "./HrAttendanceTabs";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
 import type { Cutoff, Holiday } from "./attendanceShared";
 
 function holidayTone(type: string): HrBadgeTone {
@@ -132,8 +131,6 @@ export default function AttendanceSetupPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Time &amp; leave › Attendance / DTR › Setup</div>
-      <HrAttendanceTabs />
       <HrPageHead title="Attendance setup" subtitle="Holidays and pay cut-offs used by DTR and payroll." />
 
       <Show when={missingQuincenaHint()}>
@@ -291,7 +288,7 @@ export default function AttendanceSetupPage() {
 
       <section class="mt-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-1 text-lg font-medium">
-          Per-client cut-off calendar <HrPlanned />
+          Per-client cut-off calendar
         </h2>
         <p class="mb-3 text-sm text-text-secondary">
           Each client can have its own DTR submission due date per cut-off.

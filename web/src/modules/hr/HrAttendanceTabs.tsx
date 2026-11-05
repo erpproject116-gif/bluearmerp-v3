@@ -1,31 +1,26 @@
 import { A, useLocation } from "@solidjs/router";
-import { For, Show } from "solid-js";
-import { HrPlanned } from "./HrUi";
+import { For } from "solid-js";
 
 const TABS = [
   {
     href: "/app/hr/attendance/overview",
     label: "Overview",
     match: (p: string) => p.includes("/attendance/overview") || p.includes("/attendance/employees/"),
-    planned: false,
   },
   {
     href: "/app/hr/attendance/entry",
     label: "DTR entry",
     match: (p: string) => p.includes("/attendance/entry"),
-    planned: false,
   },
   {
     href: "/app/hr/attendance/client-dtr",
-    label: "Client DTR inbox",
+    label: "Client DTR",
     match: (p: string) => p.includes("/attendance/client-dtr"),
-    planned: true,
   },
   {
     href: "/app/hr/attendance/setup",
     label: "Setup",
     match: (p: string) => p.includes("/attendance/setup"),
-    planned: false,
   },
 ] as const;
 
@@ -38,16 +33,9 @@ export function HrAttendanceTabs() {
         {(tab) => (
           <A href={tab.href} classList={{ on: tab.match(path()) }} aria-current={tab.match(path()) ? "page" : undefined}>
             {tab.label}
-            <Show when={tab.planned}>
-              {" "}
-              <HrPlanned />
-            </Show>
           </A>
         )}
       </For>
-      <span class="hr-ptabs-planned" title="Mockup gallery of DTR layouts">
-        DTR designs (6) <HrPlanned />
-      </span>
     </nav>
   );
 }

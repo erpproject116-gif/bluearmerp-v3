@@ -165,7 +165,6 @@ export default function CompanyRecordsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Policies &amp; notices</div>
       <HrPageHead
         title="Policies &amp; notices"
         subtitle="These records do not change pay."

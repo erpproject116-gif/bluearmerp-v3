@@ -4,7 +4,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { formatAmount } from "../../shared/money";
 import { useToast } from "../../shared/toast";
-import { HrBadge, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { HrLayout } from "./HrLayout";
 import { useManpowerMode } from "./manpowerMode";
 
@@ -556,7 +556,7 @@ export default function HrOverviewPage() {
                   <button type="button" class="menu-item" onClick={() => window.print()}>Print / Save as PDF</button>
                   <button type="button" class="menu-item" onClick={exportCounts}>KPIs as CSV</button>
                   <button type="button" class="menu-item" disabled title="Needs backend">
-                    Schedule e-mail digest <HrPlanned />
+                    Schedule e-mail digest
                   </button>
                 </div>
               </details>
@@ -602,19 +602,19 @@ export default function HrOverviewPage() {
             </A>
             <A href="/app/hr/manpower-requests" class="hr-kpi" title="Open Fill rate">
               <div class="v">—</div>
-              <div class="l">Fill rate <HrPlanned /></div>
+              <div class="l">Fill rate</div>
               <div class="h">needs filled ÷ requested history</div>
             </A>
             <A href="/app/hr/manpower-requests" class="hr-kpi" title="Open Time-to-deploy">
               <div class="v">—</div>
-              <div class="l">Time-to-deploy <HrPlanned /></div>
+              <div class="l">Time-to-deploy</div>
               <div class="h">request → first day</div>
             </A>
           </Show>
 
           <A href="/app/hr/reports" class="hr-kpi" title="Open Turnover">
             <div class="v">—</div>
-            <div class="l">Turnover (monthly) <HrPlanned /></div>
+            <div class="l">Turnover (monthly)</div>
             <div class="h">needs hire / separation series</div>
           </A>
 
@@ -632,7 +632,7 @@ export default function HrOverviewPage() {
 
           <A href="/app/hr/employees" class="hr-kpi warn" title="Contracts ending">
             <div class="v">—</div>
-            <div class="l">Contracts ending ≤30d <HrPlanned /></div>
+            <div class="l">Contracts ending ≤30d</div>
             <div class="h">needs contract end dates</div>
           </A>
 
@@ -671,7 +671,7 @@ export default function HrOverviewPage() {
             </A>
             <A href="/app/hr/client-billing" class="hr-kpi" title="Margin per client">
               <div class="v">—</div>
-              <div class="l">Margin per client <HrPlanned /></div>
+              <div class="l">Margin per client</div>
               <div class="h">needs billing + payroll cost</div>
             </A>
           </Show>
@@ -777,14 +777,14 @@ export default function HrOverviewPage() {
                 <li>
                   <span class="dot" aria-hidden="true">🎂</span>
                   <span class="grow">
-                    <b>Birthdays this week <HrPlanned /></b>
+                    <b>Birthdays this week</b>
                     <span class="xs" style={{ display: "block" }}>Needs employee birth dates</span>
                   </span>
                 </li>
                 <li>
                   <span class="dot" aria-hidden="true">🎉</span>
                   <span class="grow">
-                    <b>Work anniversaries <HrPlanned /></b>
+                    <b>Work anniversaries</b>
                     <span class="xs" style={{ display: "block" }}>Needs hire-date series</span>
                   </span>
                 </li>
@@ -872,7 +872,6 @@ export default function HrOverviewPage() {
               <header>
                 <h3>Headcount trend · 12 months</h3>
                 <span class="grow" />
-                <HrPlanned />
               </header>
               <div class="hr-wempty">
                 Needs a 12-month headcount / deployed series from the API.
@@ -960,7 +959,6 @@ export default function HrOverviewPage() {
               <header>
                 <h3>Attendance today</h3>
                 <span class="grow" />
-                <HrPlanned />
               </header>
               <div class="hr-stack" role="img" aria-label="Attendance today (planned)">
                 <i style={{ width: "100%", background: "#e2e8f0" }} title="No live attendance rollup yet" />
@@ -1065,8 +1063,8 @@ export default function HrOverviewPage() {
               </div>
               <div class="hr-legend">
                 <span><i style={{ background: "#10B981" }} />Billed {formatAmount(billTotal())}</span>
-                <span><i style={{ background: "#F59E0B" }} />Aging <HrPlanned /></span>
-                <span><i style={{ background: "#EF4444" }} />Overdue <HrPlanned /></span>
+                <span><i style={{ background: "#F59E0B" }} />Aging</span>
+                <span><i style={{ background: "#EF4444" }} />Overdue</span>
               </div>
               <div class="overflow-x-auto mt-2">
                 <table class="hr-tbl">
@@ -1087,14 +1085,14 @@ export default function HrOverviewPage() {
                           <td class="num">{formatAmount(row.total)}</td>
                           <td class="num">—</td>
                           <td class="num">—</td>
-                          <td><HrPlanned /></td>
+                          <td></td>
                         </tr>
                       )}
                     </For>
                   </tbody>
                 </table>
               </div>
-              <p class="hr-muted mt-2">Margin per client = billing − payroll cost − statutory share. Needs backend join — shown as Planned. Billed amounts are charges, not collections or worker pay.</p>
+              <p class="hr-muted mt-2">Margin per client = billing − payroll cost − statutory share. Needs a backend join. Billed amounts are charges, not collections or worker pay.</p>
             </section>
           </Show>
 
@@ -1179,7 +1177,6 @@ export default function HrOverviewPage() {
               <header>
                 <h3>Recent activity</h3>
                 <span class="grow" />
-                <HrPlanned />
               </header>
               <ul class="hr-feed">
                 <li>

@@ -13,8 +13,7 @@ export default function ApplicantsSettingsPage() {
     <div class="space-y-4">
       <HrNotice>
         Visible labels, required flags, and custom fields here drive the public application form at{" "}
-        <code class="text-xs">/apply/&lt;company_code&gt;</code>. File-type custom fields on the public form are
-        Planned.
+        <code class="text-xs">/apply/&lt;company_code&gt;</code>.
         <Show when={code()}>
           <span class="mt-2 flex flex-wrap gap-3">
             <A

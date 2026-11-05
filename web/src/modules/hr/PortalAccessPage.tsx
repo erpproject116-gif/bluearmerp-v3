@@ -2,9 +2,8 @@ import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
-import { ClientsDeploymentTabs } from "./ClientsDeploymentTabs";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrNotice, HrPageHead, HrPlanned } from "./HrUi";
+import { HrBadge, HrNotice, HrPageHead } from "./HrUi";
 
 type Client = { id: number; name: string };
 type Access = { id: number; client_name: string; email: string; display_name: string; is_active: boolean; login_url: string };
@@ -52,13 +51,10 @@ export default function PortalAccessPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Clients &amp; deployment › Clients › Portal access</div>
-      <ClientsDeploymentTabs />
-
       <HrPageHead
         title={
           <>
-            Portal access <HrPlanned />
+            Portal access
           </>
         }
         subtitle="This login opens the customer portal. It does not open HR pages, and it does not show pay."
@@ -69,10 +65,6 @@ export default function PortalAccessPage() {
         }
       />
 
-      <HrNotice>
-        🧩 <b>Planned page</b> inside HR &amp; Payroll. Live today: invite client portal users and open their sign-in link.
-        Role scopes per branch and revoke/resend flows need more backend.
-      </HrNotice>
 
       <SpreadsheetGrid
         columns={[
@@ -85,7 +77,7 @@ export default function PortalAccessPage() {
             sortable: false,
             render: () => (
               <span class="hr-muted">
-                Client Rep <HrPlanned />
+                Client Rep
               </span>
             ),
             exportValue: () => "Client Rep",
@@ -130,10 +122,10 @@ export default function PortalAccessPage() {
                     class="menu-item"
                     onClick={() => toast.warning("Resend invite needs backend.")}
                   >
-                    Resend invite <HrPlanned />
+                    Resend invite
                   </button>
                   <button type="button" class="menu-item" onClick={() => toast.warning("Revoke needs backend.")}>
-                    Revoke <HrPlanned />
+                    Revoke
                   </button>
                 </div>
               </details>
@@ -204,7 +196,7 @@ export default function PortalAccessPage() {
                 <input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} />
               </Field>
               <div class="rounded-lg border border-dashed border-stroke bg-panel p-3 text-sm">
-                <b>Branch scope / Client Approver role</b> <HrPlanned />
+                <b>Branch scope / Client Approver role</b>
                 <p class="hr-muted mt-1">Invites create Client Rep portal access for the whole client today.</p>
               </div>
             </div>

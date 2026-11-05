@@ -130,6 +130,58 @@ export function shiftYearMonth(ym: string, delta: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Quincena half: 1–15 or 16–end. */
+export type QuincenaHalf = "1" | "2";
+
+export function currentQuincenaHalf(): QuincenaHalf {
+  return new Date().getDate() <= 15 ? "1" : "2";
+}
+
+export function quincenaDays(ym: string, half: QuincenaHalf): number[] {
+  const b = monthBounds(ym);
+  if (!b) return [];
+  if (half === "1") return Array.from({ length: Math.min(15, b.daysInMonth) }, (_, i) => i + 1);
+  if (b.daysInMonth <= 15) return [];
+  return Array.from({ length: b.daysInMonth - 15 }, (_, i) => i + 16);
+}
+
+export function quincenaLabel(ym: string, half: QuincenaHalf): string {
+  const b = monthBounds(ym);
+  if (!b) return ym;
+  const name = new Date(Date.UTC(b.year, b.month - 1, 1)).toLocaleString("en", { month: "short", timeZone: "UTC" });
+  if (half === "1") return `1–15 ${name} ${b.year}`;
+  return `16–${b.daysInMonth} ${name} ${b.year}`;
+}
+
+export function monthRangeLabel(ym: string): string {
+  const b = monthBounds(ym);
+  if (!b) return ym;
+  const name = new Date(Date.UTC(b.year, b.month - 1, 1)).toLocaleString("en", { month: "short", timeZone: "UTC" });
+  return `1–${b.daysInMonth} ${name} ${b.year}`;
+}
+
+export function shiftQuincena(ym: string, half: QuincenaHalf, delta: number): { ym: string; half: QuincenaHalf } {
+  if (delta === 0) return { ym, half };
+  if (delta > 0) {
+    if (half === "1") return { ym, half: "2" };
+    return { ym: shiftYearMonth(ym, 1), half: "1" };
+  }
+  if (half === "2") return { ym, half: "1" };
+  return { ym: shiftYearMonth(ym, -1), half: "2" };
+}
+
+export function isFutureQuincena(ym: string, half: QuincenaHalf): boolean {
+  const now = new Date();
+  const cy = now.getFullYear();
+  const cm = now.getMonth() + 1;
+  const cd = now.getDate();
+  const b = monthBounds(ym);
+  if (!b) return false;
+  if (b.year > cy || (b.year === cy && b.month > cm)) return true;
+  if (b.year === cy && b.month === cm && half === "2" && cd < 16) return true;
+  return false;
+}
+
 export function weekdayShort(year: number, month: number, day: number): string {
   return ["Su", "M", "T", "W", "Th", "F", "Sa"][new Date(Date.UTC(year, month - 1, day)).getUTCDay()] ?? "";
 }

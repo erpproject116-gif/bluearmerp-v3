@@ -4,7 +4,7 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
 
 type CaseRow = {
   id: number;
@@ -131,7 +131,6 @@ export default function HireOnboardingPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › People › Onboarding</div>
       <HrPageHead
         title="Hire onboarding"
         subtitle="Checklists start automatically when an active employee is created. Track each new hire across onboarding stages."
@@ -155,11 +154,6 @@ export default function HireOnboardingPage() {
           </div>
         }
       />
-
-      <HrNotice>
-        Stage names, SLA days and WIP limits from the design mockup are <HrPlanned />. Live data uses onboarding cases and
-        task checklists from the API.
-      </HrNotice>
 
       <div class="mb-3 flex flex-wrap items-center gap-2">
         <input
@@ -295,7 +289,7 @@ export default function HireOnboardingPage() {
                       </For>
                     </ol>
                     <div class="rounded-lg border border-dashed border-stroke bg-panel p-3 text-sm">
-                      <b>Ready to deploy</b> <HrPlanned />
+                      <b>Ready to deploy</b>
                       <p class="hr-muted mt-1">
                         Mockup stage gates (equipment / gov’t IDs / orientation) need backend. Use Assign deployment when the
                         checklist is clear.

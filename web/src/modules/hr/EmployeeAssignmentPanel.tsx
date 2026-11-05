@@ -2,7 +2,7 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
-import { HrBadge, HrEmpty, HrNotice, HrPlanned } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice } from "./HrUi";
 
 type Assignment = {
   id: number;
@@ -74,7 +74,7 @@ export function EmployeeAssignmentPanel(props: { employeeId: number }) {
           </button>
         </div>
       </div>
-      <p class="text-xs text-text-secondary">Branch score / fill rate <HrPlanned /></p>
+      <p class="text-xs text-text-secondary">Branch score / fill rate</p>
       <div class="overflow-x-auto rounded-lg border border-stroke">
         <table class="min-w-full text-left text-sm">
           <thead>

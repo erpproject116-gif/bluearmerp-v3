@@ -4,7 +4,7 @@ import { HrLayout } from "./HrLayout";
 
 const cards = [
   {
-    title: "Month overview",
+    title: "Attendance overview",
     description: "All active employees in a calendar month — day grid and totals. Open a person for their DTR log.",
     href: "/app/hr/attendance/overview",
   },

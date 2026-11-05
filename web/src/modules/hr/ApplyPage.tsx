@@ -5,7 +5,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { SignaturePad } from "../../shared/SignaturePad";
 import "../careers/careers-surface.css";
 import "./hr-surface.css";
-import { HrPlanned, HrSteps, HrTcard } from "./HrUi";
+import { HrSteps, HrTcard } from "./HrUi";
 
 type SchemaField = {
   field_key: string;
@@ -317,7 +317,7 @@ export default function ApplyPage() {
         <nav class="flex flex-wrap gap-3 text-sm" aria-label="Application">
           <A href={`/careers/${encodeURIComponent(code())}`}>Job board</A>
           <A href={`#track`} class="text-text-secondary" onClick={(e) => e.preventDefault()}>
-            Track <HrPlanned />
+            Track
           </A>
           <button type="button" class="text-text-secondary hover:underline" onClick={resumeDraftLocal}>
             Resume draft
@@ -561,7 +561,7 @@ export default function ApplyPage() {
                 </Field>
               </div>
               <p class="mt-3 text-xs text-text-secondary">
-                Extra file-type custom fields on the public form are <HrPlanned />.
+                Extra file-type custom fields on the public form are not enabled yet.
               </p>
             </section>
             <section class={step() === 5 ? "space-y-3" : "hidden"}>

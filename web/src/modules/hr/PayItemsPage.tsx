@@ -5,7 +5,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrPayrollTabs } from "./HrPayrollTabs";
-import { HrBadge, HrEmpty, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type PayItemType = {
   id: number;
@@ -118,7 +118,6 @@ export default function PayItemsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Payroll › Pay items</div>
       <HrPayrollTabs />
       <HrPageHead
         title="Pay items"
@@ -147,7 +146,7 @@ export default function PayItemsPage() {
         <div class="flex flex-wrap gap-2 p-3">
           <HrBadge tone="brand">SSS / PhilHealth / Pag-IBIG / BIR</HrBadge>
           <span class="hr-muted text-sm">
-            Package codes on this card <HrPlanned /> — payroll uses the statutory tables for the period end date.
+            Package codes on this card — payroll uses the statutory tables for the period end date.
           </span>
         </div>
       </section>

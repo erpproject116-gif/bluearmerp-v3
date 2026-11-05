@@ -13,7 +13,7 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { useFormFieldSettings } from "../../shared/useFormFieldSettings";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type LeaveType = { id: number; code: string; name: string; is_active: boolean };
 type LeaveBalance = {
@@ -278,7 +278,6 @@ export default function LeavePage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Time &amp; leave › Leave</div>
       <HrPageHead
         title="Leave"
         subtitle="Balances, requests and approval. Approved leave updates the DTR."
@@ -514,7 +513,7 @@ export default function LeavePage() {
       </Show>
 
       <p class="hr-muted mt-3">
-        Client approval of worker leave in the client portal <HrPlanned />
+        Client approval of worker leave in the client portal
       </p>
 
       <Show when={requestOpen()}>

@@ -9,7 +9,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrCasesTabs } from "./HrCasesTabs";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
 
 const CASE_STEPS = [
   "1. Incident",
@@ -227,7 +227,6 @@ export default function DisciplinePage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › HR cases › Cases › Discipline</div>
       <HrCasesTabs />
       <HrPageHead
         title={
@@ -398,18 +397,18 @@ export default function DisciplinePage() {
 
                   <Show when={caseStep() === 3}>
                     <HrNotice>
-                      Hearing date, attendees, and minutes are <HrPlanned />. Use events below for notes until those fields exist.
+                      Hearing date, attendees, and minutes are not on the API yet. Use events below for notes until those fields exist.
                     </HrNotice>
                     <label class="block text-sm font-medium">
-                      Hearing date <HrPlanned />
+                      Hearing date
                     </label>
                     <input type="datetime-local" class={inputClass} disabled />
                     <label class="block text-sm font-medium">
-                      Attendees <HrPlanned />
+                      Attendees
                     </label>
                     <input class={inputClass} disabled />
                     <label class="block text-sm font-medium">
-                      Minutes <HrPlanned />
+                      Minutes
                     </label>
                     <textarea class={inputClass} rows={3} disabled />
                   </Show>

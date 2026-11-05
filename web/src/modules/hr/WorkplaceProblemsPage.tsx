@@ -6,7 +6,7 @@ import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
 import { HrCasesTabs } from "./HrCasesTabs";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type Problem = {
   id: number;
@@ -271,7 +271,6 @@ export default function WorkplaceProblemsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › HR cases › Cases › Workplace problems</div>
       <HrCasesTabs />
       <HrPageHead
         title="Workplace problems"
@@ -424,7 +423,7 @@ export default function WorkplaceProblemsPage() {
 
       <p class="hr-muted mt-2">
         “Late” is worked out when the list loads (target date passed). Private problems are visible only to the owner and HR admins. Client
-        workplace and pay handler <HrPlanned />
+        workplace and pay handler
       </p>
 
       <Show when={modal() === "new"}>

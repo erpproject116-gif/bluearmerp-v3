@@ -3,9 +3,8 @@ import { apiFetch } from "../../shared/api";
 import { formatAmount } from "../../shared/money";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
-import { ClientsDeploymentTabs } from "./ClientsDeploymentTabs";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrNotice, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { siteChoices, type SiteChoice } from "./siteChoices";
 
 type Order = { id: number; site_name: string; client_name: string; pay_rate: number; bill_rate: number };
@@ -82,13 +81,10 @@ export default function ContractsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Clients &amp; deployment › Clients › Contracts &amp; job orders</div>
-      <ClientsDeploymentTabs />
-
       <HrPageHead
         title={
           <>
-            Contracts &amp; job orders <HrPlanned />
+            Contracts &amp; job orders
           </>
         }
         subtitle="Job orders hold the pay rate and the bill rate. Public openings are separate and do not show rates."
@@ -99,10 +95,6 @@ export default function ContractsPage() {
         }
       />
 
-      <HrNotice>
-        🧩 <b>Planned page</b> inside HR &amp; Payroll. Live today: job orders (pay/bill rates) and public openings.
-        Contract end dates, renewals and ending-soon filters need backend.
-      </HrNotice>
 
       <div class="hr-tabs" role="tablist">
         <button type="button" classList={{ on: innerTab() === "orders" }} onClick={() => setInnerTab("orders")}>
@@ -112,7 +104,7 @@ export default function ContractsPage() {
           Public openings
         </button>
         <button type="button" disabled title="Needs contract end dates">
-          Ending ≤30d <HrPlanned />
+          Ending ≤30d
         </button>
       </div>
 
@@ -238,7 +230,7 @@ export default function ContractsPage() {
                 <input class={inputClass} value={bill()} onInput={(e) => setBill(e.currentTarget.value)} />
               </Field>
               <div class="rounded-lg border border-dashed border-stroke bg-panel p-3 text-sm">
-                <b>Contract end date</b> <HrPlanned />
+                <b>Contract end date</b>
                 <p class="hr-muted mt-1">Needs backend before ending-soon KPIs work.</p>
               </div>
             </div>

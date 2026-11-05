@@ -5,13 +5,29 @@ import { LookupCombo } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
-import { ClientsDeploymentTabs } from "./ClientsDeploymentTabs";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrTcard } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard } from "./HrUi";
 
-type Person = { employee_id: number; employee_name: string; start_date: string };
-type Site = { id: number; site_name: string; industry_id: number; industry_name: string; people: Person[] };
-type Client = { id: number; name: string; partner_id: number; partner_code: string; partner_name: string; sites: Site[] };
+type Person = {
+  employee_id: number;
+  employee_name: string;
+  start_date: string;
+};
+type Site = {
+  id: number;
+  site_name: string;
+  industry_id: number;
+  industry_name: string;
+  people: Person[];
+};
+type Client = {
+  id: number;
+  name: string;
+  partner_id: number;
+  partner_code: string;
+  partner_name: string;
+  sites: Site[];
+};
 type Customer = { id: number; partner_code: string; company_name: string };
 type Segment = { id: number; kind: string; name: string };
 
@@ -41,10 +57,19 @@ export default function ClientsPage() {
   const [addEmpLabel, setAddEmpLabel] = createSignal("");
   const [addStart, setAddStart] = createSignal("");
 
-  const [clients, { refetch }] = createResource(async () => (await apiFetch<Client[]>("/api/v1/hr/clients")).data ?? []);
-  const [customers] = createResource(async () => (await apiFetch<Customer[]>("/api/v1/hr/sales-customers")).data ?? []);
-  const [segments] = createResource(async () => (await apiFetch<Segment[]>("/api/v1/hr/applicant-segments")).data ?? []);
-  const industries = () => (segments() ?? []).filter((row) => row.kind === "industry");
+  const [clients, { refetch }] = createResource(
+    async () => (await apiFetch<Client[]>("/api/v1/hr/clients")).data ?? [],
+  );
+  const [customers] = createResource(
+    async () =>
+      (await apiFetch<Customer[]>("/api/v1/hr/sales-customers")).data ?? [],
+  );
+  const [segments] = createResource(
+    async () =>
+      (await apiFetch<Segment[]>("/api/v1/hr/applicant-segments")).data ?? [],
+  );
+  const industries = () =>
+    (segments() ?? []).filter((row) => row.kind === "industry");
 
   const clientRows = createMemo(() => {
     const q = search().trim().toLowerCase();
@@ -52,8 +77,13 @@ export default function ClientsPage() {
     return (clients() ?? [])
       .map((client) => {
         const sites = client.sites ?? [];
-        const industryNames = [...new Set(sites.map((s) => s.industry_name).filter(Boolean))];
-        const deployed = sites.reduce((sum, site) => sum + (site.people ?? []).length, 0);
+        const industryNames = [
+          ...new Set(sites.map((s) => s.industry_name).filter(Boolean)),
+        ];
+        const deployed = sites.reduce(
+          (sum, site) => sum + (site.people ?? []).length,
+          0,
+        );
         return {
           ...client,
           branchCount: sites.length,
@@ -66,13 +96,24 @@ export default function ClientsPage() {
       .filter((row) => {
         if (ind && !row.industryNames.includes(ind)) return false;
         if (!q) return true;
-        return row.name.toLowerCase().includes(q) || row.partner_name.toLowerCase().includes(q) || row.industryLabel.toLowerCase().includes(q);
+        return (
+          row.name.toLowerCase().includes(q) ||
+          row.partner_name.toLowerCase().includes(q) ||
+          row.industryLabel.toLowerCase().includes(q)
+        );
       });
   });
 
   const branchRows = createMemo(() => {
     const q = branchSearch().trim().toLowerCase();
-    const out: { id: string; site_name: string; client_name: string; industry_name: string; deployed: number; people: Person[] }[] = [];
+    const out: {
+      id: string;
+      site_name: string;
+      client_name: string;
+      industry_name: string;
+      deployed: number;
+      people: Person[];
+    }[] = [];
     for (const client of clients() ?? []) {
       for (const site of client.sites ?? []) {
         out.push({
@@ -94,12 +135,16 @@ export default function ClientsPage() {
     );
   });
 
-  const payloadPerson = (id: number | null, start: string) => (id ? { employee_id: id, start_date: start } : {});
+  const payloadPerson = (id: number | null, start: string) =>
+    id ? { employee_id: id, start_date: start } : {};
 
   const createClient = async () => {
-    if (!siteName().trim() || !industryId()) return toast.warning("Enter a site name and an industry.");
-    if (source() === "existing" && !partnerId()) return toast.warning("Choose a sales customer.");
-    if (source() === "new" && !name().trim()) return toast.warning("Enter a client name.");
+    if (!siteName().trim() || !industryId())
+      return toast.warning("Enter a site name and an industry.");
+    if (source() === "existing" && !partnerId())
+      return toast.warning("Choose a sales customer.");
+    if (source() === "new" && !name().trim())
+      return toast.warning("Enter a client name.");
     const res = await apiFetch("/api/v1/hr/clients", {
       method: "POST",
       body: JSON.stringify({
@@ -110,7 +155,8 @@ export default function ClientsPage() {
         ...payloadPerson(empId(), startDate()),
       }),
     });
-    if (!res.success) return toast.warning(res.message ?? "Could not save the client.");
+    if (!res.success)
+      return toast.warning(res.message ?? "Could not save the client.");
     setSiteName("");
     setName("");
     setEmpId(null);
@@ -121,7 +167,8 @@ export default function ClientsPage() {
   };
 
   const addSiteToClient = async () => {
-    if (!addClientId() || !addSite().trim() || !addIndustry()) return toast.warning("Choose a client, a site name, and an industry.");
+    if (!addClientId() || !addSite().trim() || !addIndustry())
+      return toast.warning("Choose a client, a site name, and an industry.");
     const res = await apiFetch(`/api/v1/hr/clients/${addClientId()}/sites`, {
       method: "POST",
       body: JSON.stringify({
@@ -130,7 +177,8 @@ export default function ClientsPage() {
         ...payloadPerson(addEmpId(), addStart()),
       }),
     });
-    if (!res.success) return toast.warning(res.message ?? "Could not save the site.");
+    if (!res.success)
+      return toast.warning(res.message ?? "Could not save the site.");
     setAddSite("");
     setAddEmpId(null);
     setAddEmpLabel("");
@@ -151,41 +199,51 @@ export default function ClientsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Clients &amp; deployment › Clients › Clients &amp; sites</div>
-      <ClientsDeploymentTabs />
-
       <HrPageHead
-        title={
-          <>
-            Clients &amp; sites <HrPlanned />
-          </>
-        }
+        title="Clients & sites"
         subtitle="Client companies, their branches/worksites and industries."
         actions={
           <div class="hr-actions">
             <button type="button" class="hr-btn" onClick={() => openAddSite()}>
               + Add site
             </button>
-            <button type="button" class="hr-btn hr-btn-primary" onClick={() => setModalOpen(true)}>
+            <button
+              type="button"
+              class="hr-btn hr-btn-primary"
+              onClick={() => setModalOpen(true)}
+            >
               + New client
             </button>
           </div>
         }
       />
 
-      <HrNotice>
-        🧩 <b>Planned page</b> inside HR &amp; Payroll. Live today: clients linked to sales customers, sites, industries, and people on sites.
-        Contract end dates, prospect status, branch manager and address fields need more backend.
-      </HrNotice>
-
       <div class="hr-tabs" role="tablist" aria-label="Clients sections">
-        <button type="button" role="tab" classList={{ on: innerTab() === "c" }} aria-selected={innerTab() === "c"} onClick={() => setInnerTab("c")}>
+        <button
+          type="button"
+          role="tab"
+          classList={{ on: innerTab() === "c" }}
+          aria-selected={innerTab() === "c"}
+          onClick={() => setInnerTab("c")}
+        >
           Clients
         </button>
-        <button type="button" role="tab" classList={{ on: innerTab() === "b" }} aria-selected={innerTab() === "b"} onClick={() => setInnerTab("b")}>
+        <button
+          type="button"
+          role="tab"
+          classList={{ on: innerTab() === "b" }}
+          aria-selected={innerTab() === "b"}
+          onClick={() => setInnerTab("b")}
+        >
           Branches / sites
         </button>
-        <button type="button" role="tab" classList={{ on: innerTab() === "i" }} aria-selected={innerTab() === "i"} onClick={() => setInnerTab("i")}>
+        <button
+          type="button"
+          role="tab"
+          classList={{ on: innerTab() === "i" }}
+          aria-selected={innerTab() === "i"}
+          onClick={() => setInnerTab("i")}
+        >
           Industries
         </button>
       </div>
@@ -208,19 +266,10 @@ export default function ClientsPage() {
                 onChange={(e) => setIndustryFilter(e.currentTarget.value)}
               >
                 <option value="">Industry: All</option>
-                <For each={industries()}>{(row) => <option value={row.name}>{row.name}</option>}</For>
+                <For each={industries()}>
+                  {(row) => <option value={row.name}>{row.name}</option>}
+                </For>
               </select>
-              <div class="hr-seg" role="group" aria-label="Status">
-                <button type="button" class="on">
-                  All
-                </button>
-                <button type="button" disabled title="Needs backend status field">
-                  Active <HrPlanned />
-                </button>
-                <button type="button" disabled title="Needs backend status field">
-                  Prospect <HrPlanned />
-                </button>
-              </div>
             </>
           }
         >
@@ -233,9 +282,6 @@ export default function ClientsPage() {
                   <th class="num">Branches</th>
                   <th class="num">Deployed</th>
                   <th>Status</th>
-                  <th>
-                    Contract ends <HrPlanned />
-                  </th>
                   <th aria-label="Actions" />
                 </tr>
               </thead>
@@ -244,8 +290,11 @@ export default function ClientsPage() {
                   each={clientRows()}
                   fallback={
                     <tr>
-                      <td colspan="7">
-                        <HrEmpty title="No matches" hint="Try a different search or clear the filters." />
+                      <td colspan="6">
+                        <HrEmpty
+                          title="No matches"
+                          hint="Try a different search or clear the filters."
+                        />
                       </td>
                     </tr>
                   }
@@ -260,22 +309,39 @@ export default function ClientsPage() {
                       <td class="num">{row.branchCount}</td>
                       <td class="num">{row.deployed}</td>
                       <td>
-                        <HrBadge tone={row.status === "Active" ? "success" : "neutral"}>{row.status}</HrBadge>
+                        <HrBadge
+                          tone={row.status === "Active" ? "success" : "neutral"}
+                        >
+                          {row.status}
+                        </HrBadge>
                       </td>
-                      <td class="hr-muted">—</td>
                       <td>
                         <details class="hr-menu hr-rowmenu">
-                          <summary class="hr-rowmenu-btn" aria-label="Row actions">
+                          <summary
+                            class="hr-rowmenu-btn"
+                            aria-label="Row actions"
+                          >
                             ⋯
                           </summary>
                           <div>
-                            <button type="button" class="menu-item" onClick={() => setInnerTab("b")}>
+                            <button
+                              type="button"
+                              class="menu-item"
+                              onClick={() => setInnerTab("b")}
+                            >
                               Open sites
                             </button>
-                            <button type="button" class="menu-item" onClick={() => openAddSite(row.id)}>
+                            <button
+                              type="button"
+                              class="menu-item"
+                              onClick={() => openAddSite(row.id)}
+                            >
                               Add branch
                             </button>
-                            <A class="menu-item" href="/app/hr/clients/portal-access">
+                            <A
+                              class="menu-item"
+                              href="/app/hr/clients/portal-access"
+                            >
                               Client Rep users
                             </A>
                           </div>
@@ -309,12 +375,6 @@ export default function ClientsPage() {
                   <th>Branch</th>
                   <th>Client</th>
                   <th>Industry</th>
-                  <th>
-                    Address <HrPlanned />
-                  </th>
-                  <th>
-                    Branch manager <HrPlanned />
-                  </th>
                   <th class="num">Deployed</th>
                 </tr>
               </thead>
@@ -323,8 +383,11 @@ export default function ClientsPage() {
                   each={branchRows()}
                   fallback={
                     <tr>
-                      <td colspan="6">
-                        <HrEmpty title="No sites yet" hint="Add a client with a site, or use Add site." />
+                      <td colspan="4">
+                        <HrEmpty
+                          title="No sites yet"
+                          hint="Add a client with a site, or use Add site."
+                        />
                       </td>
                     </tr>
                   }
@@ -334,8 +397,6 @@ export default function ClientsPage() {
                       <td class="font-semibold">{row.site_name}</td>
                       <td>{row.client_name}</td>
                       <td>{row.industry_name}</td>
-                      <td class="hr-muted">—</td>
-                      <td class="hr-muted">—</td>
                       <td class="num">{row.deployed}</td>
                     </tr>
                   )}
@@ -348,9 +409,15 @@ export default function ClientsPage() {
 
       <Show when={innerTab() === "i"}>
         <div class="rounded-lg border border-stroke bg-surface p-4 text-sm">
-          Industries reuse the existing Applicants “Manage lists → industry” list.
+          Industries reuse the existing Applicants “Manage lists → industry”
+          list.
           <div class="mt-3 flex flex-wrap gap-2">
-            <For each={industries()} fallback={<span class="hr-muted">No industries configured yet.</span>}>
+            <For
+              each={industries()}
+              fallback={
+                <span class="hr-muted">No industries configured yet.</span>
+              }
+            >
               {(row) => <HrBadge tone="info">{row.name}</HrBadge>}
             </For>
           </div>
@@ -371,13 +438,24 @@ export default function ClientsPage() {
           <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">New client</h2>
-              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setModalOpen(false)}>
+              <button
+                type="button"
+                class="hr-btn hr-btn-sm"
+                aria-label="Close"
+                onClick={() => setModalOpen(false)}
+              >
                 ✕
               </button>
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
               <Field label="Client source">
-                <select class={inputClass} value={source()} onChange={(e) => setSource(e.currentTarget.value as "existing" | "new")}>
+                <select
+                  class={inputClass}
+                  value={source()}
+                  onChange={(e) =>
+                    setSource(e.currentTarget.value as "existing" | "new")
+                  }
+                >
                   <option value="existing">Existing sales customer</option>
                   <option value="new">New HR client</option>
                 </select>
@@ -386,24 +464,48 @@ export default function ClientsPage() {
                 when={source() === "existing"}
                 fallback={
                   <Field label="Client name">
-                    <input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} />
+                    <input
+                      class={inputClass}
+                      value={name()}
+                      onInput={(e) => setName(e.currentTarget.value)}
+                    />
                   </Field>
                 }
               >
                 <Field label="Sales customer">
-                  <select class={inputClass} value={partnerId()} onChange={(e) => setPartnerId(e.currentTarget.value)}>
+                  <select
+                    class={inputClass}
+                    value={partnerId()}
+                    onChange={(e) => setPartnerId(e.currentTarget.value)}
+                  >
                     <option value="">Choose</option>
-                    <For each={customers() ?? []}>{(row) => <option value={row.id}>{row.company_name} ({row.partner_code})</option>}</For>
+                    <For each={customers() ?? []}>
+                      {(row) => (
+                        <option value={row.id}>
+                          {row.company_name} ({row.partner_code})
+                        </option>
+                      )}
+                    </For>
                   </select>
                 </Field>
               </Show>
               <Field label="Site name">
-                <input class={inputClass} value={siteName()} onInput={(e) => setSiteName(e.currentTarget.value)} />
+                <input
+                  class={inputClass}
+                  value={siteName()}
+                  onInput={(e) => setSiteName(e.currentTarget.value)}
+                />
               </Field>
               <Field label="Industry">
-                <select class={inputClass} value={industryId()} onChange={(e) => setIndustryId(e.currentTarget.value)}>
+                <select
+                  class={inputClass}
+                  value={industryId()}
+                  onChange={(e) => setIndustryId(e.currentTarget.value)}
+                >
                   <option value="">Choose</option>
-                  <For each={industries()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
+                  <For each={industries()}>
+                    {(row) => <option value={row.id}>{row.name}</option>}
+                  </For>
                 </select>
               </Field>
               <LookupCombo
@@ -423,18 +525,27 @@ export default function ClientsPage() {
                 placeholder="Optional"
               />
               <Field label="Start date">
-                <input type="date" class={inputClass} value={startDate()} onInput={(e) => setStartDate(e.currentTarget.value)} />
+                <input
+                  type="date"
+                  class={inputClass}
+                  value={startDate()}
+                  onInput={(e) => setStartDate(e.currentTarget.value)}
+                />
               </Field>
-              <div class="sm:col-span-2 rounded-lg border border-dashed border-stroke bg-panel p-3 text-sm">
-                <b>TIN / billing contact / address</b> <HrPlanned />
-                <p class="hr-muted mt-1">Not stored on the live clients API yet.</p>
-              </div>
             </div>
             <div class="mt-4 flex flex-wrap justify-end gap-2">
-              <button type="button" class="hr-btn" onClick={() => setModalOpen(false)}>
+              <button
+                type="button"
+                class="hr-btn"
+                onClick={() => setModalOpen(false)}
+              >
                 Cancel
               </button>
-              <button type="button" class="hr-btn hr-btn-primary" onClick={() => void createClient()}>
+              <button
+                type="button"
+                class="hr-btn hr-btn-primary"
+                onClick={() => void createClient()}
+              >
                 Save
               </button>
             </div>
@@ -456,24 +567,45 @@ export default function ClientsPage() {
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Add branch / site</h2>
-              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setSiteModalOpen(false)}>
+              <button
+                type="button"
+                class="hr-btn hr-btn-sm"
+                aria-label="Close"
+                onClick={() => setSiteModalOpen(false)}
+              >
                 ✕
               </button>
             </div>
             <div class="grid gap-3">
               <Field label="Client">
-                <select class={inputClass} value={addClientId()} onChange={(e) => setAddClientId(e.currentTarget.value)}>
+                <select
+                  class={inputClass}
+                  value={addClientId()}
+                  onChange={(e) => setAddClientId(e.currentTarget.value)}
+                >
                   <option value="">Choose</option>
-                  <For each={clients() ?? []}>{(row) => <option value={row.id}>{row.name}</option>}</For>
+                  <For each={clients() ?? []}>
+                    {(row) => <option value={row.id}>{row.name}</option>}
+                  </For>
                 </select>
               </Field>
               <Field label="Site name">
-                <input class={inputClass} value={addSite()} onInput={(e) => setAddSite(e.currentTarget.value)} />
+                <input
+                  class={inputClass}
+                  value={addSite()}
+                  onInput={(e) => setAddSite(e.currentTarget.value)}
+                />
               </Field>
               <Field label="Industry">
-                <select class={inputClass} value={addIndustry()} onChange={(e) => setAddIndustry(e.currentTarget.value)}>
+                <select
+                  class={inputClass}
+                  value={addIndustry()}
+                  onChange={(e) => setAddIndustry(e.currentTarget.value)}
+                >
                   <option value="">Choose</option>
-                  <For each={industries()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
+                  <For each={industries()}>
+                    {(row) => <option value={row.id}>{row.name}</option>}
+                  </For>
                 </select>
               </Field>
               <LookupCombo
@@ -493,14 +625,27 @@ export default function ClientsPage() {
                 placeholder="Optional"
               />
               <Field label="Start date">
-                <input type="date" class={inputClass} value={addStart()} onInput={(e) => setAddStart(e.currentTarget.value)} />
+                <input
+                  type="date"
+                  class={inputClass}
+                  value={addStart()}
+                  onInput={(e) => setAddStart(e.currentTarget.value)}
+                />
               </Field>
             </div>
             <div class="mt-4 flex flex-wrap justify-end gap-2">
-              <button type="button" class="hr-btn" onClick={() => setSiteModalOpen(false)}>
+              <button
+                type="button"
+                class="hr-btn"
+                onClick={() => setSiteModalOpen(false)}
+              >
                 Cancel
               </button>
-              <button type="button" class="hr-btn hr-btn-primary" onClick={() => void addSiteToClient()}>
+              <button
+                type="button"
+                class="hr-btn hr-btn-primary"
+                onClick={() => void addSiteToClient()}
+              >
                 Save
               </button>
             </div>

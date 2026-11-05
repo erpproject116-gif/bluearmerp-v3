@@ -3,7 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type RequestRow = {
   id: number;
@@ -152,7 +152,7 @@ export default function RequestsPage() {
 
   const confirmReject = async () => {
     if (!note().trim()) return toast.warning("Reason is required.");
-    // Backend only supports close (no rejected status). Gate with clear Planned messaging.
+    // Backend only supports close (no rejected status).
     toast.warning("Reject status needs backend support — request was not changed.");
   };
 
@@ -177,7 +177,6 @@ export default function RequestsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › HR cases › Requests</div>
       <HrPageHead
         title="Requests"
         subtitle="Employee requests from self-service: loans, salary advances, pay questions, certificates, resignations."
@@ -206,7 +205,7 @@ export default function RequestsPage() {
           </For>
         </div>
         <p class="hr-muted px-3 pb-3">
-          Tap a kind to open the next pending request. Reject status <HrPlanned /> — Approve closes with the live API.
+          Tap a kind to open the next pending request. Reject status — Approve closes with the live API.
         </p>
       </section>
 
@@ -314,8 +313,7 @@ export default function RequestsPage() {
       </HrTcard>
 
       <p class="hr-muted mt-2">
-        Approved loans and advances become payroll deductions <HrPlanned />. Pay questions can be linked to a workplace problem{" "}
-        <HrPlanned />. Live close sets status to Closed (Approve).
+        Approved loans and advances become payroll deductions. Pay questions can be linked to a workplace problem{" "}. Live close sets status to Closed (Approve).
       </p>
 
       <Show when={mode() === "approve" && active()}>
@@ -332,7 +330,7 @@ export default function RequestsPage() {
                 <b>{row().employee_name}</b> · {kindLabel(row().kind)}
               </p>
               <p class="mb-3 text-sm text-text-secondary">
-                Approving a loan or salary advance creates a payroll deduction schedule <HrPlanned />. This closes the request with the live API.
+                Approving a loan or salary advance creates a payroll deduction schedule. This closes the request with the live API.
               </p>
               <Field label="Note (optional)">
                 <textarea class={inputClass} rows={3} value={note()} onInput={(e) => setNote(e.currentTarget.value)} />
@@ -364,7 +362,7 @@ export default function RequestsPage() {
                 <b>{row().employee_name}</b> · {kindLabel(row().kind)}
               </p>
               <p class="mb-3 text-sm text-text-secondary">
-                Rejected status <HrPlanned /> — the API only closes pending requests today.
+                Rejected status — the API only closes pending requests today.
               </p>
               <label class="block text-sm">
                 <span class="mb-1 block font-medium">
@@ -418,7 +416,7 @@ export default function RequestsPage() {
                     <input type="number" class={inputClass} value={terms()} onInput={(e) => setTerms(e.currentTarget.value)} />
                   </Field>
                   <p class="hr-muted sm:col-span-2">
-                    Amount / terms saved to payroll schedule <HrPlanned />
+                    Amount / terms saved to payroll schedule
                   </p>
                 </Show>
 
@@ -432,7 +430,7 @@ export default function RequestsPage() {
                     </select>
                   </Field>
                   <p class="hr-muted sm:col-span-2">
-                    Deduction schedule <HrPlanned />
+                    Deduction schedule
                   </p>
                 </Show>
 
@@ -444,7 +442,7 @@ export default function RequestsPage() {
                     </select>
                   </Field>
                   <p class="hr-muted sm:col-span-2">
-                    Certificate generation <HrPlanned />
+                    Certificate generation
                   </p>
                 </Show>
 
@@ -453,7 +451,7 @@ export default function RequestsPage() {
                     <input type="date" class={inputClass} value={effectiveDate()} onInput={(e) => setEffectiveDate(e.currentTarget.value)} />
                   </Field>
                   <p class="hr-muted sm:col-span-2">
-                    Approval starts Offboarding &amp; clearance <HrPlanned />
+                    Approval starts Offboarding &amp; clearance
                   </p>
                 </Show>
 

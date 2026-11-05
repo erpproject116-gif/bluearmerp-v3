@@ -21,7 +21,7 @@ import { useToast } from "../../shared/toast";
 import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY, HR_ENTITY, HR_SETTINGS_HREF } from "../../shared/entityTypes";
 import { useMasterLifecycle } from "../../shared/masterLifecycle";
-import { HrBadge, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { HrLayout } from "./HrLayout";
 import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
 import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
@@ -843,7 +843,7 @@ export default function HrEmployeesPage() {
           </Field>
           <Show when={!selected()}>
             <div class="col-span-full rounded-lg border border-stroke bg-panel p-3">
-              <b>Assignment</b> <HrPlanned />
+              <b>Assignment</b>
               <p class="mt-1 text-xs text-text-secondary">
                 Client, worksite, start date and pay handler are available on the Assignment tab after the employee is saved.
               </p>

@@ -6,7 +6,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrCasesTabs } from "./HrCasesTabs";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrPageHead, HrPlanned, HrTcard } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard } from "./HrUi";
 
 type Alert = {
   id: number;
@@ -153,9 +153,6 @@ export default function AbsenteeismPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">
-        HR &amp; Payroll › HR cases › Cases › Absenteeism
-      </div>
       <HrCasesTabs />
       <HrPageHead
         title="Absenteeism"
@@ -199,7 +196,7 @@ export default function AbsenteeismPage() {
             </For>
           </ul>
           <p class="hr-muted mt-2 px-1 pb-2">
-            Create a workplace problem from an alert <HrPlanned />
+            Create a workplace problem from an alert
           </p>
         </section>
 
@@ -292,7 +289,7 @@ export default function AbsenteeismPage() {
                   <option value="acknowledge">Acknowledge</option>
                   <option value="discipline">Create discipline case</option>
                   <option value="dismiss" disabled>
-                    Dismiss (Planned)
+                    Dismiss
                   </option>
                 </select>
               </Field>

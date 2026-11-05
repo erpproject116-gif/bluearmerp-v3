@@ -7,7 +7,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrPerformanceTabs } from "./HrPerformanceTabs";
-import { HrBadge, HrEmpty, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type Course = {
   id: number;
@@ -160,7 +160,6 @@ export default function LearningPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Performance › Evaluations &amp; learning › Learning</div>
       <HrPerformanceTabs />
       <HrPageHead
         title="Learning"
@@ -301,10 +300,10 @@ export default function LearningPage() {
                               class="menu-item"
                               onClick={() => toast.warning("Mark complete needs a quiz attempt — use My HR / quiz flow.")}
                             >
-                              Mark complete <HrPlanned />
+                              Mark complete
                             </button>
                             <button type="button" class="menu-item" onClick={() => toast.warning("Unenroll is not available yet.")}>
-                              Unenroll <HrPlanned />
+                              Unenroll
                             </button>
                           </div>
                         </details>
@@ -345,7 +344,7 @@ export default function LearningPage() {
                 Mandatory (required for compliance)
               </label>
               <p class="hr-muted text-xs">
-                Required-for site/plant scope <HrPlanned />
+                Required-for site/plant scope
               </p>
             </div>
             <div class="mt-4 flex flex-wrap justify-end gap-2">

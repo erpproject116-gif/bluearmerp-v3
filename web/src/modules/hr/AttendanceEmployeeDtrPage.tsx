@@ -4,7 +4,6 @@ import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
-import { HrAttendanceTabs } from "./HrAttendanceTabs";
 import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { currentYearMonth, monthBounds, type EmployeeMonthLine } from "./attendanceShared";
 
@@ -91,8 +90,6 @@ export default function AttendanceEmployeeDtrPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Time &amp; leave › Attendance / DTR › Employee</div>
-      <HrAttendanceTabs />
       <HrPageHead
         crumb={
           <A href="/app/hr/attendance/overview" class="text-brand-700 hover:underline">

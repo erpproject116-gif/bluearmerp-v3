@@ -4,7 +4,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrReportsTabs } from "./HrReportsTabs";
-import { HrEmpty, HrNotice, HrPageHead, HrPlanned, HrTcard } from "./HrUi";
+import { HrEmpty, HrNotice, HrPageHead, HrTcard } from "./HrUi";
 import { formatAmount } from "../../shared/money";
 
 type Row = { employee_no: string; employee_name: string; tin: string; withholding: number };
@@ -63,23 +63,16 @@ export default function GovernmentReportsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">
-        HR &amp; Payroll › Reports &amp; compliance › Government reports
-      </div>
       <HrReportsTabs />
       <HrPageHead
         title={
           <>
-            Government reports <HrPlanned />
+            Government reports
           </>
         }
         subtitle="Generate statutory files from posted payroll."
       />
 
-      <HrNotice>
-        <b>Planned page</b> inside HR &amp; Payroll for agency file generators. Needs backend after UI. Live today: withholding
-        already stored on payslips (year table below). Remittance files stay on Remittances.
-      </HrNotice>
 
       <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <For each={[...GENERATORS]}>
@@ -95,7 +88,7 @@ export default function GovernmentReportsPage() {
                   title="Needs backend"
                   onClick={() => toast.warning(`${card.title} generator needs backend.`)}
                 >
-                  Generate <HrPlanned />
+                  Generate
                 </button>
                 <button type="button" class="hr-btn hr-btn-sm" disabled title="Needs backend">
                   History
@@ -206,7 +199,7 @@ export default function GovernmentReportsPage() {
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">
-                Generate government report <HrPlanned />
+                Generate government report
               </h2>
               <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setRunOpen(false)}>
                 ✕

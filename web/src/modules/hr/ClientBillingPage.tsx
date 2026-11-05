@@ -4,7 +4,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrPayrollTabs } from "./HrPayrollTabs";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 import { formatPeso } from "../../shared/money";
 
 type Submission = { id: number; client_name: string; site_name: string; period_start: string; period_end: string; status: string };
@@ -64,12 +64,11 @@ export default function ClientBillingPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Payroll › Client billing</div>
       <HrPayrollTabs />
       <HrPageHead
         title={
           <>
-            Client billing <HrPlanned />
+            Client billing
           </>
         }
         subtitle="Bill clients from posted payroll + markup; track receivables."
@@ -80,10 +79,6 @@ export default function ClientBillingPage() {
         }
       />
 
-      <HrNotice>
-        <b>Planned page</b> inside HR &amp; Payroll for full invoice / receivables workflow. Today you can create a bill from an
-        accepted client time submission (hours × site bill rate). Employee pay is unchanged.
-      </HrNotice>
 
       <div class="hr-kpis mt-3 mb-3">
         <a class="hr-kpi" href="#bills">
@@ -93,13 +88,13 @@ export default function ClientBillingPage() {
         <a class="hr-kpi" href="#bills" title="Needs due-date status">
           <div class="v">—</div>
           <div class="l">
-            Overdue <HrPlanned />
+            Overdue
           </div>
         </a>
         <a class="hr-kpi" href="#bills" title="Needs markup field">
           <div class="v">—</div>
           <div class="l">
-            Avg markup <HrPlanned />
+            Avg markup
           </div>
         </a>
         <a class="hr-kpi" href="#bills">
@@ -125,13 +120,13 @@ export default function ClientBillingPage() {
                 All
               </button>
               <button type="button" classList={{ on: statusSeg() === "Sent" }} onClick={() => setStatusSeg("Sent")} title="Needs backend status">
-                Sent <HrPlanned />
+                Sent
               </button>
               <button type="button" classList={{ on: statusSeg() === "Paid" }} onClick={() => setStatusSeg("Paid")} title="Needs backend status">
-                Paid <HrPlanned />
+                Paid
               </button>
               <button type="button" classList={{ on: statusSeg() === "Overdue" }} onClick={() => setStatusSeg("Overdue")} title="Needs backend status">
-                Overdue <HrPlanned />
+                Overdue
               </button>
             </div>
           </>
@@ -146,11 +141,11 @@ export default function ClientBillingPage() {
                 <th>Period</th>
                 <th class="num">Amount</th>
                 <th class="num">
-                  VAT 12% <HrPlanned />
+                  VAT 12%
                 </th>
                 <th>Status</th>
                 <th>
-                  Due <HrPlanned />
+                  Due
                 </th>
                 <th aria-label="Actions" />
               </tr>
@@ -189,13 +184,13 @@ export default function ClientBillingPage() {
                         </summary>
                         <div>
                           <button type="button" class="menu-item" disabled title="Needs backend">
-                            Send <HrPlanned />
+                            Send
                           </button>
                           <button type="button" class="menu-item" disabled title="Needs backend">
-                            Record payment <HrPlanned />
+                            Record payment
                           </button>
                           <button type="button" class="menu-item" disabled title="Needs backend">
-                            Statement of account <HrPlanned />
+                            Statement of account
                           </button>
                         </div>
                       </details>
@@ -224,8 +219,7 @@ export default function ClientBillingPage() {
               </button>
             </div>
             <p class="mb-3 text-sm text-text-secondary">
-              Live path today: accepted client time × site bill rate. Generate from posted payroll run + markup is{" "}
-              <HrPlanned />.
+              Live path today: accepted client time × site bill rate. Generate from posted payroll run + markup is{" "}.
             </p>
             <Field label="Accepted time submission">
               <select class={inputClass} value={submissionId()} onChange={(e) => setSubmissionId(e.currentTarget.value)}>

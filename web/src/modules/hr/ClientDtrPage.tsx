@@ -1,328 +1,610 @@
-import { createMemo, createResource, createSignal, For, Show } from "solid-js";
-import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
-import { Field, inputClass } from "../../shared/SpreadsheetGrid";
+import { A } from "@solidjs/router";
+import { createMemo, createSignal, For, Show } from "solid-js";
+import { createQuery } from "@tanstack/solid-query";
+import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrAttendanceTabs } from "./HrAttendanceTabs";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
-import { siteChoices } from "./siteChoices";
+import { HrEmpty, HrPageHead } from "./HrUi";
+import {
+  currentQuincenaHalf,
+  currentYearMonth,
+  dtrMatrixCell,
+  dtrNeedsLook,
+  isFutureQuincena,
+  isWeekendDay,
+  monthBounds,
+  quincenaDays,
+  quincenaLabel,
+  shiftQuincena,
+  weekdayShort,
+  type MonthDayCell,
+  type MonthOverviewRow,
+  type QuincenaHalf,
+} from "./attendanceShared";
 
-type Submission = {
-  id: number;
-  client_name: string;
-  site_name: string;
-  period_start: string;
-  period_end: string;
-  status: string;
-  file_name: string;
-  accepted_hours: number;
-};
+type LookFilter = "all" | "look";
+type ViewMode = "matrix" | "agenda";
 
-function statusTone(status: string): HrBadgeTone {
-  switch ((status || "").toLowerCase()) {
-    case "accepted":
-      return "success";
-    case "returned":
-      return "warning";
-    case "late":
-      return "danger";
-    case "submitted":
-    case "pending":
-      return "info";
-    case "not_submitted":
-    case "not submitted":
-      return "neutral";
-    default:
-      return "neutral";
-  }
-}
-
-function statusLabel(status: string): string {
-  if (!status) return "—";
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+function lookCount(row: MonthOverviewRow, days: number[]): number {
+  const set = new Set(days);
+  return (row.days ?? []).filter(
+    (c) => set.has(c.day) && dtrNeedsLook(c.status, c.hours_worked ?? 0),
+  ).length;
 }
 
 export default function ClientDtrPage() {
   const toast = useToast();
-  const [siteId, setSiteId] = createSignal("");
-  const [start, setStart] = createSignal("");
-  const [end, setEnd] = createSignal("");
-  const [file, setFile] = createSignal<File | null>(null);
-  const [hours, setHours] = createSignal<Record<number, string>>({});
-  const [search, setSearch] = createSignal("");
-  const [statusSeg, setStatusSeg] = createSignal("");
+  const [ym, setYm] = createSignal(currentYearMonth());
+  const [half, setHalf] = createSignal<QuincenaHalf>(currentQuincenaHalf());
+  const [filter, setFilter] = createSignal<LookFilter>("all");
   const [clientFilter, setClientFilter] = createSignal("");
-  const [sites] = createResource(siteChoices);
-  const [rows, { refetch }] = createResource(async () => (await apiFetch<Submission[]>("/api/v1/hr/client-time")).data ?? []);
+  const [q, setQ] = createSignal("");
+  const [collapsed, setCollapsed] = createSignal<Record<string, boolean>>({});
+  const [wrapEl, setWrapEl] = createSignal<HTMLDivElement | null>(null);
+  const [view, setView] = createSignal<ViewMode>("matrix");
 
-  const clients = createMemo(() => {
-    const set = new Set<string>();
-    for (const r of rows() ?? []) if (r.client_name) set.add(r.client_name);
-    return [...set].sort((a, b) => a.localeCompare(b));
+  const bounds = () => monthBounds(ym());
+  const days = createMemo(() => quincenaDays(ym(), half()));
+  const cutLabel = createMemo(() => quincenaLabel(ym(), half()));
+  const nextDisabled = createMemo(() => {
+    const n = shiftQuincena(ym(), half(), 1);
+    return isFutureQuincena(n.ym, n.half);
   });
 
-  const counts = createMemo(() => {
-    const list = rows() ?? [];
-    const by = (pred: (s: string) => boolean) => list.filter((r) => pred((r.status || "").toLowerCase())).length;
+  const today = createMemo(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+  });
+
+  const monthOverview = createQuery(() => {
+    const b = bounds();
     return {
-      total: list.length,
-      submitted: by((s) => s === "submitted" || s === "pending"),
-      accepted: by((s) => s === "accepted"),
-      returned: by((s) => s === "returned"),
-      other: by((s) => !["submitted", "pending", "accepted", "returned"].includes(s)),
+      queryKey: ["hr-dtr-month-overview", b?.year, b?.month],
+      enabled: Boolean(b),
+      queryFn: async () => {
+        if (!b) return { rows: [] as MonthOverviewRow[] };
+        const res = await apiFetch<{ rows: MonthOverviewRow[] }>(
+          `/api/v1/hr/dtr/month-overview?year=${b.year}&month=${b.month}`,
+          {},
+          { silent: true },
+        );
+        if (!res.success)
+          throw new Error(res.message ?? "Failed to load DTR matrix");
+        return { rows: res.data?.rows ?? [] };
+      },
     };
   });
 
-  const filtered = createMemo(() => {
-    const qq = search().trim().toLowerCase();
-    const st = statusSeg().toLowerCase();
+  const clients = createMemo(() => {
+    const set = new Set<string>();
+    for (const r of monthOverview.data?.rows ?? []) {
+      if (r.department) set.add(r.department);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  });
+
+  const filteredRows = createMemo(() => {
+    const qq = q().trim().toLowerCase();
     const cl = clientFilter();
-    return (rows() ?? []).filter((row) => {
-      if (cl && row.client_name !== cl) return false;
-      if (st && (row.status || "").toLowerCase() !== st) return false;
+    const lookOnly = filter() === "look";
+    const dayList = days();
+    return (monthOverview.data?.rows ?? []).filter((row) => {
+      if (cl && row.department !== cl) return false;
+      if (lookOnly && lookCount(row, dayList) === 0) return false;
       if (!qq) return true;
       return (
-        row.client_name.toLowerCase().includes(qq) ||
-        row.site_name.toLowerCase().includes(qq) ||
-        (row.file_name || "").toLowerCase().includes(qq)
+        row.employee_name.toLowerCase().includes(qq) ||
+        row.employee_no.toLowerCase().includes(qq) ||
+        (row.job_title || "").toLowerCase().includes(qq) ||
+        (row.department || "").toLowerCase().includes(qq)
       );
     });
   });
 
-  const save = async () => {
-    if (!siteId() || !start() || !end()) return toast.warning("Choose a site and a period.");
-    const data = new FormData();
-    data.set("site_id", siteId());
-    data.set("period_start", start());
-    data.set("period_end", end());
-    if (file()) data.set("file", file()!);
-    const token = await getAccessToken();
-    const res = await fetch(`${apiBase}/api/v1/hr/client-time`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: data,
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok || body.success === false) return toast.warning(body.message ?? "Could not save the submission.");
-    toast.success("Submission saved.");
-    void refetch();
+  const groups = createMemo(() => {
+    const map = new Map<string, MonthOverviewRow[]>();
+    for (const row of filteredRows()) {
+      const key = row.department || "Unassigned";
+      const list = map.get(key) ?? [];
+      list.push(row);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  });
+
+  const cellByDay = (row: MonthOverviewRow) => {
+    const map = new Map<number, MonthDayCell>();
+    for (const cell of row.days ?? []) map.set(cell.day, cell);
+    return map;
   };
 
-  const accept = async (row: Submission) => {
-    const res = await apiFetch(`/api/v1/hr/client-time/${row.id}/accept`, {
-      method: "POST",
-      body: JSON.stringify({ accepted_hours: Number(hours()[row.id] ?? row.accepted_hours) || 0 }),
-    });
-    if (!res.success) return toast.warning(res.message ?? "Could not accept the submission.");
-    toast.success("Accepted.");
-    void refetch();
+  const isTodayCol = (d: number) => {
+    const b = bounds();
+    const t = today();
+    return Boolean(b && b.year === t.y && b.month === t.m && d === t.d);
   };
+
+  const rowHalfTotals = (row: MonthOverviewRow) => {
+    const set = new Set(days());
+    let present = 0;
+    let hours = 0;
+    for (const c of row.days ?? []) {
+      if (!set.has(c.day)) continue;
+      if (c.status === "present") {
+        present += 1;
+        hours += c.hours_worked ?? 0;
+      }
+    }
+    return { present, hours };
+  };
+
+  const goCutoff = (delta: number) => {
+    const next = shiftQuincena(ym(), half(), delta);
+    if (delta > 0 && isFutureQuincena(next.ym, next.half)) return;
+    setYm(next.ym);
+    setHalf(next.half);
+  };
+
+  const scrollDays = (dir: number) => {
+    const el = wrapEl();
+    if (!el) return;
+    el.scrollBy({ left: dir * 240, behavior: "smooth" });
+  };
+
+  const toggleGroup = (key: string) => {
+    setCollapsed({ ...collapsed(), [key]: !collapsed()[key] });
+  };
+
+  const onDayClick = (row: MonthOverviewRow, day: number) => {
+    toast.info(
+      `Day edit · ${row.employee_name} · ${day} — opens employee DTR.`,
+    );
+  };
+
+  const dueHint = createMemo(() => {
+    const b = bounds();
+    if (!b) return "";
+    const name = new Date(Date.UTC(b.year, b.month - 1, 1)).toLocaleString(
+      "en",
+      { month: "short", timeZone: "UTC" },
+    );
+    if (half() === "1")
+      return `Cut-off ${cutLabel()} · DTR due from clients on the 16th`;
+    return `Cut-off ${cutLabel()} · DTR due from clients early ${name === "Dec" ? "Jan" : "next month"}`;
+  });
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Time &amp; leave › Attendance / DTR › Client DTR inbox</div>
-      <HrAttendanceTabs />
       <HrPageHead
-        title={
-          <>
-            Client DTR inbox <HrPlanned />
-          </>
-        }
-        subtitle="DTR submitted by client users per cut-off. Review, accept or return, then lock and push to payroll."
-        actions={
-          <div class="flex flex-wrap gap-2">
-            <button
-              type="button"
-              class="hr-btn"
-              onClick={() => toast.info("Send reminders — Planned (needs client portal recipients).")}
-            >
-              Send reminders… <HrPlanned />
-            </button>
-            <button
-              type="button"
-              class="hr-btn hr-btn-primary"
-              onClick={() => toast.info("Lock cut-off & push to payroll — Planned.")}
-            >
-              Lock cut-off &amp; push… <HrPlanned />
-            </button>
-          </div>
-        }
+        title="Client DTR"
+        subtitle="Cut-off matrix by client / site. Click a day to edit · click a name for full detail."
       />
 
-      <HrNotice>
-        <b>Planned page</b> for full submission inbox (versions, receipts, return, lock). Today you can record a site
-        submission and accept hours — accepted hours stay here and are not written into attendance.
-      </HrNotice>
-
-      <div class="hr-kpis mt-3 mb-3">
-        <a class="hr-kpi" href="#inbox">
-          <div class="v">{rows() ? counts().total : "—"}</div>
-          <div class="l">Submissions</div>
-        </a>
-        <a class="hr-kpi" href="#inbox">
-          <div class="v">{rows() ? counts().submitted : "—"}</div>
-          <div class="l">Submitted / pending</div>
-        </a>
-        <a class="hr-kpi warn" href="#inbox">
-          <div class="v">{rows() ? counts().returned : "—"}</div>
-          <div class="l">
-            Returned <HrPlanned />
+      <div
+        id="mx"
+        class="me-surface"
+        data-open={view() === "agenda" ? "agenda" : ""}
+      >
+        <div class="me-bar">
+          <div class="me-cut" role="group" aria-label="Cut-off">
+            <button
+              type="button"
+              class="me-btn me-btn-secondary me-btn-sm"
+              id="meprev"
+              aria-label="Previous cut-off"
+              onClick={() => goCutoff(-1)}
+            >
+              ‹
+            </button>
+            <b id="mecutl">{cutLabel()}</b>
+            <button
+              type="button"
+              class="me-btn me-btn-secondary me-btn-sm"
+              id="menext"
+              aria-label="Next cut-off"
+              disabled={nextDisabled()}
+              onClick={() => goCutoff(1)}
+            >
+              ›
+            </button>
           </div>
-        </a>
-        <a class="hr-kpi" href="#inbox">
-          <div class="v">{rows() ? counts().accepted : "—"}</div>
-          <div class="l">Accepted</div>
-        </a>
-      </div>
-
-      <section class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 grid-cols-1 min-[1024px]:grid-cols-2">
-        <Field label="Site">
-          <select class={inputClass} value={siteId()} onChange={(e) => setSiteId(e.currentTarget.value)}>
-            <option value="">Choose</option>
-            <For each={sites() ?? []}>
-              {(site) => (
-                <option value={site.id}>
-                  {site.client_name} · {site.site_name}
-                </option>
-              )}
-            </For>
+          <div class="me-seg" role="group" aria-label="Quick filter">
+            <button
+              type="button"
+              data-fl="all"
+              aria-pressed={filter() === "all"}
+              classList={{ on: filter() === "all" }}
+              onClick={() => setFilter("all")}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              data-fl="look"
+              aria-pressed={filter() === "look"}
+              classList={{ on: filter() === "look" }}
+              onClick={() => setFilter("look")}
+            >
+              Needs a look
+            </button>
+          </div>
+          <select
+            class="me-input input"
+            id="mecl"
+            aria-label="Client"
+            value={clientFilter()}
+            onChange={(e) => setClientFilter(e.currentTarget.value)}
+          >
+            <option value="">All clients</option>
+            <For each={clients()}>{(c) => <option value={c}>{c}</option>}</For>
           </select>
-        </Field>
-        <Field label="Period start">
-          <input type="date" class={inputClass} value={start()} onInput={(e) => setStart(e.currentTarget.value)} />
-        </Field>
-        <Field label="Period end">
-          <input type="date" class={inputClass} value={end()} onInput={(e) => setEnd(e.currentTarget.value)} />
-        </Field>
-        <Field label="File">
-          <input type="file" class={inputClass} onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} />
-        </Field>
-        <button type="button" class="hr-btn hr-btn-primary self-end" onClick={() => void save()}>
-          Save submission
-        </button>
-      </section>
+          <input
+            class="me-input input grow"
+            id="meq"
+            type="search"
+            placeholder="Search name"
+            aria-label="Search name"
+            value={q()}
+            onInput={(e) => setQ(e.currentTarget.value)}
+          />
+          <span class="grow" />
+          <button
+            type="button"
+            class="me-btn me-btn-ghost me-btn-sm"
+            id="meview"
+            aria-pressed={view() === "agenda"}
+            onClick={() => setView(view() === "matrix" ? "agenda" : "matrix")}
+          >
+            {view() === "matrix" ? "☰ Agenda" : "▦ Matrix"}
+          </button>
+        </div>
 
-      <div id="inbox">
-        <HrTcard
-          toolbar={
-            <>
-              <input
-                class={`${inputClass} grow`}
-                placeholder="Search client or branch…"
-                aria-label="Search"
-                value={search()}
-                onInput={(e) => setSearch(e.currentTarget.value)}
-              />
-              <div class="hr-seg" role="group" aria-label="Status">
-                <button type="button" classList={{ on: statusSeg() === "" }} onClick={() => setStatusSeg("")}>
-                  All
-                </button>
-                <button type="button" classList={{ on: statusSeg() === "submitted" }} onClick={() => setStatusSeg("submitted")}>
-                  Submitted
-                </button>
-                <button type="button" classList={{ on: statusSeg() === "accepted" }} onClick={() => setStatusSeg("accepted")}>
-                  Accepted
-                </button>
-                <button
-                  type="button"
-                  classList={{ on: statusSeg() === "returned" }}
-                  onClick={() => setStatusSeg("returned")}
-                  title="Needs backend status"
-                >
-                  Returned <HrPlanned />
-                </button>
-              </div>
-              <select
-                class={inputClass}
-                aria-label="Client"
-                value={clientFilter()}
-                onChange={(e) => setClientFilter(e.currentTarget.value)}
-              >
-                <option value="">Client: All</option>
-                <For each={clients()}>{(c) => <option value={c}>{c}</option>}</For>
-              </select>
-            </>
-          }
-        >
-          <div class="hr-tbl-wrap">
+        <div class="me-legend" aria-label="Legend">
+          <span>
+            <i class="me-k ok">✓</i>Present
+          </span>
+          <span>
+            <i class="me-k chk">
+              ⏰<b>L</b>
+            </i>
+            Needs a look
+          </span>
+          <span>
+            <i class="me-k bad">
+              ✖<b>A</b>
+            </i>
+            Absent / missing punch
+          </span>
+          <span>
+            <i class="me-k neu">
+              🌴<b>LV</b>
+            </i>
+            Leave · <b>R</b> rest · <b>H</b> holiday
+          </span>
+          <span>
+            <i class="me-k wkk" />
+            Weekend
+          </span>
+          <span>
+            <i class="me-k tdk" />
+            Today
+          </span>
+          <span class="muted">
+            Click a day to edit · click a name for full detail
+          </span>
+        </div>
+
+        <div class="me-tools">
+          <button
+            type="button"
+            class="me-btn me-btn-ghost me-btn-sm"
+            id="metog"
+            onClick={() => {
+              const keys = groups().map(([k]) => k);
+              const allCollapsed =
+                keys.length > 0 && keys.every((k) => collapsed()[k]);
+              const next: Record<string, boolean> = {};
+              for (const k of keys) next[k] = !allCollapsed;
+              setCollapsed(next);
+            }}
+          >
+            {groups().length > 0 && groups().every(([k]) => collapsed()[k])
+              ? "Expand all"
+              : "Collapse all"}
+          </button>
+          <span class="xs muted">{dueHint()}</span>
+          <span class="grow" />
+          <Show when={view() === "matrix"}>
+            <button
+              type="button"
+              class="me-btn me-btn-secondary me-btn-sm"
+              id="mesl"
+              aria-label="Scroll days left"
+              onClick={() => scrollDays(-1)}
+            >
+              ◀
+            </button>
+            <button
+              type="button"
+              class="me-btn me-btn-secondary me-btn-sm"
+              id="mesr"
+              aria-label="Scroll days right"
+              onClick={() => scrollDays(1)}
+            >
+              ▶
+            </button>
+          </Show>
+        </div>
+
+        <Show when={view() === "agenda"}>
+          <div class="me-agenda" aria-label={`Agenda ${cutLabel()}`}>
             <Show
-              when={filtered().length > 0}
+              when={filteredRows().length > 0}
               fallback={
                 <HrEmpty
-                  title={rows.loading ? "Loading…" : "No submissions"}
-                  hint="Save a site submission above, or clear filters."
+                  title={
+                    monthOverview.isFetching
+                      ? "Loading…"
+                      : "No people in this cut-off"
+                  }
+                  hint="Try another cut-off, clear filters, or switch back to Matrix."
                 />
               }
             >
-              <table class="hr-tbl">
+              <For each={groups()}>
+                {([site, rows]) => (
+                  <section class="me-agenda-group">
+                    <h3>
+                      {site}{" "}
+                      <span class="xs muted">
+                        {rows.length} people
+                        <Show
+                          when={
+                            rows.filter((r) => lookCount(r, days()) > 0)
+                              .length > 0
+                          }
+                        >
+                          {" · "}
+                          <span class="lk">
+                            {
+                              rows.filter((r) => lookCount(r, days()) > 0)
+                                .length
+                            }{" "}
+                            need a look
+                          </span>
+                        </Show>
+                      </span>
+                    </h3>
+                    <ul>
+                      <For each={rows}>
+                        {(row) => {
+                          const looks = lookCount(row, days());
+                          const halfTot = rowHalfTotals(row);
+                          return (
+                            <li>
+                              <A
+                                href={`/app/hr/attendance/employees/${row.employee_id}?month=${ym()}`}
+                                class="mx-open"
+                              >
+                                {row.employee_name}
+                              </A>
+                              <Show when={looks > 0}>
+                                <span class="xs lk">● {looks}</span>
+                              </Show>
+                              <span class="xs muted">
+                                {row.job_title || row.employee_no} ·{" "}
+                                {halfTot.present} days ·{" "}
+                                {halfTot.hours.toFixed(1)}h
+                              </span>
+                            </li>
+                          );
+                        }}
+                      </For>
+                    </ul>
+                  </section>
+                )}
+              </For>
+            </Show>
+          </div>
+        </Show>
+
+        <Show when={view() === "matrix"}>
+          <div class="me-wrap" id="mewrap" tabindex="-1" ref={setWrapEl}>
+            <Show
+              when={filteredRows().length > 0}
+              fallback={
+                <HrEmpty
+                  title={
+                    monthOverview.isFetching
+                      ? "Loading…"
+                      : "No people in this cut-off"
+                  }
+                  hint="Try another cut-off, clear filters, or seed HR sample data."
+                />
+              }
+            >
+              <table
+                class="me"
+                role="grid"
+                aria-label={`DTR matrix ${cutLabel()}`}
+              >
                 <thead>
                   <tr>
-                    <th>Client</th>
-                    <th>Branch / site</th>
-                    <th>Period</th>
-                    <th>File</th>
-                    <th>
-                      Version <HrPlanned />
+                    <th class="nm" scope="col">
+                      Employee
                     </th>
-                    <th>Status</th>
-                    <th>Accepted hours</th>
-                    <th>
-                      <span class="sr-only">Actions</span>
+                    <For each={days()}>
+                      {(d) => {
+                        const b = bounds();
+                        const wk = b ? isWeekendDay(b.year, b.month, d) : false;
+                        const td = isTodayCol(d);
+                        return (
+                          <th
+                            scope="col"
+                            data-d={String(d)}
+                            class={`dh ${wk ? "wk" : ""} ${td ? "td" : ""}`}
+                          >
+                            <span class="dn">{d}</span>
+                            <span class="dw">
+                              {b ? weekdayShort(b.year, b.month, d) : ""}
+                            </span>
+                            <Show when={td}>
+                              <span class="hl tdl">Today</span>
+                            </Show>
+                          </th>
+                        );
+                      }}
+                    </For>
+                    <th scope="col" class="tot t1" title="Days worked">
+                      Days
+                    </th>
+                    <th scope="col" class="tot" title="Hours worked">
+                      Hours
+                    </th>
+                    <th scope="col" class="tot" title="Overtime hours">
+                      OT<small>h</small>
+                    </th>
+                    <th
+                      scope="col"
+                      class="tot"
+                      title="Night differential hours"
+                    >
+                      ND<small>h</small>
                     </th>
                   </tr>
                 </thead>
-                <tbody>
-                  <For each={filtered()}>
-                    {(row) => (
-                      <tr>
-                        <td>{row.client_name}</td>
-                        <td>{row.site_name}</td>
-                        <td>
-                          {row.period_start} → {row.period_end}
-                        </td>
-                        <td>{row.file_name || "—"}</td>
-                        <td>—</td>
-                        <td>
-                          <HrBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</HrBadge>
-                        </td>
-                        <td>
-                          <Show
-                            when={row.status === "accepted"}
-                            fallback={
-                              <span class="flex flex-wrap items-center gap-2">
-                                <input
-                                  class={inputClass}
-                                  style={{ width: "5.5rem" }}
-                                  value={hours()[row.id] ?? ""}
-                                  onInput={(e) => setHours({ ...hours(), [row.id]: e.currentTarget.value })}
-                                  aria-label="Accepted hours"
-                                />
-                                <button type="button" class="hr-btn hr-btn-sm hr-btn-primary" onClick={() => void accept(row)}>
-                                  Accept
-                                </button>
-                              </span>
-                            }
-                          >
-                            <span class="tabular-nums">{row.accepted_hours}</span>
-                          </Show>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            class="hr-btn hr-btn-sm"
-                            onClick={() => toast.info("Review / return / version history — Planned.")}
-                          >
-                            Review <HrPlanned />
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
+                <For each={groups()}>
+                  {([site, rows]) => {
+                    const dayList = days();
+                    const needPeople = rows.filter(
+                      (r) => lookCount(r, dayList) > 0,
+                    ).length;
+                    const sumDays = rows.reduce(
+                      (n, r) => n + rowHalfTotals(r).present,
+                      0,
+                    );
+                    const sumHrs = rows.reduce(
+                      (n, r) => n + rowHalfTotals(r).hours,
+                      0,
+                    );
+                    const sumOt = rows.reduce((n, r) => n + r.ot_hours_sum, 0);
+                    const sumNd = rows.reduce(
+                      (n, r) => n + r.night_diff_hours_sum,
+                      0,
+                    );
+                    const open = !collapsed()[site];
+                    return (
+                      <tbody>
+                        <tr class="grp">
+                          <th class="nm" scope="rowgroup">
+                            <button
+                              type="button"
+                              class="me-g"
+                              aria-expanded={open}
+                              onClick={() => toggleGroup(site)}
+                            >
+                              <span aria-hidden="true">{open ? "▾" : "▸"}</span>{" "}
+                              {site}
+                            </button>
+                            <span class="xs text-text-secondary">
+                              {rows.length} people
+                              <Show when={needPeople > 0}>
+                                {" · "}
+                                <span class="lk">{needPeople} need a look</span>
+                              </Show>
+                            </span>
+                          </th>
+                          <td class="gsp" colSpan={dayList.length} />
+                          <td class="tot t1">{sumDays}</td>
+                          <td class="tot">{sumHrs.toFixed(1)}</td>
+                          <td class="tot">{sumOt.toFixed(1)}</td>
+                          <td class="tot">{sumNd.toFixed(1)}</td>
+                        </tr>
+                        <Show when={open}>
+                          <For each={rows}>
+                            {(row) => {
+                              const byDay = cellByDay(row);
+                              const looks = lookCount(row, dayList);
+                              const halfTot = rowHalfTotals(row);
+                              return (
+                                <tr class="r">
+                                  <th class="nm" scope="row">
+                                    <A
+                                      class="mx-open"
+                                      href={`/app/hr/attendance/employees/${row.employee_id}?month=${ym()}`}
+                                      title="Open full detail"
+                                    >
+                                      {row.employee_name}
+                                    </A>{" "}
+                                    <Show when={looks > 0}>
+                                      <span class="xs lk" title="Needs a look">
+                                        ● {looks}
+                                      </span>
+                                    </Show>
+                                    <span class="xs text-text-secondary sub">
+                                      {row.job_title || row.employee_no}
+                                    </span>
+                                  </th>
+                                  <For each={dayList}>
+                                    {(d) => {
+                                      const cell = byDay.get(d);
+                                      const status = cell?.status ?? "";
+                                      const hours = cell?.hours_worked ?? 0;
+                                      const m = dtrMatrixCell(status, hours);
+                                      const b = bounds();
+                                      const wk = b
+                                        ? isWeekendDay(b.year, b.month, d)
+                                        : false;
+                                      const td = isTodayCol(d);
+                                      return (
+                                        <td
+                                          class={`${wk ? "wk" : ""} ${td ? "td" : ""}`}
+                                          data-d={String(d)}
+                                        >
+                                          <button
+                                            type="button"
+                                            class={`me-c ${m.tone}`}
+                                            aria-label={`${row.employee_name}, day ${d}: ${status || "empty"}`}
+                                            onClick={() => onDayClick(row, d)}
+                                          >
+                                            <span aria-hidden="true">
+                                              {m.icon}
+                                              <Show when={m.tag}>
+                                                <b>{m.tag}</b>
+                                              </Show>
+                                            </span>
+                                          </button>
+                                        </td>
+                                      );
+                                    }}
+                                  </For>
+                                  <td class="tot t1">{halfTot.present}</td>
+                                  <td class="tot">
+                                    {halfTot.hours.toFixed(1)}
+                                  </td>
+                                  <td class="tot">
+                                    {row.ot_hours_sum.toFixed(1)}
+                                  </td>
+                                  <td class="tot">
+                                    {row.night_diff_hours_sum.toFixed(1)}
+                                  </td>
+                                </tr>
+                              );
+                            }}
+                          </For>
+                        </Show>
+                      </tbody>
+                    );
+                  }}
+                </For>
               </table>
             </Show>
           </div>
-        </HrTcard>
+        </Show>
+        <p class="xs muted" style={{ "margin-top": "10px" }}>
+          Groups use department / site labels from employee records. Name opens
+          the employee DTR log.
+        </p>
       </div>
     </HrLayout>
   );

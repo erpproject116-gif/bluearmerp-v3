@@ -6,7 +6,7 @@ import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid
 import { loadViewMode, ViewModeToggle, type ViewMode } from "../../shared/ViewModeToggle";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 
 type Application = {
   id: number;
@@ -178,7 +178,7 @@ export default function ApplicantsPage() {
       <div class="mt-2 flex flex-wrap items-center gap-1">
         <HrBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</HrBadge>
         <span class="hr-muted">
-          Docs <HrPlanned />
+          Docs
         </span>
       </div>
       <div class="mt-2 flex flex-wrap gap-2">
@@ -194,7 +194,6 @@ export default function ApplicantsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › People › Applicants</div>
       <HrPageHead
         title="Applicants"
         subtitle="Submissions from the public application form, as a pipeline board. Drag cards between stages."
@@ -242,7 +241,7 @@ export default function ApplicantsPage() {
       />
 
       <p class="hr-muted mb-3">
-        SLA / aging targets per stage are <HrPlanned />. Rejection notice email is <HrPlanned />.
+        SLA / aging targets per stage and rejection notice email are not wired yet.
       </p>
 
       <div class="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stroke bg-surface p-2">
@@ -329,7 +328,7 @@ export default function ApplicantsPage() {
                         class="menu-item"
                         onClick={() => toast.warning("Reject dialog extras need backend remarks workflow.")}
                       >
-                        Reject <HrPlanned />
+                        Reject
                       </button>
                     </div>
                   </details>

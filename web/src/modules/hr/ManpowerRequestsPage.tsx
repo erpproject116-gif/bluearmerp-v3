@@ -2,9 +2,8 @@ import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
-import { ClientsDeploymentTabs } from "./ClientsDeploymentTabs";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrNotice, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { siteChoices } from "./siteChoices";
 
 type RequestRow = { id: number; client_name: string; site_name: string; headcount: number; details: string; status: string };
@@ -72,13 +71,10 @@ export default function ManpowerRequestsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Clients &amp; deployment › Clients › Manpower requests</div>
-      <ClientsDeploymentTabs />
-
       <HrPageHead
         title={
           <>
-            Manpower requests <HrPlanned />
+            Manpower requests
           </>
         }
         subtitle="Headcount requests from a client or from HR. Filling a request does not hire anyone."
@@ -89,10 +85,6 @@ export default function ManpowerRequestsPage() {
         }
       />
 
-      <HrNotice>
-        🧩 <b>Planned page</b> inside HR &amp; Payroll. Live today: open/filled/closed requests by site.
-        Fill progress, age, urgency flags and applicant shortlist links need more backend.
-      </HrNotice>
 
       <SpreadsheetGrid
         columns={[
@@ -122,7 +114,7 @@ export default function ManpowerRequestsPage() {
             sortable: false,
             render: () => (
               <span class="hr-muted">
-                — <HrPlanned />
+                —
               </span>
             ),
             exportValue: () => "",
@@ -166,7 +158,7 @@ export default function ManpowerRequestsPage() {
                     class="menu-item"
                     onClick={() => toast.warning("Applicant shortlist needs backend.")}
                   >
-                    Shortlist <HrPlanned />
+                    Shortlist
                   </button>
                   <Show when={row.status === "open"}>
                     <button type="button" class="menu-item" onClick={() => void setStatus(row, "filled")}>
@@ -248,7 +240,7 @@ export default function ManpowerRequestsPage() {
                 <input class={inputClass} value={details()} onInput={(e) => setDetails(e.currentTarget.value)} />
               </Field>
               <div class="rounded-lg border border-dashed border-stroke bg-panel p-3 text-sm">
-                <b>Needed-by date / urgency</b> <HrPlanned />
+                <b>Needed-by date / urgency</b>
               </div>
             </div>
             <div class="mt-4 flex flex-wrap justify-end gap-2">

@@ -93,7 +93,6 @@ export default function SpecialRunsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Payroll › Special runs</div>
       <HrPayrollTabs />
       <HrPageHead title="Special runs" subtitle="13th month and final pay. Preview before posting." />
 

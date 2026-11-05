@@ -5,7 +5,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrReportsTabs } from "./HrReportsTabs";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type ReportRow = {
   case_no: string;
@@ -144,7 +144,6 @@ export default function HrReportsPage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Reports &amp; compliance › HR reports</div>
       <HrReportsTabs />
       <HrPageHead
         title="HR reports"
@@ -175,7 +174,7 @@ export default function HrReportsPage() {
                     when={item.live}
                     fallback={
                       <span class="hr-muted">
-                        {item.label} <HrPlanned />
+                        {item.label}
                       </span>
                     }
                   >
@@ -376,7 +375,7 @@ export default function HrReportsPage() {
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">
-                Schedule report <HrPlanned />
+                Schedule report
               </h2>
               <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setSchOpen(false)}>
                 ✕

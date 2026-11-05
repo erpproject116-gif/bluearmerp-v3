@@ -1,7 +1,5 @@
 import { A, useLocation } from "@solidjs/router";
 import { For } from "solid-js";
-import { HrPlanned } from "./HrUi";
-
 const TABS = [
   { href: "/app/hr/clients", label: "Clients & sites", match: (p: string) => p === "/app/hr/clients" || p.endsWith("/hr/clients") },
   { href: "/app/hr/contracts", label: "Contracts & job orders", match: (p: string) => p.includes("/hr/contracts") },
@@ -17,7 +15,7 @@ export function ClientsDeploymentTabs() {
       <For each={[...TABS]}>
         {(tab) => (
           <A href={tab.href} classList={{ on: tab.match(path()) }} aria-current={tab.match(path()) ? "page" : undefined}>
-            {tab.label} <HrPlanned />
+            {tab.label}
           </A>
         )}
       </For>

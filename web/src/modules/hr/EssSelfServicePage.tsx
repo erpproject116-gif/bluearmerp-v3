@@ -6,7 +6,7 @@ import { formatPeso } from "../../shared/money";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrSteps, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, type HrBadgeTone } from "./HrUi";
 import "./ess-surface.css";
 
 type Screen =
@@ -417,7 +417,6 @@ function EssSelfServiceView() {
   return (
     <HrLayout>
       <div class="ess-shell">
-        <div class="hr-crumb">HR &amp; Payroll › My HR (self-service)</div>
         <HrPageHead
           title="My HR · Employee self-service"
           subtitle="Mobile-first for deployed employees, also usable on desktop. Same BluearmERP account; you only see your own records."
@@ -556,7 +555,7 @@ function EssSelfServiceView() {
                     </div>
                     <div class="ess-card">
                       <h4>
-                        Announcements <HrPlanned />
+                        Announcements
                       </h4>
                       <p class="text-xs text-text-secondary">Company notices from Policies &amp; notices will show here when ESS feed is wired.</p>
                     </div>
@@ -570,10 +569,10 @@ function EssSelfServiceView() {
                         {new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                       </div>
                       <div class="my-2 flex h-28 items-center justify-center rounded-xl bg-slate-100 text-sm text-text-secondary">
-                        📍 Geofence map <HrPlanned />
+                        📍 Geofence map
                       </div>
                       <p class="text-xs text-text-secondary mb-2">
-                        Location check <HrPlanned /> · Selfie capture optional below
+                        Location check · Selfie capture optional below
                       </p>
                       <Field label="Punch PIN (if set)">
                         <input class={inputClass} type="password" inputMode="numeric" value={punchPin()} onInput={(ev) => setPunchPin(ev.currentTarget.value)} />
@@ -595,13 +594,13 @@ function EssSelfServiceView() {
                         </div>
                         <div>
                           <div class="text-xs text-text-secondary">
-                            Late <HrPlanned />
+                            Late
                           </div>
                           <b class="text-xl">—</b>
                         </div>
                         <div>
                           <div class="text-xs text-text-secondary">
-                            OT <HrPlanned />
+                            OT
                           </div>
                           <b class="text-xl">—</b>
                         </div>
@@ -630,7 +629,7 @@ function EssSelfServiceView() {
                         ⏱ File OT
                       </button>
                       <button type="button" class="hr-btn hr-btn-sm" disabled title="Needs deployment roster">
-                        📅 Schedule <HrPlanned />
+                        📅 Schedule
                       </button>
                       <button type="button" class="hr-btn hr-btn-sm" onClick={() => go("hist")}>
                         History
@@ -653,7 +652,7 @@ function EssSelfServiceView() {
                         <textarea class={inputClass} value={corrReason()} onInput={(ev) => setCorrReason(ev.currentTarget.value)} placeholder="e.g. biometric did not read" />
                       </Field>
                       <HrNotice>
-                        Time correction request <HrPlanned /> — submit as a pay question / request for now.
+                        Time correction request — submit as a pay question / request for now.
                       </HrNotice>
                       <button
                         type="button"
@@ -683,7 +682,7 @@ function EssSelfServiceView() {
                       <Field label="Reason / approved by">
                         <textarea class={inputClass} value={otReason()} onInput={(ev) => setOtReason(ev.currentTarget.value)} />
                       </Field>
-                      <p class="text-xs text-text-secondary">Client approver confirms OT in the portal; HR checks before payroll. Filing path <HrPlanned /> — stored as request today.</p>
+                      <p class="text-xs text-text-secondary">Client approver confirms OT in the portal; HR checks before payroll. Filing path — stored as request today.</p>
                       <button
                         type="button"
                         class="hr-btn hr-btn-primary w-full"
@@ -907,7 +906,7 @@ function EssSelfServiceView() {
                         <span>🎄</span>
                         <div class="grow">
                           <b>
-                            13th month (estimate) <HrPlanned />
+                            13th month (estimate)
                           </b>
                           <div class="text-xs text-text-secondary">PD 851 — estimate only</div>
                         </div>
@@ -972,7 +971,7 @@ function EssSelfServiceView() {
                         Gross YTD {taxPack() ? money(taxPack()!.gross_ytd) : "—"} · WHT {taxPack() ? money(taxPack()!.withholding_tax_ytd) : "—"}
                       </p>
                       <button type="button" class="hr-btn hr-btn-sm mt-2" disabled title="PDF export needs backend">
-                        ⬇ Download PDF <HrPlanned />
+                        ⬇ Download PDF
                       </button>
                     </div>
                   </Show>
@@ -1047,7 +1046,7 @@ function EssSelfServiceView() {
                       </Show>
                       <Show when={screen() === "adv"}>
                         <p class="text-xs text-text-secondary">
-                          Max % of earned pay rule <HrPlanned /> — set in ESS settings later.
+                          Max % of earned pay rule — set in ESS settings later.
                         </p>
                       </Show>
                       <button type="button" class="hr-btn hr-btn-primary w-full" onClick={() => void submitRequest()}>
@@ -1109,7 +1108,7 @@ function EssSelfServiceView() {
                         </div>
                       </div>
                       <button type="button" class="hr-btn hr-btn-sm" disabled title="Needs approval workflow">
-                        Request update <HrPlanned />
+                        Request update
                       </button>
                     </div>
                     <p class="text-xs text-text-secondary">Changes are requests: HR approves before they update your 201 file.</p>
@@ -1240,7 +1239,7 @@ function EssSelfServiceView() {
                         <span>👆</span>
                         <div class="grow">
                           <b>
-                            Biometric unlock <HrPlanned />
+                            Biometric unlock
                           </b>
                           <div class="text-xs text-text-secondary">WebAuthn / device biometrics</div>
                         </div>

@@ -5,43 +5,68 @@ import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { inputClass } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
-import { HrAttendanceTabs } from "./HrAttendanceTabs";
-import { HrPageHead, HrPlanned } from "./HrUi";
+import { HrPageHead } from "./HrUi";
 import {
+  currentQuincenaHalf,
   currentYearMonth,
   dtrMatrixCell,
   dtrNeedsLook,
+  isFutureQuincena,
   isWeekendDay,
   monthBounds,
+  monthRangeLabel,
+  quincenaDays,
+  quincenaLabel,
+  shiftQuincena,
   shiftYearMonth,
   weekdayShort,
   type MonthDayCell,
   type MonthOverviewRow,
+  type QuincenaHalf,
 } from "./attendanceShared";
 
 type Density = "S" | "M" | "L";
 type LookFilter = "all" | "look";
+type RangeMode = "quincena" | "month";
 
-const densityPx: Record<Density, { day: number; padY: number; padX: number; row: number; font: number }> = {
+const densityPx: Record<
+  Density,
+  { day: number; padY: number; padX: number; row: number; font: number }
+> = {
   S: { day: 28, padY: 2, padX: 2, row: 28, font: 11 },
   M: { day: 36, padY: 4, padX: 4, row: 36, font: 12 },
   L: { day: 48, padY: 8, padX: 6, row: 44, font: 13 },
 };
 
-function lookCount(row: MonthOverviewRow): number {
-  return (row.days ?? []).filter((c) => dtrNeedsLook(c.status, c.hours_worked ?? 0)).length;
+function lookCount(row: MonthOverviewRow, days: number[]): number {
+  const set = new Set(days);
+  return (row.days ?? []).filter(
+    (c) => set.has(c.day) && dtrNeedsLook(c.status, c.hours_worked ?? 0),
+  ).length;
 }
 
-function monthLabel(ym: string): string {
-  const b = monthBounds(ym);
-  if (!b) return ym;
-  const name = new Date(Date.UTC(b.year, b.month - 1, 1)).toLocaleString("en", { month: "short", timeZone: "UTC" });
-  return `1–${b.daysInMonth} ${name} ${b.year}`;
+function rangeTotals(row: MonthOverviewRow, days: number[]) {
+  const set = new Set(days);
+  let present = 0;
+  let hours = 0;
+  let absent = 0;
+  for (const c of row.days ?? []) {
+    if (!set.has(c.day)) continue;
+    if (c.status === "present") {
+      present += 1;
+      hours += c.hours_worked ?? 0;
+    } else if (c.status === "absent" || c.status === "awol") {
+      absent += 1;
+    }
+  }
+  return { present, hours, absent };
 }
 
 export default function AttendanceOverviewPage() {
   const toast = useToast();
   const [overviewMonth, setOverviewMonth] = createSignal(currentYearMonth());
+  const [half, setHalf] = createSignal<QuincenaHalf>(currentQuincenaHalf());
+  const [rangeMode, setRangeMode] = createSignal<RangeMode>("quincena");
   const [density, setDensity] = createSignal<Density>("M");
   const [empColW, setEmpColW] = createSignal(200);
   const [filter, setFilter] = createSignal<LookFilter>("all");
@@ -62,12 +87,16 @@ export default function AttendanceOverviewPage() {
       enabled: Boolean(b),
       queryFn: async () => {
         if (!b) return { rows: [] as MonthOverviewRow[], days_in_month: 0 };
-        const res = await apiFetch<{ rows: MonthOverviewRow[]; days_in_month: number }>(
+        const res = await apiFetch<{
+          rows: MonthOverviewRow[];
+          days_in_month: number;
+        }>(
           `/api/v1/hr/dtr/month-overview?year=${b.year}&month=${b.month}`,
           {},
           { silent: true },
         );
-        if (!res.success) throw new Error(res.message ?? "Failed to load month overview");
+        if (!res.success)
+          throw new Error(res.message ?? "Failed to load month overview");
         return {
           rows: res.data?.rows ?? [],
           days_in_month: res.data?.days_in_month ?? b.daysInMonth,
@@ -76,10 +105,34 @@ export default function AttendanceOverviewPage() {
     };
   });
 
-  const dayNums = () => {
-    const n = monthOverview.data?.days_in_month ?? overviewBounds()?.daysInMonth ?? 31;
-    return Array.from({ length: n }, (_, i) => i + 1);
-  };
+  const dayNums = createMemo(() => {
+    if (rangeMode() === "month") {
+      const n =
+        monthOverview.data?.days_in_month ??
+        overviewBounds()?.daysInMonth ??
+        31;
+      return Array.from({ length: n }, (_, i) => i + 1);
+    }
+    return quincenaDays(overviewMonth(), half());
+  });
+
+  const periodLabel = createMemo(() =>
+    rangeMode() === "month"
+      ? monthRangeLabel(overviewMonth())
+      : quincenaLabel(overviewMonth(), half()),
+  );
+
+  const nextDisabled = createMemo(() => {
+    if (rangeMode() === "month") {
+      const next = shiftYearMonth(overviewMonth(), 1);
+      const b = monthBounds(next);
+      if (!b) return false;
+      const t = today();
+      return b.year > t.y || (b.year === t.y && b.month > t.m);
+    }
+    const n = shiftQuincena(overviewMonth(), half(), 1);
+    return isFutureQuincena(n.ym, n.half);
+  });
 
   const depts = createMemo(() => {
     const set = new Set<string>();
@@ -93,9 +146,10 @@ export default function AttendanceOverviewPage() {
     const qq = q().trim().toLowerCase();
     const dept = deptFilter();
     const lookOnly = filter() === "look";
+    const days = dayNums();
     return (monthOverview.data?.rows ?? []).filter((row) => {
       if (dept && row.department !== dept) return false;
-      if (lookOnly && lookCount(row) === 0) return false;
+      if (lookOnly && lookCount(row, days) === 0) return false;
       if (!qq) return true;
       return (
         row.employee_name.toLowerCase().includes(qq) ||
@@ -130,50 +184,97 @@ export default function AttendanceOverviewPage() {
 
   const tableMinW = () => empColW() + dayNums().length * size().day + 5 * 56;
 
+  const goPrev = () => {
+    if (rangeMode() === "month") {
+      setOverviewMonth(shiftYearMonth(overviewMonth(), -1));
+      return;
+    }
+    const prev = shiftQuincena(overviewMonth(), half(), -1);
+    setOverviewMonth(prev.ym);
+    setHalf(prev.half);
+  };
+
+  const goNext = () => {
+    if (nextDisabled()) return;
+    if (rangeMode() === "month") {
+      setOverviewMonth(shiftYearMonth(overviewMonth(), 1));
+      return;
+    }
+    const next = shiftQuincena(overviewMonth(), half(), 1);
+    if (isFutureQuincena(next.ym, next.half)) return;
+    setOverviewMonth(next.ym);
+    setHalf(next.half);
+  };
+
   const onDayClick = (row: MonthOverviewRow, day: number) => {
     toast.info(
-      `Day edit for ${row.employee_name} · ${day} ${monthLabel(overviewMonth()).split(" ").slice(1).join(" ")} — workbench day editor Planned.`,
+      `Day edit for ${row.employee_name} · ${day} — opens employee DTR.`,
     );
   };
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Time &amp; leave › Attendance / DTR › Overview</div>
-      <HrAttendanceTabs />
       <HrPageHead
-        title={
-          <>
-            DTR matrix · workbench <HrPlanned />
-          </>
-        }
-        subtitle="Click a day to edit it, click a name for the full detail."
+        title="Attendance overview"
+        subtitle="Quincena matrix by default · switch to full month when you need the whole calendar."
       />
 
       <div class="me-bar">
-        <div class="flex items-center gap-1" role="group" aria-label="Month">
+        <div
+          class="flex items-center gap-1"
+          role="group"
+          aria-label={rangeMode() === "month" ? "Month" : "Cut-off"}
+        >
           <button
             type="button"
             class="hr-btn hr-btn-sm"
-            aria-label="Previous month"
-            onClick={() => setOverviewMonth(shiftYearMonth(overviewMonth(), -1))}
+            aria-label="Previous"
+            onClick={goPrev}
           >
             ‹
           </button>
-          <b class="min-w-[9rem] text-center text-sm">{monthLabel(overviewMonth())}</b>
+          <b class="min-w-[10rem] text-center text-sm">{periodLabel()}</b>
           <button
             type="button"
             class="hr-btn hr-btn-sm"
-            aria-label="Next month"
-            onClick={() => setOverviewMonth(shiftYearMonth(overviewMonth(), 1))}
+            aria-label="Next"
+            disabled={nextDisabled()}
+            onClick={goNext}
           >
             ›
           </button>
         </div>
+        <div class="hr-seg" role="group" aria-label="Range">
+          <button
+            type="button"
+            classList={{ on: rangeMode() === "quincena" }}
+            aria-pressed={rangeMode() === "quincena"}
+            onClick={() => setRangeMode("quincena")}
+          >
+            Quincena
+          </button>
+          <button
+            type="button"
+            classList={{ on: rangeMode() === "month" }}
+            aria-pressed={rangeMode() === "month"}
+            onClick={() => setRangeMode("month")}
+          >
+            Month
+          </button>
+        </div>
         <div class="hr-seg" role="group" aria-label="Quick filter">
-          <button type="button" classList={{ on: filter() === "all" }} onClick={() => setFilter("all")}>
+          <button
+            type="button"
+            classList={{ on: filter() === "all" }}
+            onClick={() => setFilter("all")}
+          >
             All
           </button>
-          <button type="button" classList={{ on: filter() === "look" }} onClick={() => setFilter("look")}>
+          <button
+            type="button"
+            classList={{ on: filter() === "look" }}
+            onClick={() => setFilter("look")}
+          >
             Needs a look
           </button>
         </div>
@@ -195,9 +296,13 @@ export default function AttendanceOverviewPage() {
           onInput={(e) => setQ(e.currentTarget.value)}
         />
         <div class="hr-seg" role="group" aria-label="Cell size">
-          <For each={(["S", "M", "L"] as Density[])}>
+          <For each={["S", "M", "L"] as Density[]}>
             {(d) => (
-              <button type="button" classList={{ on: density() === d }} onClick={() => setDensity(d)}>
+              <button
+                type="button"
+                classList={{ on: density() === d }}
+                onClick={() => setDensity(d)}
+              >
                 {d}
               </button>
             )}
@@ -238,15 +343,20 @@ export default function AttendanceOverviewPage() {
           </i>
           Leave · <b>R</b> rest · <b>H</b> holiday
         </span>
-        <span class="text-text-secondary">Click a day to edit · click a name for full detail</span>
+        <span class="text-text-secondary">
+          Click a day to edit · click a name for full detail
+        </span>
       </div>
 
       <section class="rounded-xl border border-stroke bg-surface shadow-sm">
-        <div class="max-h-[min(70vh,720px)] overflow-auto overscroll-contain" style={{ "scrollbar-gutter": "stable" }}>
+        <div
+          class="max-h-[min(70vh,720px)] overflow-auto overscroll-contain"
+          style={{ "scrollbar-gutter": "stable" }}
+        >
           <table
             class="me border-separate border-spacing-0 text-left"
             role="grid"
-            aria-label={`DTR matrix ${monthLabel(overviewMonth())}`}
+            aria-label={`DTR matrix ${periodLabel()}`}
             style={{
               "min-width": `${tableMinW()}px`,
               "font-size": `${size().font}px`,
@@ -256,7 +366,11 @@ export default function AttendanceOverviewPage() {
               <tr class="border-b border-stroke text-xs font-semibold text-text-secondary">
                 <th
                   class="sticky left-0 top-0 z-30 border-b border-r border-stroke bg-surface py-2 pr-3 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
-                  style={{ width: `${empColW()}px`, "min-width": `${empColW()}px`, "max-width": `${empColW()}px` }}
+                  style={{
+                    width: `${empColW()}px`,
+                    "min-width": `${empColW()}px`,
+                    "max-width": `${empColW()}px`,
+                  }}
                   scope="col"
                 >
                   Employee
@@ -281,25 +395,50 @@ export default function AttendanceOverviewPage() {
                           {b ? weekdayShort(b.year, b.month, d) : ""}
                         </span>
                         <Show when={td}>
-                          <span class="block text-[9px] font-semibold text-brand-700">Today</span>
+                          <span class="block text-[9px] font-semibold text-brand-700">
+                            Today
+                          </span>
                         </Show>
                       </th>
                     );
                   }}
                 </For>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pl-2 pr-2 text-right" title="Days present">
+                <th
+                  class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pl-2 pr-2 text-right"
+                  title="Days present"
+                >
                   Days
                 </th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right" title="Hours worked">
+                <th
+                  class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right"
+                  title="Hours worked"
+                >
                   Hours
                 </th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right" title="OT hours">
+                <th
+                  class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right"
+                  title={
+                    rangeMode() === "quincena"
+                      ? "OT hours (month total)"
+                      : "OT hours"
+                  }
+                >
                   OT<small>h</small>
                 </th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right" title="Night differential">
+                <th
+                  class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 pr-2 text-right"
+                  title={
+                    rangeMode() === "quincena"
+                      ? "Night differential (month total)"
+                      : "Night differential"
+                  }
+                >
                   ND<small>h</small>
                 </th>
-                <th class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 text-right" title="Absent + AWOL">
+                <th
+                  class="sticky top-0 z-20 border-b border-stroke bg-surface py-2 text-right"
+                  title="Absent + AWOL"
+                >
                   Abs
                 </th>
               </tr>
@@ -309,8 +448,13 @@ export default function AttendanceOverviewPage() {
               fallback={
                 <tbody>
                   <tr>
-                    <td colSpan={6 + dayNums().length} class="px-3 py-4 text-text-secondary">
-                      {monthOverview.isFetching ? "Loading…" : "No matching employees."}
+                    <td
+                      colSpan={6 + dayNums().length}
+                      class="px-3 py-4 text-text-secondary"
+                    >
+                      {monthOverview.isFetching
+                        ? "Loading…"
+                        : "No matching employees."}
                     </td>
                   </tr>
                 </tbody>
@@ -318,12 +462,28 @@ export default function AttendanceOverviewPage() {
             >
               <For each={groups()}>
                 {([dept, rows]) => {
-                  const need = rows.reduce((n, r) => n + (lookCount(r) > 0 ? 1 : 0), 0);
-                  const sumDays = rows.reduce((n, r) => n + r.present_days, 0);
-                  const sumHrs = rows.reduce((n, r) => n + r.hours_worked_sum, 0);
+                  const days = dayNums();
+                  const need = rows.reduce(
+                    (n, r) => n + (lookCount(r, days) > 0 ? 1 : 0),
+                    0,
+                  );
+                  const sumDays = rows.reduce(
+                    (n, r) => n + rangeTotals(r, days).present,
+                    0,
+                  );
+                  const sumHrs = rows.reduce(
+                    (n, r) => n + rangeTotals(r, days).hours,
+                    0,
+                  );
                   const sumOt = rows.reduce((n, r) => n + r.ot_hours_sum, 0);
-                  const sumNd = rows.reduce((n, r) => n + r.night_diff_hours_sum, 0);
-                  const sumAbs = rows.reduce((n, r) => n + r.absent_days + r.awol_days, 0);
+                  const sumNd = rows.reduce(
+                    (n, r) => n + r.night_diff_hours_sum,
+                    0,
+                  );
+                  const sumAbs = rows.reduce(
+                    (n, r) => n + rangeTotals(r, days).absent,
+                    0,
+                  );
                   return (
                     <tbody>
                       <tr class="bg-slate-50/90">
@@ -347,19 +507,36 @@ export default function AttendanceOverviewPage() {
                             </Show>
                           </div>
                         </th>
-                        <td class="border-b border-slate-100" colSpan={dayNums().length} />
-                        <td class="border-b border-slate-100 py-1 pl-2 pr-2 text-right tabular-nums">{sumDays}</td>
-                        <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">{sumHrs.toFixed(1)}</td>
-                        <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">{sumOt.toFixed(1)}</td>
-                        <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">{sumNd.toFixed(1)}</td>
-                        <td class="border-b border-slate-100 py-1 text-right tabular-nums">{sumAbs}</td>
+                        <td
+                          class="border-b border-slate-100"
+                          colSpan={days.length}
+                        />
+                        <td class="border-b border-slate-100 py-1 pl-2 pr-2 text-right tabular-nums">
+                          {sumDays}
+                        </td>
+                        <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">
+                          {sumHrs.toFixed(1)}
+                        </td>
+                        <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">
+                          {sumOt.toFixed(1)}
+                        </td>
+                        <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">
+                          {sumNd.toFixed(1)}
+                        </td>
+                        <td class="border-b border-slate-100 py-1 text-right tabular-nums">
+                          {sumAbs}
+                        </td>
                       </tr>
                       <For each={rows}>
                         {(row) => {
                           const byDay = cellByDay(row);
-                          const looks = lookCount(row);
+                          const looks = lookCount(row, days);
+                          const tot = rangeTotals(row, days);
                           return (
-                            <tr class="hover:bg-slate-50/80" style={{ height: `${size().row}px` }}>
+                            <tr
+                              class="hover:bg-slate-50/80"
+                              style={{ height: `${size().row}px` }}
+                            >
                               <th
                                 class="sticky left-0 z-10 border-b border-r border-slate-100 bg-surface pr-3 text-left font-normal shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
                                 style={{
@@ -377,20 +554,27 @@ export default function AttendanceOverviewPage() {
                                   {row.employee_name}
                                 </A>
                                 <Show when={looks > 0}>
-                                  <span class="mr-1 text-xs text-amber-700" title="Needs a look">
+                                  <span
+                                    class="mr-1 text-xs text-amber-700"
+                                    title="Needs a look"
+                                  >
                                     ● {looks}
                                   </span>
                                 </Show>
-                                <span class="block truncate text-xs text-text-secondary">{row.job_title || row.employee_no}</span>
+                                <span class="block truncate text-xs text-text-secondary">
+                                  {row.job_title || row.employee_no}
+                                </span>
                               </th>
-                              <For each={dayNums()}>
+                              <For each={days}>
                                 {(d) => {
                                   const cell = byDay.get(d);
                                   const status = cell?.status ?? "";
                                   const hours = cell?.hours_worked ?? 0;
                                   const m = dtrMatrixCell(status, hours);
                                   const b = overviewBounds();
-                                  const wk = b ? isWeekendDay(b.year, b.month, d) : false;
+                                  const wk = b
+                                    ? isWeekendDay(b.year, b.month, d)
+                                    : false;
                                   const td = isTodayCol(d);
                                   return (
                                     <td
@@ -404,7 +588,11 @@ export default function AttendanceOverviewPage() {
                                       <button
                                         type="button"
                                         class={`me-c ${m.tone}`}
-                                        title={status ? `${status}${status === "present" ? ` · ${hours}h` : ""}` : undefined}
+                                        title={
+                                          status
+                                            ? `${status}${status === "present" ? ` · ${hours}h` : ""}`
+                                            : undefined
+                                        }
                                         aria-label={`${row.employee_name}, day ${d}: ${status || "empty"}`}
                                         onClick={() => onDayClick(row, d)}
                                       >
@@ -419,12 +607,20 @@ export default function AttendanceOverviewPage() {
                                   );
                                 }}
                               </For>
-                              <td class="border-b border-slate-100 py-1 pl-2 pr-2 text-right tabular-nums">{row.present_days}</td>
-                              <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">{row.hours_worked_sum}</td>
-                              <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">{row.ot_hours_sum}</td>
-                              <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">{row.night_diff_hours_sum}</td>
+                              <td class="border-b border-slate-100 py-1 pl-2 pr-2 text-right tabular-nums">
+                                {tot.present}
+                              </td>
+                              <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">
+                                {tot.hours.toFixed(1)}
+                              </td>
+                              <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">
+                                {row.ot_hours_sum}
+                              </td>
+                              <td class="border-b border-slate-100 py-1 pr-2 text-right tabular-nums">
+                                {row.night_diff_hours_sum}
+                              </td>
                               <td class="border-b border-slate-100 py-1 text-right tabular-nums">
-                                {row.absent_days + row.awol_days}
+                                {tot.absent}
                               </td>
                             </tr>
                           );
@@ -438,9 +634,6 @@ export default function AttendanceOverviewPage() {
           </table>
         </div>
       </section>
-      <p class="mt-2 text-xs text-text-secondary">
-        Day-edit workbench modal <HrPlanned /> · name opens the employee DTR log.
-      </p>
     </HrLayout>
   );
 }

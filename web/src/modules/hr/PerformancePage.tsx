@@ -222,7 +222,6 @@ export default function PerformancePage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Performance › Evaluations &amp; learning › Evaluations</div>
       <HrPerformanceTabs />
       <HrPageHead
         title="Evaluations"

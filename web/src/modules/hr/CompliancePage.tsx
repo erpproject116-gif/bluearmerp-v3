@@ -4,7 +4,7 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { HrReportsTabs } from "./HrReportsTabs";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, HrTcard, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type Doc = {
   id: number;
@@ -123,12 +123,11 @@ export default function CompliancePage() {
 
   return (
     <HrLayout>
-      <div class="hr-crumb">HR &amp; Payroll › Reports &amp; compliance › Compliance &amp; documents</div>
       <HrReportsTabs />
       <HrPageHead
         title={
           <>
-            Compliance &amp; documents <HrPlanned />
+            Compliance &amp; documents
           </>
         }
         subtitle="Document expiry, 201-file completeness and DOLE checks."
@@ -140,15 +139,11 @@ export default function CompliancePage() {
             title="Needs backend"
             onClick={() => toast.warning("Reminders need backend.")}
           >
-            Send reminders <HrPlanned />
+            Send reminders
           </button>
         }
       />
 
-      <HrNotice>
-        <b>Planned page</b> for full DOLE / nightly expiry workflow. Live today: document dates and client visibility on the
-        employee file. Showing a document to a client does not send the file.
-      </HrNotice>
 
       <div class="hr-kpis mt-3 mb-3">
         <a
@@ -195,7 +190,7 @@ export default function CompliancePage() {
         >
           <div class="v">—</div>
           <div class="l">
-            Near 6-month mark <HrPlanned />
+            Near 6-month mark
           </div>
           <div class="h">Regularization check</div>
         </a>
@@ -326,10 +321,10 @@ export default function CompliancePage() {
                                     Upload / set expiry
                                   </button>
                                   <button type="button" class="menu-item" disabled title="Needs backend">
-                                    Remind <HrPlanned />
+                                    Remind
                                   </button>
                                   <button type="button" class="menu-item" disabled title="Open on employee file">
-                                    View <HrPlanned />
+                                    View
                                   </button>
                                 </div>
                               </details>
@@ -357,19 +352,19 @@ export default function CompliancePage() {
               <li class="flex flex-wrap items-center justify-between gap-2">
                 <span>Employees approaching 6 months of service (probationary → regular)</span>
                 <span class="inline-flex items-center gap-1">
-                  <HrBadge tone="neutral">—</HrBadge> <HrPlanned />
+                  <HrBadge tone="neutral">—</HrBadge>
                 </span>
               </li>
               <li class="flex flex-wrap items-center justify-between gap-2">
                 <span>Contracts renewed back-to-back on the same role (“5-5-5” endo pattern)</span>
                 <span class="inline-flex items-center gap-1">
-                  <HrBadge tone="danger">flagged</HrBadge> <HrPlanned />
+                  <HrBadge tone="danger">flagged</HrBadge>
                 </span>
               </li>
               <li class="flex flex-wrap items-center justify-between gap-2">
                 <span>DO 174 registration certificate validity</span>
                 <span class="inline-flex items-center gap-1">
-                  <HrBadge tone="success">Valid</HrBadge> <HrPlanned />
+                  <HrBadge tone="success">Valid</HrBadge>
                 </span>
               </li>
             </ul>

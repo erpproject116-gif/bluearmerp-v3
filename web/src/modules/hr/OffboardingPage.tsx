@@ -6,7 +6,7 @@ import { SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrPlanned, type HrBadgeTone } from "./HrUi";
+import { HrBadge, HrEmpty, HrNotice, HrPageHead, type HrBadgeTone } from "./HrUi";
 
 type Clearance = {
   id: number;
@@ -99,7 +99,7 @@ export default function OffboardingPage() {
     setSaving(false);
     if (!res.success) return toast.warning(res.message ?? "Could not save the clearance.");
     if (reason() || lastDay()) {
-      toast.success("Clearance started. Reason and last day need backend (shown as Planned).");
+      toast.success("Clearance started.");
     } else {
       toast.success("Clearance started.");
     }
@@ -131,7 +131,7 @@ export default function OffboardingPage() {
         crumb={<>HR &amp; Payroll › People › Offboarding &amp; clearance</>}
         title={
           <>
-            Offboarding &amp; clearance <HrPlanned />
+            Offboarding &amp; clearance
           </>
         }
         subtitle="Clearance checklist, final pay and certificate of employment."
@@ -150,11 +150,6 @@ export default function OffboardingPage() {
         }
       />
 
-      <HrNotice>
-        🧩 <b>Planned page</b> inside HR &amp; Payroll. Live today: start clearance and release final pay.
-        Checklist steps, reason, last day, COE and quitclaim need backend. Starts from an approved resignation
-        or a closed termination case when those flows are wired.
-      </HrNotice>
 
       <div class="hr-tcard-grid mt-3">
         <SpreadsheetGrid
@@ -185,7 +180,7 @@ export default function OffboardingPage() {
               sortable: false,
               render: () => (
                 <span class="hr-muted">
-                  — <HrPlanned />
+                  —
                 </span>
               ),
               exportValue: () => "",
@@ -196,7 +191,7 @@ export default function OffboardingPage() {
               sortable: false,
               render: () => (
                 <span class="hr-muted">
-                  — <HrPlanned />
+                  —
                 </span>
               ),
               exportValue: () => "",
@@ -209,7 +204,6 @@ export default function OffboardingPage() {
                 <span class="tabular-nums">
                   {row.status === "released" ? "5 / 5" : "— / 5"}{" "}
                   <Show when={row.status !== "released"}>
-                    <HrPlanned />
                   </Show>
                 </span>
               ),
@@ -241,13 +235,13 @@ export default function OffboardingPage() {
                   <summary class="hr-rowmenu-btn" aria-label="Row actions">⋯</summary>
                   <div>
                     <button type="button" class="menu-item" onClick={() => openFor(row, "checklist")}>
-                      Open checklist <HrPlanned />
+                      Open checklist
                     </button>
                     <button type="button" class="menu-item" onClick={() => openFor(row, "final")}>
-                      Compute final pay <HrPlanned />
+                      Compute final pay
                     </button>
                     <button type="button" class="menu-item" onClick={() => openFor(row, "coe")}>
-                      Issue COE <HrPlanned />
+                      Issue COE
                     </button>
                     <Show
                       when={row.status !== "released"}
@@ -285,7 +279,7 @@ export default function OffboardingPage() {
                     onClick={() => setStatusFilter(chip.value)}
                   >
                     {chip.label}
-                    <Show when={chip.planned}>{" "}<HrPlanned /></Show>
+                    <Show when={chip.planned}>{" "}</Show>
                   </button>
                 )}
               </For>
@@ -305,7 +299,6 @@ export default function OffboardingPage() {
           <h3>Final pay</h3>
           <span class="grow" />
           <Show when={!selectedRow() || selectedRow()!.status !== "released"}>
-            <HrPlanned />
           </Show>
         </header>
         <Show
@@ -366,7 +359,7 @@ export default function OffboardingPage() {
               />
               <label class="block text-sm">
                 <span class="mb-1 flex items-center gap-2 font-medium">
-                  Reason <HrPlanned />
+                  Reason
                 </span>
                 <select
                   class="w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm"
@@ -380,7 +373,7 @@ export default function OffboardingPage() {
               </label>
               <label class="block text-sm">
                 <span class="mb-1 flex items-center gap-2 font-medium">
-                  Last day <HrPlanned />
+                  Last day
                 </span>
                 <input
                   type="date"
@@ -420,7 +413,7 @@ export default function OffboardingPage() {
             <div class="hr-side-panel flex h-full w-full max-w-md flex-col border-l border-stroke bg-surface shadow-xl">
               <header class="flex items-center justify-between gap-2 border-b border-stroke px-4 py-3">
                 <h3 class="text-sm font-semibold">
-                  Clearance checklist · {row().employee_name} <HrPlanned />
+                  Clearance checklist · {row().employee_name}
                 </h3>
                 <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setChecklistOpen(false)}>
                   ✕
@@ -442,7 +435,7 @@ export default function OffboardingPage() {
                 <label class="mt-3 flex items-start gap-2 text-sm">
                   <input type="checkbox" disabled class="mt-0.5" />
                   <span>
-                    Mark Finance as cleared <HrPlanned />
+                    Mark Finance as cleared
                   </span>
                 </label>
               </div>
@@ -481,7 +474,7 @@ export default function OffboardingPage() {
             <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">
-                  Compute final pay <HrPlanned />
+                  Compute final pay
                 </h2>
                 <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setFinalPayOpen(false)}>
                   ✕
@@ -532,7 +525,7 @@ export default function OffboardingPage() {
             <div class="w-full max-w-lg rounded-lg border border-stroke bg-surface p-4 shadow-lg">
               <div class="mb-3 flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold">
-                  Print / PDF preview — Certificate of employment <HrPlanned />
+                  Print / PDF preview — Certificate of employment
                 </h2>
                 <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setCoeOpen(false)}>
                   ✕
