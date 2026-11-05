@@ -45,7 +45,8 @@ export default function ContractsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Contracts & job orders</h1>
+      <h1 class="mb-1 text-2xl font-semibold">Contracts & job orders</h1>
+      <p class="mb-4 text-sm text-text-secondary">Job orders hold the pay rate and the bill rate. Public openings are separate and do not show rates.</p>
       <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-4">
         <SiteField sites={clients() ?? []} value={siteId()} onChange={setSiteId} />
         <Field label="Pay rate"><input class={inputClass} value={pay()} onInput={(e) => setPay(e.currentTarget.value)} /></Field>

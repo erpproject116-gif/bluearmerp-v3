@@ -134,7 +134,7 @@ export default function DisciplinePage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-1 text-2xl font-semibold">Discipline / NTE</h1>
+      <h1 class="mb-1 text-2xl font-semibold">Discipline</h1>
       <p class="mb-6 text-sm text-text-secondary">
         Case timeline and letter → 201. Have PH labor counsel review wording before claiming DOLE compliance.
       </p>

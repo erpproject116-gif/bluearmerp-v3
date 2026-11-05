@@ -35,7 +35,8 @@ export default function ManpowerRequestsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Manpower requests</h1>
+      <h1 class="mb-1 text-2xl font-semibold">Manpower requests</h1>
+      <p class="mb-4 text-sm text-text-secondary">Headcount requests from a client or from HR. Filling a request does not hire anyone.</p>
       <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-4">
         <Field label="Site">
           <select class={inputClass} value={siteId()} onChange={(e) => setSiteId(e.currentTarget.value)}>

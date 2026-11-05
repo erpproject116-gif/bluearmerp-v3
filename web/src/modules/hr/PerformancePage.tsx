@@ -113,7 +113,7 @@ export default function PerformancePage() {
   return (
     <HrLayout>
       <h1 class="mb-1 text-2xl font-semibold">Evaluations</h1>
-      <p class="mb-6 text-sm text-text-secondary">Review cycles, manager scoring, signature acknowledgment, and 201 store.</p>
+      <p class="mb-6 text-sm text-text-secondary">Review cycles and client evaluations. A score does not change pay, assignment, or status.</p>
 
       <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCycleOpen(true)}>
         New cycle

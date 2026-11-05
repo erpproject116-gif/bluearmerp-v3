@@ -75,7 +75,7 @@ export default function LearningPage() {
   return (
     <HrLayout>
       <h1 class="mb-1 text-2xl font-semibold">Learning</h1>
-      <p class="mb-6 text-sm text-text-secondary">Built-in courses and quizzes (no SCORM). Assignments can auto-link from hire onboarding.</p>
+      <p class="mb-6 text-sm text-text-secondary">Courses, enrollments, and completion.</p>
 
       <div class="mb-4 flex flex-wrap gap-2">
         <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setCourseOpen(true)}>

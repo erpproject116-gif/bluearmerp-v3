@@ -539,7 +539,7 @@ export default function HrEmployeesPage() {
       <div class="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 class="text-2xl font-semibold">Employees</h1>
-          <p class="mt-1 text-sm text-text-secondary">People on the payroll. Import, export, and new employee stay on this page.</p>
+          <p class="mt-1 text-sm text-text-secondary">Employee master records.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
         <button

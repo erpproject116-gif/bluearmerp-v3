@@ -36,19 +36,19 @@ type PortalTicket = {
 
 type PortalSite = { site_name: string; client_name: string };
 
-const tabs = ["orders", "invoices", "tickets", "sites", "time", "requests", "evaluations", "incidents", "bills", "documents", "summary", "users", "notices", "activity", "leave"] as const;
+const tabs = ["summary", "sites", "time", "leave", "requests", "incidents", "evaluations", "bills", "documents", "users", "notices", "activity", "orders", "invoices", "tickets"] as const;
 type Tab = (typeof tabs)[number];
 const classic = new Set<Tab>(["orders", "invoices", "tickets", "sites"]);
 const labels: Record<Tab, string> = {
-  orders: "Orders", invoices: "Invoices", tickets: "Tickets", sites: "Sites",
-  time: "Time", requests: "Requests", evaluations: "Evaluations", incidents: "Incidents",
-  bills: "Bills", documents: "Documents", summary: "Summary", users: "Users",
-  notices: "Notices", activity: "Activity", leave: "Leave",
+  summary: "Dashboard", sites: "Sites", time: "Time files", leave: "Leave",
+  requests: "Manpower", incidents: "Incidents", evaluations: "Evaluations",
+  bills: "Bills", documents: "Documents", users: "Users", notices: "Notices",
+  activity: "Activity", orders: "Orders", invoices: "Invoices", tickets: "Tickets",
 };
 
 export default function PortalDashboardPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = createSignal<Tab>("orders");
+  const [tab, setTab] = createSignal<Tab>("summary");
   const token = getPortalToken();
 
   const [session] = createResource(async () => {
@@ -96,7 +96,7 @@ export default function PortalDashboardPage() {
         <header class="border-b border-stroke bg-white px-6 py-4">
           <div class="mx-auto flex max-w-5xl items-center justify-between gap-4">
             <div>
-              <h1 class="text-lg font-semibold text-text-primary">Customer Portal</h1>
+              <h1 class="text-lg font-semibold text-text-primary">Client portal</h1>
               <Show when={session()}>
                 <p class="text-sm text-text-secondary">
                   {session()!.display_name || session()!.email}
@@ -114,7 +114,7 @@ export default function PortalDashboardPage() {
           </div>
         </header>
 
-        <main class="mx-auto max-w-5xl px-6 py-6">
+        <main class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:px-6">
           <Show when={session.state === "ready" && !session()}>
             <p class="text-sm text-red-600">
               Your link has expired.{" "}
@@ -124,7 +124,7 @@ export default function PortalDashboardPage() {
             </p>
           </Show>
 
-          <nav class="mb-6 flex flex-wrap gap-2">
+          <nav class="flex gap-1 overflow-x-auto md:w-48 md:shrink-0 md:flex-col" aria-label="Client portal">
             <For each={tabs}>
               {(t) => (
                 <button
@@ -141,7 +141,7 @@ export default function PortalDashboardPage() {
               )}
             </For>
           </nav>
-
+          <div class="min-w-0 flex-1">
           <Show when={!classic.has(tab())}>
             <PortalHrTab tab={tab()} />
           </Show>
@@ -255,6 +255,7 @@ export default function PortalDashboardPage() {
               </table>
             </div>
           </Show>
+          </div>
         </main>
       </div>
     </Show>

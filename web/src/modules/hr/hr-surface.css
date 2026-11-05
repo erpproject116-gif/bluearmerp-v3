@@ -51,12 +51,42 @@
   outline: none;
 }
 
-.hr-surface .erp-grid thead th {
+.hr-surface .erp-grid thead th,
+.hr-surface table thead th {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   background: var(--color-panel);
+}
+
+.hr-surface table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.hr-surface table th,
+.hr-surface table td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.hr-surface table tbody tr {
+  border-top: 1px solid var(--color-stroke);
+}
+
+.hr-surface > h1,
+.hr-surface .hr-pagehead h1 {
+  margin-bottom: 4px;
+}
+
+.hr-surface > h1 + p,
+.hr-surface .hr-pagehead p {
+  margin-bottom: 16px;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 14px;
 }
 
 .hr-surface .w-80.shrink-0 {
@@ -71,6 +101,93 @@
   padding: 0 12px;
   font-size: 13px;
   font-weight: 600;
+}
+
+.hr-surface .hr-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 12px;
+}
+
+.hr-surface .hr-widgets {
+  display: grid;
+  gap: 16px;
+}
+
+.hr-surface .hr-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--color-panel);
+}
+
+.hr-surface .hr-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--color-brand-600);
+}
+
+.hr-surface summary.bg-brand-600,
+.hr-surface summary.border-stroke {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hr-surface summary.bg-brand-600 {
+  background: var(--color-brand-700);
+  color: #fff;
+}
+
+.hr-surface summary::-webkit-details-marker {
+  display: none;
+}
+
+.hr-surface details.hr-menu {
+  position: relative;
+}
+
+.hr-surface details.hr-menu > div {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--color-stroke);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+}
+
+.hr-surface details.hr-menu a,
+.hr-surface details.hr-menu button.menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.hr-surface details.hr-menu a:hover,
+.hr-surface details.hr-menu button.menu-item:hover {
+  background: var(--color-panel);
+}
+
+@media (min-width: 1024px) {
+  .hr-surface .hr-widgets {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hr-surface .hr-span {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {

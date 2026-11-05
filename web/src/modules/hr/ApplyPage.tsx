@@ -177,8 +177,16 @@ export default function ApplyPage() {
   return (
     <main class="mx-auto min-h-screen w-full max-w-3xl bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 text-sm">
       <Show when={(openings() ?? []).length > 0}>
-        <ul class="mb-4 space-y-1 text-sm">
-          <For each={openings() ?? []}>{(row) => <li>{row.title} · {row.site_name} · {row.headcount}</li>}</For>
+        <h1 class="mb-1 text-2xl font-bold">Openings</h1>
+        <ul class="mb-6 grid gap-2">
+          <For each={openings() ?? []}>
+            {(row) => (
+              <li class="rounded-lg border border-stroke bg-white p-3">
+                <p class="font-semibold">{row.title}</p>
+                <p class="text-text-secondary">{row.site_name} · {row.headcount} {row.headcount === 1 ? "place" : "places"}</p>
+              </li>
+            )}
+          </For>
         </ul>
       </Show>
       <h1 class="mb-1 text-2xl font-bold">Application form</h1>

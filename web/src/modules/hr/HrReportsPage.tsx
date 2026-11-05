@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
@@ -35,7 +36,11 @@ export default function HrReportsPage() {
   return (
     <HrLayout>
       <h1 class="mb-1 text-2xl font-semibold">HR reports</h1>
-      <p class="mb-6 text-sm text-text-secondary">Discipline cases opened in the selected dates.</p>
+      <p class="mb-3 text-sm text-text-secondary">Choose the dates and read the discipline cases opened in that period.</p>
+      <p class="mb-6 flex flex-wrap gap-4 text-sm">
+        <A href="/app/hr/government-reports" class="text-brand-700">Government reports</A>
+        <A href="/app/hr/compliance" class="text-brand-700">Compliance documents</A>
+      </p>
       <div class="mb-4 grid max-w-xl gap-3 sm:grid-cols-2">
         <Field label="From">
           <input class={inputClass} type="date" value={from()} onInput={(e) => setFrom(e.currentTarget.value)} />

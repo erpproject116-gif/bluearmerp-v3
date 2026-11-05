@@ -30,7 +30,8 @@ export default function DeploymentsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Roster</h1>
+      <h1 class="mb-1 text-2xl font-semibold">Deployments</h1>
+      <p class="mb-4 text-sm text-text-secondary">Who is assigned to which site, and when that assignment ends. Ending it does not change employment.</p>
       <SpreadsheetGrid
         columns={[
           { key: "employee_name", header: "Employee" },

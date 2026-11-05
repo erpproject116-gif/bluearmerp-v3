@@ -32,7 +32,8 @@ export default function CompliancePage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Compliance docs</h1>
+      <h1 class="mb-1 text-2xl font-semibold">Compliance & documents</h1>
+      <p class="mb-4 text-sm text-text-secondary">Document dates on the employee file. Showing a document to a client does not send the file.</p>
       <SpreadsheetGrid
         columns={[
           { key: "employee_name", header: "Employee" },

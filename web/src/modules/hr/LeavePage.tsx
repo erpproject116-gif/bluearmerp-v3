@@ -154,14 +154,15 @@ export default function LeavePage() {
   return (
     <HrLayout>
       <h1 class="mb-1 text-2xl font-semibold">Leave</h1>
-      <p class="mb-6 text-sm text-text-secondary">Balances, requests, and approval. Approved leave stamps DTR.</p>
-      <button type="button" class="mb-4 rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => void accrue()}>
+      <p class="mb-4 text-sm text-text-secondary">Balances, requests and approval. Approved leave updates the DTR.</p>
+      <div class="mb-4 flex flex-wrap gap-2">
+      <button type="button" class="rounded-lg border border-stroke px-3 py-1.5 text-sm" onClick={() => void accrue()}>
         Accrue annual credit
       </button>
-
-      <button type="button" class="mb-4 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRequestOpen(true)}>
+      <button type="button" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white" onClick={() => setRequestOpen(true)}>
         New request
       </button>
+      </div>
       <EntityModal
         open={requestOpen()}
         title="New request"

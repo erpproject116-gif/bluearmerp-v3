@@ -77,7 +77,27 @@ export default function ClientsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Clients & sites</h1>
+      <h1 class="mb-1 text-2xl font-semibold">Clients & sites</h1>
+      <p class="mb-4 text-sm text-text-secondary">Client companies, their sites, and the industry of each site.</p>
+      <div class="mb-4 overflow-x-auto rounded-xl border border-stroke bg-surface">
+        <table>
+          <thead>
+            <tr><th>Client</th><th>Sales customer</th><th>Sites</th><th>People on sites</th></tr>
+          </thead>
+          <tbody>
+            <For each={clients() ?? []} fallback={<tr><td colspan="4">No clients yet.</td></tr>}>
+              {(client) => (
+                <tr>
+                  <td>{client.name}</td>
+                  <td>{client.partner_name}</td>
+                  <td>{(client.sites ?? []).map((site) => site.site_name).join(", ") || "—"}</td>
+                  <td class="tabular-nums">{(client.sites ?? []).reduce((sum, site) => sum + (site.people ?? []).length, 0)}</td>
+                </tr>
+              )}
+            </For>
+          </tbody>
+        </table>
+      </div>
       <div class="mb-4 grid gap-3 rounded-xl border border-stroke bg-surface p-4 md:grid-cols-2">
         <Field label="Client">
           <select class={inputClass} value={source()} onChange={(e) => setSource(e.currentTarget.value as "existing" | "new")}>

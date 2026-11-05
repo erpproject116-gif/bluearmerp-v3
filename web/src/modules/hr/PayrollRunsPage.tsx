@@ -125,7 +125,8 @@ export default function PayrollRunsPage() {
 
   return (
     <HrLayout>
-      <h1 class="mb-4 text-2xl font-semibold">Payroll</h1>
+      <h1 class="mb-1 text-2xl font-semibold">Payroll runs</h1>
+      <p class="mb-4 text-sm text-text-secondary">Compute, review and post payroll per cut-off. Pay amounts stay on this page.</p>
       <section class="mb-6 rounded-xl border border-stroke bg-surface p-4 shadow-sm">
         <h2 class="mb-3 text-lg font-medium">New payroll run</h2>
         <p class="mb-3 text-sm text-text-secondary">
