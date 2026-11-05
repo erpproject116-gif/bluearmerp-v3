@@ -1,4 +1,5 @@
-import { For, JSX, Show, createSignal } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
+import type { JSX } from "solid-js";
 
 export type HrBadgeTone = "neutral" | "brand" | "success" | "warning" | "danger" | "info";
 
