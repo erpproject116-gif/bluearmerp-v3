@@ -311,7 +311,16 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
   const featureNavModule = () => {
     const mod = activeModule();
-    if (!mod || activeSubBranch() || isReviewPurchasesPath(loc.pathname) || masterListTab(loc.pathname)) return undefined;
+    // HR page chips live in HrHeaderNav (incl. Userflow Guides) — skip dual feature nav.
+    if (
+      !mod ||
+      mod.id === "hr" ||
+      activeSubBranch() ||
+      isReviewPurchasesPath(loc.pathname) ||
+      masterListTab(loc.pathname)
+    ) {
+      return undefined;
+    }
     return mod;
   };
 

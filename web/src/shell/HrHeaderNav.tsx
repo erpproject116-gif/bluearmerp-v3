@@ -116,6 +116,8 @@ function pageActive(pathname: string, page: PageLink): boolean {
   return pathUnder(pathname, page.href);
 }
 
+const guidePage: PageLink = { label: "Userflow Guides", href: "/app/hr/roadmap", exact: true };
+
 export function HrHeaderNav() {
   const auth = useAuth();
   const loc = useLocation();
@@ -126,28 +128,25 @@ export function HrHeaderNav() {
     (activeGroup()?.pages ?? []).filter(
       (page) => elevatedTenantAdmin(auth.me) || mode.enabled() || !isAgencyPath(page.href),
     );
+  const chips = () => [guidePage, ...pages()];
   return (
-    <Show when={onHr() && pages().length > 0}>
-      <Show when={pages()}>
-        {(list) => (
-          <nav class="erp-header-features mt-3" aria-label="HR and Payroll pages">
-            <For each={list()}>
-              {(page) => (
-                <A
-                  href={page.href}
-                  class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
-                  classList={{
-                    "bg-brand-50 text-brand-700": pageActive(loc.pathname, page),
-                    "text-text-secondary hover:erp-panel hover:text-text-primary": !pageActive(loc.pathname, page),
-                  }}
-                >
-                  {page.label}
-                </A>
-              )}
-            </For>
-          </nav>
-        )}
-      </Show>
+    <Show when={onHr()}>
+      <nav class="erp-header-features mt-3" aria-label="HR and Payroll pages">
+        <For each={chips()}>
+          {(page) => (
+            <A
+              href={page.href}
+              class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              classList={{
+                "bg-brand-50 text-brand-700": pageActive(loc.pathname, page),
+                "text-text-secondary hover:erp-panel hover:text-text-primary": !pageActive(loc.pathname, page),
+              }}
+            >
+              {page.label}
+            </A>
+          )}
+        </For>
+      </nav>
     </Show>
   );
 }

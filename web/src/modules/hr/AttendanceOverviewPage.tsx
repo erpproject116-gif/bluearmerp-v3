@@ -33,9 +33,9 @@ const densityPx: Record<
   Density,
   { day: number; padY: number; padX: number; row: number; font: number }
 > = {
-  S: { day: 28, padY: 2, padX: 2, row: 28, font: 11 },
-  M: { day: 36, padY: 4, padX: 4, row: 36, font: 12 },
-  L: { day: 48, padY: 8, padX: 6, row: 44, font: 13 },
+  S: { day: 28, padY: 2, padX: 2, row: 36, font: 11 },
+  M: { day: 36, padY: 4, padX: 4, row: 48, font: 12 },
+  L: { day: 48, padY: 8, padX: 6, row: 56, font: 13 },
 };
 
 function lookCount(row: MonthOverviewRow, days: number[]): number {
@@ -68,7 +68,7 @@ export default function AttendanceOverviewPage() {
   const [half, setHalf] = createSignal<QuincenaHalf>(currentQuincenaHalf());
   const [rangeMode, setRangeMode] = createSignal<RangeMode>("quincena");
   const [density, setDensity] = createSignal<Density>("M");
-  const [empColW, setEmpColW] = createSignal(200);
+  const [empColW, setEmpColW] = createSignal(280);
   const [filter, setFilter] = createSignal<LookFilter>("all");
   const [deptFilter, setDeptFilter] = createSignal("");
   const [q, setQ] = createSignal("");
@@ -312,8 +312,8 @@ export default function AttendanceOverviewPage() {
           Name col
           <input
             type="range"
-            min="140"
-            max="320"
+            min="180"
+            max="440"
             step="10"
             value={empColW()}
             onInput={(e) => setEmpColW(Number(e.currentTarget.value))}
@@ -365,7 +365,7 @@ export default function AttendanceOverviewPage() {
             <thead>
               <tr class="border-b border-stroke text-xs font-semibold text-text-secondary">
                 <th
-                  class="sticky left-0 top-0 z-30 border-b border-r border-stroke bg-surface py-2 pr-3 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
+                  class="sticky left-0 top-0 z-30 border-b border-r border-stroke bg-surface px-3 py-2 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
                   style={{
                     width: `${empColW()}px`,
                     "min-width": `${empColW()}px`,
@@ -488,7 +488,7 @@ export default function AttendanceOverviewPage() {
                     <tbody>
                       <tr class="bg-slate-50/90">
                         <th
-                          class="sticky left-0 z-10 border-b border-r border-slate-100 bg-slate-50 py-2 pr-3 text-left font-medium shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
+                          class="sticky left-0 z-10 border-b border-r border-slate-100 bg-slate-50 px-3 py-2 text-left font-medium shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
                           style={{
                             width: `${empColW()}px`,
                             "min-width": `${empColW()}px`,
@@ -538,7 +538,7 @@ export default function AttendanceOverviewPage() {
                               style={{ height: `${size().row}px` }}
                             >
                               <th
-                                class="sticky left-0 z-10 border-b border-r border-slate-100 bg-surface pr-3 text-left font-normal shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
+                                class="sticky left-0 z-10 border-b border-r border-slate-100 bg-surface px-3 py-1.5 text-left font-normal shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
                                 style={{
                                   width: `${empColW()}px`,
                                   "min-width": `${empColW()}px`,
@@ -548,8 +548,8 @@ export default function AttendanceOverviewPage() {
                               >
                                 <A
                                   href={`/app/hr/attendance/employees/${row.employee_id}?month=${overviewMonth()}`}
-                                  class="block truncate font-medium text-brand-700 hover:underline"
-                                  title="Open full detail"
+                                  class="block truncate font-medium leading-snug text-brand-700 hover:underline"
+                                  title={row.employee_name}
                                 >
                                   {row.employee_name}
                                 </A>
@@ -561,7 +561,10 @@ export default function AttendanceOverviewPage() {
                                     ● {looks}
                                   </span>
                                 </Show>
-                                <span class="block truncate text-xs text-text-secondary">
+                                <span
+                                  class="mt-0.5 block truncate text-xs leading-snug text-text-secondary"
+                                  title={row.job_title || row.employee_no || undefined}
+                                >
                                   {row.job_title || row.employee_no}
                                 </span>
                               </th>
