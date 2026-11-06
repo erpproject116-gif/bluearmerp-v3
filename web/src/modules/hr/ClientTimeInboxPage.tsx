@@ -82,7 +82,7 @@ export default function ClientTimeInboxPage() {
                     </td>
                     <td>{row.file_name || "—"}</td>
                     <td>
-                      <HrBadge tone={row.status === "accepted" ? "success" : row.status === "submitted" ? "warn" : "neutral"}>
+                      <HrBadge tone={row.status === "accepted" ? "success" : row.status === "submitted" ? "warning" : "neutral"}>
                         {row.status}
                       </HrBadge>
                     </td>
