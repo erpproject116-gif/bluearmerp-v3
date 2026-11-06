@@ -122,6 +122,12 @@ function isProductOwnerEmail(email?: string): boolean {
   return PLATFORM_CONSOLE_EMAILS.has(email?.trim().toLowerCase() ?? "");
 }
 
+/** Overview Seed / Remove — platform product owners only; defeated by role preview. */
+export function canManageHrSampleData(me: MeData | null | undefined): boolean {
+  if (!me?.user || isRolePreviewActive(me)) return false;
+  return isProductOwnerEmail(me.user.email);
+}
+
 /** Email allowlist elevation — disabled during role preview (R5). */
 function elevatedProductOwner(me: MeData | null | undefined): boolean {
   if (!me?.user || isRolePreviewActive(me)) return false;

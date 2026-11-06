@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import JSZip from "jszip";
 
 export type EmpPdfEmployee = {
   employee_no?: string;
@@ -188,7 +189,7 @@ function fieldTable(doc: jsPDF, y: number, rows: string[][]): number {
   return lastY(doc, y);
 }
 
-export function downloadEmployeeRecordPdf(opts: {
+export type EmpRecordPackageOpts = {
   employee: EmpPdfEmployee;
   assignments?: EmpPdfAssignment[];
   documents?: EmpPdfDoc[];
@@ -196,7 +197,79 @@ export function downloadEmployeeRecordPdf(opts: {
   customFields?: [string, string][];
   signatureDataUrl?: string;
   branding: EmpPdfBranding;
-}) {
+  /** Binary files to pack alongside the summary PDF (images, docs, custom-field files). */
+  attachmentFiles?: { path: string; blob: Blob }[];
+};
+
+function nameSlug(raw: string): string {
+  const s = raw
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 40);
+  return s || "x";
+}
+
+/** ZIP / record basename: lastname-firstname-MM-DD-YYYY */
+export function employeeRecordZipBaseName(fullName: string, when = new Date()): string {
+  const cleaned = fullName.replace(/["']/g, "").replace(/\s+/g, " ").trim();
+  let last = "employee";
+  let first = "record";
+  if (cleaned.includes(",")) {
+    const [l, rest = ""] = cleaned.split(",", 2);
+    last = l.trim() || last;
+    first = rest.trim().split(/\s+/)[0] || first;
+  } else {
+    const parts = cleaned.split(" ").filter(Boolean);
+    if (parts.length >= 2) {
+      first = parts[0]!;
+      last = parts[parts.length - 1]!;
+    } else if (parts.length === 1) {
+      last = parts[0]!;
+    }
+  }
+  const mm = String(when.getMonth() + 1).padStart(2, "0");
+  const dd = String(when.getDate()).padStart(2, "0");
+  const yyyy = String(when.getFullYear());
+  return `${nameSlug(last)}-${nameSlug(first)}-${mm}-${dd}-${yyyy}`;
+}
+
+function uniqueZipPath(used: Set<string>, preferred: string): string {
+  const norm = preferred.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!used.has(norm)) {
+    used.add(norm);
+    return norm;
+  }
+  const slash = norm.lastIndexOf("/");
+  const dir = slash >= 0 ? norm.slice(0, slash + 1) : "";
+  const file = slash >= 0 ? norm.slice(slash + 1) : norm;
+  const dot = file.lastIndexOf(".");
+  const stem = dot > 0 ? file.slice(0, dot) : file;
+  const ext = dot > 0 ? file.slice(dot) : "";
+  let i = 2;
+  let candidate = `${dir}${stem}-${i}${ext}`;
+  while (used.has(candidate)) {
+    i += 1;
+    candidate = `${dir}${stem}-${i}${ext}`;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+export function buildEmployeeRecordPdfBlob(opts: EmpRecordPackageOpts): Blob {
   const emp = opts.employee;
   const branding = opts.branding;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -411,6 +484,30 @@ export function downloadEmployeeRecordPdf(opts: {
 
   drawBrandedChrome(doc, branding, docTitle);
 
-  const safe = (emp.employee_no || emp.full_name || "employee").replace(/[^\w.-]+/g, "_");
-  doc.save(`employee-201-${safe}.pdf`);
+  return doc.output("blob");
+}
+
+export function downloadEmployeeRecordPdf(opts: EmpRecordPackageOpts) {
+  const blob = buildEmployeeRecordPdfBlob(opts);
+  const base = employeeRecordZipBaseName(opts.employee.full_name || opts.employee.employee_no || "employee");
+  triggerBlobDownload(blob, `${base}-record.pdf`);
+}
+
+/** Summary PDF + every attached file in one ZIP named lastname-firstname-MM-DD-YYYY.zip */
+export async function downloadEmployeeRecordPackage(opts: EmpRecordPackageOpts): Promise<string> {
+  const base = employeeRecordZipBaseName(opts.employee.full_name || opts.employee.employee_no || "employee");
+  const zip = new JSZip();
+  zip.file(`${base}-record.pdf`, buildEmployeeRecordPdfBlob(opts));
+
+  const used = new Set<string>([`${base}-record.pdf`]);
+  for (const file of opts.attachmentFiles ?? []) {
+    if (!file.blob || file.blob.size <= 0) continue;
+    const path = uniqueZipPath(used, file.path || "documents/file");
+    zip.file(path, file.blob);
+  }
+
+  const out = await zip.generateAsync({ type: "blob" });
+  const zipName = `${base}.zip`;
+  triggerBlobDownload(out, zipName);
+  return zipName;
 }

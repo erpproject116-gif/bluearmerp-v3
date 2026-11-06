@@ -82,6 +82,25 @@ func TestProductOwnerEmailHasOwnerCapability(t *testing.T) {
 	}
 }
 
+func TestCanManageHRSampleDataProductOwners(t *testing.T) {
+	for _, email := range []string{
+		"itsjohnranel@gmail.com",
+		"ItsJohnRanel@gmail.com",
+		"bluearmph@gmail.com",
+		"erpproject116@gmail.com",
+	} {
+		if !CanManageHRSampleData(TenantUser{Email: email}) {
+			t.Fatalf("%s must manage HR sample data", email)
+		}
+	}
+	if CanManageHRSampleData(TenantUser{Email: "owner@customer.com", IsPlatformSuperadmin: true, IsTenantOwner: true}) {
+		t.Fatal("non-allowlisted email must not manage HR sample data even if elevated flags are set")
+	}
+	if CanManageHRSampleData(TenantUser{Email: "itsjohnranel@gmail.com", RolePreviewActive: true}) {
+		t.Fatal("role preview must block HR sample data")
+	}
+}
+
 func TestNonOwnerEmailDoesNotGainBootstrapAccess(t *testing.T) {
 	tu := TenantUser{Email: "store.member@example.com", TenantRole: "member"}
 	if tu.hasOwnerCapability() {

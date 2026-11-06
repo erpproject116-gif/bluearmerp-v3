@@ -239,3 +239,19 @@ func RequirePermission(code, minLevel string) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+// RequireHRSampleDataDeveloper limits Overview Seed / Remove to platform product owners.
+func RequireHRSampleDataDeveloper(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Not authenticated.", "ERR_UNAUTHORIZED")
+			return
+		}
+		if !CanManageHRSampleData(tu) {
+			response.Err(w, http.StatusForbidden, "HR sample data is limited to Bluearm product owners.", "ERR_FORBIDDEN")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

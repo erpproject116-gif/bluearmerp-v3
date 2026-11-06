@@ -128,9 +128,11 @@ export function HrHeaderNav() {
     (activeGroup()?.pages ?? []).filter(
       (page) => elevatedTenantAdmin(auth.me) || mode.enabled() || !isAgencyPath(page.href),
     );
-  const chips = () => [guidePage, ...pages()];
+  const onRoadmap = () => pathUnder(loc.pathname, "/app/hr/roadmap");
+  // Userflow Guides is the roadmap header tab only — not a global chip on every HR page.
+  const chips = () => (onRoadmap() ? [guidePage] : pages());
   return (
-    <Show when={onHr()}>
+    <Show when={onHr() && chips().length > 0}>
       <nav class="erp-header-features mt-3" aria-label="HR and Payroll pages">
         <For each={chips()}>
           {(page) => (

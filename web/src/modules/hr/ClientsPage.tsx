@@ -449,7 +449,7 @@ export default function ClientsPage() {
             if (e.key === "Escape") setModalOpen(false);
           }}
         >
-          <div class="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
+          <div class="max-h-[90vh] w-full max-w-sm overflow-auto rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">New client</h2>
               <div class="flex items-center gap-2">
@@ -472,7 +472,7 @@ export default function ClientsPage() {
                 </button>
               </div>
             </div>
-            <div class="grid gap-3 sm:grid-cols-2">
+            <div class="grid gap-3">
               <Field label="Client source">
                 <select
                   class={inputClass}

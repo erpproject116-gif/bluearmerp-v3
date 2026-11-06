@@ -2,7 +2,7 @@ import { A } from "@solidjs/router";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
-import { hasPermission, isRolePreviewActive, useAuth } from "../../shared/auth-context";
+import { canManageHrSampleData, hasPermission, isRolePreviewActive, useAuth } from "../../shared/auth-context";
 import { formatAmount } from "../../shared/money";
 import { useToast } from "../../shared/toast";
 import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
@@ -214,11 +214,16 @@ export default function HrOverviewPage() {
   const [busy, setBusy] = createSignal(false);
   const [sampleActionError, setSampleActionError] = createSignal("");
   const [customize, setCustomize] = createSignal(false);
+  const canSeeSample = createMemo(() => canManageHrSampleData(auth.me));
   const canWriteSample = createMemo(
-    () => hasPermission(auth.me, "hr.sample_data", "write") && !isRolePreviewActive(auth.me),
+    () =>
+      canSeeSample() &&
+      hasPermission(auth.me, "hr.sample_data", "write") &&
+      !isRolePreviewActive(auth.me),
   );
   const sampleStatus = createQuery(() => ({
     queryKey: ["hr-sample-status", auth.me?.tenant?.id ?? 0],
+    enabled: canSeeSample(),
     queryFn: async () => {
       const res = await apiFetch<SamplePasteCard>("/api/v1/hr/sample-data/status", {}, { silent: true });
       if (!res.success) throw new Error(res.message || "Could not load sample status.");
@@ -1342,125 +1347,127 @@ export default function HrOverviewPage() {
         <A href="/app/hr/reports" class="text-brand-700">Discipline report</A>
       </div>
 
-      <section class="mt-6 rounded-lg border border-stroke bg-surface p-4 shadow-sm">
-        <h2 class="text-lg font-medium">Sample HR data</h2>
-        <p class="mt-1 text-sm text-text-secondary">
-          Reversible demo batch for product walkthroughs. Current + previous quincena DTR is seeded so attendance matrices work immediately.
-          Payroll / withholding samples stay in 2099; sample employees stay out of live pay runs. Remove deletes only this batch.
-        </p>
-        <Show when={sampleStatus.isError}>
-          <p class="mt-2 text-sm text-red-700" role="alert">
-            {(sampleStatus.error as Error)?.message || "Could not load sample status."}
+      <Show when={canSeeSample()}>
+        <section class="mt-6 rounded-lg border border-stroke bg-surface p-4 shadow-sm">
+          <h2 class="text-lg font-medium">Sample HR data</h2>
+          <p class="mt-1 text-sm text-text-secondary">
+            Reversible demo batch for product walkthroughs. Current + previous quincena DTR is seeded so attendance matrices work immediately.
+            Payroll / withholding samples stay in 2099; sample employees stay out of live pay runs. Remove deletes only this batch.
           </p>
-        </Show>
-        <Show when={sampleStatus.data?.open}>
-          <p class="mt-2 text-sm text-amber-800">
-            Sample batch #{sampleStatus.data?.batch_id} is already loaded — Seed stays off until you remove it.
-          </p>
-        </Show>
-        <Show when={!canWriteSample()}>
-          <p class="mt-2 text-sm text-amber-800">
-            {isRolePreviewActive(auth.me)
-              ? "Role preview is read-only — exit preview to seed or remove sample data."
-              : "Your role can view this card but cannot seed or remove it (needs hr.sample_data write)."}
-          </p>
-        </Show>
-        <Show when={sampleActionError()}>
-          <p class="mt-2 text-sm text-red-700" role="alert">
-            {sampleActionError()}
-          </p>
-        </Show>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="hr-btn hr-btn-primary"
-            title={
-              sampleStatus.data?.open
-                ? "Sample data is already loaded — remove it first"
-                : !canWriteSample()
-                  ? "Write permission required"
-                  : "Add reversible sample HR data"
-            }
-            disabled={busy() || sampleStatus.data?.open === true || !canWriteSample()}
-            onClick={() => void runSample("/api/v1/hr/sample-data", "Sample HR data added.")}
-          >
-            {sampleStatus.data?.open ? "Already seeded" : "Seed"}
-          </button>
-          <button
-            type="button"
-            class="hr-btn"
-            title={!sampleStatus.data?.open ? "Nothing to remove" : !canWriteSample() ? "Write permission required" : "Remove sample batch"}
-            disabled={busy() || !sampleStatus.data?.open || !canWriteSample()}
-            onClick={removeSample}
-          >
-            Remove sample data
-          </button>
-          <button
-            type="button"
-            class="hr-btn"
-            disabled={!sampleStatus.data?.paste_text}
-            onClick={() => void copyPasteCard()}
-          >
-            Copy paste card
-          </button>
-        </div>
-        <Show when={sampleStatus.data}>
-          {(card) => (
-            <div class="mt-4 rounded-lg border border-dashed border-stroke bg-panel/40 p-3">
-              <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                <span class="font-medium">{card().open ? `Batch #${card().batch_id} open` : "No sample batch"}</span>
-                <Show when={card().company_code}>
-                  <span class="text-text-secondary">· company code {card().company_code}</span>
-                </Show>
-              </div>
-              <Show when={card().open && card().personas?.length}>
-                <ul class="mb-3 space-y-2 text-sm">
-                  <For each={card().personas}>
-                    {(p) => (
-                      <li class="rounded border border-stroke bg-surface px-3 py-2">
-                        <div class="font-medium">
-                          {p.role} — {p.name}
-                        </div>
-                        <Show when={p.email}>
-                          <div class="text-text-secondary">{p.email}</div>
-                        </Show>
-                        <Show when={p.url}>
-                          <A class="text-brand-700 break-all hover:underline" href={p.url!} target="_blank" rel="noopener noreferrer">
-                            {p.url}
-                          </A>
-                        </Show>
-                        <Show when={p.path && !p.url}>
-                          <A class="text-brand-700 hover:underline" href={p.path!}>
-                            {p.path}
-                          </A>
-                        </Show>
-                        <Show when={p.path && p.url}>
-                          <div>
+          <Show when={sampleStatus.isError}>
+            <p class="mt-2 text-sm text-red-700" role="alert">
+              {(sampleStatus.error as Error)?.message || "Could not load sample status."}
+            </p>
+          </Show>
+          <Show when={sampleStatus.data?.open}>
+            <p class="mt-2 text-sm text-amber-800">
+              Sample batch #{sampleStatus.data?.batch_id} is already loaded — Seed stays off until you remove it.
+            </p>
+          </Show>
+          <Show when={!canWriteSample()}>
+            <p class="mt-2 text-sm text-amber-800">
+              {isRolePreviewActive(auth.me)
+                ? "Role preview is read-only — exit preview to seed or remove sample data."
+                : "Your role can view this card but cannot seed or remove it (needs hr.sample_data write)."}
+            </p>
+          </Show>
+          <Show when={sampleActionError()}>
+            <p class="mt-2 text-sm text-red-700" role="alert">
+              {sampleActionError()}
+            </p>
+          </Show>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="hr-btn hr-btn-primary"
+              title={
+                sampleStatus.data?.open
+                  ? "Sample data is already loaded — remove it first"
+                  : !canWriteSample()
+                    ? "Write permission required"
+                    : "Add reversible sample HR data"
+              }
+              disabled={busy() || sampleStatus.data?.open === true || !canWriteSample()}
+              onClick={() => void runSample("/api/v1/hr/sample-data", "Sample HR data added.")}
+            >
+              {sampleStatus.data?.open ? "Already seeded" : "Seed"}
+            </button>
+            <button
+              type="button"
+              class="hr-btn"
+              title={!sampleStatus.data?.open ? "Nothing to remove" : !canWriteSample() ? "Write permission required" : "Remove sample batch"}
+              disabled={busy() || !sampleStatus.data?.open || !canWriteSample()}
+              onClick={removeSample}
+            >
+              Remove sample data
+            </button>
+            <button
+              type="button"
+              class="hr-btn"
+              disabled={!sampleStatus.data?.paste_text}
+              onClick={() => void copyPasteCard()}
+            >
+              Copy paste card
+            </button>
+          </div>
+          <Show when={sampleStatus.data}>
+            {(card) => (
+              <div class="mt-4 rounded-lg border border-dashed border-stroke bg-panel/40 p-3">
+                <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                  <span class="font-medium">{card().open ? `Batch #${card().batch_id} open` : "No sample batch"}</span>
+                  <Show when={card().company_code}>
+                    <span class="text-text-secondary">· company code {card().company_code}</span>
+                  </Show>
+                </div>
+                <Show when={card().open && card().personas?.length}>
+                  <ul class="mb-3 space-y-2 text-sm">
+                    <For each={card().personas}>
+                      {(p) => (
+                        <li class="rounded border border-stroke bg-surface px-3 py-2">
+                          <div class="font-medium">
+                            {p.role} — {p.name}
+                          </div>
+                          <Show when={p.email}>
+                            <div class="text-text-secondary">{p.email}</div>
+                          </Show>
+                          <Show when={p.url}>
+                            <A class="text-brand-700 break-all hover:underline" href={p.url!} target="_blank" rel="noopener noreferrer">
+                              {p.url}
+                            </A>
+                          </Show>
+                          <Show when={p.path && !p.url}>
                             <A class="text-brand-700 hover:underline" href={p.path!}>
                               {p.path}
                             </A>
-                          </div>
-                        </Show>
-                        <Show when={p.note}>
-                          <div class="text-xs text-text-secondary">{p.note}</div>
-                        </Show>
-                      </li>
-                    )}
-                  </For>
-                </ul>
-              </Show>
-              <pre class="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-stroke bg-surface p-2 text-xs text-text-secondary">
-                {card().paste_text}
-              </pre>
-              <Show when={card().hints?.length}>
-                <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-text-secondary">
-                  <For each={card().hints}>{(h) => <li>{h}</li>}</For>
-                </ul>
-              </Show>
-            </div>
-          )}
-        </Show>
-      </section>
+                          </Show>
+                          <Show when={p.path && p.url}>
+                            <div>
+                              <A class="text-brand-700 hover:underline" href={p.path!}>
+                                {p.path}
+                              </A>
+                            </div>
+                          </Show>
+                          <Show when={p.note}>
+                            <div class="text-xs text-text-secondary">{p.note}</div>
+                          </Show>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
+                <pre class="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-stroke bg-surface p-2 text-xs text-text-secondary">
+                  {card().paste_text}
+                </pre>
+                <Show when={card().hints?.length}>
+                  <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-text-secondary">
+                    <For each={card().hints}>{(h) => <li>{h}</li>}</For>
+                  </ul>
+                </Show>
+              </div>
+            )}
+          </Show>
+        </section>
+      </Show>
 
       <Show when={customize()}>
         <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Customize dashboard" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setCustomize(false); }}>

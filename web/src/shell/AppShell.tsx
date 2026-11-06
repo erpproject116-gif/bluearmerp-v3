@@ -311,7 +311,7 @@ function AppShellInner(props: { children?: import("solid-js").JSX.Element }) {
 
   const featureNavModule = () => {
     const mod = activeModule();
-    // HR page chips live in HrHeaderNav (incl. Userflow Guides) — skip dual feature nav.
+    // HR page chips live in HrHeaderNav (Userflow Guides only on /app/hr/roadmap) — skip dual feature nav.
     if (
       !mod ||
       mod.id === "hr" ||

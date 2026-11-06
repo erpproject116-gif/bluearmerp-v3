@@ -54,6 +54,15 @@ func IsPlatformConsoleEmail(email string) bool {
 	return isBootstrapSuperadminEmail(email)
 }
 
+// CanManageHRSampleData reports whether the caller may use Overview Seed / Remove sample HR data.
+// Restricted to platform product-owner emails (same set as Command Center) — not ordinary tenant admins.
+func CanManageHRSampleData(tu TenantUser) bool {
+	if tu.RolePreviewActive {
+		return false
+	}
+	return isBootstrapSuperadminEmail(tu.Email)
+}
+
 // applyBootstrapOwnerFlags grants allowlisted emails the same in-request
 // capabilities as a platform superadmin, even if DB rows are still catching up.
 // Commercial ownership (IsTenantOwner) is only forced on the BLUEARM operator

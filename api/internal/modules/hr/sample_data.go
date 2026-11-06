@@ -77,9 +77,9 @@ func employeeInOpenSample(ctx context.Context, q rowQuery, tenantID, employeeID 
 }
 
 func registerSampleDataRoutes(r chi.Router, pool *pgxpool.Pool) {
-	r.With(auth.RequirePermission("hr.sample_data", auth.AccessRead)).Get("/sample-data/status", getSampleDataStatus(pool))
-	r.With(auth.RequirePermission("hr.sample_data", auth.AccessWrite)).Post("/sample-data", postSampleData(pool))
-	r.With(auth.RequirePermission("hr.sample_data", auth.AccessWrite)).Post("/sample-data/retract", postRetractSampleData(pool))
+	r.With(auth.RequireHRSampleDataDeveloper, auth.RequirePermission("hr.sample_data", auth.AccessRead)).Get("/sample-data/status", getSampleDataStatus(pool))
+	r.With(auth.RequireHRSampleDataDeveloper, auth.RequirePermission("hr.sample_data", auth.AccessWrite)).Post("/sample-data", postSampleData(pool))
+	r.With(auth.RequireHRSampleDataDeveloper, auth.RequirePermission("hr.sample_data", auth.AccessWrite)).Post("/sample-data/retract", postRetractSampleData(pool))
 }
 
 type samplePersona struct {

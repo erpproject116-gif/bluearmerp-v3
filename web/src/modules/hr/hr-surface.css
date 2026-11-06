@@ -1262,31 +1262,72 @@
 
 .hr-surface .me-bar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--color-stroke, #e2e8f0);
   border-radius: 12px;
   background: var(--color-surface, #fff);
+  overflow-x: auto;
 }
 
 .hr-surface .me-bar .grow {
-  flex: 1 1 8px;
-  min-width: 8px;
+  flex: 1 1 7rem;
+  min-width: 6.5rem;
+  max-width: 12rem;
+}
+
+.hr-surface .me-bar .me-bar-dept {
+  flex: 0 1 9.5rem;
+  width: 9.5rem;
+  max-width: 9.5rem;
+}
+
+.hr-surface .me-bar .me-bar-density button {
+  width: 1.75rem;
+  padding: 0;
+}
+
+.hr-surface .me-bar .me-bar-namecol {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #64748b);
+  white-space: nowrap;
+}
+
+.hr-surface .me-bar .me-bar-namecol input[type="range"] {
+  width: 4.5rem;
+}
+
+.hr-surface .me-bar .hr-seg {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.hr-surface .me-bar .hr-seg button {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .hr-surface .me-cut {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .hr-surface .me-cut b {
-  min-width: 9.5rem;
+  min-width: 7.5rem;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .hr-surface .me-seg {
@@ -1318,19 +1359,22 @@
 
 .hr-surface .me-input,
 .hr-surface .me-bar .input {
-  min-height: 32px;
-  padding: 6px 10px;
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: 4px 8px;
   border: 1px solid var(--color-stroke, #e2e8f0);
   border-radius: 8px;
   background: #fff;
-  font-size: 13px;
+  font-size: 12px;
   color: inherit;
+  width: auto;
 }
 
 .hr-surface .me-input.grow,
 .hr-surface .me-bar .input.grow {
-  flex: 1 1 160px;
-  min-width: 140px;
+  flex: 1 1 7rem;
+  min-width: 6.5rem;
+  max-width: 12rem;
 }
 
 .hr-surface .me-btn {

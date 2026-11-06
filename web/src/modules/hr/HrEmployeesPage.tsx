@@ -26,7 +26,8 @@ import { HrLayout } from "./HrLayout";
 import { EmployeeExtrasPanel } from "./EmployeeExtrasPanel";
 import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
 import { DemoFillButton } from "./DemoFillButton";
-import { downloadEmployeeRecordPdf } from "./employeeRecordPdf";
+import { downloadEmployeeRecordPackage } from "./employeeRecordPdf";
+import type { CustomFieldFileValue } from "../../shared/customFieldFiles";
 import { buildEmployeeDemoFill } from "./hrDemoFill";
 import { HrMappedImportModal } from "./HrMappedImportModal";
 import { UserSearchModal, type UserSearchRow } from "../purchase-request/purchase-request/UserSearchModal";
@@ -573,14 +574,14 @@ export default function HrEmployeesPage() {
     setUserSearchOpen(false);
   };
 
-  const downloadSelectedPdf = async () => {
+  const downloadSelectedRecord = async () => {
     const id = selected()?.id;
     if (!id || pdfBusy()) return;
     setPdfBusy(true);
     try {
       const empRes = await apiFetch<Employee>(`/api/v1/hr/employees/${id}`);
       if (!empRes.success || !empRes.data) {
-        toast.warning(empRes.message ?? "Could not load employee for PDF.");
+        toast.warning(empRes.message ?? "Could not load employee for download.");
         return;
       }
       const emp = empRes.data;
@@ -596,15 +597,24 @@ export default function HrEmployeesPage() {
 
       const listed = docsRes.data ?? [];
       const headers = await employeeDocHeaders();
+      const attachmentFiles: { path: string; blob: Blob }[] = [];
       const documents = await Promise.all(
         listed.map(async (d) => {
           let imageDataUrl: string | undefined;
-          if (d.has_file && isImageMime(d.mime_type, d.file_name)) {
+          if (d.has_file) {
             try {
               const res = await fetch(`${apiBase}/api/v1/hr/employees/${id}/documents/${d.id}/download`, { headers });
-              if (res.ok) imageDataUrl = await blobToDataUrl(await res.blob());
+              if (res.ok) {
+                const blob = await res.blob();
+                const safeType = (d.doc_type || "other").replace(/[^\w.-]+/g, "_");
+                const safeName = (d.file_name || `${safeType}-${d.id}`).replace(/[\\/:*?"<>|]+/g, "_");
+                attachmentFiles.push({ path: `documents/${safeType}/${safeName}`, blob });
+                if (isImageMime(d.mime_type, d.file_name)) {
+                  imageDataUrl = await blobToDataUrl(blob);
+                }
+              }
             } catch {
-              /* keep index row even if image fails */
+              /* keep index row even if a file fails */
             }
           }
           return {
@@ -620,6 +630,35 @@ export default function HrEmployeesPage() {
         }),
       );
 
+      for (const field of activeCustomFields()) {
+        if (field.field_type !== "file") continue;
+        const raw = customValues()[field.field_key] as CustomFieldFileValue | string | null | undefined;
+        const fileMeta =
+          raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as CustomFieldFileValue) : null;
+        const fileId = Number(fileMeta?.file_id || 0);
+        if (!fileId) continue;
+        try {
+          const res = await fetch(`${apiBase}/api/v1/custom-fields/files/${fileId}/download`, { headers });
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const safeLabel = (field.label || field.field_key).replace(/[\\/:*?"<>|]+/g, "_");
+          const safeName = (fileMeta?.file_name || `custom-${fileId}`).replace(/[\\/:*?"<>|]+/g, "_");
+          attachmentFiles.push({ path: `custom-fields/${safeLabel}-${safeName}`, blob });
+        } catch {
+          /* skip broken custom file */
+        }
+      }
+
+      const sigDataUrl = signatureDataUrl() || emp.signature_data_url || undefined;
+      if (sigDataUrl?.startsWith("data:")) {
+        try {
+          const res = await fetch(sigDataUrl);
+          if (res.ok) attachmentFiles.push({ path: "signature.png", blob: await res.blob() });
+        } catch {
+          /* optional */
+        }
+      }
+
       const settings = branding.settings();
       const companyName = resolvePrintCompanyName(undefined, settings, auth.me?.tenant.company_name);
       const headerText = resolvePrintHeaderText(undefined, settings, companyName);
@@ -630,10 +669,13 @@ export default function HrEmployeesPage() {
 
       const customFields: [string, string][] = activeCustomFields().map((f) => {
         const raw = customValues()[f.field_key];
+        if (raw && typeof raw === "object" && !Array.isArray(raw) && "file_name" in (raw as object)) {
+          return [f.label || f.field_key, String((raw as CustomFieldFileValue).file_name || "")];
+        }
         return [f.label || f.field_key, raw == null ? "" : String(raw)];
       });
 
-      downloadEmployeeRecordPdf({
+      const zipName = await downloadEmployeeRecordPackage({
         employee: {
           ...emp,
           employee_no: employeeNo() || emp.employee_no,
@@ -677,15 +719,18 @@ export default function HrEmployeesPage() {
         documents,
         payItems: payRes.data ?? [],
         customFields,
-        signatureDataUrl: signatureDataUrl() || emp.signature_data_url || undefined,
+        signatureDataUrl: sigDataUrl,
         branding: {
           companyName,
           headerText,
           footerText,
           logoDataUrl,
         },
+        attachmentFiles,
       });
-      toast.success("201 PDF downloaded.");
+      toast.success(`Downloaded ${zipName}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not download employee record.");
     } finally {
       setPdfBusy(false);
     }
@@ -1055,11 +1100,11 @@ export default function HrEmployeesPage() {
                 type="button"
                 class="inline-flex items-center gap-2 rounded-lg border-2 border-brand-600 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100 disabled:cursor-wait disabled:opacity-60"
                 disabled={pdfBusy()}
-                title="Download the full Employee 201 file as PDF (all tabs + attachments)"
-                onClick={() => void downloadSelectedPdf()}
+                title="Download employee record ZIP (summary PDF + all documents and files)"
+                onClick={() => void downloadSelectedRecord()}
               >
                 <span aria-hidden="true">📄</span>
-                {pdfBusy() ? "Preparing 201 PDF…" : "Download 201 PDF"}
+                {pdfBusy() ? "Preparing download…" : "Download Record"}
               </button>
             </Show>
           </div>

@@ -3,7 +3,6 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
-import { inputClass } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
 import { HrPageHead } from "./HrUi";
 import {
@@ -220,20 +219,11 @@ export default function AttendanceOverviewPage() {
       />
 
       <div class="me-bar">
-        <div
-          class="flex items-center gap-1"
-          role="group"
-          aria-label={rangeMode() === "month" ? "Month" : "Cut-off"}
-        >
-          <button
-            type="button"
-            class="hr-btn hr-btn-sm"
-            aria-label="Previous"
-            onClick={goPrev}
-          >
+        <div class="me-cut" role="group" aria-label={rangeMode() === "month" ? "Month" : "Cut-off"}>
+          <button type="button" class="hr-btn hr-btn-sm" aria-label="Previous" onClick={goPrev}>
             ‹
           </button>
-          <b class="min-w-[10rem] text-center text-sm">{periodLabel()}</b>
+          <b>{periodLabel()}</b>
           <button
             type="button"
             class="hr-btn hr-btn-sm"
@@ -263,23 +253,15 @@ export default function AttendanceOverviewPage() {
           </button>
         </div>
         <div class="hr-seg" role="group" aria-label="Quick filter">
-          <button
-            type="button"
-            classList={{ on: filter() === "all" }}
-            onClick={() => setFilter("all")}
-          >
+          <button type="button" classList={{ on: filter() === "all" }} onClick={() => setFilter("all")}>
             All
           </button>
-          <button
-            type="button"
-            classList={{ on: filter() === "look" }}
-            onClick={() => setFilter("look")}
-          >
+          <button type="button" classList={{ on: filter() === "look" }} onClick={() => setFilter("look")}>
             Needs a look
           </button>
         </div>
         <select
-          class={inputClass}
+          class="me-input me-bar-dept"
           aria-label="Department"
           value={deptFilter()}
           onChange={(e) => setDeptFilter(e.currentTarget.value)}
@@ -288,28 +270,24 @@ export default function AttendanceOverviewPage() {
           <For each={depts()}>{(d) => <option value={d}>{d}</option>}</For>
         </select>
         <input
-          class={`${inputClass} grow`}
+          class="me-input grow"
           type="search"
           placeholder="Search name"
           aria-label="Search name"
           value={q()}
           onInput={(e) => setQ(e.currentTarget.value)}
         />
-        <div class="hr-seg" role="group" aria-label="Cell size">
+        <div class="hr-seg me-bar-density" role="group" aria-label="Cell size">
           <For each={["S", "M", "L"] as Density[]}>
             {(d) => (
-              <button
-                type="button"
-                classList={{ on: density() === d }}
-                onClick={() => setDensity(d)}
-              >
+              <button type="button" classList={{ on: density() === d }} onClick={() => setDensity(d)}>
                 {d}
               </button>
             )}
           </For>
         </div>
-        <label class="flex items-center gap-2 text-xs text-text-secondary">
-          Name col
+        <label class="me-bar-namecol">
+          Name
           <input
             type="range"
             min="180"
