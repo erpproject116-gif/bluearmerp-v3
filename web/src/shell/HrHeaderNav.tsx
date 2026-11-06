@@ -1,7 +1,6 @@
 import { A, useLocation } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { isAgencyPath, useManpowerMode } from "../modules/hr/manpowerMode";
-import { elevatedTenantAdmin, useAuth } from "../shared/auth-context";
 
 type PageLink = { label: string; href: string; exact?: boolean };
 
@@ -119,15 +118,12 @@ function pageActive(pathname: string, page: PageLink): boolean {
 const guidePage: PageLink = { label: "Userflow Guides", href: "/app/hr/roadmap", exact: true };
 
 export function HrHeaderNav() {
-  const auth = useAuth();
   const loc = useLocation();
   const mode = useManpowerMode();
   const onHr = () => loc.pathname === "/app/hr" || loc.pathname.startsWith("/app/hr/");
   const activeGroup = () => groups.find((group) => groupActive(loc.pathname, group));
   const pages = () =>
-    (activeGroup()?.pages ?? []).filter(
-      (page) => elevatedTenantAdmin(auth.me) || mode.enabled() || !isAgencyPath(page.href),
-    );
+    (activeGroup()?.pages ?? []).filter((page) => mode.enabled() || !isAgencyPath(page.href));
   const onRoadmap = () => pathUnder(loc.pathname, "/app/hr/roadmap");
   // Userflow Guides is the roadmap header tab only — not a global chip on every HR page.
   const chips = () => (onRoadmap() ? [guidePage] : pages());

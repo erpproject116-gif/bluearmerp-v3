@@ -1292,7 +1292,7 @@ export default function HrOverviewPage() {
             </section>
           </Show>
 
-          <Show when={shown("feed")}>
+          <Show when={mode.enabled() && shown("feed")}>
             <section class="hr-w" aria-label="Recent activity">
               <header>
                 <h3>Portal activity</h3>
