@@ -40,3 +40,17 @@ func TestCORSAllowOrigin_vercelPreview(t *testing.T) {
 		t.Fatal("expected reject lookalike domain")
 	}
 }
+
+func TestCORSAllowedHeaders_includesPortalToken(t *testing.T) {
+	opts := (Config{}).CORSOptions()
+	found := false
+	for _, h := range opts.AllowedHeaders {
+		if h == "X-Portal-Token" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("AllowedHeaders missing X-Portal-Token: %v", opts.AllowedHeaders)
+	}
+}

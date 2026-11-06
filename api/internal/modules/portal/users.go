@@ -366,7 +366,24 @@ func lookupElevatedStaffTenant(ctx context.Context, pool *pgxpool.Pool, email st
 
 func lookupPortalPreviewPartner(ctx context.Context, pool *pgxpool.Pool, tenantID int64) (int64, error) {
 	var partnerID int64
+	// Prefer an open Sample HR client so staff preview lands on seeded portal data.
 	err := pool.QueryRow(ctx, `
+		select c.partner_id
+		from public.hr_clients c
+		join public.hr_sample_rows r
+		  on r.row_id = c.id and r.table_name = 'hr_clients'
+		join public.hr_sample_batches b
+		  on b.id = r.batch_id and b.tenant_id = c.tenant_id and b.retracted_at is null
+		where c.tenant_id = $1
+		order by c.id asc
+		limit 1`, tenantID).Scan(&partnerID)
+	if err == nil {
+		return partnerID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return 0, err
+	}
+	err = pool.QueryRow(ctx, `
 		select c.partner_id from public.hr_clients c
 		where c.tenant_id = $1
 		order by c.id asc limit 1`, tenantID).Scan(&partnerID)

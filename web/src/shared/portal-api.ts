@@ -48,19 +48,26 @@ export async function portalFetch<T>(
 ): Promise<PortalApiEnvelope<T> & { status: number; ok: boolean }> {
   const token = init?.token ?? getPortalToken();
   const url = new URL(`${apiBase}${path}`, window.location.origin);
+  // Auth via query only in the browser. Sending X-Portal-Token triggers a CORS
+  // preflight; older API images omit that header from Access-Control-Allow-Headers.
   if (token) url.searchParams.set("token", token);
 
-  const res = await fetch(url.toString(), {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(token ? { "X-Portal-Token": token } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = (await res.json().catch(() => ({}))) as PortalApiEnvelope<T>;
-  return { ...body, status: res.status, ok: res.ok };
+  try {
+    const { token: _omitToken, ...fetchInit } = init ?? {};
+    const res = await fetch(url.toString(), {
+      ...fetchInit,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(fetchInit.headers ?? {}),
+      },
+    });
+    const body = (await res.json().catch(() => ({}))) as PortalApiEnvelope<T>;
+    return { ...body, status: res.status, ok: res.ok };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to fetch";
+    return { success: false, message, status: 0, ok: false };
+  }
 }
 
 export async function requestPortalMagicLink(email: string) {

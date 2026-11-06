@@ -15,6 +15,7 @@ var corsAllowedHeaders = []string{
 	"X-Tenant-ID",
 	"X-Branch-ID",
 	"X-User-Activity",
+	"X-Portal-Token",
 }
 
 // CORSOrigins splits CORS_ORIGIN on commas and normalizes (trim space, strip trailing slash).
