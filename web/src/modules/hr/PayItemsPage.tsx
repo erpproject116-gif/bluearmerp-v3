@@ -4,7 +4,6 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrPayrollTabs } from "./HrPayrollTabs";
 import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type PayItemType = {
@@ -118,7 +117,6 @@ export default function PayItemsPage() {
 
   return (
     <HrLayout>
-      <HrPayrollTabs />
       <HrPageHead
         title="Pay items"
         subtitle="Earnings and deductions used by payroll."

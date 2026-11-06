@@ -4,7 +4,6 @@ import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { getActiveBranchIdCurrent, getActiveTenantId } from "../../shared/activeContext";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
-import { HrCasesTabs } from "./HrCasesTabs";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrEmpty, HrPageHead, HrTcard } from "./HrUi";
 
@@ -153,7 +152,6 @@ export default function AbsenteeismPage() {
 
   return (
     <HrLayout>
-      <HrCasesTabs />
       <HrPageHead
         title="Absenteeism"
         subtitle="Alerts from DTR against your absence rules."

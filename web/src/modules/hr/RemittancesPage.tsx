@@ -8,7 +8,6 @@ import { useDocumentDraft } from "../../shared/useDocumentDraft";
 import { DRAFT_ENTITY } from "../../shared/entityTypes";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { HrLayout } from "./HrLayout";
-import { HrPayrollTabs } from "./HrPayrollTabs";
 import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 import { formatAmount, formatPeso } from "../../shared/money";
 
@@ -155,7 +154,6 @@ export default function RemittancesPage() {
 
   return (
     <HrLayout>
-      <HrPayrollTabs />
       <HrPageHead
         title="Remittances"
         subtitle="Government contributions and tax due per month."

@@ -18,7 +18,6 @@ import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
 import { useManpowerMode } from "./manpowerMode";
-import { HrPayrollTabs } from "./HrPayrollTabs";
 import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
 import type { Cutoff } from "./attendanceShared";
 import { formatAmount, formatPeso } from "../../shared/money";
@@ -198,7 +197,6 @@ export default function PayrollRunsPage() {
 
   return (
     <HrLayout>
-      <HrPayrollTabs />
       <HrPageHead
         title="Payroll runs"
         subtitle="Compute, review and post payroll per cut-off."

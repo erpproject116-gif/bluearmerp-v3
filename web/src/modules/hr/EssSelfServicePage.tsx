@@ -13,6 +13,7 @@ import {
   buildOtDemoFill,
 } from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
+import { useManpowerMode } from "./manpowerMode";
 import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, type HrBadgeTone } from "./HrUi";
 import "./ess-surface.css";
 
@@ -206,6 +207,7 @@ function maskId(value?: string) {
 
 function EssSelfServiceView() {
   const toast = useToast();
+  const mode = useManpowerMode();
   const [screen, setScreen] = createSignal<Screen>("home");
   const [reveal, setReveal] = createSignal(false);
   const [slipId, setSlipId] = createSignal<number | null>(null);
@@ -458,7 +460,11 @@ function EssSelfServiceView() {
       <div class="ess-shell">
         <HrPageHead
           title="My HR · Employee self-service"
-          subtitle="Mobile-first for deployed employees, also usable on desktop. Same BluearmERP account; you only see your own records."
+          subtitle={
+            mode.enabled()
+              ? "Mobile-first for deployed employees, also usable on desktop. Same BluearmERP account; you only see your own records."
+              : "Mobile-first employee self-service for time, leave, pay, and requests. Same BluearmERP account; you only see your own records."
+          }
         />
 
         <Show when={me.loading}>
@@ -667,9 +673,11 @@ function EssSelfServiceView() {
                       <button type="button" class="hr-btn hr-btn-sm" onClick={() => go("ot")}>
                         ⏱ File OT
                       </button>
-                      <button type="button" class="hr-btn hr-btn-sm" disabled title="Needs deployment roster">
-                        📅 Schedule
-                      </button>
+                      <Show when={mode.enabled()}>
+                        <button type="button" class="hr-btn hr-btn-sm" disabled title="Needs deployment roster">
+                          📅 Schedule
+                        </button>
+                      </Show>
                       <button type="button" class="hr-btn hr-btn-sm" onClick={() => go("hist")}>
                         History
                       </button>
@@ -829,7 +837,11 @@ function EssSelfServiceView() {
                         </p>
                         <p class="text-text-secondary">{reason() || "—"}</p>
                       </div>
-                      <p class="text-xs text-text-secondary mb-2">Goes to your client supervisor (if set) then HR.</p>
+                      <p class="text-xs text-text-secondary mb-2">
+                        {mode.enabled()
+                          ? "Goes to your client supervisor (if set) then HR."
+                          : "Goes to your manager (if set) then HR."}
+                      </p>
                       <button type="button" class="hr-btn hr-btn-primary w-full" onClick={() => void submitLeave()}>
                         Submit leave
                       </button>

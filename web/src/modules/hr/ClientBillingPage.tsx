@@ -4,7 +4,6 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { DemoFillButton } from "./DemoFillButton";
 import { HrLayout } from "./HrLayout";
-import { HrPayrollTabs } from "./HrPayrollTabs";
 import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 import { formatPeso } from "../../shared/money";
 
@@ -65,7 +64,6 @@ export default function ClientBillingPage() {
 
   return (
     <HrLayout>
-      <HrPayrollTabs />
       <HrPageHead
         title={
           <>

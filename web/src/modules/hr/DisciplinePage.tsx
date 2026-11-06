@@ -7,7 +7,6 @@ import { fetchEmployeeOptions } from "../../shared/useHr";
 import { LookupCombo } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
-import { HrCasesTabs } from "./HrCasesTabs";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
 
@@ -227,7 +226,6 @@ export default function DisciplinePage() {
 
   return (
     <HrLayout>
-      <HrCasesTabs />
       <HrPageHead
         title={
           <>

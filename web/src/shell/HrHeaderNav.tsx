@@ -125,8 +125,12 @@ export function HrHeaderNav() {
   const pages = () =>
     (activeGroup()?.pages ?? []).filter((page) => mode.enabled() || !isAgencyPath(page.href));
   const onRoadmap = () => pathUnder(loc.pathname, "/app/hr/roadmap");
-  // Userflow Guides is the roadmap header tab only — not a global chip on every HR page.
-  const chips = () => (onRoadmap() ? [guidePage] : pages());
+  const onOverview = () => {
+    const p = loc.pathname.replace(/\/+$/, "") || "/";
+    return p === "/app/hr";
+  };
+  // Guides on overview + roadmap; other HR pages use the active group chips only.
+  const chips = () => (onRoadmap() || onOverview() ? [guidePage] : pages());
   return (
     <Show when={onHr() && chips().length > 0}>
       <nav class="erp-header-features mt-3" aria-label="HR and Payroll pages">

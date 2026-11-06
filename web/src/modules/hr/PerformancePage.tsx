@@ -7,7 +7,6 @@ import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { SignaturePad } from "../../shared/SignaturePad";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrPerformanceTabs } from "./HrPerformanceTabs";
 import { HrBadge, HrEmpty, HrPageHead, type HrBadgeTone } from "./HrUi";
 
 type Cycle = { id: number; name: string; period_start: string; period_end: string; status: string };
@@ -222,7 +221,6 @@ export default function PerformancePage() {
 
   return (
     <HrLayout>
-      <HrPerformanceTabs />
       <HrPageHead
         title="Evaluations"
         subtitle="Review cycles and client evaluations (template LMSI_5). Scores never change pay, assignment or status."

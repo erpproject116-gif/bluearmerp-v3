@@ -6,7 +6,6 @@ import { LookupCombo } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrPerformanceTabs } from "./HrPerformanceTabs";
 import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type Course = {
@@ -160,7 +159,6 @@ export default function LearningPage() {
 
   return (
     <HrLayout>
-      <HrPerformanceTabs />
       <HrPageHead
         title="Learning"
         subtitle="Courses, enrollments and completion."

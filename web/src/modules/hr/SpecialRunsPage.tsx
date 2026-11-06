@@ -5,7 +5,6 @@ import { LookupCombo } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrPayrollTabs } from "./HrPayrollTabs";
 import { HrPageHead, HrTcard } from "./HrUi";
 import { formatAmount, formatPeso } from "../../shared/money";
 
@@ -93,7 +92,6 @@ export default function SpecialRunsPage() {
 
   return (
     <HrLayout>
-      <HrPayrollTabs />
       <HrPageHead title="Special runs" subtitle="13th month and final pay. Preview before posting." />
 
       <div class="grid gap-4 lg:grid-cols-2">

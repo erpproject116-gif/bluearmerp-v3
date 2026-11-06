@@ -3,7 +3,6 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrReportsTabs } from "./HrReportsTabs";
 import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
 type Doc = {
@@ -123,7 +122,6 @@ export default function CompliancePage() {
 
   return (
     <HrLayout>
-      <HrReportsTabs />
       <HrPageHead
         title={
           <>

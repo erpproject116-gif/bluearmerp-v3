@@ -4,7 +4,6 @@ import { LookupCombo } from "../../shared/LookupCombo";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { fetchEmployeeOptions } from "../../shared/useHr";
 import { useToast } from "../../shared/toast";
-import { HrCasesTabs } from "./HrCasesTabs";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
 
@@ -271,7 +270,6 @@ export default function WorkplaceProblemsPage() {
 
   return (
     <HrLayout>
-      <HrCasesTabs />
       <HrPageHead
         title="Workplace problems"
         subtitle="Every open problem needs an owner, a next step and a target date."

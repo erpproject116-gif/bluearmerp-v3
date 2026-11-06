@@ -3,7 +3,6 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
-import { HrReportsTabs } from "./HrReportsTabs";
 import { HrEmpty, HrNotice, HrPageHead, HrTcard } from "./HrUi";
 import { formatAmount } from "../../shared/money";
 
@@ -63,7 +62,6 @@ export default function GovernmentReportsPage() {
 
   return (
     <HrLayout>
-      <HrReportsTabs />
       <HrPageHead
         title={
           <>
