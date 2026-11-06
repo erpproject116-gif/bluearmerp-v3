@@ -24,14 +24,13 @@ export type PortalApiEnvelope<T> = {
 const PORTAL_TOKEN_KEY = "portal_token";
 
 export function getPortalToken(): string | null {
-  const fromStorage = sessionStorage.getItem(PORTAL_TOKEN_KEY);
-  if (fromStorage) return fromStorage;
+  // Prefer URL token so paste-card / magic links can replace a stale session.
   const fromUrl = new URLSearchParams(window.location.search).get("token");
   if (fromUrl) {
     sessionStorage.setItem(PORTAL_TOKEN_KEY, fromUrl);
     return fromUrl;
   }
-  return null;
+  return sessionStorage.getItem(PORTAL_TOKEN_KEY);
 }
 
 export function setPortalToken(token: string) {
