@@ -1255,9 +1255,11 @@ func buildSamplePasteCard(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }, tenantID int64) (samplePasteCard, error) {
-	var code string
+	var code, publicSlug string
 	if err := q.QueryRow(ctx, `
-		select coalesce(company_code, '') from public.tenants where id = $1`, tenantID).Scan(&code); err != nil {
+		select coalesce(company_code, ''),
+		       coalesce(nullif(btrim(public_careers_slug), ''), '')
+		from public.tenants where id = $1`, tenantID).Scan(&code, &publicSlug); err != nil {
 		return samplePasteCard{}, err
 	}
 	card := samplePasteCard{
@@ -1288,9 +1290,10 @@ func buildSamplePasteCard(ctx context.Context, q interface {
 	card.Open = true
 	card.BatchID = batchID
 
-	careers := "/careers/" + code
-	apply := "/apply/" + code
-	if code == "" {
+	publicPath := publicPathSegment(code, publicSlug)
+	careers := "/careers/" + publicPath
+	apply := "/apply/" + publicPath
+	if publicPath == "" {
 		careers = "/careers/<company_code>"
 		apply = "/apply/<company_code>"
 	}

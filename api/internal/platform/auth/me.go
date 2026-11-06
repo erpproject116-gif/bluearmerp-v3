@@ -76,12 +76,13 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 	if tu.PlatformOnly || tu.TenantID <= 0 {
 		return buildPlatformOnlyMe(tu), nil
 	}
-	var companyName, companyCode, tenantStatus string
+	var companyName, companyCode, tenantStatus, publicCareersSlug string
 	var autoEnableAll, isDemo bool
 	err := pool.QueryRow(ctx, `
-		select company_name, company_code, status, auto_enable_all_modules, is_demo
+		select company_name, company_code, status, auto_enable_all_modules, is_demo,
+		       coalesce(nullif(btrim(public_careers_slug), ''), '')
 		from public.tenants where id = $1`, tu.TenantID).
-		Scan(&companyName, &companyCode, &tenantStatus, &autoEnableAll, &isDemo)
+		Scan(&companyName, &companyCode, &tenantStatus, &autoEnableAll, &isDemo, &publicCareersSlug)
 	if err != nil {
 		return MePayload{}, err
 	}
@@ -225,6 +226,7 @@ func buildMe(ctx context.Context, pool *pgxpool.Pool, tu TenantUser, cfg config.
 			"id":                      tu.TenantID,
 			"company_name":            companyName,
 			"company_code":            companyCode,
+			"public_careers_slug":     publicCareersSlug,
 			"status":                  tenantStatus,
 			"auto_enable_all_modules": autoEnableAll,
 			"is_demo":                 isDemo,

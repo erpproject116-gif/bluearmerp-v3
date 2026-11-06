@@ -1,14 +1,16 @@
 import { Show } from "solid-js";
 import { hrDemoFillEnabled } from "./hrDemoFill";
 
-/** Gated control — only when ?demo=1, localStorage.hrDemoFill=1, or Vite DEV. */
+/** Gated control — only when ?demo=1, localStorage.hrDemoFill=1, or Vite DEV.
+ *  Pass always to show on public surfaces (e.g. /apply/:code) without the gate. */
 export function DemoFillButton(props: {
   onFill: () => void;
   label?: string;
   class?: string;
+  always?: boolean;
 }) {
   return (
-    <Show when={hrDemoFillEnabled()}>
+    <Show when={props.always || hrDemoFillEnabled()}>
       <button
         type="button"
         class={

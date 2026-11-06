@@ -56,6 +56,7 @@ export type MeData = {
     id: number;
     company_name: string;
     company_code: string;
+    public_careers_slug?: string;
     status: string;
     auto_enable_all_modules?: boolean;
     is_demo?: boolean;

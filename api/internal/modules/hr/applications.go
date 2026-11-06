@@ -39,6 +39,7 @@ func registerPublicApplyRoutes(r chi.Router, pool *pgxpool.Pool) {
 }
 
 func registerApplicationRoutes(r chi.Router, pool *pgxpool.Pool) {
+	registerPublicLinksRoutes(r, pool)
 	r.Get("/applications", listApplications(pool))
 	r.Get("/applications/{id}/comments", listApplicationComments(pool))
 	r.Get("/applications/{id}/files/{fileId}", downloadApplicationFile(pool))
@@ -103,11 +104,7 @@ type applyForm struct {
 }
 
 func tenantByCompanyCode(ctx context.Context, pool *pgxpool.Pool, code string) (int64, error) {
-	var id int64
-	err := pool.QueryRow(ctx, `
-		select id from public.tenants
-		where lower(company_code) = lower($1) and status = 'active'`, strings.TrimSpace(code)).Scan(&id)
-	return id, err
+	return tenantByPublicCode(ctx, pool, code)
 }
 
 func listPublicOpenings(pool *pgxpool.Pool) http.HandlerFunc {

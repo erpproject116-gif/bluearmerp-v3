@@ -1102,6 +1102,31 @@
 
 .hr-surface .hr-rowmenu {
   display: inline-block;
+  position: relative;
+  vertical-align: middle;
+}
+
+/* Card + table scroll wrappers clip absolute menus; open rows must escape. */
+.hr-surface .hr-tcard:has(.hr-rowmenu[open]),
+.hr-surface .hr-tbl-wrap:has(.hr-rowmenu[open]) {
+  overflow: visible;
+}
+
+.hr-surface table.hr-tbl tr:has(.hr-rowmenu[open]) {
+  position: relative;
+  z-index: 30;
+}
+
+.hr-surface table.hr-tbl td:has(.hr-rowmenu) {
+  overflow: visible;
+}
+
+/* Open above the ⋯ so the panel is not trapped under the next rows / card edge. */
+.hr-surface details.hr-rowmenu > div {
+  top: auto;
+  bottom: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
 }
 
 .hr-surface .hr-rowmenu > summary.hr-rowmenu-btn {

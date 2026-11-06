@@ -342,7 +342,7 @@ export default function ApplyPage() {
           <button type="button" class="text-text-secondary hover:underline" onClick={resumeDraftLocal}>
             Resume draft
           </button>
-          <DemoFillButton onFill={fillDemo} />
+          <DemoFillButton always onFill={fillDemo} label="Auto fill" />
         </nav>
       </header>
 
@@ -383,7 +383,10 @@ export default function ApplyPage() {
           </div>
         </Show>
 
-        <h1 class="mb-1 text-2xl font-bold">Application form</h1>
+        <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h1 class="text-2xl font-bold">Application form</h1>
+          <DemoFillButton always onFill={fillDemo} label="Auto fill" />
+        </div>
         <p class="mb-2 text-sm text-text-secondary">
           Step {step() + 1} of {STEPS.length} · You can leave and come back; a draft is saved on this device.
         </p>
