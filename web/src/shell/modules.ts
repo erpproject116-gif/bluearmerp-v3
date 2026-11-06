@@ -525,6 +525,7 @@ export const appModules: AppModule[] = [
       { label: "Contracts & job orders", href: "/app/hr/contracts", settingsHref: "/app/hr/contracts", headerHidden: true },
       { label: "Manpower requests", href: "/app/hr/manpower-requests", settingsHref: "/app/hr/manpower-requests", headerHidden: true },
       { label: "Portal access", href: "/app/hr/clients/portal-access", settingsHref: "/app/hr/clients/portal-access", headerHidden: true },
+      { label: "Client time inbox", href: "/app/hr/client-time-inbox", settingsHref: "/app/hr/client-time-inbox", headerHidden: true },
       { label: "Client DTR", href: "/app/hr/attendance/client-dtr", settingsHref: "/app/hr/attendance/client-dtr", headerHidden: true },
       { label: "Client billing", href: "/app/hr/client-billing", settingsHref: "/app/hr/client-billing", headerHidden: true },
       { label: "Offboarding", href: "/app/hr/offboarding", settingsHref: "/app/hr/offboarding", headerHidden: true },

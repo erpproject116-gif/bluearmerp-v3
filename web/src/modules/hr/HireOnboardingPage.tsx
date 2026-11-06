@@ -3,6 +3,8 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
+import { DemoFillButton } from "./DemoFillButton";
+import { buildHireOnboardingDemoFill } from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrEmpty, HrPageHead, type HrBadgeTone } from "./HrUi";
 
@@ -78,6 +80,7 @@ export default function HireOnboardingPage() {
   const [caseId, setCaseId] = createSignal<number | null>(null);
   const [search, setSearch] = createSignal("");
   const [colFilter, setColFilter] = createSignal("");
+  const [taskNote, setTaskNote] = createSignal("");
 
   const cases = createQuery(() => ({
     queryKey: ["hr-hire-onboarding"],
@@ -255,9 +258,14 @@ export default function HireOnboardingPage() {
                   {(c) => <HrBadge tone={caseTone(c())}>{caseLabel(c())}</HrBadge>}
                 </Show>
               </div>
-              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setCaseId(null)}>
-                ✕
-              </button>
+              <div class="flex items-center gap-2">
+                <DemoFillButton
+                  onFill={() => setTaskNote(buildHireOnboardingDemoFill().taskNote)}
+                />
+                <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setCaseId(null)}>
+                  ✕
+                </button>
+              </div>
             </header>
             <div class="min-h-0 flex-1 overflow-y-auto p-4">
               <Show when={detail.isPending}>
@@ -288,6 +296,14 @@ export default function HireOnboardingPage() {
                         )}
                       </For>
                     </ol>
+                    <label class="mb-1 block text-sm font-medium">Walkthrough note</label>
+                    <textarea
+                      class="mb-4 w-full rounded border border-stroke px-2 py-1.5 text-sm"
+                      rows={2}
+                      placeholder="Optional note for this walkthrough (not auto-saved)."
+                      value={taskNote()}
+                      onInput={(e) => setTaskNote(e.currentTarget.value)}
+                    />
                     <div class="rounded-lg border border-dashed border-stroke bg-panel p-3 text-sm">
                       <b>Ready to deploy</b>
                       <p class="hr-muted mt-1">

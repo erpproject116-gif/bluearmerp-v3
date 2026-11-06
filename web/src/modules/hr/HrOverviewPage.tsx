@@ -234,6 +234,19 @@ export default function HrOverviewPage() {
     queryKey: ["hr-overview"],
     queryFn: async () => (await apiFetch<Overview>("/api/v1/hr/overview", {}, { silent: true })).data,
   }));
+  type PortalActivityRow = {
+    id: number;
+    client_name: string;
+    email: string;
+    action: string;
+    target_id: number;
+    created_at: string;
+  };
+  const portalActivity = createQuery(() => ({
+    queryKey: ["hr-portal-activity", auth.me?.tenant?.id ?? 0],
+    queryFn: async () =>
+      (await apiFetch<PortalActivityRow[]>("/api/v1/hr/portal-activity", {}, { silent: true })).data ?? [],
+  }));
   const clients = createQuery(() => ({
     queryKey: ["hr-overview-clients"],
     enabled: mode.enabled(),
@@ -1277,17 +1290,45 @@ export default function HrOverviewPage() {
           <Show when={shown("feed")}>
             <section class="hr-w" aria-label="Recent activity">
               <header>
-                <h3>Recent activity</h3>
+                <h3>Portal activity</h3>
                 <span class="grow" />
+                <A class="xs" href="/app/hr/client-time-inbox">Inbox →</A>
               </header>
               <ul class="hr-feed">
-                <li>
-                  <span class="dot" aria-hidden="true">📣</span>
-                  <span class="grow">Activity feed needs an audit log API</span>
-                  <span class="xs">—</span>
-                </li>
+                <Show
+                  when={!portalActivity.isPending}
+                  fallback={
+                    <li>
+                      <span class="grow">Loading portal activity…</span>
+                    </li>
+                  }
+                >
+                  <For
+                    each={(portalActivity.data ?? []).slice(0, 8)}
+                    fallback={
+                      <li>
+                        <span class="dot" aria-hidden="true">📣</span>
+                        <span class="grow">No portal submissions yet</span>
+                        <span class="xs">—</span>
+                      </li>
+                    }
+                  >
+                    {(row) => (
+                      <li>
+                        <span class="dot" aria-hidden="true">📣</span>
+                        <span class="grow">
+                          <b>{row.action.replace(/_/g, " ")}</b>
+                          <span class="xs block">
+                            {[row.client_name, row.email].filter(Boolean).join(" · ") || "Portal"}
+                          </span>
+                        </span>
+                        <span class="xs">{row.created_at?.slice(0, 10) || "—"}</span>
+                      </li>
+                    )}
+                  </For>
+                </Show>
               </ul>
-              <A class="xs" href="/app/hr/reports">Reports →</A>
+              <A class="xs" href="/app/hr/clients/portal-access">Portal access →</A>
             </section>
           </Show>
         </div>

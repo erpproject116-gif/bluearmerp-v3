@@ -2,6 +2,7 @@ import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { Field, inputClass } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { DemoFillButton } from "./DemoFillButton";
 import { HrLayout } from "./HrLayout";
 import { HrPayrollTabs } from "./HrPayrollTabs";
 import { HrBadge, HrEmpty, HrPageHead, HrTcard, type HrBadgeTone } from "./HrUi";
@@ -214,9 +215,18 @@ export default function ClientBillingPage() {
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Generate bill</h2>
-              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setGenOpen(false)}>
-                ✕
-              </button>
+              <div class="flex items-center gap-2">
+                <DemoFillButton
+                  onFill={() => {
+                    const first = accepted()[0];
+                    if (!first) return toast.warning("No accepted submissions to fill.");
+                    setSubmissionId(String(first.id));
+                  }}
+                />
+                <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setGenOpen(false)}>
+                  ✕
+                </button>
+              </div>
             </div>
             <p class="mb-3 text-sm text-text-secondary">
               Live path today: accepted client time × site bill rate. Generate from posted payroll run + markup is{" "}.

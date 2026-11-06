@@ -39,6 +39,56 @@ function policyCurrentValue(policy: ProcessPolicy | null, field: string): boolea
   return typeof v === "boolean" ? v : null;
 }
 
+function AgencyStaffingRow(props: {
+  compact?: boolean;
+  manpower: boolean | null;
+  manpowerSaving: boolean;
+  canManage: boolean;
+  hrEnabled: boolean;
+  onToggle: (on: boolean) => void;
+}) {
+  const disabled = () =>
+    props.manpower === null || !props.canManage || props.manpowerSaving || !props.hrEnabled;
+  return (
+    <li class="flex items-start justify-between gap-2">
+      <div class="min-w-0">
+        <p class={props.compact ? "text-sm font-medium text-slate-800" : "text-xs font-medium text-slate-800"}>
+          Agency staffing (manpower)
+        </p>
+        <p class={props.compact ? "text-xs text-slate-500" : "text-[11px] text-slate-500"}>
+          Clients, contracts, deployments, portal access, client time, and client billing. Shared HR
+          (employees, attendance, leave, payroll, cases, ESS, offboarding, compliance, gov reports) stays available.
+        </p>
+        <Show when={!props.hrEnabled}>
+          <p class="mt-1 text-[11px] text-amber-700">Turn on HR &amp; Payroll first.</p>
+        </Show>
+      </div>
+      <Show
+        when={props.canManage}
+        fallback={
+          <span class="text-[11px] text-slate-400">
+            {props.manpower == null ? "…" : boolLabel(!!props.manpower)}
+          </span>
+        }
+      >
+        <button
+          type="button"
+          class="shrink-0 rounded border px-2 py-1 text-[11px] font-medium disabled:opacity-50"
+          classList={{
+            "border-slate-300 text-slate-600": !!props.manpower,
+            "border-brand-300 text-brand-700": !props.manpower,
+          }}
+          disabled={disabled()}
+          title={!props.hrEnabled ? "Turn on HR & Payroll first" : undefined}
+          onClick={() => props.onToggle(!props.manpower)}
+        >
+          {props.manpowerSaving ? "Saving…" : props.manpower ? "Turn off" : "Turn on"}
+        </button>
+      </Show>
+    </li>
+  );
+}
+
 export default function ModuleFeaturesPage() {
   const toast = useToast();
   const auth = useAuth();
@@ -70,6 +120,11 @@ export default function ModuleFeaturesPage() {
       setRows(list);
       setBaseline(list.map((r) => ({ ...r })));
       setCanManage(!!res.data.can_manage);
+      if (!list.some((r) => r.module_code === "hr")) {
+        toast.warning(
+          "Blocker B1: no HR & Payroll module row in catalog — Agency staffing control cannot be nested.",
+        );
+      }
     } else {
       toast.error(res.message || "Failed to load modules.");
     }
@@ -88,8 +143,10 @@ export default function ModuleFeaturesPage() {
     return row ? row.is_enabled : null;
   };
 
+  const hrModule = createMemo(() => rows().find((r) => r.module_code === "hr") ?? null);
+
   const saveManpower = async (on: boolean) => {
-    if (!canManage()) return;
+    if (!canManage() || hrModule()?.is_enabled === false) return;
     setManpowerSaving(true);
     const res = await apiFetch<{ manpower_mode: boolean }>("/api/v1/user-management/hr-manpower-mode", {
       method: "PATCH",
@@ -97,13 +154,25 @@ export default function ModuleFeaturesPage() {
     }, { silent: true });
     setManpowerSaving(false);
     if (!res.success || !res.data) {
-      toast.error(res.message || "Could not save manpower mode.");
+      toast.error(res.message || "Could not save agency staffing mode.");
       return;
     }
     setManpower(res.data.manpower_mode);
     void qc.invalidateQueries({ queryKey: ["hr-manpower-mode"] });
-    toast.success(on ? "Manpower pages are in the HR menu." : "Older HR pages are in the menu. Client records were kept.");
+    toast.success(
+      on
+        ? "Agency staffing pages are in the HR menu."
+        : "Agency staffing pages are hidden. Shared HR stays on; client records were kept.",
+    );
   };
+
+  const agencyRowProps = () => ({
+    manpower: manpower(),
+    manpowerSaving: manpowerSaving(),
+    canManage: canManage(),
+    hrEnabled: hrModule()?.is_enabled !== false,
+    onToggle: (on: boolean) => void saveManpower(on),
+  });
 
   const toggle = (code: string) => {
     if (!canManage()) return;
@@ -201,28 +270,6 @@ export default function ModuleFeaturesPage() {
           Prefer a starter pack if you are not sure what to change.
         </p>
       </div>
-
-      <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 class="text-sm font-semibold text-slate-900">HR manpower mode</h2>
-        <Show
-          when={manpower() !== null}
-          fallback={<p class="mt-1 text-xs text-slate-600">Loading manpower mode…</p>}
-        >
-          <p class="mt-1 text-xs text-slate-600">
-            {manpower()
-              ? "Clients, roster, client time, and client billing stay in the HR menu. Turning this off keeps those records and shows the older HR pages."
-              : "The older HR and Payroll pages are in the menu. Client and site records are kept."}
-          </p>
-        </Show>
-        <button
-          type="button"
-          class="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50"
-          disabled={manpower() === null || !canManage() || manpowerSaving()}
-          onClick={() => void saveManpower(!manpower())}
-        >
-          {manpower() ? "Use older HR pages" : "Turn manpower mode on"}
-        </button>
-      </section>
 
       <Show when={canManage()}>
         <div class="grid gap-3 sm:grid-cols-3">
@@ -365,7 +412,7 @@ export default function ModuleFeaturesPage() {
                               </button>
                             </Show>
                           </div>
-                          <Show when={node.features.length > 0}>
+                          <Show when={node.features.length > 0 || node.parent.module_code === "hr"}>
                             <ul class="mt-3 space-y-2 border-t border-slate-100 pt-3">
                               <For each={node.features}>
                                 {(feat) => (
@@ -399,6 +446,9 @@ export default function ModuleFeaturesPage() {
                                   </li>
                                 )}
                               </For>
+                              <Show when={node.parent.module_code === "hr"}>
+                                <AgencyStaffingRow {...agencyRowProps()} />
+                              </Show>
                             </ul>
                           </Show>
                         </article>
@@ -418,20 +468,27 @@ export default function ModuleFeaturesPage() {
                   <div class="space-y-2">
                     <For each={group.items}>
                       {(row) => (
-                        <label class="flex cursor-pointer gap-3 rounded-md px-2 py-2 hover:bg-slate-50">
-                          <input
-                            type="checkbox"
-                            class="mt-1 h-4 w-4"
-                            checked={row.is_enabled}
-                            disabled={!canManage() || !row.can_toggle}
-                            onChange={() => toggle(row.module_code)}
-                          />
-                          <span>
-                            <span class="block text-sm font-medium text-slate-900">{moduleDisplayName(row)}</span>
-                            <span class="block text-xs text-slate-500">{moduleBlurb(row.module_code)}</span>
-                            <span class="block font-mono text-[10px] text-slate-400">{row.module_code}</span>
-                          </span>
-                        </label>
+                        <div class="rounded-md px-2 py-2 hover:bg-slate-50">
+                          <label class="flex cursor-pointer gap-3">
+                            <input
+                              type="checkbox"
+                              class="mt-1 h-4 w-4"
+                              checked={row.is_enabled}
+                              disabled={!canManage() || !row.can_toggle}
+                              onChange={() => toggle(row.module_code)}
+                            />
+                            <span>
+                              <span class="block text-sm font-medium text-slate-900">{moduleDisplayName(row)}</span>
+                              <span class="block text-xs text-slate-500">{moduleBlurb(row.module_code)}</span>
+                              <span class="block font-mono text-[10px] text-slate-400">{row.module_code}</span>
+                            </span>
+                          </label>
+                          <Show when={row.module_code === "hr"}>
+                            <ul class="ml-7 mt-2 border-l border-slate-200 pl-3">
+                              <AgencyStaffingRow compact {...agencyRowProps()} />
+                            </ul>
+                          </Show>
+                        </div>
                       )}
                     </For>
                   </div>

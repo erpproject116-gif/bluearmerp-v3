@@ -260,6 +260,7 @@ import {
   ManpowerRequestsPage,
   ClientDtrPage,
   ClientBillingPage,
+  ClientTimeInboxPage,
   PortalAccessPage,
   OffboardingPage,
   CompliancePage,
@@ -1085,6 +1086,9 @@ export default function App() {
           )} />
           <Route path="/hr/attendance/client-dtr" component={() => (
             <HrRoute><ClientDtrPage /></HrRoute>
+          )} />
+          <Route path="/hr/client-time-inbox" component={() => (
+            <HrRoute><ClientTimeInboxPage /></HrRoute>
           )} />
           <Route path="/hr/client-billing" component={() => (
             <HrRoute><ClientBillingPage /></HrRoute>

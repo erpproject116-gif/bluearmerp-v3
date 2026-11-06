@@ -2,6 +2,8 @@ import { A, useParams } from "@solidjs/router";
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiBase, apiFetch, getAccessToken } from "../../shared/api";
 import { useToast } from "../../shared/toast";
+import { DemoFillButton } from "./DemoFillButton";
+import { buildApplicantOfferDemoFill } from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, HrTcard, HrWizardNav } from "./HrUi";
 
@@ -60,6 +62,8 @@ export default function ApplicantDetailPage() {
   const toast = useToast();
   const [status, setStatus] = createSignal("");
   const [step, setStep] = createSignal(0);
+  const [offerNote, setOfferNote] = createSignal("");
+  const [offerStart, setOfferStart] = createSignal("");
   const [detail, { refetch }] = createResource(
     () => params.id,
     async (id) => {
@@ -261,8 +265,31 @@ export default function ApplicantDetailPage() {
 
                 <Show when={step() === 4}>
                   <div class="space-y-3">
-                    <p class="text-sm text-text-secondary">Sets status to Hired only. Use Convert to employee to create the roster record.</p>
-                    <HrNotice>Status alone never creates an employee. Use Convert hire below.</HrNotice>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <p class="text-sm text-text-secondary">Sets status to Hired only. Use Convert to employee to create the roster record.</p>
+                      <DemoFillButton
+                        onFill={() => {
+                          const packed = buildApplicantOfferDemoFill();
+                          setOfferNote(packed.offerNote);
+                          setOfferStart(packed.startDate);
+                        }}
+                      />
+                    </div>
+                    <HrNotice>Status alone never creates an employee. Use Convert hire below. Offer fields stay on this screen (not auto-submitted).</HrNotice>
+                    <label class="block text-sm font-medium">Offer note</label>
+                    <textarea
+                      class="w-full max-w-lg rounded border border-stroke px-2 py-1.5"
+                      rows={3}
+                      value={offerNote()}
+                      onInput={(e) => setOfferNote(e.currentTarget.value)}
+                    />
+                    <label class="block text-sm font-medium">Proposed start date</label>
+                    <input
+                      type="date"
+                      class="w-full max-w-sm rounded border border-stroke px-2 py-1.5"
+                      value={offerStart()}
+                      onInput={(e) => setOfferStart(e.currentTarget.value)}
+                    />
                   </div>
                 </Show>
 

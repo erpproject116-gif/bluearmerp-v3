@@ -299,6 +299,45 @@ export function buildClientDemoFill() {
   };
 }
 
+export function buildPortalInviteDemoFill() {
+  const fullName = demoPersonName();
+  return {
+    displayName: fullName,
+    email: demoEmail(fullName),
+  };
+}
+
+export function buildJobPostingDemoFill() {
+  return {
+    title: `Sample ${pick(ROLES)}`,
+    headcount: String(randInt(1, 5)),
+  };
+}
+
+export function buildClientBillingDemoFill() {
+  return {
+    note: `Demo bill prep ${isoDateOffset(0)}`,
+  };
+}
+
+export function buildApplicantOfferDemoFill() {
+  const fullName = demoPersonName();
+  return {
+    offerNote: `Demo offer for ${fullName} — ${pick(ROLES)} at ${pick(COMPANIES)}.`,
+    startDate: isoDateOffset(randInt(7, 21)),
+  };
+}
+
+export function buildHireOnboardingDemoFill() {
+  return {
+    taskNote: pick([
+      "Demo: medical certificate received.",
+      "Demo: SSS number pending — follow up Friday.",
+      "Demo: uniform size M issued.",
+    ]),
+  };
+}
+
 export function buildManpowerDemoFill() {
   return {
     headcount: String(randInt(1, 8)),

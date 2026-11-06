@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/auth"
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/inviteemail"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -45,8 +46,12 @@ func registerAgencyRoutes(r chi.Router, pool *pgxpool.Pool) {
 	r.Get("/client-bills", listClientBills(pool))
 	r.With(write).Post("/client-bills", createClientBill(pool))
 	r.Get("/portal-access", listClientPortalAccess(pool))
+	r.Get("/portal-activity", listHRPortalActivity(pool))
+	r.Get("/client-time-inbox", listClientTimeInbox(pool))
 	r.With(write).Post("/clients/{id}/portal-users", createClientPortalUser(pool))
 	r.With(write).Post("/clients/{id}/portal-preview", previewClientPortal(pool))
+	r.With(write).Post("/portal-users/{id}/resend-invite", resendClientPortalInvite(pool))
+	r.With(write).Post("/portal-users/{id}/revoke", revokeClientPortalUser(pool))
 	r.Get("/clearances", listClearances(pool))
 	r.With(write).Post("/clearances", createClearance(pool))
 	r.With(write).Post("/clearances/{id}/release", releaseClearance(pool))
@@ -562,7 +567,10 @@ func createClientPortalUser(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var partnerID int64
-		err = pool.QueryRow(r.Context(), `select partner_id from public.hr_clients where id = $1 and tenant_id = $2`, clientID, tu.TenantID).Scan(&partnerID)
+		var clientName string
+		err = pool.QueryRow(r.Context(), `
+			select partner_id, name from public.hr_clients where id = $1 and tenant_id = $2`,
+			clientID, tu.TenantID).Scan(&partnerID, &clientName)
 		if errors.Is(err, pgx.ErrNoRows) {
 			response.Err(w, http.StatusNotFound, "Client not found.", "ERR_NOT_FOUND")
 			return
@@ -571,10 +579,11 @@ func createClientPortalUser(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save portal access.", "ERR_INTERNAL")
 			return
 		}
+		displayName := strings.TrimSpace(body.DisplayName)
 		var id int64
 		err = pool.QueryRow(r.Context(), `
 			insert into public.portal_users (tenant_id, partner_id, email, display_name)
-			values ($1,$2,$3,$4) returning id`, tu.TenantID, partnerID, email, strings.TrimSpace(body.DisplayName)).Scan(&id)
+			values ($1,$2,$3,$4) returning id`, tu.TenantID, partnerID, email, displayName).Scan(&id)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -589,7 +598,169 @@ func createClientPortalUser(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to create the portal sign-in link.", "ERR_INTERNAL")
 			return
 		}
-		response.OK(w, map[string]any{"id": id, "login_url": loginURL}, "Created.")
+		emailed := inviteemail.SendPortalInviteAsync(email, displayName, clientName, tu.FullName, loginURL)
+		response.OK(w, map[string]any{
+			"id":              id,
+			"login_url":       loginURL,
+			"absolute_url":    inviteemail.AbsolutePortalURL(loginURL),
+			"email_attempted": emailed,
+			"mail_configured": inviteemail.MailConfigured(),
+		}, "Created.")
+	}
+}
+
+func resendClientPortalInvite(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		userID, err := parseID(chi.URLParam(r, "id"))
+		if err != nil {
+			response.Err(w, http.StatusBadRequest, "Portal user not found.", "ERR_BAD_REQUEST")
+			return
+		}
+		var email, displayName, clientName string
+		var partnerID int64
+		err = pool.QueryRow(r.Context(), `
+			select u.email, u.display_name, u.partner_id, coalesce(c.name, '')
+			from public.portal_users u
+			left join public.hr_clients c on c.partner_id = u.partner_id and c.tenant_id = u.tenant_id
+			where u.id = $1 and u.tenant_id = $2`, userID, tu.TenantID).
+			Scan(&email, &displayName, &partnerID, &clientName)
+		if errors.Is(err, pgx.ErrNoRows) {
+			response.Err(w, http.StatusNotFound, "Portal user not found.", "ERR_NOT_FOUND")
+			return
+		}
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to resend invite.", "ERR_INTERNAL")
+			return
+		}
+		_, _ = pool.Exec(r.Context(), `
+			update public.portal_users set is_active = true where id = $1 and tenant_id = $2`, userID, tu.TenantID)
+		loginURL, err := insertPortalMagicLink(r.Context(), pool, userID, time.Now().Add(7*24*time.Hour))
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to create the portal sign-in link.", "ERR_INTERNAL")
+			return
+		}
+		emailed := inviteemail.SendPortalInviteAsync(email, displayName, clientName, tu.FullName, loginURL)
+		response.OK(w, map[string]any{
+			"id":              userID,
+			"login_url":       loginURL,
+			"absolute_url":    inviteemail.AbsolutePortalURL(loginURL),
+			"email_attempted": emailed,
+			"mail_configured": inviteemail.MailConfigured(),
+		}, "Invite refreshed.")
+	}
+}
+
+func revokeClientPortalUser(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		userID, err := parseID(chi.URLParam(r, "id"))
+		if err != nil {
+			response.Err(w, http.StatusBadRequest, "Portal user not found.", "ERR_BAD_REQUEST")
+			return
+		}
+		tag, err := pool.Exec(r.Context(), `
+			update public.portal_users set is_active = false
+			where id = $1 and tenant_id = $2`, userID, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to revoke portal access.", "ERR_INTERNAL")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			response.Err(w, http.StatusNotFound, "Portal user not found.", "ERR_NOT_FOUND")
+			return
+		}
+		_, _ = pool.Exec(r.Context(), `
+			update public.portal_magic_links
+			set expires_at = now()
+			where portal_user_id = $1 and expires_at > now()`, userID)
+		response.OK(w, map[string]any{"id": userID, "is_active": false}, "Revoked.")
+	}
+}
+
+func listClientTimeInbox(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select t.id, c.name, s.site_name, t.period_start::text, t.period_end::text,
+			       t.status, coalesce(t.file_name, ''), coalesce(t.accepted_hours::float8, 0)
+			from public.hr_client_time_submissions t
+			join public.hr_client_sites s on s.id = t.site_id and s.tenant_id = t.tenant_id
+			join public.hr_clients c on c.id = s.client_id and c.tenant_id = t.tenant_id
+			where t.tenant_id = $1
+			order by case when t.status = 'submitted' then 0 else 1 end, t.id desc
+			limit 100`, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load client time inbox.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		out := []map[string]any{}
+		for rows.Next() {
+			var id int64
+			var client, site, start, end, status, fileName string
+			var hours float64
+			if err := rows.Scan(&id, &client, &site, &start, &end, &status, &fileName, &hours); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load client time inbox.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, map[string]any{
+				"id": id, "client_name": client, "site_name": site,
+				"period_start": start, "period_end": end, "status": status,
+				"file_name": fileName, "accepted_hours": hours,
+			})
+		}
+		response.OK(w, out, "OK")
+	}
+}
+
+func listHRPortalActivity(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tu, ok := auth.FromContext(r.Context())
+		if !ok {
+			response.Err(w, http.StatusUnauthorized, "Unauthorized.", "ERR_UNAUTHORIZED")
+			return
+		}
+		rows, err := pool.Query(r.Context(), `
+			select a.id, coalesce(c.name, ''), coalesce(u.email, ''), a.action, coalesce(a.target_id, 0), a.created_at
+			from public.hr_portal_activity a
+			left join public.hr_clients c on c.partner_id = a.partner_id and c.tenant_id = a.tenant_id
+			left join public.portal_users u on u.id = a.portal_user_id
+			where a.tenant_id = $1
+			order by a.id desc
+			limit 40`, tu.TenantID)
+		if err != nil {
+			response.Err(w, http.StatusInternalServerError, "Failed to load portal activity.", "ERR_INTERNAL")
+			return
+		}
+		defer rows.Close()
+		out := []map[string]any{}
+		for rows.Next() {
+			var id, targetID int64
+			var client, email, action string
+			var created time.Time
+			if err := rows.Scan(&id, &client, &email, &action, &targetID, &created); err != nil {
+				response.Err(w, http.StatusInternalServerError, "Failed to load portal activity.", "ERR_INTERNAL")
+				return
+			}
+			out = append(out, map[string]any{
+				"id": id, "client_name": client, "email": email, "action": action,
+				"target_id": targetID, "created_at": created.UTC().Format(time.RFC3339),
+			})
+		}
+		response.OK(w, out, "OK")
 	}
 }
 

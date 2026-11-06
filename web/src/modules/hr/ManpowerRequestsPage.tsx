@@ -3,7 +3,7 @@ import { apiFetch } from "../../shared/api";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
 import { DemoFillButton } from "./DemoFillButton";
-import { buildManpowerDemoFill, pick } from "./hrDemoFill";
+import { buildJobPostingDemoFill, buildManpowerDemoFill, hrDemoFillEnabled, pick } from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrPageHead, type HrBadgeTone } from "./HrUi";
 import { siteChoices } from "./siteChoices";
@@ -72,7 +72,8 @@ export default function ManpowerRequestsPage() {
   };
 
   const publishOpening = async (row: RequestRow) => {
-    const title = window.prompt("Opening title", row.details || "Open role")?.trim();
+    const demoTitle = hrDemoFillEnabled() ? buildJobPostingDemoFill().title : "";
+    const title = window.prompt("Opening title", demoTitle || row.details || "Open role")?.trim();
     if (title === undefined) return;
     const res = await apiFetch(`/api/v1/hr/manpower-requests/${row.id}/publish-opening`, {
       method: "POST",

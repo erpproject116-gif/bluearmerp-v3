@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/notify"
 	"github.com/bluearm/bluearm-erp-v3/api/internal/platform/response"
 )
 
@@ -126,6 +128,7 @@ func portalCreateTime(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save time.", "ERR_INTERNAL")
 			return
 		}
+		signalHRPortalSubmit(r.Context(), pool, pu.TenantID, id, "hr_client_time_submissions")
 		response.OK(w, map[string]any{"id": id}, "Created.")
 	}
 }
@@ -203,6 +206,7 @@ func portalCreateManpower(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save the request.", "ERR_INTERNAL")
 			return
 		}
+		signalHRPortalSubmit(r.Context(), pool, pu.TenantID, id, "hr_manpower_requests")
 		response.OK(w, map[string]any{"id": id}, "Created.")
 	}
 }
@@ -356,6 +360,7 @@ func portalCreateIncident(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save the incident.", "ERR_INTERNAL")
 			return
 		}
+		signalHRPortalSubmit(r.Context(), pool, pu.TenantID, id, "hr_client_violation_reports")
 		response.OK(w, map[string]any{"id": id}, "Created.")
 	}
 }
@@ -664,6 +669,7 @@ func portalLeaveDecision(pool *pgxpool.Pool) http.HandlerFunc {
 			response.Err(w, http.StatusInternalServerError, "Failed to save the decision.", "ERR_INTERNAL")
 			return
 		}
+		signalHRPortalSubmit(r.Context(), pool, pu.TenantID, id, "hr_leave_requests")
 		response.OK(w, map[string]any{"id": id, "client_decision": body.Decision, "status": "submitted"}, "Saved.")
 	}
 }
@@ -698,4 +704,17 @@ func recordPortal(r *http.Request, tx pgx.Tx, pu PortalUser, action string, targ
 		insert into public.hr_portal_notices (tenant_id, partner_id, title)
 		values ($1,$2,$3)`, pu.TenantID, pu.PartnerID, title)
 	return err
+}
+
+// signalHRPortalSubmit notifies tenant owners (bell) after a portal write commits.
+// Reuses notify.FromAudit; portal actors have no ERP user id (actor 0).
+func signalHRPortalSubmit(ctx context.Context, pool *pgxpool.Pool, tenantID, targetID int64, targetType string) {
+	if pool == nil || tenantID <= 0 {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	tid := targetID
+	notify.FromAudit(ctx, pool, tenantID, 0, "hr.portal.post", targetType, &tid, nil, nil)
 }

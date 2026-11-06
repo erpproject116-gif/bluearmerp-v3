@@ -1,8 +1,11 @@
-import { createMemo, createResource, createSignal, For, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
+import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { apiFetch } from "../../shared/api";
 import { elevatedTenantAdmin, useAuth } from "../../shared/auth-context";
 import { Field, inputClass, SpreadsheetGrid } from "../../shared/SpreadsheetGrid";
 import { useToast } from "../../shared/toast";
+import { DemoFillButton } from "./DemoFillButton";
+import { buildPortalInviteDemoFill } from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
 import { HrBadge, HrPageHead } from "./HrUi";
 
@@ -16,10 +19,18 @@ type Access = {
   is_active: boolean;
   login_url: string;
 };
+type InviteResult = {
+  id: number;
+  login_url: string;
+  absolute_url?: string;
+  email_attempted?: boolean;
+  mail_configured?: boolean;
+};
 
 export default function PortalAccessPage() {
   const auth = useAuth();
   const toast = useToast();
+  const [params] = useSearchParams();
   const [clientId, setClientId] = createSignal("");
   const [email, setEmail] = createSignal("");
   const [name, setName] = createSignal("");
@@ -28,10 +39,19 @@ export default function PortalAccessPage() {
   const [activeFilter, setActiveFilter] = createSignal<"" | "active" | "inactive">("");
   const [modalOpen, setModalOpen] = createSignal(false);
   const [previewBusy, setPreviewBusy] = createSignal(false);
+  const [lastLink, setLastLink] = createSignal("");
   const [clients] = createResource(async () => (await apiFetch<Client[]>("/api/v1/hr/clients")).data ?? []);
   const [rows, { refetch }] = createResource(async () => (await apiFetch<Access[]>("/api/v1/hr/portal-access")).data ?? []);
 
   const canPreview = () => elevatedTenantAdmin(auth.me);
+
+  createEffect(() => {
+    const fromQuery = typeof params.clientId === "string" ? params.clientId : "";
+    if (fromQuery && !clientId()) {
+      setClientId(fromQuery);
+      setModalOpen(true);
+    }
+  });
 
   const filtered = createMemo(() => {
     const q = search().trim().toLowerCase();
@@ -47,6 +67,32 @@ export default function PortalAccessPage() {
       );
     });
   });
+
+  const reportInviteResult = (data: InviteResult | undefined, fallback: string) => {
+    const link = data?.absolute_url || data?.login_url || "";
+    setLastLink(link);
+    if (data?.email_attempted) {
+      toast.success("Invite emailed. You can also copy the link below.");
+      return;
+    }
+    if (data?.mail_configured === false || !data?.email_attempted) {
+      toast.success(fallback + " Copy the sign-in link — email was not sent (mail not configured).");
+      return;
+    }
+    toast.success(fallback);
+  };
+
+  const copyLink = async (url: string) => {
+    if (!url) return toast.warning("No link to copy.");
+    try {
+      await navigator.clipboard.writeText(
+        url.startsWith("http") ? url : `${window.location.origin}${url}`,
+      );
+      toast.success("Link copied.");
+    } catch {
+      toast.warning("Could not copy. Select the link manually.");
+    }
+  };
 
   const openPortalPreview = async (forClientId: number) => {
     if (!forClientId || previewBusy()) return;
@@ -69,27 +115,44 @@ export default function PortalAccessPage() {
 
   const save = async () => {
     if (!clientId() || !email().trim()) return toast.warning("Choose a client and enter an email.");
-    const res = await apiFetch(`/api/v1/hr/clients/${clientId()}/portal-users`, {
+    const res = await apiFetch<InviteResult>(`/api/v1/hr/clients/${clientId()}/portal-users`, {
       method: "POST",
       body: JSON.stringify({ email: email().trim(), display_name: name().trim() }),
     });
     if (!res.success) return toast.warning(res.message ?? "Could not save portal access.");
+    reportInviteResult(res.data, "Portal access saved.");
     setEmail("");
     setName("");
     setModalOpen(false);
     void refetch();
-    toast.success("Portal access saved.");
+  };
+
+  const resend = async (row: Access) => {
+    const res = await apiFetch<InviteResult>(`/api/v1/hr/portal-users/${row.id}/resend-invite`, {
+      method: "POST",
+      body: "{}",
+    });
+    if (!res.success) return toast.warning(res.message ?? "Could not resend invite.");
+    reportInviteResult(res.data, "Invite refreshed.");
+    void refetch();
+  };
+
+  const revoke = async (row: Access) => {
+    if (!window.confirm(`Revoke portal access for ${row.email}?`)) return;
+    const res = await apiFetch(`/api/v1/hr/portal-users/${row.id}/revoke`, {
+      method: "POST",
+      body: "{}",
+    });
+    if (!res.success) return toast.warning(res.message ?? "Could not revoke.");
+    toast.success("Portal access revoked.");
+    void refetch();
   };
 
   return (
     <HrLayout>
       <HrPageHead
-        title={
-          <>
-            Portal access
-          </>
-        }
-        subtitle="This login opens the customer portal. It does not open HR pages, and it does not show pay."
+        title={<>Portal access</>}
+        subtitle="HR invites client reps here. Links open the customer portal only — not HR pages or pay."
         actions={
           <div class="flex flex-wrap gap-2">
             <Show when={canPreview()}>
@@ -121,6 +184,17 @@ export default function PortalAccessPage() {
         }
       />
 
+      <Show when={lastLink()}>
+        <div class="mb-3 rounded-lg border border-dashed border-stroke bg-panel px-3 py-2 text-sm">
+          <span class="hr-muted">Last sign-in link: </span>
+          <a class="text-brand-700 break-all" href={lastLink()}>
+            {lastLink()}
+          </a>
+          <button type="button" class="hr-btn hr-btn-sm ml-2" onClick={() => void copyLink(lastLink())}>
+            Copy
+          </button>
+        </div>
+      </Show>
 
       <SpreadsheetGrid
         columns={[
@@ -131,11 +205,7 @@ export default function PortalAccessPage() {
             key: "role",
             header: "Role",
             sortable: false,
-            render: () => (
-              <span class="hr-muted">
-                Client Rep
-              </span>
-            ),
+            render: () => <span class="hr-muted">Client Rep</span>,
             exportValue: () => "Client Rep",
           },
           {
@@ -182,17 +252,18 @@ export default function PortalAccessPage() {
                     <a class="menu-item" href={row.login_url}>
                       Open portal
                     </a>
+                    <button type="button" class="menu-item" onClick={() => void copyLink(row.login_url)}>
+                      Copy link
+                    </button>
                   </Show>
-                  <button
-                    type="button"
-                    class="menu-item"
-                    onClick={() => toast.warning("Resend invite needs backend.")}
-                  >
+                  <button type="button" class="menu-item" onClick={() => void resend(row)}>
                     Resend invite
                   </button>
-                  <button type="button" class="menu-item" onClick={() => toast.warning("Revoke needs backend.")}>
-                    Revoke
-                  </button>
+                  <Show when={row.is_active}>
+                    <button type="button" class="menu-item" onClick={() => void revoke(row)}>
+                      Revoke
+                    </button>
+                  </Show>
                 </div>
               </details>
             ),
@@ -244,9 +315,19 @@ export default function PortalAccessPage() {
           <div class="w-full max-w-md rounded-lg border border-stroke bg-surface p-4 shadow-lg">
             <div class="mb-3 flex items-center justify-between gap-2">
               <h2 class="text-sm font-semibold">Invite client user</h2>
-              <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setModalOpen(false)}>
-                ✕
-              </button>
+              <div class="flex items-center gap-2">
+                <DemoFillButton
+                  onFill={() => {
+                    const packed = buildPortalInviteDemoFill();
+                    setEmail(packed.email);
+                    setName(packed.displayName);
+                    if (!clientId() && (clients() ?? [])[0]) setClientId(String((clients() ?? [])[0]!.id));
+                  }}
+                />
+                <button type="button" class="hr-btn hr-btn-sm" aria-label="Close" onClick={() => setModalOpen(false)}>
+                  ✕
+                </button>
+              </div>
             </div>
             <div class="grid gap-3">
               <Field label="Client">
@@ -262,8 +343,11 @@ export default function PortalAccessPage() {
                 <input class={inputClass} value={name()} onInput={(e) => setName(e.currentTarget.value)} />
               </Field>
               <div class="rounded-lg border border-dashed border-stroke bg-panel p-3 text-sm">
-                <b>Branch scope / Client Approver role</b>
-                <p class="hr-muted mt-1">Invites create Client Rep portal access for the whole client today.</p>
+                <b>Invite email</b>
+                <p class="hr-muted mt-1">
+                  When Resend/SMTP is configured on the API, we email the magic link. Otherwise copy the link from the
+                  success message.
+                </p>
               </div>
             </div>
             <div class="mt-4 flex flex-wrap justify-end gap-2">
@@ -281,7 +365,7 @@ export default function PortalAccessPage() {
                 </button>
               </Show>
               <button type="button" class="hr-btn hr-btn-primary" onClick={() => void save()}>
-                Save
+                Save &amp; invite
               </button>
             </div>
           </div>

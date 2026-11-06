@@ -27,12 +27,13 @@ const groups: HrGroup[] = [
   {
     label: "Clients",
     href: "/app/hr/clients",
-    paths: ["/app/hr/clients", "/app/hr/contracts", "/app/hr/manpower-requests"],
+    paths: ["/app/hr/clients", "/app/hr/contracts", "/app/hr/manpower-requests", "/app/hr/client-time-inbox"],
     pages: [
       { label: "Clients & sites", href: "/app/hr/clients", exact: true },
       { label: "Contracts & job orders", href: "/app/hr/contracts" },
       { label: "Manpower requests", href: "/app/hr/manpower-requests" },
       { label: "Portal access", href: "/app/hr/clients/portal-access" },
+      { label: "Client time inbox", href: "/app/hr/client-time-inbox" },
     ],
   },
   {

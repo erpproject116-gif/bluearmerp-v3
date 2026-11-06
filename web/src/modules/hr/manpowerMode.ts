@@ -8,10 +8,8 @@ const agencyPrefixes = [
   "/app/hr/deployments",
   "/app/hr/workforce",
   "/app/hr/attendance/client-dtr",
+  "/app/hr/client-time-inbox",
   "/app/hr/client-billing",
-  "/app/hr/offboarding",
-  "/app/hr/compliance",
-  "/app/hr/government-reports",
 ];
 
 export function isAgencyPath(pathname: string): boolean {

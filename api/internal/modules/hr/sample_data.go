@@ -676,6 +676,20 @@ func seedSampleAgency(s sampler, tenantID int64, siteIDs, partnerIDs []int64, em
 			userID, token); err != nil {
 			return err
 		}
+		if i == 0 {
+			if _, err := s.ins("hr_portal_notices", `
+				insert into public.hr_portal_notices (tenant_id, partner_id, title)
+				values ($1,$2,'Sample notice: welcome to the portal') returning id`,
+				tenantID, partnerID); err != nil {
+				return err
+			}
+			if _, err := s.ins("hr_portal_activity", `
+				insert into public.hr_portal_activity (tenant_id, partner_id, portal_user_id, action, target_id)
+				values ($1,$2,$3,'sample_seed',0) returning id`,
+				tenantID, partnerID, userID); err != nil {
+				return err
+			}
+		}
 	}
 	if _, err := s.ins("hr_clearances", `
 		insert into public.hr_clearances (tenant_id, employee_id, status)
@@ -747,8 +761,8 @@ func seedSamplePeopleOps(s sampler, tenantID int64, emps, active []int64, templa
 		return err
 	}
 	if _, err := s.ins("hr_leave_requests", `
-		insert into public.hr_leave_requests (tenant_id, employee_id, leave_type_id, date_from, date_to, days, status, reason)
-		values ($1,$2,$3,'2099-01-06','2099-01-06',1,'submitted','Sample leave') returning id`,
+		insert into public.hr_leave_requests (tenant_id, employee_id, leave_type_id, date_from, date_to, days, status, reason, client_decision)
+		values ($1,$2,$3,'2099-01-06','2099-01-06',1,'submitted','Sample leave awaiting client','pending') returning id`,
 		tenantID, emps[0], leaveTypeID); err != nil {
 		return err
 	}
@@ -833,8 +847,14 @@ func seedSamplePeopleOps(s sampler, tenantID int64, emps, active []int64, templa
 		}
 	}
 	if _, err := s.ins("hr_employee_documents", `
-		insert into public.hr_employee_documents (tenant_id, employee_id, doc_type, title, expires_on)
-		values ($1,$2,'other','Sample 201 file','2020-01-01') returning id`, tenantID, emps[0]); err != nil {
+		insert into public.hr_employee_documents (tenant_id, employee_id, doc_type, title, expires_on, client_visible)
+		values ($1,$2,'other','Sample 201 file','2020-01-01',false) returning id`, tenantID, emps[0]); err != nil {
+		return err
+	}
+	if _, err := s.ins("hr_employee_documents", `
+		insert into public.hr_employee_documents (tenant_id, employee_id, doc_type, title, expires_on, client_visible)
+		values ($1,$2,'other','Sample client-visible certificate','2099-12-31',true) returning id`,
+		tenantID, active[0]); err != nil {
 		return err
 	}
 
@@ -1178,6 +1198,8 @@ func seedSampleClientBillForPartner(s sampler, tenantID, partnerID int64, master
 
 var sampleRetractOrder = []string{
 	"hr_client_bills",
+	"hr_portal_activity",
+	"hr_portal_notices",
 	"portal_magic_links",
 	"hr_client_time_submissions",
 	"hr_job_postings",
@@ -1245,7 +1267,8 @@ func buildSamplePasteCard(ctx context.Context, q interface {
 			"Attendance overview and Client DTR use the current quincena (also previous half is seeded).",
 			"Payroll sample periods and withholding stay in 2099; sample employees are excluded from live pay runs.",
 			"ESS (My HR): Sample Active 01 is linked to the user who ran Seed when that login is available.",
-			"Client time accept does not write DTR; client_decision=approve is not claimed by this seed.",
+			"Portal: open /portal/dashboard?token=samplehr{batch} for Sample Client 1 (see paste card).",
+			"Accept portal DTR on HR → Client time inbox; leave rows await client_decision=pending.",
 		},
 	}
 	var batchID int64
@@ -1307,7 +1330,7 @@ func buildSamplePasteCard(ctx context.Context, q interface {
 			Role:  "Client portal",
 			Name:  name,
 			Email: email,
-			URL:   "/app/hr/client-portal?token=" + token,
+			URL:   "/portal/dashboard?token=" + token,
 			Note:  "Paste URL or open Portal access and use the sign-in link.",
 		})
 	}

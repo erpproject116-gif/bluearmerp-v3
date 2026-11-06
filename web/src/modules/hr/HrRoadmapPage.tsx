@@ -330,27 +330,27 @@ export default function HrRoadmapPage() {
               <ul>
                 <li>
                   {t(
-                    "HR staff — Applicants, Jobs, Interviews, Onboarding, and related HR modals.",
-                    "HR staff — Applicants, Jobs, Interviews, Onboarding, at mga kaugnay na HR modal.",
+                    "HR staff — Clients (+ New client), Portal access invite, Manpower request, Employees create, Applicant hire/offer notes, Hire onboarding note, Client billing generate.",
+                    "HR staff — Clients (+ New client), Portal access invite, Manpower request, Employees create, Applicant hire/offer notes, Hire onboarding note, Client billing generate.",
                   )}
                 </li>
                 <li>
                   {t(
-                    "Client / Employer — client portal request and hiring forms.",
-                    "Client / Employer — mga form ng request at hiring sa client portal.",
+                    "Client / Employer — portal DTR, manpower request, and incident forms (not leave Accept/Refuse — those are buttons).",
+                    "Client / Employer — portal DTR, manpower request, at incident forms (hindi leave Accept/Refuse — buttons iyon).",
                   )}
                 </li>
                 <li>
                   {t(
-                    "Employee / Contractor — Apply and ESS / self-service forms.",
-                    "Employee / Contractor — Apply at ESS / self-service forms.",
+                    "Employee / Contractor — Apply and My HR (leave, OT, correction, requests).",
+                    "Employee / Contractor — Apply at My HR (leave, OT, correction, requests).",
                   )}
                 </li>
               </ul>
               <p>
                 {t(
-                  "Turn it on with ?demo=1 on the page URL, or set localStorage.hrDemoFill=1. In local Vite DEV it also shows by default. Look for the amber Fill demo button on Apply, My HR, client portal, Clients, Manpower, and Employees.",
-                  "I-on gamit ang ?demo=1 sa URL, o localStorage.hrDemoFill=1. Sa local Vite DEV, default itong makikita. Hanapin ang amber Fill demo sa Apply, My HR, client portal, Clients, Manpower, at Employees.",
+                  "Turn it on with ?demo=1 on the page URL, or set localStorage.hrDemoFill=1. In local Vite DEV it also shows by default. Look for the amber Fill demo button inside the form (not a page-level toolbar only).",
+                  "I-on gamit ang ?demo=1 sa URL, o localStorage.hrDemoFill=1. Sa local Vite DEV, default itong makikita. Hanapin ang amber Fill demo sa loob ng form.",
                 )}
               </p>
               <p>

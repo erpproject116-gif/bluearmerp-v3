@@ -147,7 +147,7 @@ export default function ClientsPage() {
       return toast.warning("Choose a sales customer.");
     if (source() === "new" && !name().trim())
       return toast.warning("Enter a client name.");
-    const res = await apiFetch("/api/v1/hr/clients", {
+    const res = await apiFetch<{ id: number }>("/api/v1/hr/clients", {
       method: "POST",
       body: JSON.stringify({
         partner_id: source() === "existing" ? Number(partnerId()) : 0,
@@ -159,6 +159,7 @@ export default function ClientsPage() {
     });
     if (!res.success)
       return toast.warning(res.message ?? "Could not save the client.");
+    const newId = res.data?.id;
     setSiteName("");
     setName("");
     setEmpId(null);
@@ -166,6 +167,14 @@ export default function ClientsPage() {
     setModalOpen(false);
     void refetch();
     toast.success("Client saved.");
+    if (newId) {
+      const invite = window.confirm(
+        "Invite a client portal user now? HR staff provision portal access (not the tenant owner).",
+      );
+      if (invite) {
+        window.location.href = `/app/hr/clients/portal-access?clientId=${newId}`;
+      }
+    }
   };
 
   const addSiteToClient = async () => {
@@ -342,9 +351,12 @@ export default function ClientsPage() {
                             </button>
                             <A
                               class="menu-item"
-                              href="/app/hr/clients/portal-access"
+                              href={`/app/hr/clients/portal-access?clientId=${row.id}`}
                             >
-                              Client Rep users
+                              Invite portal user
+                            </A>
+                            <A class="menu-item" href="/app/hr/clients/portal-access">
+                              Portal access list
                             </A>
                           </div>
                         </details>

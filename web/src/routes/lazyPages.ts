@@ -259,6 +259,7 @@ export const HrContractsPage = lazy(() => import("../modules/hr/ContractsPage"))
 export const ManpowerRequestsPage = lazy(() => import("../modules/hr/ManpowerRequestsPage"));
 export const ClientDtrPage = lazy(() => import("../modules/hr/ClientDtrPage"));
 export const ClientBillingPage = lazy(() => import("../modules/hr/ClientBillingPage"));
+export const ClientTimeInboxPage = lazy(() => import("../modules/hr/ClientTimeInboxPage"));
 export const PortalAccessPage = lazy(() => import("../modules/hr/PortalAccessPage"));
 export const OffboardingPage = lazy(() => import("../modules/hr/OffboardingPage"));
 export const CompliancePage = lazy(() => import("../modules/hr/CompliancePage"));
