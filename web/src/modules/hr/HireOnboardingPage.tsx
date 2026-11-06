@@ -6,6 +6,7 @@ import { useToast } from "../../shared/toast";
 import { DemoFillButton } from "./DemoFillButton";
 import { buildHireOnboardingDemoFill } from "./hrDemoFill";
 import { HrLayout } from "./HrLayout";
+import { useManpowerMode } from "./manpowerMode";
 import { HrBadge, HrEmpty, HrPageHead, type HrBadgeTone } from "./HrUi";
 
 type CaseRow = {
@@ -77,6 +78,7 @@ function progressPct(pending: number, overdue: number) {
 export default function HireOnboardingPage() {
   const toast = useToast();
   const qc = useQueryClient();
+  const mode = useManpowerMode();
   const [caseId, setCaseId] = createSignal<number | null>(null);
   const [search, setSearch] = createSignal("");
   const [colFilter, setColFilter] = createSignal("");
@@ -142,18 +144,22 @@ export default function HireOnboardingPage() {
             <A class="hr-btn" href="/app/hr/applicants">
               Applicants ↗
             </A>
-            <A class="hr-btn" href="/app/hr/workforce">
-              Employee board ↗
-            </A>
+            <Show when={mode.enabled()}>
+              <A class="hr-btn" href="/app/hr/workforce">
+                Employee board ↗
+              </A>
+            </Show>
             <A class="hr-btn" href="/app/hr/employees">
               Open 201 file ↗
             </A>
             <A class="hr-btn" href="/app/hr/compliance">
               Compliance documents ↗
             </A>
-            <A class="hr-btn hr-btn-primary" href="/app/hr/deployments">
-              Assign deployment →
-            </A>
+            <Show when={mode.enabled()}>
+              <A class="hr-btn hr-btn-primary" href="/app/hr/deployments">
+                Assign deployment →
+              </A>
+            </Show>
           </div>
         }
       />
@@ -310,9 +316,11 @@ export default function HireOnboardingPage() {
                         Mockup stage gates (equipment / gov’t IDs / orientation) need backend. Use Assign deployment when the
                         checklist is clear.
                       </p>
-                      <A class="hr-btn hr-btn-sm mt-2" href="/app/hr/deployments">
-                        Assign deployment →
-                      </A>
+                      <Show when={mode.enabled()}>
+                        <A class="hr-btn hr-btn-sm mt-2" href="/app/hr/deployments">
+                          Assign deployment →
+                        </A>
+                      </Show>
                     </div>
                   </>
                 )}

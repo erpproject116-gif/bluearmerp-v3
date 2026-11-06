@@ -1,5 +1,6 @@
 import { A, useLocation } from "@solidjs/router";
-import { For } from "solid-js";
+import { createMemo, For } from "solid-js";
+import { isAgencyPath, useManpowerMode } from "./manpowerMode";
 
 const TABS = [
   {
@@ -31,10 +32,14 @@ const TABS = [
 
 export function HrPayrollTabs() {
   const loc = useLocation();
+  const mode = useManpowerMode();
   const path = () => loc.pathname.replace(/\/+$/, "") || "/";
+  const tabs = createMemo(() =>
+    TABS.filter((tab) => mode.enabled() || !isAgencyPath(tab.href)),
+  );
   return (
     <nav class="hr-ptabs" aria-label="Payroll">
-      <For each={[...TABS]}>
+      <For each={tabs()}>
         {(tab) => (
           <A href={tab.href} classList={{ on: tab.match(path()) }} aria-current={tab.match(path()) ? "page" : undefined}>
             {tab.label}

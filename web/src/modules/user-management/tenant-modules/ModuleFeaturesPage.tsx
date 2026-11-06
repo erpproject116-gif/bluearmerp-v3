@@ -39,6 +39,9 @@ function policyCurrentValue(policy: ProcessPolicy | null, field: string): boolea
   return typeof v === "boolean" ? v : null;
 }
 
+const AGENCY_STAFFING_TIP =
+  "Off hides: clients (+ portal-access), contracts, manpower requests, deployments, workforce, client DTR, client time inbox, client billing. Keeps: employees, applicants, attendance overview/entry/setup, leave, cases, requests, evaluations/learning, payroll runs/pay-items/remittances/special-runs, ESS, offboarding, compliance, gov reports, overview, roadmap.";
+
 function AgencyStaffingRow(props: {
   compact?: boolean;
   manpower: boolean | null;
@@ -51,13 +54,12 @@ function AgencyStaffingRow(props: {
     props.manpower === null || !props.canManage || props.manpowerSaving || !props.hrEnabled;
   return (
     <li class="flex items-start justify-between gap-2">
-      <div class="min-w-0">
+      <div class="min-w-0" title={AGENCY_STAFFING_TIP}>
         <p class={props.compact ? "text-sm font-medium text-slate-800" : "text-xs font-medium text-slate-800"}>
-          Agency staffing (manpower)
+          Agency staffing
         </p>
         <p class={props.compact ? "text-xs text-slate-500" : "text-[11px] text-slate-500"}>
-          Clients, contracts, deployments, portal access, client time, and client billing. Shared HR
-          (employees, attendance, leave, payroll, cases, ESS, offboarding, compliance, gov reports) stays available.
+          Clients, contracts, requests, deployments, workforce, client DTR/inbox, billing. Shared HR stays on.
         </p>
         <Show when={!props.hrEnabled}>
           <p class="mt-1 text-[11px] text-amber-700">Turn on HR &amp; Payroll first.</p>
@@ -79,7 +81,7 @@ function AgencyStaffingRow(props: {
             "border-brand-300 text-brand-700": !props.manpower,
           }}
           disabled={disabled()}
-          title={!props.hrEnabled ? "Turn on HR & Payroll first" : undefined}
+          title={!props.hrEnabled ? "Turn on HR & Payroll first" : AGENCY_STAFFING_TIP}
           onClick={() => props.onToggle(!props.manpower)}
         >
           {props.manpowerSaving ? "Saving…" : props.manpower ? "Turn off" : "Turn on"}

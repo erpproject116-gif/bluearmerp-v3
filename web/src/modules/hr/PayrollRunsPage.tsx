@@ -17,6 +17,7 @@ import { exportPayrollRegisterCsv } from "../../shared/hrCsvImport";
 import { apiFetch } from "../../shared/api";
 import { useToast } from "../../shared/toast";
 import { HrLayout } from "./HrLayout";
+import { useManpowerMode } from "./manpowerMode";
 import { HrPayrollTabs } from "./HrPayrollTabs";
 import { HrBadge, HrEmpty, HrNotice, HrPageHead, HrSteps, HrTcard, HrWizardNav, type HrBadgeTone } from "./HrUi";
 import type { Cutoff } from "./attendanceShared";
@@ -47,6 +48,7 @@ const PAY_STEPS = [
 ];
 
 export default function PayrollRunsPage() {
+  const mode = useManpowerMode();
   const toast = useToast();
   const invalidate = useInvalidatePayroll();
   const periods = usePayPeriods();
@@ -268,8 +270,10 @@ export default function PayrollRunsPage() {
               </HrNotice>
               <p class="mt-3 text-sm">
                 <a href="/app/hr/attendance/overview" class="text-brand-700">Open attendance →</a>
-                {" · "}
-                <a href="/app/hr/attendance/client-dtr" class="text-brand-700">Client DTR inbox →</a>
+                <Show when={mode.enabled()}>
+                  {" · "}
+                  <a href="/app/hr/attendance/client-dtr" class="text-brand-700">Client DTR inbox →</a>
+                </Show>
               </p>
               <label class="mt-3 flex items-start gap-2 text-sm">
                 <input type="checkbox" disabled />
